@@ -25,12 +25,19 @@ export class UI {
   bind(farm, icons) {
     this.farm = farm;
     this.icons = icons;
-    for (const img of this.root.querySelectorAll('img[data-icon]')) img.src = icons[img.dataset.icon];
+    this.refreshIcons();
+    farm.onIcons = () => { clearTimeout(this._icT); this._icT = setTimeout(() => this.refreshIcons(), 30); };
     $('#btn-bag').onclick = () => this.bagPanel(farm);
     $('#btn-market').onclick = () => this.marketPanel(farm);
     $('#btn-house').onclick = () => this.housePanel(farm);
     $('#btn-center').onclick = () => { farm.player.worldPos(this._p = this._p || {}); farm.cam.centerOn(this._p.x, this._p.y - 20); };
     $('#energy-pill').onclick = () => this.bagPanel(farm);
+  }
+
+  refreshIcons() {
+    for (const img of this.root.querySelectorAll('img[data-icon]')) img.src = this.icons[img.dataset.icon];
+    const av = this.root.querySelector('.avatar');
+    if (av && this.icons.avatar && !av.querySelector('img')) av.innerHTML = `<img src="${this.icons.avatar}" alt="">`;
   }
 
   ic(name, cls = 'ic') { return `<img class="${cls}" src="${this.icons[name] || ''}" alt="">`; }

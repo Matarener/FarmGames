@@ -46,6 +46,7 @@ button:disabled { cursor: default; }
   display: grid; place-items: center; overflow: hidden;
 }
 .avatar svg { width: 40px; height: 40px; }
+.avatar img { width: 44px; height: 44px; object-fit: contain; }
 .lvl { background: rgba(61,43,31,.72); border-radius: 10px; padding: 4px 8px 6px; color: #fff; min-width: 86px; }
 .lvl-row { display: flex; align-items: center; gap: 4px; }
 .lvl-row b { font-size: 16px; }
@@ -208,6 +209,7 @@ button:disabled { cursor: default; }
   .ic { width: 20px; height: 20px; }
   .avatar { width: 56px; height: 56px; }
   .avatar svg { width: 48px; height: 48px; }
+  .avatar img { width: 54px; height: 54px; }
   .lvl { min-width: 120px; padding: 6px 10px 8px; }
   .wallet { flex-direction: row; }
   .pill { height: 34px; font-size: 15px; padding: 0 12px 0 6px; }

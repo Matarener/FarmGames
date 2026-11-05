@@ -43,6 +43,11 @@ export async function loadArt(onProgress) {
     onProgress && onProgress(++done / list.length);
     A[name] = { canvas: img, w: m.w, h: m.h, ax: m.ax, ay: m.ay, name };
   }));
+  // иконки интерфейса (ic_<имя>.webp); старые, нарисованные кодом, остаются запасными
+  const icons = {};
+  try {
+    for (const n of await (await fetch(BASE + 'icons.json?v=' + V)).json()) icons[n] = BASE + 'ic_' + n + '.webp?v=' + V;
+  } catch (e) { /* без иконок */ }
   const obj = {};
   for (const [type, names] of Object.entries(OBJ)) obj[type] = names.map((n) => A[n]).filter(Boolean);
   const crops = {};
@@ -51,7 +56,7 @@ export async function loadArt(onProgress) {
     if (m) (crops[m[1]] = crops[m[1]] || [])[+m[2]] = A[name];
   }
   return {
-    obj, crops,
+    obj, crops, icons,
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {
       const k = tree && tree.name && tree.name.replace('tree_', '');

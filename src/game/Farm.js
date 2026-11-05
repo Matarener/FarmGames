@@ -29,6 +29,10 @@ export class Farm {
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
       if (a.water.every(Boolean)) { this.S.waterArt = a.water; this.S.water.clear(); }
       for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
+      for (const [k, url] of Object.entries(a.icons)) {
+        const im = new Image(); im.src = url;
+        im.onload = () => { this.icons[k] = url; this.iconImg[k] = im; this.dirty = true; this.onIcons && this.onIcons(k); };
+      }
       this.dirty = true;
     }).catch((e) => console.warn('art', e));
   }

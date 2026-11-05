@@ -43,6 +43,58 @@ TILE_SHEETS = [('tiles', ['tile_grass', 'tile_flowers', 'tile_soil', 'tile_sand'
                ('tiles_path', ['tile_cobble', 'tile_planks', 'tile_sand2', 'tile_soil_wet'])]
 
 
+# Иконки интерфейса: листы на тёмном фоне со свечением (не прозрачные) — фон срезаем по контуру.
+ICON_SHEETS = {
+    'ui_res': ['coin', 'gem', 'energy', 'star', 'wood', 'stone', 'ore', 'water'],
+    'ui_btn': ['bag', 'market', 'house', 'center', 'walk', 'dig', 'seed', 'lock'],
+    'ui_crops': ['carrot', 'wheat', 'beet', 'cabbage', 'tomato', 'corn', 'sunflower', 'pumpkin', 'strawberry', 'cotton'],
+    'ui_avatar': ['avatar'],
+}
+ICON_PX = 128
+
+
+def cut_dark_bg(a):
+    """Маска объектов на гладком тёмном фоне: фон — всё, что связано с краем листа без резких перепадов."""
+    rgb = ndimage.gaussian_filter(a[..., :3].astype(float), (1, 1, 0))
+    g = sum(np.hypot(ndimage.sobel(rgb[..., c], 0), ndimage.sobel(rgb[..., c], 1)) for c in range(3))
+    lab, k = ndimage.label(~ndimage.binary_dilation(g > 120))
+    border = set(np.unique(np.r_[lab[0], lab[-1], lab[:, 0], lab[:, -1]])) - {0}
+    bg = np.isin(lab, list(border))
+    # фон, запертый внутри (кольцо прицела, дужка замка): большой гладкий кусок цвета фона
+    bgc = ndimage.gaussian_filter(np.where(bg[..., None], rgb, 0), (40, 40, 0)) / \
+        np.maximum(ndimage.gaussian_filter(bg.astype(float), 40), 1e-3)[..., None]
+    idx = np.arange(1, k + 1)
+    size = ndimage.sum(np.ones(lab.shape), lab, idx)
+    diff = sum(np.abs(ndimage.mean(rgb[..., c], lab, idx) - ndimage.mean(bgc[..., c], lab, idx)) for c in range(3))
+    enclosed = [i for i in idx[(size > 5000) & (diff < 40)] if i not in border]
+    bg |= np.isin(lab, enclosed)
+    obj = ndimage.binary_opening(~bg, iterations=2)
+    lab, k = ndimage.label(obj)
+    sizes = ndimage.sum(obj, lab, range(1, k + 1))
+    return np.isin(lab, np.where(sizes > 1500)[0] + 1)
+
+
+def icons():
+    names = []
+    for sheet, items in ICON_SHEETS.items():
+        a = np.array(Image.open(os.path.join(SRC, sheet + '.png')).convert('RGBA'))
+        a[..., 3] = np.where(cut_dark_bg(a), 255, 0)
+        boxes, lab = components(a, len(items))
+        for (y0, y1, x0, x1, i), name in zip(boxes, items):
+            c = a[y0:y1, x0:x1].copy()
+            c[lab[y0:y1, x0:x1] != i, 3] = 0
+            img = Image.fromarray(c)
+            k = ICON_PX / max(img.size)
+            img = img.resize((max(1, round(img.width * k)), max(1, round(img.height * k))), Image.LANCZOS)
+            sq = Image.new('RGBA', (ICON_PX, ICON_PX))
+            sq.paste(img, ((ICON_PX - img.width) // 2, (ICON_PX - img.height) // 2))
+            sq.save(os.path.join(OUT, 'ic_' + name + '.webp'), 'WEBP', quality=90, method=6)
+            names.append(name)
+            print(f'ic_{name}')
+    with open(os.path.join(OUT, 'icons.json'), 'w') as f:
+        json.dump(names, f)
+
+
 def load(name):
     a = np.array(Image.open(os.path.join(SRC, name + '.png')).convert('RGBA'))
     al = a[..., 3].astype(np.float32)
@@ -160,6 +212,7 @@ def main():
 
     with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
         json.dump(man, f, indent=1)
+    icons()
 
 
 if __name__ == '__main__':
