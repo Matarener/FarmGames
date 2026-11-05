@@ -242,7 +242,6 @@ export class Farm {
       this.ui.levelUp(st.level, opened, st.level * 10);
       this.sfx('level');
       this.player.celebrate();
-      this.tg.haptic('success');
     }
   }
 
@@ -390,7 +389,6 @@ export class Farm {
     this.quests.emit('expand');
     this.sfx('unlock');
     this.addXp(10);
-    this.tg.haptic('success');
     this.changed();
   }
 
@@ -406,7 +404,6 @@ export class Farm {
     this.addXp(20);
     this.sfx('unlock');
     this.player.celebrate();
-    this.tg.haptic('success');
     this.changed();
     return true;
   }
@@ -419,7 +416,6 @@ export class Farm {
     this.st.coins += n * GOODS[key].sell;
     this.quests.emit('sell', key, n);
     this.sfx('coin');
-    this.tg.haptic('light');
     this.changed();
   }
 
@@ -430,17 +426,15 @@ export class Farm {
     this.st.crops[key]--;
     this.st.energy = Math.min(this.maxEnergy, this.st.energy + c.food);
     this.sfx('eat');
-    this.tg.haptic('light');
     this.changed();
   }
 
   queue(a) {
     if (!this.player.enqueue(a)) { this.toast('Очередь заполнена'); return; }
     this.sfx('tap');
-    this.tg.haptic('select');
   }
 
-  toast(msg, kind) { this.ui.toast(msg, kind); if (kind === 'warn') { this.tg.haptic('warning'); this.sfx('error'); } }
+  toast(msg, kind) { this.ui.toast(msg, kind); if (kind === 'warn') this.sfx('error'); }
 
   sfx(name) { if (this.audio) this.audio.play(name); }
 
@@ -508,7 +502,6 @@ export class Farm {
         const hy = o.type === 'stump' || o.type === 'rock' || o.type === 'bush' || o.type === 'berry' ? 8 : o.type === 'boulder' ? 20 : 26;
         this.burst(o.wx, o.wy - hy, a.kind === 'chop' ? '#b07a45' : '#b8bec3', 6);
         if (a.kind === 'chop' && o.type !== 'stump') this.burst(o.wx, o.wy - 60, '#5aa83a', 4, true);
-        this.tg.haptic('light');
         if (o.hp <= 0) { this.destroy(o); this.changed(); return false; }
         this.ui.update(this);
         return st.energy >= 1;
@@ -568,7 +561,6 @@ export class Farm {
         this.quests.emit('fish', fish.key);
         this.sfx('catch');
         this.addXp(fish.xp);
-        this.tg.haptic(fish.key === 'fish_gold' ? 'success' : 'medium');
         this.changed();
         return false;
       }
@@ -584,7 +576,6 @@ export class Farm {
         this.quests.emit('harvest', c.key);
         this.sfx('harvest');
         this.addXp(c.xp);
-        this.tg.haptic('medium');
         this.changed();
         return false;
       }
@@ -617,7 +608,6 @@ export class Farm {
     this.sfx('break');
     if (def.stump) { o.was = o.type; o.type = 'stump'; o.hp = OBJECTS.stump.hp; this.world.version++; }
     else this.world.remove(o);
-    this.tg.haptic('medium');
   }
 
   // ---------------- Эффекты ----------------

@@ -141,7 +141,6 @@ export class Quests {
   completed() {
     this.st.told = true;
     this.farm.ui.questDone(this.current);
-    this.farm.tg.haptic('success');
     this.farm.sfx('quest');
   }
 

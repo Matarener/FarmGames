@@ -15,10 +15,8 @@ import { Audio } from './engine/Audio.js';
 async function main() {
   const tg = new TelegramBridge();
   tg.init();
-  // звук и вибрация (настройки в окне «Настройки»)
+  // звук (настройки в окне «Настройки»)
   const audio = new Audio();
-  const haptic = tg.haptic.bind(tg);
-  tg.haptic = (k) => { if (audio.s.vibro) haptic(k); };
   audio.setTheme('menu');
   const unlock = () => audio.unlock();
   window.addEventListener('pointerdown', unlock, true);

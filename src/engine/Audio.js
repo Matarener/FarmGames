@@ -21,7 +21,7 @@ const THEMES = {
 export class Audio {
   constructor() {
     this.ctx = null;
-    this.s = { music: 0.55, sfx: 0.7, muted: false, vibro: true };
+    this.s = { music: 0.55, sfx: 0.7, muted: false };
     try { Object.assign(this.s, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch (e) { /* */ }
     this.theme = 'menu';
     this.step = 0; this.nextT = 0; this.bar = 0;
