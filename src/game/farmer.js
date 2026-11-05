@@ -119,6 +119,45 @@ function parts() {
   return P;
 }
 
+// Части тела художника (второй лист): голова, туловище, рука, бедро, голень.
+// Возвращает размеры костей под эти части или null, если частей нет.
+// У туловищ на листе нарисованы руки по бокам — их срезаем (fx0..fx1),
+// руки рисуются отдельными костями поверх.
+function artParts(P, A) {
+  const need = ['head_34', 'torso_34', 'arm_4', 'thigh_1', 'leg_1'];
+  if (!need.every((n) => A[n])) return null;
+  const part = (src, fx0, fy0, fx1, fy1, w, axF, ayF, shade = 0) => {
+    const img = src.img;
+    let c = cropImage(img, fx0, fy0, fx1, fy1);
+    if (shade) {
+      const g = c.getContext('2d');
+      g.globalCompositeOperation = 'source-atop';
+      g.fillStyle = `rgba(20,30,60,${shade})`; g.fillRect(0, 0, c.width, c.height);
+    }
+    const h = w * c.height / c.width;
+    return { canvas: c, w, h, ax: w * axF, ay: h * ayF };
+  };
+  const TX0 = 0.16, TX1 = 0.84, TW = 14 * (TX1 - TX0);
+  P.head = part(A.head_34, 0, 0, 1, 1, 17, 0.5, 0.93);
+  P.torso = part(A.torso_34, TX0, 0, TX1, 1, TW, 0.5, 0.8);
+  P.torsoBack = A.torso_back ? part(A.torso_back, TX0, 0, TX1, 1, TW, 0.5, 0.8) : P.torso;
+  if (A.farmer_back) P.headBack = part(A.farmer_back, 0.04, 0, 0.96, 0.3, 17, 0.5, 0.95);
+  // рука: рукав (плечо) и предплечье с кистью — две половины одного рисунка
+  const AW = 7;
+  P.upperArm = part(A.arm_4, 0, 0, 1, 0.5, AW, 0.5, 0.12);
+  P.upperArmFar = part(A.arm_4, 0, 0, 1, 0.5, AW, 0.5, 0.12, 0.22);
+  P.foreArm = part(A.arm_4, 0.08, 0.36, 0.92, 1, AW * 0.84, 0.5, 0.06);
+  P.foreArmFar = part(A.arm_4, 0.08, 0.36, 0.92, 1, AW * 0.84, 0.5, 0.06, 0.22);
+  // у штанины снизу и у голени сверху нарисованы колени — срезаем, чтобы не торчали
+  P.thigh = part(A.thigh_1, 0, 0, 1, 0.84, 6.6, 0.5, 0.08);
+  P.thighFar = part(A.thigh_1, 0, 0, 1, 0.84, 6.6, 0.5, 0.08, 0.22);
+  P.shin = part(A.leg_1, 0, 0.14, 1, 1, 6.2, 0.5, 0.04);
+  P.shinFar = part(A.leg_1, 0, 0.14, 1, 1, 6.2, 0.5, 0.04, 0.22);
+  return {
+    hip: -15.4, head: -16.2, shoulderY: -14.2, shoulderX: 3.6, fore: 4.6, hipX: 2.2, knee: 6.2,
+  };
+}
+
 // Голова из кадров художника: 3/4 (отражаем, чтобы смотрел вправо) и вид сзади.
 function artHeads(P, A) {
   const head = (img, flip, neckX) => {
@@ -132,21 +171,24 @@ function artHeads(P, A) {
 
 export function makeFarmerData(A = {}) {
   const P = parts();
-  artHeads(P, A);
+  // размеры костей: под части художника или под процедурные
+  const K = artParts(P, A) || (artHeads(P, A), {
+    hip: -12.6, head: -12, shoulderY: -10.5, shoulderX: 2.6, fore: 6.4, hipX: 2.3, knee: 6.3,
+  });
   const att = (sprite, x = 0, y = 0, rotation = 0) => ({ sprite, x, y, rotation });
   const bones = [
     { name: 'root' },
-    { name: 'hip', parent: 'root', y: -12.6 },
+    { name: 'hip', parent: 'root', y: K.hip },
     { name: 'torso', parent: 'hip' },
-    { name: 'head', parent: 'torso', y: -12 },
-    { name: 'armB', parent: 'torso', x: 2.8, y: -10.6 },
-    { name: 'foreB', parent: 'armB', y: 6.4 },
-    { name: 'armF', parent: 'torso', x: -2.4, y: -10.4 },
-    { name: 'foreF', parent: 'armF', y: 6.4 },
-    { name: 'thighB', parent: 'hip', x: 2.3, y: -0.6 },
-    { name: 'shinB', parent: 'thighB', y: 6.3 },
-    { name: 'thighF', parent: 'hip', x: -2.3, y: -0.6 },
-    { name: 'shinF', parent: 'thighF', y: 6.3 },
+    { name: 'head', parent: 'torso', y: K.head },
+    { name: 'armB', parent: 'torso', x: K.shoulderX, y: K.shoulderY },
+    { name: 'foreB', parent: 'armB', y: K.fore },
+    { name: 'armF', parent: 'torso', x: -K.shoulderX, y: K.shoulderY },
+    { name: 'foreF', parent: 'armF', y: K.fore },
+    { name: 'thighB', parent: 'hip', x: K.hipX, y: -0.6 },
+    { name: 'shinB', parent: 'thighB', y: K.knee },
+    { name: 'thighF', parent: 'hip', x: -K.hipX, y: -0.6 },
+    { name: 'shinF', parent: 'thighF', y: K.knee },
   ];
   const slots = [
     { name: 'armB', bone: 'armB', attachment: 'arm' },

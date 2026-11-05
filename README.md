@@ -67,10 +67,10 @@ docs/GDD.md               геймдизайн-документ
 - Скелет фермера: 12 костей, на кадр одна матрица на часть тела.
 
 ### Графика
-Спрайты художника лежат в `assets/sprites/*.webp`. Они нарезаны из листа `assets/source/sprites.png` скриптом:
+Спрайты художника лежат в `assets/sprites/*.webp`. Они нарезаны из листов `assets/source/sprites2.png` (основной, фон-«шахматка») и `assets/source/sprites.png` (из него только значки, сарай 1-го уровня и то, чего нет во втором). Фермер собирается в скелет из отдельных частей второго листа (голова, туловище, рука, штанина, голень с ботинком), см. `farmer.js → artParts()`. Нарезка:
 
 ```
-cd tools/upscale && npm install && npm run upscale && cd ../..
+cd tools/upscale && npm install && node upscale.js ../../assets/source/sprites.png ../../assets/source/sprites@4x.png && node upscale.js ../../assets/source/sprites2.png ../../assets/source/sprites2@4x.png && cd ../..
 pip install pillow numpy scipy
 python tools/slice_sprites.py
 ```

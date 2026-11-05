@@ -10,7 +10,7 @@ export const SPRITE_DIR = 'assets/sprites/';
 const EXT = '.webp' + (typeof __ASSET_V__ !== 'undefined' ? '?v=' + __ASSET_V__ : '');
 
 export const DEFS = {
-  tree_oak: { w: 86, ay: 0.93 }, tree_oak2: { w: 84, ay: 0.93 }, tree_apple: { w: 88, ay: 0.93 }, tree_pine: { w: 64, ay: 0.96 },
+  tree_oak: { w: 86, ay: 0.93 }, tree_oak2: { w: 84, ay: 0.93 }, tree_apple: { w: 88, ay: 0.93 }, tree_pine: { w: 64, ay: 0.96 }, tree_sakura: { w: 88, ay: 0.93 },
   stump: { w: 40, ay: 0.8 }, stump2: { w: 38, ay: 0.8 },
   rock_small: { w: 42, ay: 0.78 }, rock_small2: { w: 44, ay: 0.78 }, rock_big: { w: 112, ay: 0.74 },
   bush: { w: 44, ay: 0.86 }, bush_yellow: { w: 36, ay: 0.86 },
@@ -19,12 +19,15 @@ export const DEFS = {
   mailbox: { w: 22, ay: 0.92 }, barrel: { w: 24, ay: 0.88 }, lantern: { w: 16, ay: 0.95 },
   planter_white: { w: 30, ay: 0.9 }, pot_tulips: { w: 24, ay: 0.9 }, signpost: { w: 26, ay: 0.95 },
   haystack: { w: 48, ay: 0.85 }, sack: { w: 22, ay: 0.9 }, bench: { w: 40, ay: 0.8 },
-  flowers_white: { w: 30, ay: 0.8 }, flowers_pink: { w: 24, ay: 0.8 }, flowers_purple: { w: 22, ay: 0.8 }, flowers_yellow: { w: 20, ay: 0.8 },
+  flowers_white: { w: 20, ay: 0.8 }, flowers_pink: { w: 24, ay: 0.8 }, flowers_purple: { w: 22, ay: 0.8 }, flowers_yellow: { w: 20, ay: 0.8 },
   grass_tuft: { w: 14, ay: 0.85 }, grass_tall: { w: 22, ay: 0.85 }, grass_reed: { w: 18, ay: 0.85 },
   sprout_1: { w: 16, ay: 0.7 }, sprout_3: { w: 22, ay: 0.7 },
   crop_wheat: { w: 24 }, crop_corn: { w: 22 }, crop_tomato: { w: 20 }, crop_carrot: { w: 16 }, crop_beet: { w: 20 },
   crop_cabbage: { w: 26 }, crop_pumpkin: { w: 30 }, crop_strawberry: { w: 22 }, crop_sunflower: { w: 26 }, crop_cotton: { w: 22 },
   boy_side: { w: 24 }, boy_back: { w: 24 },
+  // части фермера для скелета (второй лист)
+  head_34: { w: 17 }, farmer_back: { w: 17 }, torso_34: { w: 14 }, torso_back: { w: 14 },
+  arm_4: { w: 7 }, thigh_1: { w: 6.6 }, leg_1: { w: 6.2 },
   tex_soil: { w: 64 }, tex_water: { w: 64 }, tex_sand: { w: 64 }, tex_stone: { w: 64 },
 };
 

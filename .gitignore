@@ -4,4 +4,4 @@ Thumbs.db
 *.log
 .history/
 tools/upscale/node_modules
-assets/source/sprites@4x.png
+assets/source/*@4x.png
