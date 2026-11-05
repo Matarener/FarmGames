@@ -3,18 +3,23 @@
 // Квадрат рисуется один раз и дальше только переносится на экран: прокрутка и зум ничего
 // не перерисовывают. Квадрат обновляется, только если на нём что-то изменилось.
 // Уровень берётся ближайший не мельче экрана — картинка только уменьшается, без размытия.
+// Квадраты лежат в нескольких больших холстах-атласах (8×8 квадратов в каждом): сотни
+// отдельных маленьких холстов видеокарта держит плохо — кадр тормозит и мигает.
 import { makeCanvas } from '../engine/Sprite.js';
 
 export const TILE = 256;
+const SLOT = TILE + 2, PER = 8; // ячейка атласа с пикселем запаса по краям; 8×8 ячеек
 const levelOf = (va) => Math.ceil(2 * Math.log2(va) - 1e-6);
 const scaleOf = (L) => Math.pow(2, L / 2);
 
 export class MapTiles {
-  constructor(farm, maxTiles) {
+  constructor(farm, atlases) {
     this.f = farm;
-    this.max = maxTiles;
+    this.atlases = atlases;
+    this.max = atlases * PER * PER;
     this.map = new Map(); // "L|i|j" → квадрат
-    this.pool = [];
+    this.pool = []; // свободные ячейки атласов
+    this.made = 0;
     this.frame = 0;
     this.key = '';
     this.pending = false; // на экране есть недостроенные квадраты
@@ -28,28 +33,61 @@ export class MapTiles {
   }
 
   build(t) {
-    const g = t.c.getContext('2d');
-    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = this.f.r.ctx.imageSmoothingQuality;
+    const g = this.open(t);
     const [x0, y0, x1, y1] = this.rect(t);
-    g.setTransform(t.s, 0, 0, t.s, -t.i * TILE + 1, -t.j * TILE + 1);
+    g.setTransform(t.s, 0, 0, t.s, t.sl.x - t.i * TILE + 1, t.sl.y - t.j * TILE + 1);
     this.f.drawScene(g, x0, y0, x1, y1, null);
+    g.restore();
     t.dirty = false; t.patch = null;
     this.built++;
     this.f.stats.layers++;
+  }
+
+  slot() {
+    if (this.pool.length) return this.pool.pop();
+    if (this.made < this.max) {
+      const n = this.made++, a = (n / (PER * PER)) | 0;
+      if (!this.canv) this.canv = [];
+      if (!this.canv[a]) this.canv[a] = makeCanvas(SLOT * PER, SLOT * PER);
+      const q = n % (PER * PER);
+      return { c: this.canv[a], x: (q % PER) * SLOT, y: ((q / PER) | 0) * SLOT };
+    }
+    return null;
   }
 
   get(L, i, j, make) {
     const k = L + '|' + i + '|' + j;
     let t = this.map.get(k);
     if (!t && make) {
-      const c = this.pool.pop() || makeCanvas(TILE + 2, TILE + 2);
-      t = { k, L, i, j, s: scaleOf(L), c, dirty: true, used: 0 };
+      let sl = this.slot();
+      if (!sl) { this.evictOne(); sl = this.slot(); }
+      if (!sl) return null;
+      t = { k, L, i, j, s: scaleOf(L), sl, dirty: true, used: 0 };
       this.map.set(k, t);
     }
     return t;
   }
 
-  drop(t) { this.map.delete(t.k); this.pool.push(t.c); }
+  drop(t) { this.map.delete(t.k); this.pool.push(t.sl); }
+
+  // освободить ячейку: самый давно не нужный квадрат (не с этого кадра)
+  evictOne() {
+    let old = null;
+    for (const t of this.map.values()) if (t.used !== this.frame && (!old || t.used < old.used)) old = t;
+    if (old) this.drop(old);
+  }
+
+  // контекст атласа, обрезанный по ячейке квадрата; s — масштаб, ox/oy — сдвиг мира
+  open(t) {
+    const g = t.sl.c.getContext('2d');
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = this.f.r.ctx.imageSmoothingQuality;
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.beginPath(); g.rect(t.sl.x, t.sl.y, SLOT, SLOT); g.clip();
+    return g;
+  }
+
+  blit(ctx, t) { ctx.drawImage(t.sl.c, t.sl.x, t.sl.y, SLOT, SLOT, t.i * TILE - 1, t.j * TILE - 1, SLOT, SLOT); }
 
   // всё перерисовать (новые картинки, открыт участок): видимое — сразу, остальное — выкинуть
   invalidateAll() { for (const t of this.map.values()) t.dirty = true; }
@@ -68,10 +106,9 @@ export class MapTiles {
   }
 
   patch(t) {
-    const g = t.c.getContext('2d'), P = t.patch, s = t.s, ox = -t.i * TILE + 1, oy = -t.j * TILE + 1;
+    const g = this.open(t), P = t.patch, s = t.s, ox = t.sl.x - t.i * TILE + 1, oy = t.sl.y - t.j * TILE + 1;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     g.save();
-    g.setTransform(1, 0, 0, 1, 0, 0);
     g.beginPath();
     for (let n = 0; n < P.length; n += 4) {
       // по целым пикселям квадрата: без полупрозрачной кромки
@@ -83,7 +120,7 @@ export class MapTiles {
     g.clip();
     g.setTransform(s, 0, 0, s, ox, oy);
     this.f.drawScene(g, x0, y0, x1, y1, null);
-    g.restore();
+    g.restore(); g.restore();
     t.patch = null;
     this.f.stats.parts++;
   }
@@ -111,6 +148,7 @@ export class MapTiles {
     for (let n = 0; n < miss.length; n += 2) {
       if (!warm && n > 0 && performance.now() - t0 > budget) { left = miss.length - n; break; }
       const t = this.get(L, miss[n], miss[n + 1], true);
+      if (!t) { left = miss.length - n; break; }
       this.build(t); t.used = fr;
     }
     this.pending = left > 0;
@@ -124,7 +162,7 @@ export class MapTiles {
     ctx.setTransform(k, 0, 0, k, r.ve, r.vf);
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const t = this.get(L, i, j, false);
-      if (t && !t.dirty) ctx.drawImage(t.c, i * TILE - 1, j * TILE - 1);
+      if (t && !t.dirty) this.blit(ctx, t);
     }
     // 4) запас на время простоя: соседние квадраты (для прокрутки) и уровень мельче (для зума)
     if (!left) this.prefetch(L, i0, j0, i1, j1, t0, budget, fr, warm);
@@ -144,7 +182,7 @@ export class MapTiles {
       if (!ok) continue;
       const k2 = r.va / s2;
       ctx.setTransform(k2, 0, 0, k2, r.ve, r.vf);
-      for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) { const t = this.get(L2, a, b, false); t.used = fr; ctx.drawImage(t.c, a * TILE - 1, b * TILE - 1); }
+      for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) { const t = this.get(L2, a, b, false); t.used = fr; this.blit(ctx, t); }
       return;
     }
   }
@@ -166,8 +204,10 @@ export class MapTiles {
       const t = this.get(jobs[n], jobs[n + 1], jobs[n + 2], false);
       if (t && !t.dirty && !t.patch) { t.used = fr; continue; }
       if (!warm && performance.now() - t0 > budget * 0.5) return;
-      if (this.map.size >= this.max && !t) return;
+      // запас — только в свободные ячейки, ради него ничего не выкидываем
+      if (!t && !this.pool.length && this.made >= this.max) return;
       const nt = t || this.get(jobs[n], jobs[n + 1], jobs[n + 2], true);
+      if (!nt) return;
       this.build(nt); nt.used = fr;
     }
   }
@@ -175,8 +215,5 @@ export class MapTiles {
   evict(fr) {
     // выкидываем изменившиеся квадраты вне экрана и самые давно не нужные сверх лимита
     for (const t of this.map.values()) if ((t.dirty || t.patch) && t.used !== fr) this.drop(t);
-    if (this.map.size <= this.max) return;
-    const old = [...this.map.values()].filter((t) => t.used !== fr).sort((a, b) => a.used - b.used);
-    for (let n = 0; n < old.length && this.map.size > this.max; n++) this.drop(old[n]);
   }
 }

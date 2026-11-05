@@ -5,7 +5,7 @@ export class Renderer {
   constructor(canvas, perf) {
     this.canvas = canvas;
     this.perf = perf;
-    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+    this.ctx = canvas.getContext('2d', { alpha: false });
     this.cssW = 1; this.cssH = 1; this.scale = 1;
     // Матрица вида: экран = мир * va + (ve, vf)
     this.va = 1; this.ve = 0; this.vf = 0;

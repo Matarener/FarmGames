@@ -997,7 +997,7 @@ export class Farm {
     r.begin(this.cam, null);
 
     // Карта из готовых квадратов: перерисовываются только квадраты, где что-то изменилось
-    const T = this.tiles || (this.tiles = new MapTiles(this, this.perf.tier === 'low' ? 90 : this.perf.tier === 'mid' ? 150 : 220));
+    const T = this.tiles || (this.tiles = new MapTiles(this, this.perf.tier === 'low' ? 1 : this.perf.tier === 'mid' ? 2 : 3));
     const key = `${this.groundV}|${w.unlockedCount()}`;
     if (T.key !== key) { T.key = key; T.invalidateAll(); this.gDirty.length = 0; this.oDirty.length = 0; this.diffScene(); }
     else this.diffScene();
