@@ -96,12 +96,23 @@ async function main() {
   setTimeout(() => { document.getElementById('loading').classList.add('hide'); if (!ui.panelOpen) audio.setTheme('farm'); }, 150);
   // начало истории: новое задание показываем сразу
   if (farm.quests.current && !farm.quests.st.seen) setTimeout(() => ui.questPanel(farm), 700);
-  if (new URLSearchParams(location.search).has('debug')) {
-    const d = document.createElement('div');
-    d.className = 'debug';
-    document.body.appendChild(d);
-    setInterval(() => { d.textContent = `${perf.fps.toFixed(0)} fps · ${perf.tier} · x${perf.renderScale}`; }, 500);
-  }
+  // Счётчик FPS и времени кадра: включается в настройках (или ?debug в адресе)
+  let fpsEl = null, fpsTimer = 0;
+  const debug = new URLSearchParams(location.search).has('debug');
+  const showFps = (on) => {
+    if (!on) { if (fpsEl) fpsEl.remove(); fpsEl = null; clearInterval(fpsTimer); return; }
+    if (fpsEl) return;
+    fpsEl = document.createElement('div');
+    fpsEl.className = 'debug';
+    document.body.appendChild(fpsEl);
+    const paint = () => {
+      fpsEl.textContent = `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
+        (debug ? ` · ${perf.tier} · x${perf.renderScale}` : '');
+    };
+    paint(); fpsTimer = setInterval(paint, 500);
+  };
+  perf.onShowFps = showFps;
+  showFps(perf.showFps || debug);
   window.__farm = farm;
 }
 
