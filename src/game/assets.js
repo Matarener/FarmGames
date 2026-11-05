@@ -29,7 +29,7 @@ export const DEFS = {
   boy_side: { w: 24 }, boy_back: { w: 24 },
   // части фермера для скелета (второй лист)
   head_34: { w: 17 }, farmer_back: { w: 17 }, torso_34: { w: 14 }, torso_back: { w: 14 },
-  arm_4: { w: 7 }, thigh_1: { w: 6.6 }, leg_1: { w: 6.2 },
+  arm_4: { w: 7 }, hand_1: { w: 4.2 }, thigh_1: { w: 6.6 }, leg_1: { w: 6.2 },
   tex_soil: { w: 64 }, tex_water: { w: 64 }, tex_sand: { w: 64 }, tex_stone: { w: 64 },
 };
 
