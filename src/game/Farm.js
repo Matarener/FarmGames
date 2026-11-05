@@ -277,6 +277,8 @@ export class Farm {
     if (w.occ[w.idx(x, y)] >= 0) return;
     const items = [{ icon: 'walk', label: 'Идти сюда', onClick: () => this.queue({ kind: 'walk', x, y }) }];
     if (t === T.GRASS) items.push({ icon: 'dig', label: 'Вскопать грядку', sub: `⚡ ${ENERGY.dig}`, onClick: () => this.queue({ kind: 'dig', x, y }) });
+    // одно действие (например, дорожка: только «идти») — выполняем сразу, без меню
+    if (items.length === 1) { this.ui.closePopup(); return items[0].onClick(); }
     this.ui.popup(sx, sy, { items });
   }
 
