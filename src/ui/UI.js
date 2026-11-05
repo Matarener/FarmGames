@@ -5,6 +5,7 @@
 import { CROPS, GOODS, HOUSE, xpToNext, houseNeedChunks } from '../game/data.js';
 import { fmtTime } from '../game/Farm.js';
 import { QUEST_END } from '../game/quests.js';
+import { MUSIC } from '../engine/Audio.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -222,7 +223,7 @@ export class UI {
         row.appendChild(inp);
         body.appendChild(row);
       };
-      slider('music', 'Музыка');
+      if (MUSIC) slider('music', 'Музыка');
       slider('sfx', 'Звуки');
       const toggle = (label, on, set) => {
         const row = h('div', 'set-row tog', `<span>${label}</span>`);

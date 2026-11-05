@@ -2,6 +2,8 @@
 // Ничего не скачивается, музыка генерируется по нотам (каждый круг немного другой).
 
 const SETTINGS_KEY = 'farm.audio.v1';
+// Музыка пока выключена (просьба Марка). Вернуть: true, и ползунок «Музыка» появится в настройках.
+export const MUSIC = false;
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
 // Музыкальные темы: аккорды (MIDI), темп, барабаны
@@ -50,9 +52,11 @@ export class Audio {
     this.sfxBus = c.createGain(); this.sfxBus.connect(this.master);
     this.noise = this.makeNoise();
     this.applyVolume();
-    this.startVinyl();
-    this.nextT = c.currentTime + 0.1;
-    this._timer = setInterval(() => this.schedule(), 90);
+    if (MUSIC) {
+      this.startVinyl();
+      this.nextT = c.currentTime + 0.1;
+      this._timer = setInterval(() => this.schedule(), 90);
+    }
   }
 
   applyVolume() {

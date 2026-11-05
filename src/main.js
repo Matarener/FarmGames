@@ -40,6 +40,7 @@ async function main() {
   const fitZoom = () => {
     // mobile-first: на телефоне ~6.5 клеток по ширине, на больших экранах — крупнее, но не огромно
     const w = renderer.cssW, hgt = renderer.cssH;
+    if (w > hgt && hgt < 500) return Math.min(1.7, Math.max(0.8, Math.min(w / (64 * 10), hgt / (32 * 8)))); // горизонтальный телефон
     return Math.min(1.7, Math.max(0.8, Math.min(w / (64 * 6.5), hgt / (32 * 13))));
   };
   const resize = () => {
@@ -49,7 +50,12 @@ async function main() {
     const big = Math.min(renderer.cssW, renderer.cssH) > 600;
     camera.minZoom = big ? 0.6 : 0.5;
     camera.maxZoom = 2.6;
+    // телефон повернули: подбираем масштаб под новую форму экрана
+    const land = renderer.cssW > renderer.cssH;
+    if (lastLand !== null && land !== lastLand) camera.zoom = fitZoom();
+    lastLand = land;
   };
+  let lastLand = null;
   perf.onScaleChange = () => renderer.resize();
 
   const input = new Input(canvas, {
