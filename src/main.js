@@ -22,7 +22,11 @@ async function main() {
   const camera = new Camera();
   const ui = new UI(document.getElementById('app'));
   const save = new Save(tg);
+  const fill = document.getElementById('ld-fill'), ltext = document.getElementById('ld-text');
+  const progress = (k) => { fill.style.width = Math.round(k * 100) + '%'; ltext.textContent = k < 1 ? `Загрузка… ${Math.round(k * 100)}%` : 'Готово!'; };
+  progress(0.05);
   const farm = new Farm({ renderer, camera, ui, tg, save, perf });
+  farm.onArtProgress = (k) => progress(0.1 + k * 0.85);
   window.__farm = farm; // для тестов в браузере
   ui.bind(farm, farm.icons);
 
@@ -73,7 +77,10 @@ async function main() {
   window.addEventListener('pagehide', () => save.flush());
   game.start();
 
-  document.getElementById('loading').classList.add('hide');
+  // ждём картинки (но не дольше 15 с: на плохой связи игра откроется с графикой из кода)
+  await Promise.race([farm.artReady, new Promise((r) => setTimeout(r, 15000))]);
+  progress(1);
+  setTimeout(() => document.getElementById('loading').classList.add('hide'), 150);
   if (new URLSearchParams(location.search).has('debug')) {
     const d = document.createElement('div');
     d.className = 'debug';

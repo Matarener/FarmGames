@@ -24,7 +24,7 @@ export class Farm {
     this.time = 0;
     this.dirty = true;
     this.buildSprites();
-    loadArt().then((a) => {
+    this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
       Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, objArt: a.obj });
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
       if (a.water.every(Boolean)) { this.S.waterArt = a.water; this.S.water.clear(); }

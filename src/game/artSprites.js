@@ -33,11 +33,14 @@ function tinted(s, color) {
   return { canvas: c, w: s.w, h: s.h, ax: s.ax, ay: s.ay };
 }
 
-export async function loadArt() {
+export async function loadArt(onProgress) {
   const man = await (await fetch(BASE + 'manifest.json?v=' + V)).json();
   const A = {};
-  await Promise.all(Object.entries(man).map(async ([name, m]) => {
+  const list = Object.entries(man);
+  let done = 0;
+  await Promise.all(list.map(async ([name, m]) => {
     const img = await loadImage(BASE + name + '.webp?v=' + V);
+    onProgress && onProgress(++done / list.length);
     A[name] = { canvas: img, w: m.w, h: m.h, ax: m.ax, ay: m.ay };
   }));
   const obj = {};

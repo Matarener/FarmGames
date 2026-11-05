@@ -46,7 +46,24 @@
     <div id="popup" class="popup ui-layer"></div>
     <div id="panel" class="panel"></div>
     <div id="toast" class="toast"></div>
-    <div id="loading" class="loading">Ферма загружается…</div>
+    <div id="loading" class="loading">
+      <div class="ld-box">
+        <svg class="ld-ghost" viewBox="0 0 64 72" aria-hidden="true">
+          <ellipse cx="32" cy="68" rx="14" ry="3.5" fill="rgba(0,0,0,.18)"/>
+          <path d="M12 34 A20 20 0 0 1 52 34 L53 56 Q48 62 43 57 Q38 63 32 57 Q26 63 21 57 Q16 62 11 56 Z" fill="#f7f8ff" stroke="#3d2b1f" stroke-width="2.2" stroke-linejoin="round"/>
+          <ellipse cx="27" cy="36" rx="2.6" ry="3.6" fill="#3d2b1f"/><ellipse cx="39" cy="36" rx="2.4" ry="3.4" fill="#3d2b1f"/>
+          <circle cx="27.8" cy="34.6" r="0.9" fill="#fff"/><circle cx="39.7" cy="34.6" r="0.8" fill="#fff"/>
+          <ellipse cx="22.5" cy="42" rx="3" ry="1.7" fill="rgba(245,120,140,.5)"/><ellipse cx="43.5" cy="42" rx="2.6" ry="1.6" fill="rgba(245,120,140,.5)"/>
+          <path d="M30 42 Q33 45 36 42" stroke="#3d2b1f" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+          <ellipse cx="32" cy="19" rx="21" ry="6.5" fill="#e9c46a" stroke="#3d2b1f" stroke-width="2"/>
+          <path d="M21 19 Q21 5 32 5 Q43 5 43 19 Z" fill="#e9c46a" stroke="#3d2b1f" stroke-width="2"/>
+          <rect x="21.2" y="14" width="21.6" height="4" fill="#d65a3c"/>
+        </svg>
+        <div class="ld-title">Ферма</div>
+        <div class="ld-bar"><i id="ld-fill"></i></div>
+        <div class="ld-text" id="ld-text">Загрузка…</div>
+      </div>
+    </div>
   </div>
   <script type="module" src="src/main.js"></script>
 </body>
