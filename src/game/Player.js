@@ -5,6 +5,7 @@ import { AnimationState } from '../skeleton/Animation.js';
 import { toWorld } from '../engine/Iso.js';
 import { findPath } from '../engine/Pathfinding.js';
 import { N } from './World.js';
+import { farmerReady, drawFarmerFrame, FRAMES, IDLE } from './farmerSprite.js';
 
 const TOOL_ANIM = {
   chop: ['swing', 'axe'], mine: ['swing', 'pickaxe'], dig: ['swing', 'hoe'],
@@ -12,6 +13,7 @@ const TOOL_ANIM = {
 };
 const MAX_QUEUE = 6;
 const tmp = { x: 0, y: 0 };
+const STEP_CELLS = 1.3;   // клеток на полный цикл из 8 кадров ходьбы
 
 export class Player {
   constructor(world, data, x, y) {
@@ -30,6 +32,9 @@ export class Player {
     this.anim.onComplete = (name) => { if (name === 'happy') this.anim.play('idle'); };
     this.handlers = null; // { perform(action) → bool продолжать, fail(action, reason) }
     this.idleTime = 0;
+    this.walkPhase = 0;
+    // скелет только отсчитывает время действий (событие hit) и задаёт качание
+    // инструмента; тело рисуется кадрами
   }
 
   get tx() { return Math.floor(this.x); }
@@ -116,6 +121,8 @@ export class Player {
         const tx = nx + 0.5, ty = ny + 0.5;
         const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy);
         this.face(dx, dy);
+        const step = Math.min(d, move);
+        this.walkPhase = (this.walkPhase + step / STEP_CELLS) % 1;
         if (d <= move) { this.x = tx; this.y = ty; this.path.shift(); move -= d; }
         else { this.x += dx / d * move; this.y += dy / d * move; move = 0; }
       }
@@ -133,7 +140,33 @@ export class Player {
     const ctx = r.ctx;
     ctx.fillStyle = 'rgba(20,40,10,0.22)';
     ctx.beginPath(); ctx.ellipse(tmp.x, tmp.y, 9, 4, 0, 0, Math.PI * 2); ctx.fill();
-    this.sk.draw(ctx, r, tmp.x, tmp.y, 1, this.flip);
+    if (!farmerReady()) { this.sk.draw(ctx, r, tmp.x, tmp.y, 1, this.flip); return; }
+    const dir = (this.back ? 'u' : 'd') + (this.flip ? 'l' : 'r');
+    const walking = this.state === 'walk';
+    const frame = walking ? Math.floor(this.walkPhase * FRAMES) : IDLE[dir];
+    // покачивание из скелетной анимации: дыхание, присед при посадке, прыжок радости
+    const hip = this.sk.boneMap.hip, root = this.sk.boneMap.root;
+    const bob = walking ? 0 : (hip.y - (hip.data.y || 0)) * 0.6 + root.y;
+    const breathe = this.anim.name === 'idle' ? 1 + Math.sin(this.anim.time / this.anim.cur.duration * Math.PI * 2) * 0.012 : 1;
+    const tool = this.sk.override.tool;
+    if (tool && this.back) this.drawTool(ctx, r, tool, tmp.x, tmp.y + bob);   // сзади инструмент за телом
+    drawFarmerFrame(ctx, dir, frame, tmp.x, tmp.y + bob, 1, breathe);
+    if (tool && !this.back) this.drawTool(ctx, r, tool, tmp.x, tmp.y + bob);
+  }
+
+  // Инструмент в руке: точка хвата у кисти, угол — от руки скелета (замах, полив)
+  drawTool(ctx, r, name, x, y) {
+    const att = this.sk.getAttachment(this.sk.slotMap.tool, name);
+    if (!att) return;
+    const s = att.sprite, arm = this.sk.boneMap.foreF;
+    const f = this.flip ? -1 : 1;
+    const ang = Math.atan2(arm.b, arm.a);          // угол предплечья в скелете
+    ctx.save();
+    ctx.translate(x + f * 7, y - 13);
+    ctx.scale(f, 1);
+    ctx.rotate(ang);
+    ctx.drawImage(s.canvas, -s.ax, -s.ay + 1, s.w, s.h);
+    ctx.restore();
   }
 }
 

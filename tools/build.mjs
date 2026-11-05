@@ -6,7 +6,7 @@
 
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,8 +17,19 @@ const hash = (buf) => createHash('sha1').update(buf).digest('hex').slice(0, 8);
 rmSync(DIST, { recursive: true, force: true });
 mkdirSync(DIST, { recursive: true });
 
+// Кадры фермера (assets/farmer): копируем, хеш — в адрес картинок, чтобы новые не застревали в кэше
+const FARMER = join(ROOT, 'assets', 'farmer');
+mkdirSync(join(DIST, 'assets', 'farmer'), { recursive: true });
+const vh = createHash('sha1');
+for (const f of readdirSync(FARMER).filter((n) => n.endsWith('.png')).sort()) {
+  vh.update(readFileSync(join(FARMER, f)));
+  copyFileSync(join(FARMER, f), join(DIST, 'assets', 'farmer', f));
+}
+const assetV = vh.digest('hex').slice(0, 8);
+
 // JS
 const js = await build({
+  define: { __ASSET_V__: JSON.stringify(assetV) },
   entryPoints: [join(ROOT, 'src', 'main.js')],
   bundle: true, minify: true, format: 'esm', target: ['es2020', 'safari14'],
   write: false, legalComments: 'none',
