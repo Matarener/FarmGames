@@ -8,7 +8,7 @@ import { makeGhostData, ROD_TIP } from './ghost.js';
 import * as art from './art.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
-import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, houseNeedChunks, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 const BG = '#3d7a35';
@@ -390,7 +390,8 @@ export class Farm {
 
   upgradeHouse() {
     const next = HOUSE[this.st.house + 1];
-    if (!next || !this.pay(next.cost)) return false;
+    if (!next || this.world.unlockedCount() < houseNeedChunks(this.st.house)) return false;
+    if (!this.pay(next.cost)) return false;
     const oldMax = this.maxEnergy;
     this.st.house++;
     this.st.energy += this.maxEnergy - oldMax;
@@ -581,7 +582,7 @@ export class Farm {
       if (got) { this.float(o.wx, o.wy + dy, `+${got}`, res); dy -= 14; }
     }
     if (def.oreChance && Math.random() < def.oreChance) {
-      const got = this.addItem('inv', 'ore', 1 + Math.floor(Math.random() * 2));
+      const [o0, o1] = def.ore || [1, 2], got = this.addItem('inv', 'ore', o0 + Math.floor(Math.random() * (o1 - o0 + 1)));
       if (got) { this.float(o.wx + 14, o.wy + dy, `+${got}`, 'ore'); dy -= 14; }
     }
     if (def.seedChance && Math.random() < def.seedChance) {

@@ -41,8 +41,8 @@ export const OBJECTS = {
   stump:   { name: 'Пень',    hp: 2, action: 'chop', drops: { wood: [1, 1] }, xp: 1 },
   bush:    { name: 'Куст',    hp: 1, action: 'chop', drops: { wood: [1, 1] }, xp: 1, seedChance: 0.3 },
   berry:   { name: 'Куст',    hp: 1, action: 'chop', drops: { wood: [1, 1] }, xp: 1, seedChance: 0.5 },
-  rock:    { name: 'Камень',  hp: 2, action: 'mine', drops: { stone: [1, 2] }, xp: 2 },
-  boulder: { name: 'Валун',   hp: 5, action: 'mine', drops: { stone: [4, 6] }, xp: 5, oreChance: 0.6, w: 2, h: 2 },
+  rock:    { name: 'Камень',  hp: 2, action: 'mine', drops: { stone: [2, 4] }, xp: 2, oreChance: 0.1, ore: [1, 1] },
+  boulder: { name: 'Валун',   hp: 5, action: 'mine', drops: { stone: [6, 9] }, xp: 5, oreChance: 1, ore: [1, 3], w: 2, h: 2 },
   house:   { name: 'Дом',     static: true, w: 2, h: 2 },
 };
 
@@ -55,8 +55,8 @@ export const HOUSE = [
   { energy: 30, storage: 50,  can: 3, chunks: 3 },
   { energy: 40, storage: 100, can: 4, chunks: 6,  cost: { wood: 20, stone: 10, coins: 50 } },
   { energy: 55, storage: 200, can: 5, chunks: 10, cost: { wood: 60, stone: 40, coins: 300 } },
-  { energy: 75, storage: 350, can: 6, chunks: 16, cost: { wood: 150, stone: 120, ore: 20, coins: 1500 } },
-  { energy: 100, storage: 500, can: 8, chunks: 25, cost: { wood: 300, stone: 300, ore: 80, coins: 6000 } },
+  { energy: 75, storage: 350, can: 6, chunks: 16, cost: { wood: 150, stone: 80, ore: 20, coins: 1500 } },
+  { energy: 100, storage: 500, can: 8, chunks: 25, cost: { wood: 300, stone: 120, ore: 25, coins: 6000 } },
 ];
 
 export const START = { coins: 50, gems: 5, energy: 30 };
@@ -65,8 +65,13 @@ export function xpToNext(level) { return Math.round(20 * Math.pow(level, 1.5)); 
 
 const r5 = (v) => Math.max(5, Math.round(v / 5) * 5);
 export function expansionCost(n) {
-  // n — порядковый номер покупаемого участка (1, 2, ...)
-  return { wood: r5(15 * Math.pow(1.5, n - 1)), stone: r5(8 * Math.pow(1.5, n - 1)), coins: r5(40 * Math.pow(1.6, n - 1)) };
+  // n — порядковый номер покупаемого участка (1, 2, ...).
+  // Дерево и камень растут линейно: участок приносит их примерно поровну с ценой
+  // следующего (проверено tools/balance-bot.mjs), монеты — плавно по экспоненте.
+  return { wood: r5(15 + 3.5 * (n - 1)), stone: r5(6 + 1.5 * (n - 1)), coins: r5(40 * Math.pow(1.3, n - 1)) };
 }
+
+// Улучшить дом можно, только открыв хотя бы один новый участок на текущем уровне
+export function houseNeedChunks(level) { return (HOUSE[level - 1] ? HOUSE[level - 1].chunks : 1) + 1; }
 
 export const GEM_SPEEDUP_SEC = 600; // 1 кристалл ускоряет на 10 минут (минимум 1)

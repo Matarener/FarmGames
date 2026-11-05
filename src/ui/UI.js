@@ -2,7 +2,7 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { CROPS, GOODS, HOUSE, xpToNext } from '../game/data.js';
+import { CROPS, GOODS, HOUSE, xpToNext, houseNeedChunks } from '../game/data.js';
 import { fmtTime } from '../game/Farm.js';
 import { QUEST_END } from '../game/quests.js';
 
@@ -205,8 +205,10 @@ export class UI {
       if (next) {
         body.appendChild(h('div', 'pn-sub', 'Улучшение'));
         body.appendChild(h('div', 'pp-cost', this.costHtml(next.cost, f)));
+        const need = houseNeedChunks(lvl), have = f.world.unlockedCount();
+        if (have < need) body.appendChild(h('div', 'pn-text', `Сначала откройте новый участок земли (участков: ${have} из ${need}).`));
         const b = h('button', 'btn-main', `Улучшить до ${lvl + 1} уровня`);
-        b.disabled = !f.canPay(next.cost);
+        b.disabled = !f.canPay(next.cost) || have < need;
         b.onclick = () => { if (f.upgradeHouse()) this.refreshPanel(); };
         body.appendChild(b);
       } else body.appendChild(h('div', 'pn-text', 'Дом улучшен до максимума!'));

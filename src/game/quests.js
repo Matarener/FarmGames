@@ -20,6 +20,11 @@ export const QUESTS = [
     task: 'Полей грядки 2 раза', goal: { ev: 'water', n: 2 }, reward: { coins: 10 },
   },
   {
+    title: 'Рыбалка', who: 'note',
+    text: '«В пруду водятся караси и окуни. Удочка стоит за дверью — вечером на зорьке клюёт лучше всего! Бабушка Марфа»',
+    task: 'Поймай 2 рыбы', goal: { ev: 'fish', n: 2 }, reward: { coins: 10 },
+  },
+  {
     title: 'Дровишки', who: 'ghost',
     text: 'Деревья подступили к самому дому. Бабушка всегда говорила: «Дрова зимой — лучшие друзья». Срублю одно.',
     task: 'Сруби дерево', goal: { ev: 'chop', n: 1 }, reward: { coins: 15 },
@@ -50,19 +55,24 @@ export const QUESTS = [
     task: 'Продай 5 урожаев на рынке', goal: { ev: 'sell', n: 5 }, reward: { coins: 20 },
   },
   {
+    title: 'За забором', who: 'note',
+    text: '«За забором — тоже наша земля. Когда-то там цвели целые поля… А дом подлатаешь, когда ферма подрастёт. Бабушка Марфа»',
+    task: 'Открой новый участок', goal: { ev: 'expand', n: 1 }, reward: { coins: 40 },
+  },
+  {
     title: 'Уютный дом', who: 'ghost',
     text: 'Домик совсем старенький: крыша скрипит, окна дрожат. Пора его подлатать! Нужны дерево, камень и монетки.',
     task: 'Улучши дом до 2 уровня', goal: { state: 'house', n: 2 }, reward: { gems: 2, coins: 30 },
   },
   {
-    title: 'За забором', who: 'note',
-    text: '«За забором — тоже наша земля. Когда-то там цвели целые поля… Бабушка Марфа»',
-    task: 'Открой новый участок', goal: { ev: 'expand', n: 1 }, reward: { coins: 40 },
-  },
-  {
     title: 'Бабушкин хлеб', who: 'ghost',
     text: 'Бабушка пекла самый вкусный хлеб из своей пшеницы. Выращу пшеницу и я!',
     task: 'Собери 5 пшеницы', goal: { ev: 'harvest', key: 'wheat', n: 5 }, reward: { coins: 40, gems: 1 },
+  },
+  {
+    title: 'Золотая рыбка', who: 'note',
+    text: '«Говорят, в нашем пруду живёт золотая рыбка. Мне она так и не попалась… Может, повезёт тебе? Бабушка Марфа»',
+    task: 'Поймай золотую рыбку', goal: { ev: 'fish', key: 'fish_gold', n: 1 }, reward: { gems: 2 },
   },
   {
     title: 'Ферма оживает', who: 'ghost',
@@ -88,7 +98,17 @@ export class Quests {
   // счётчики за всю игру
   get life() { const s = this.farm.st.stats; return s.ev || (s.ev = { harvest: s.harvested || 0 }); }
 
-  get current() { return QUESTS[this.st.i] || null; }
+  get current() {
+    const st = this.st;
+    // порядок заданий мог поменяться в обновлении: находим своё по названию
+    if (st.t && (!QUESTS[st.i] || QUESTS[st.i].title !== st.t)) {
+      const j = QUESTS.findIndex((q) => q.title === st.t);
+      if (j >= 0) st.i = j;
+    }
+    const q = QUESTS[st.i] || null;
+    if (q) st.t = q.title;
+    return q;
+  }
 
   progress() {
     const q = this.current;

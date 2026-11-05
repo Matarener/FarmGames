@@ -137,6 +137,13 @@ export class World {
         else if (r < forest + 0.13) this.add(k < 0.7 ? 'bush' : 'berry', x, y);
       }
     }
+    // Добавочные камни (баланс: камня не хватало на расширения). Отдельный поток случайных
+    // чисел и в конце списка — номера старых объектов не сдвигаются, сохранения совместимы.
+    const rnd2 = mulberry32(this.seed ^ 0x5bd1e995);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const r = rnd2();
+      if (this.chunkOf(x, y) !== START_CHUNK && r < 0.055) this.add('rock', x, y);
+    }
     this.genCount = this.objects.length;
   }
 
