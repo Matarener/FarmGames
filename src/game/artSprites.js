@@ -50,7 +50,8 @@ export async function loadArt() {
   return {
     obj, crops,
     house: [null, A.house_1, A.house_2, A.house_3, A.house_4, A.house_5],
-    water: [A.water_0, A.water_spark, A.water_lily, A.water_reed],
+    water: Object.assign([A.water_0, A.water_spark, A.water_lily, A.water_reed],
+      { flip: [flipped(A.water_0), flipped(A.water_spark)] }),
     // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%)
     grass: [A.tile_grass, flipped(A.tile_grass), A.tile_flowers, flipped(A.tile_flowers)],
     path: [A.tile_sand, flipped(A.tile_sand)],
