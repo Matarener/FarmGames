@@ -3,7 +3,7 @@
 
 import { loadImage, makeCanvas } from '../engine/Sprite.js';
 
-/* global __ASSET_V__ */
+/* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
 const BASE = 'assets/art/';
 
@@ -34,7 +34,8 @@ function tinted(s, color) {
 }
 
 export async function loadArt(onProgress) {
-  const man = await (await fetch(BASE + 'manifest.json?v=' + V)).json();
+  // в сборке manifest вшит в код (работает и с file://), в разработке — читаем файл
+  const man = typeof __ART_MANIFEST__ !== 'undefined' ? __ART_MANIFEST__ : await (await fetch(BASE + 'manifest.json?v=' + V)).json();
   const A = {};
   const list = Object.entries(man);
   let done = 0;
@@ -46,7 +47,8 @@ export async function loadArt(onProgress) {
   // иконки интерфейса (ic_<имя>.webp); старые, нарисованные кодом, остаются запасными
   const icons = {};
   try {
-    for (const n of await (await fetch(BASE + 'icons.json?v=' + V)).json()) icons[n] = BASE + 'ic_' + n + '.webp?v=' + V;
+    const list = typeof __ART_ICONS__ !== 'undefined' ? __ART_ICONS__ : await (await fetch(BASE + 'icons.json?v=' + V)).json();
+    for (const n of list) icons[n] = BASE + 'ic_' + n + '.webp?v=' + V;
   } catch (e) { /* без иконок */ }
   const obj = {};
   for (const [type, names] of Object.entries(OBJ)) obj[type] = names.map((n) => A[n]).filter(Boolean);

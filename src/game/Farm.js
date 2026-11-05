@@ -1,7 +1,7 @@
 // Сцена фермы: состояние игрока, взаимодействия, рост растений, отрисовка мира.
 
 import { toWorld, toGrid, HW, HH } from '../engine/Iso.js';
-import { dimSprite, hash2 } from '../engine/Sprite.js';
+import { dimSprite, hash2, makeCanvas } from '../engine/Sprite.js';
 import { World, N, CHUNK, CHUNKS, T, START_CHUNK } from './World.js';
 import { Player } from './Player.js';
 import { makeGhostData, ROD_TIP } from './ghost.js';
@@ -25,11 +25,13 @@ export class Farm {
     this.time = 0;
     this.dirty = true;
     this.quests = new Quests(this);
+    this.groundV = 0; // растёт, когда меняются клетки земли
     this.buildSprites();
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
       Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, objArt: a.obj, stumpOf: a.stumpOf });
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
       if (a.water.every(Boolean)) { this.S.waterArt = a.water; this.S.water.clear(); }
+      this.groundV++;
       for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
       for (const [k, url] of Object.entries(a.icons)) {
         const im = new Image(); im.src = url;
@@ -502,7 +504,7 @@ export class Farm {
       }
       case 'dig': {
         if (!this.spend(ENERGY.dig)) return false;
-        w.tiles[w.idx(a.x, a.y)] = T.SOIL;
+        w.tiles[w.idx(a.x, a.y)] = T.SOIL; this.groundV++;
         const b = this.bedAt(w.idx(a.x, a.y)); b.crop = null; b.p = 0; b.w = 0;
         this.burst(b.wx, b.wy, '#8a5a30', 8);
         this.quests.emit('dig');
@@ -677,7 +679,10 @@ export class Farm {
 
   update(dt) {
     this.time += dt;
-    this.grow(dt);
+    // рост — по настоящим часам: в фоне (Telegram свёрнут) кадры не идут, а грядки растут
+    const now = Date.now();
+    this.grow(this._wall ? Math.min(Math.max(0, (now - this._wall) / 1000), 7 * 86400) : dt);
+    this._wall = now;
     this._eT = (this._eT || 0) + dt;
     if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.ui.tick(this); }
     this.player.update(dt);
@@ -700,10 +705,8 @@ export class Farm {
 
   // ---------------- Отрисовка ----------------
 
-  render() {
-    const r = this.r, ctx = r.ctx, w = this.world, v = r.view;
-    r.begin(this.cam, BG);
-
+  drawGround(ctx) {
+    const r = this.r, w = this.world, v = r.view;
     // видимый диапазон клеток
     let gx0 = Infinity, gx1 = -Infinity, gy0 = Infinity, gy1 = -Infinity;
     for (const [x, y] of [[v.minX, v.minY], [v.maxX, v.minY], [v.minX, v.maxY], [v.maxX, v.maxY]]) {
@@ -753,7 +756,32 @@ export class Farm {
     }
     // граница открытой территории
     this.drawBorder(ctx);
+  }
 
+  render() {
+    const r = this.r, ctx = r.ctx, w = this.world, S = this.S;
+    r.begin(this.cam, BG);
+
+    // Земля, туман и граница меняются редко: рисуем их в отдельный холст и, пока камера
+    // и клетки те же, только копируем его (на слабых телефонах это половина кадра).
+    let wet = 0;
+    for (const b of this.beds.values()) if (b.crop) { const i = this.cropInfo(b); if (!i.needsWater && !i.ready) wet = (wet * 31 + b.i) % 1e9; }
+    const key = `${this.cam.x.toFixed(2)}|${this.cam.y.toFixed(2)}|${this.cam.zoom.toFixed(4)}|${r.canvas.width}x${r.canvas.height}|${this.groundV}|${w.unlockedCount()}|${wet}`;
+    let gc = this._ground;
+    if (!gc || gc.width !== r.canvas.width || gc.height !== r.canvas.height) {
+      gc = this._ground = makeCanvas(r.canvas.width, r.canvas.height); this._groundKey = '';
+    }
+    if (key !== this._groundKey) {
+      this._groundKey = key;
+      const g = gc.getContext('2d');
+      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = ctx.imageSmoothingQuality;
+      g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = BG; g.fillRect(0, 0, gc.width, gc.height);
+      g.setTransform(r.va, 0, 0, r.va, r.ve, r.vf);
+      this.drawGround(g);
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(gc, 0, 0);
+    r.resetView();
 
     // объекты + растения + персонаж, по глубине
     const L = this.drawList; L.length = 0;
