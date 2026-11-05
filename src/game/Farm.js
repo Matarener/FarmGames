@@ -11,8 +11,6 @@ import { CROPS, OBJECTS, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expan
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 const BG = '#3d7a35';
-// сила покачивания (наклон верхушки на единицу высоты)
-const SWAY = { oak: 0.022, oak2: 0.022, apple: 0.02, pine: 0.014, bush: 0.03, berry: 0.03 };
 
 export class Farm {
   constructor({ renderer, camera, ui, tg, save, perf }) {
@@ -66,11 +64,7 @@ export class Farm {
     const lily = WA ? (h < 0.55 ? 0 : h < 0.75 ? 1 : h < 0.88 ? 2 : mask ? 3 : 1) : h < 0.3 ? 1 : 0;
     const key = mask * 4 + lily;
     let s = this.S.water.get(key);
-    if (!s) {
-      s = art.waterTile(mask, lily, WA && WA[lily]);
-      if (WA && lily < 2) s.ripple = art.waterTile(mask, lily, WA.flip[lily]);
-      this.S.water.set(key, s);
-    }
+    if (!s) { s = art.waterTile(mask, lily, WA && WA[lily]); this.S.water.set(key, s); }
     return s;
   }
 
@@ -629,23 +623,13 @@ export class Farm {
         let s;
         if (t === T.GRASS) s = S.grass[w.variant[i]];
         else if (t === T.PATH) s = S.path[(gx + gy) & 1];
-        else if (t === T.WATER) {
-          s = this.waterSprite(gx, gy);
-          // рябь: поверх — тот же тайл с отражённой водой, прозрачность бежит волной
-          const s2 = s.ripple;
-          if (s2) {
-            const a = 0.5 + 0.5 * Math.sin(this.time * 1.6 - gx * 0.9 - gy * 0.6);
-            ctx.drawImage(s.canvas, cx - s.ax, cy - s.ay, s.w, s.h);
-            ctx.globalAlpha = a * 0.85; s = s2;
-          }
-        }
+        else if (t === T.WATER) s = this.waterSprite(gx, gy);
         else {
           const b = this.beds.get(i);
           const wet = b && b.crop && !this.cropInfo(b).needsWater && !this.cropInfo(b).ready;
           s = S.soil[wet ? 1 : 0];
         }
         ctx.drawImage(s.canvas, cx - s.ax, cy - s.ay, s.w, s.h);
-        ctx.globalAlpha = 1;
       }
     }
 
@@ -708,15 +692,7 @@ export class Farm {
         if (d.fade < 0.02) d.fade = 0;
         if (fade && F[0].hit) playerHidden = true;
         if (d.fade) ctx.globalAlpha = 1 - 0.62 * d.fade;
-        const sway = SWAY[d.type];
-        if (sway) {
-          // покачивание: наклон (skew) от основания, по карте бежит волна ветра
-          const t = this.time, ph = (d.gx + d.gy) * 0.45 + (d.id % 7) * 0.3;
-          const k = sway * (Math.sin(t * 1.3 - ph) + 0.35 * Math.sin(t * 2.9 + d.id));
-          ctx.transform(1, 0, k, 1, -k * d.wy, 0);
-          ctx.drawImage(s.canvas, d.wx - s.ax + sh, d.wy - s.ay, s.w, s.h);
-          ctx.setTransform(r.view.va, 0, 0, r.view.va, r.view.ve, r.view.vf);
-        } else ctx.drawImage(s.canvas, d.wx - s.ax + sh, d.wy - s.ay, s.w, s.h);
+        ctx.drawImage(s.canvas, d.wx - s.ax + sh, d.wy - s.ay, s.w, s.h);
         ctx.globalAlpha = 1;
       } else if (d.kind === 'c') {
         const b = d.bed, info = this.cropInfo(b);
