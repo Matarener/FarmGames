@@ -81,6 +81,8 @@ async function main() {
   await Promise.race([farm.artReady, new Promise((r) => setTimeout(r, 15000))]);
   progress(1);
   setTimeout(() => document.getElementById('loading').classList.add('hide'), 150);
+  // начало истории: новое задание показываем сразу
+  if (farm.quests.current && !farm.quests.st.seen) setTimeout(() => ui.questPanel(farm), 700);
   if (new URLSearchParams(location.search).has('debug')) {
     const d = document.createElement('div');
     d.className = 'debug';

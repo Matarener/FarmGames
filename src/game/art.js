@@ -637,6 +637,13 @@ export function makeIcons(crops) {
     g.fillStyle = OUT; blob(g, 0, 2, 12); g.fillStyle = '#e2392f'; blob(g, 0, 2, 10.6);
     g.fillStyle = '#ff8a73'; blob(g, -4, -2, 3); leaf(g, 1, -8, 0.6, 7, 2.4, '#4f9e36');
   });
+  I.note = iconURL((g) => {
+    g.save(); g.rotate(-0.12);
+    g.fillStyle = '#f6e7c1'; g.beginPath(); g.roundRect(-10, -13, 20, 26, 3); g.fill(); g.strokeStyle = OUT; g.lineWidth = 1.6; g.stroke();
+    g.strokeStyle = '#b8955e'; g.lineWidth = 1.4; for (const y of [-7, -2, 3]) { g.beginPath(); g.moveTo(-6, y); g.lineTo(6, y); g.stroke(); }
+    g.beginPath(); g.moveTo(-6, 8); g.lineTo(1, 8); g.stroke();
+    g.fillStyle = '#e2392f'; blob(g, 7, 9, 3.4); g.restore();
+  });
   for (const crop of Object.values(crops)) I[crop.key] = iconURL(cropIcon(crop));
   return I;
 }

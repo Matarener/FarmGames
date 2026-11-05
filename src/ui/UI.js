@@ -4,6 +4,7 @@
 
 import { CROPS, HOUSE, xpToNext } from '../game/data.js';
 import { fmtTime } from '../game/Farm.js';
+import { QUEST_END } from '../game/quests.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -32,6 +33,7 @@ export class UI {
     $('#btn-house').onclick = () => this.housePanel(farm);
     $('#btn-center').onclick = () => { farm.player.worldPos(this._p = this._p || {}); farm.cam.centerOn(this._p.x, this._p.y - 20); };
     $('#energy-pill').onclick = () => this.bagPanel(farm);
+    $('#quest-card').onclick = () => this.questPanel(farm);
   }
 
   refreshIcons() {
@@ -57,6 +59,7 @@ export class UI {
     const pct = Math.min(100, (st.xp / xpToNext(st.level)) * 100).toFixed(1) + '%';
     if (this.last.xp !== pct) { this.last.xp = pct; $('#hud-xp').style.width = pct; }
     $('#ore-chip').hidden = !(st.inv.ore > 0);
+    this.questCard(f);
     this.tick(f);
     if (this.panelEl.dataset.kind && this.panelEl.classList.contains('show')) this.refreshPanel();
   }
@@ -88,6 +91,51 @@ export class UI {
       const icon = k === 'coins' ? 'coin' : k === 'gems' ? 'gem' : k;
       return `<span class="cost ${have < v ? 'lack' : ''}" title="${RES_NAMES[k] || k}">${this.ic(icon)}${have < v ? `${fmtNum(have)}/` : ''}${fmtNum(v)}</span>`;
     }).join('');
+  }
+
+  // ---------- Задания ----------
+  questCard(f) {
+    const Q = f.quests, q = Q.current, el = $('#quest-card');
+    const key = q ? `${Q.st.i}:${Q.progress()}` : 'end';
+    if (this.last.quest === key) return;
+    this.last.quest = key;
+    el.hidden = !q;
+    if (!q) return;
+    const done = Q.done, pct = (Q.progress() / q.goal.n) * 100;
+    el.classList.toggle('done', done);
+    el.innerHTML = `${this.ic(q.who === 'note' ? 'note' : 'star', 'ic')}<div class="qc-t"><b>${done ? 'Забрать награду!' : q.task}</b>` +
+      `<div class="qc-bar"><i style="width:${pct}%"></i></div></div><span class="qc-n">${Q.progress()}/${q.goal.n}</span>`;
+  }
+
+  questDone(q) {
+    this.toast(`Задание выполнено: ${q.title}`, 'good');
+    this.last.quest = null;
+  }
+
+  rewardHtml(r) {
+    return [r.coins && `${r.coins} ${this.ic('coin')}`, r.gems && `${r.gems} ${this.ic('gem')}`].filter(Boolean).join(' ');
+  }
+
+  questPanel(f) {
+    this.openPanel('quest', 'Задания', (body) => {
+      const Q = f.quests, q = Q.current || QUEST_END;
+      if (Q.current) Q.st.seen = true;
+      const who = q.who === 'note' ? 'Записка бабушки Марфы' : 'Призрачок';
+      const face = q.who === 'note' ? this.ic('note', 'ic big') : `<img class="qp-face" src="${this.icons.avatar || this.icons.star}" alt="">`;
+      body.appendChild(h('div', 'qp-story' + (q.who === 'note' ? ' note' : ''), `${face}<div class="qp-say"><b>${who}</b><p>${q.text}</p></div>`));
+      if (!Q.current) return;
+      const n = Q.progress(), done = Q.done;
+      body.appendChild(h('div', 'pn-sub', q.title));
+      body.appendChild(h('div', 'qp-task', `<span>${q.task}</span><b>${n}/${q.goal.n}</b><div class="qc-bar"><i style="width:${(n / q.goal.n) * 100}%"></i></div>`));
+      body.appendChild(h('div', 'qp-reward', `Награда: ${this.rewardHtml(q.reward)}`));
+      const b = h('button', 'btn-main', done ? 'Забрать награду' : 'Понятно');
+      b.onclick = () => {
+        if (!done) return this.closePanel();
+        const r = q.reward;
+        if (Q.claim()) { this.toast(`+${this.rewardHtml(r)}`, 'good'); this.refreshPanel(); }
+      };
+      body.appendChild(b);
+    });
   }
 
   // ---------- Всплывающее меню у точки на карте ----------

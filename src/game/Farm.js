@@ -7,6 +7,7 @@ import { Player } from './Player.js';
 import { makeGhostData } from './ghost.js';
 import * as art from './art.js';
 import { loadArt } from './artSprites.js';
+import { Quests } from './quests.js';
 import { CROPS, OBJECTS, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
@@ -23,6 +24,7 @@ export class Farm {
     this.tapFx = null;
     this.time = 0;
     this.dirty = true;
+    this.quests = new Quests(this);
     this.buildSprites();
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
       Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, objArt: a.obj, stumpOf: a.stumpOf });
@@ -153,7 +155,7 @@ export class Farm {
     };
   }
 
-  changed() { this.ui.update(this); this.save.schedule(() => this.serialize()); }
+  changed() { this.quests.check(); this.ui.update(this); this.save.schedule(() => this.serialize()); }
 
   bedAt(i) {
     let b = this.beds.get(i);
@@ -362,6 +364,7 @@ export class Farm {
     toWorld(cx * CHUNK + CHUNK / 2, cy * CHUNK + CHUNK / 2, tmp);
     this.burst(tmp.x, tmp.y - 10, '#ffe066', 24);
     this.float(tmp.x, tmp.y - 30, 'Новый участок!', null);
+    this.quests.emit('expand');
     this.addXp(10);
     this.tg.haptic('success');
     this.changed();
@@ -388,6 +391,7 @@ export class Farm {
     if (!n) return;
     this.st.crops[key] = have - n;
     this.st.coins += n * CROPS[key].sell;
+    this.quests.emit('sell', key, n);
     this.tg.haptic('light');
     this.changed();
   }
@@ -481,6 +485,7 @@ export class Farm {
         w.tiles[w.idx(a.x, a.y)] = T.SOIL;
         const b = this.bedAt(w.idx(a.x, a.y)); b.crop = null; b.p = 0; b.w = 0;
         this.burst(b.wx, b.wy, '#8a5a30', 8);
+        this.quests.emit('dig');
         this.addXp(1);
         this.changed();
         return false;
@@ -490,6 +495,7 @@ export class Farm {
         if (st.seeds[a.crop] > 0) st.seeds[a.crop]--; else if (st.coins >= c.seed) st.coins -= c.seed; else return false;
         b.crop = a.crop; b.p = 0; b.w = 0;
         this.burst(b.wx, b.wy, '#7ccf4f', 6);
+        this.quests.emit('plant', a.crop);
         this.addXp(1);
         this.changed();
         return false;
@@ -498,6 +504,7 @@ export class Farm {
         const b = this.bedAt(w.idx(a.x, a.y));
         if (st.can <= 0 || !this.spend(ENERGY.water)) return false;
         st.can--; b.w++;
+        this.quests.emit('water');
         this.burst(b.wx, b.wy - 6, '#6fc2ff', 10);
         this.changed();
         return false;
@@ -519,6 +526,7 @@ export class Farm {
         this.burst(b.wx, b.wy - 6, '#ffe066', 8);
         b.crop = null; b.p = 0; b.w = 0;
         st.stats.harvested++;
+        this.quests.emit('harvest', c.key);
         this.addXp(c.xp);
         this.tg.haptic('medium');
         this.changed();
@@ -548,6 +556,7 @@ export class Farm {
     }
     this.addXp(def.xp || 1);
     st.stats.cleared++;
+    this.quests.emit(def.stump ? 'chop' : o.type === 'stump' ? 'stump' : def.action === 'mine' ? 'mine' : 'clear');
     this.burst(o.wx, o.wy - 10, o.type === 'rock' || o.type === 'boulder' ? '#9aa1a7' : '#7a4b28', 12);
     if (def.stump) { o.was = o.type; o.type = 'stump'; o.hp = OBJECTS.stump.hp; this.world.version++; }
     else this.world.remove(o);
