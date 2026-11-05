@@ -29,7 +29,9 @@ export class Farm {
     this.focus = [];
     this.tapFx = null;
     this.time = 0;
-    this.stats = { layers: 0, live: 0 }; // сколько раз перерисованы слои; живых прямоугольников в кадре
+    this.gDirty = []; this.oDirty = []; // изменившиеся прямоугольники мира: x0,y0,x1,y1,...
+    this._st = new Map(); this._stamp = 0; // прошлое состояние объектов и грядок — для поиска изменений
+    this.stats = { layers: 0, parts: 0, live: 0 }; // сколько раз перерисованы слои; живых прямоугольников в кадре
     this.dirty = true;
     this.quests = new Quests(this);
     this.mover = new Mover(this);
@@ -115,6 +117,12 @@ export class Farm {
     let s = this.S.water.get(key);
     if (!s) { s = art.waterTile(mask, lily, this.S.waterTex ? 'none' : WA && WA[lily], this.grassColor(), dg); this.S.water.set(key, s); }
     return s;
+  }
+
+  // Клетка земли изменилась: перерисовать только её окрестность (а не всю землю)
+  touchTile(x, y) {
+    toWorld(x + 0.5, y + 0.5, tmp);
+    this.gDirty.push(tmp.x - HW * 2 - 4, tmp.y - 80, tmp.x + HW * 2 + 4, tmp.y + HH * 2 + 4);
   }
 
   bedStyle(v) { setBedStyle(v); this.groundV++; this.dirty = true; }
@@ -606,7 +614,7 @@ export class Farm {
       case 'dig': {
         if (w.tiles[w.idx(a.x, a.y)] !== T.GRASS || w.occ[w.idx(a.x, a.y)] >= 0) return false;
         if (!this.spend(ENERGY.dig)) return false;
-        w.tiles[w.idx(a.x, a.y)] = T.SOIL; this.groundV++;
+        w.tiles[w.idx(a.x, a.y)] = T.SOIL; this.touchTile(a.x, a.y);
         const b = this.bedAt(w.idx(a.x, a.y)); b.crop = null; b.p = 0; b.w = 0;
         this.burst(b.wx, b.wy, '#8a5a30', 8);
         this.quests.emit('dig');
@@ -907,21 +915,57 @@ export class Farm {
     else ctx.drawImage(L.c, ox - k * L.ox, oy - k * L.oy, L.c.width * k, L.c.height * k);
   }
 
-  // Отпечаток статичной сцены: если он не изменился, слой объектов не перерисовывается
-  staticSig() {
-    let h = 7;
+  // Сравнить сцену с прошлым кадром: какие объекты и растения поменяли картинку или место,
+  // какие грядки стали политыми/сухими. Их прямоугольники попадают в списки перерисовки.
+  diffScene() {
+    const M = this._st, stamp = ++this._stamp, O = this.oDirty, G = this.gDirty;
+    const mark = (key, sig, x0, y0, x1, y1, ground) => {
+      let e = M.get(key);
+      if (!e) { e = { sig, x0, y0, x1, y1, stamp }; M.set(key, e); (ground ? G : O).push(x0, y0, x1, y1); return; }
+      e.stamp = stamp;
+      if (e.sig === sig && e.x0 === x0 && e.y0 === y0) return;
+      (ground ? G : O).push(e.x0, e.y0, e.x1, e.y1, x0, y0, x1, y1);
+      e.sig = sig; e.x0 = x0; e.y0 = y0; e.x1 = x1; e.y1 = y1;
+    };
     for (const o of this.world.objects) {
       if (!o) continue;
       const s = this.objSprite(o);
       if (!s._sid) s._sid = ++SID;
-      h = (Math.imul(h, 31) + o.id * 7 + o.gx * 131 + o.gy * 8191 + s._sid) | 0;
+      const x0 = o.wx - s.ax - 6, y0 = o.wy - s.ay - 2;
+      mark(o, s._sid, x0, y0, x0 + s.w + 12, y0 + s.h + 4, false);
     }
     for (const b of this.beds.values()) {
-      if (!b.crop) continue;
-      const i = this.cropInfo(b);
-      h = (Math.imul(h, 31) + b.i * 13 + i.stage * 5 + (i.needsWater || i.ready ? 1 : 2) + b.crop.length) | 0;
+      const info = b.crop ? this.cropInfo(b) : null;
+      const wet = info && !info.needsWater && !info.ready ? 1 : 0;
+      mark(b, wet, b.wx - HW * 2, b.wy - 70, b.wx + HW * 2, b.wy + HH * 2, true);
+      if (b.crop) {
+        const c = this.S.crops[b.crop][info.stage];
+        if (!c._sid) c._sid = ++SID;
+        mark(b.dr, c._sid, b.wx - c.ax - 4, b.wy - c.ay - 4, b.wx - c.ax + c.w + 4, b.wy - c.ay + c.h + 4, false);
+      }
     }
-    return h;
+    for (const [k, e] of M) if (e.stamp !== stamp) { (k.kind === 'c' || k.kind === 'o' || k.type ? O : G).push(e.x0, e.y0, e.x1, e.y1); M.delete(k); }
+  }
+
+  // Перерисовать в слое только прямоугольники R (в его собственном масштабе и сдвиге)
+  patchLayer(L, R, r, draw) {
+    const g = L.c.getContext('2d'), v = r.view, save = { ...v };
+    v.minX = Infinity; v.minY = Infinity; v.maxX = -Infinity; v.maxY = -Infinity;
+    g.save();
+    // прямоугольники по целым пикселям слоя: без полупрозрачных краёв у клипа
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.beginPath();
+    for (let i = 0; i < R.length; i += 4) {
+      const x0 = Math.floor(R[i] * L.va + L.ox), y0 = Math.floor(R[i + 1] * L.va + L.oy);
+      g.rect(x0, y0, Math.ceil(R[i + 2] * L.va + L.ox) - x0, Math.ceil(R[i + 3] * L.va + L.oy) - y0);
+      v.minX = Math.min(v.minX, R[i]); v.minY = Math.min(v.minY, R[i + 1]); v.maxX = Math.max(v.maxX, R[i + 2]); v.maxY = Math.max(v.maxY, R[i + 3]);
+    }
+    g.clip();
+    g.setTransform(L.va, 0, 0, L.va, L.ox, L.oy);
+    draw(g);
+    g.restore();
+    Object.assign(v, save);
+    this.stats.parts++;
   }
 
   // статичные объекты и растения в пределах видимой области (с запасом), по глубине
@@ -941,6 +985,15 @@ export class Farm {
     }
     out.sort((a, b) => a.depth - b.depth || a.wy - b.wy);
     return out;
+  }
+
+  // пересекает ли картинка объекта/растения какой-нибудь прямоугольник из R
+  hitsRects(d, R) {
+    let x0, y0, x1, y1;
+    if (d.kind === 'o') { const s = this.objSprite(d); x0 = d.wx - s.ax - 4; y0 = d.wy - s.ay; x1 = x0 + s.w + 8; y1 = y0 + s.h; }
+    else { const b = d.bed, s = this.S.crops[b.crop][this.cropInfo(b).stage]; x0 = b.wx - s.ax - 4; y0 = b.wy - s.ay - 4; x1 = x0 + s.w + 8; y1 = y0 + s.h + 8; }
+    for (let i = 0; i < R.length; i += 4) if (x0 < R[i + 2] && x1 > R[i] && y0 < R[i + 3] && y1 > R[i + 1]) return true;
+    return false;
   }
 
   drawItem(ctx, d, live) {
@@ -969,23 +1022,45 @@ export class Farm {
     const settled = now - (this._zoomAt || 0) > 200;
 
     // Слой 1: земля, вода, грядки, туман, граница. Меняется редко.
-    let wet = 0;
-    for (const b of this.beds.values()) if (b.crop) { const i = this.cropInfo(b); if (!i.needsWater && !i.ready) wet = (wet * 31 + b.i) % 1e9; }
+    this.diffScene();
     const G = this._gl || (this._gl = {});
-    const gkey = `${CW}x${CH}|${this.groundV}|${w.unlockedCount()}|${wet}`;
-    if (this.layerStale(G, gkey, settled, r, CW, CH)) {
+    const gkey = `${CW}x${CH}|${this.groundV}|${w.unlockedCount()}`;
+    let gPatched = false;
+    if (this.layerStale(G, gkey, settled, r, CW, CH) || this.gDirty.length > 4 * 40) {
       this.buildLayer(G, gkey, r, CW, CH, (g) => {
         g.fillStyle = BG; g.fillRect(0, 0, G.c.width, G.c.height);
         g.setTransform(r.va, 0, 0, r.va, G.ox, G.oy);
         this.drawGround(g);
       });
+    } else if (this.gDirty.length) {
+      this.patchLayer(G, this.gDirty, r, (g) => {
+        g.fillStyle = BG; g.fillRect(-1e5, -1e5, 2e5, 2e5);
+        this.drawGround(g);
+      });
+      gPatched = true;
     }
 
     // Слой 2: земля + все неподвижные объекты и растения. Перерисовывается, только когда что-то
     // изменилось (срубили дерево, выросла морковка, переставили дом) или камера ушла за запас.
     const O = this._ol || (this._ol = { list: [] });
-    const okey = `${G.ver}|${this.staticSig()}`;
-    if (this.layerStale(O, okey, settled, r, CW, CH)) {
+    const okey = `${G.ver}`;
+    // на изменённой земле объекты тоже надо положить заново
+    if (gPatched) for (const x of this.gDirty) this.oDirty.push(x);
+    this.gDirty.length = 0;
+    const OD = this.oDirty;
+    if (OD.length && O.c && O.key === okey && OD.length <= 4 * 40 && !this.layerStale(O, okey, settled, r, CW, CH)) {
+      this.patchLayer(O, OD, r, (g) => {
+        g.save(); g.setTransform(1, 0, 0, 1, 0, 0); this.blitLayer(g, G, O.va, O.ox, O.oy); g.restore();
+        // список объектов слоя: в границах слоя, а не экрана
+        const v = r.view, k = O.va;
+        v.minX = -O.ox / k; v.minY = -O.oy / k; v.maxX = (O.c.width - O.ox) / k; v.maxY = (O.c.height - O.oy) / k;
+        for (const d of this.staticList(O.list)) if (this.hitsRects(d, OD)) this.drawItem(g, d, false);
+        g.globalAlpha = 0.45; this.drawBorder(g); g.globalAlpha = 1;
+      });
+      OD.length = 0;
+    }
+    if (this.layerStale(O, okey, settled, r, CW, CH) || OD.length) {
+      OD.length = 0;
       this.buildLayer(O, okey, r, CW, CH, (g) => {
         g.clearRect(0, 0, O.c.width, O.c.height);
         this.blitLayer(g, G, r.va, O.ox, O.oy);
@@ -1029,20 +1104,19 @@ export class Farm {
       if (d.fade || fade || d.shake > 0) R.push(d.wx - s.ax - 4, d.wy - s.ay - 1, d.wx - s.ax + s.w + 4, d.wy - s.ay + s.h + 1);
     }
     ctx.save();
-    ctx.beginPath();
-    for (let i = 0; i < R.length; i += 4) ctx.rect(R[i], R[i + 1], R[i + 2] - R[i], R[i + 3] - R[i + 1]);
-    ctx.clip();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.beginPath();
+    for (let i = 0; i < R.length; i += 4) {
+      const x0 = Math.floor(R[i] * r.va + r.ve), y0 = Math.floor(R[i + 1] * r.va + r.vf);
+      ctx.rect(x0, y0, Math.ceil(R[i + 2] * r.va + r.ve) - x0, Math.ceil(R[i + 3] * r.va + r.vf) - y0);
+    }
+    ctx.clip();
     this.blitLayer(ctx, G, r.va, r.ve, r.vf);
     r.resetView();
     let pDone = false;
     for (const d of list) {
       if (!pDone && (d.depth > pd.depth || (d.depth === pd.depth && d.wy > pd.wy))) { this.drawItem(ctx, pd, true); pDone = true; }
-      const s = d.kind === 'o' ? this.objSprite(d) : null;
-      const x0 = s ? d.wx - s.ax - 4 : d.bed.wx - 32, y0 = s ? d.wy - s.ay : d.bed.wy - 44, x1 = s ? x0 + s.w + 8 : x0 + 64, y1 = s ? y0 + s.h : y0 + 60;
-      let hit = false;
-      for (let i = 0; i < R.length; i += 4) if (x0 < R[i + 2] && x1 > R[i] && y0 < R[i + 3] && y1 > R[i + 1]) { hit = true; break; }
-      if (hit) this.drawItem(ctx, d, true);
+      if (this.hitsRects(d, R)) this.drawItem(ctx, d, true);
     }
     if (!pDone) this.drawItem(ctx, pd, true);
     ctx.globalAlpha = 0.45; this.drawBorder(ctx); ctx.globalAlpha = 1;
