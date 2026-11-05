@@ -20,6 +20,7 @@ export class Farm {
     this.particles = [];
     this.floaters = [];
     this.hover = null;
+    this.focus = [];
     this.tapFx = null;
     this.time = 0;
     this.dirty = true;
@@ -646,9 +647,6 @@ export class Farm {
     // граница открытой территории
     this.drawBorder(ctx);
 
-    // подсветка клетки
-    if (this.hover && w.inside(this.hover.x, this.hover.y)) this.tileOutline(ctx, this.hover.x, this.hover.y, 'rgba(255,255,255,0.45)', 1.5);
-    if (this.tapFx) this.tileOutline(ctx, this.tapFx.x, this.tapFx.y, `rgba(255,250,200,${this.tapFx.t * 2.4})`, 2.5);
 
     // объекты + растения + персонаж, по глубине
     const L = this.drawList; L.length = 0;
@@ -670,12 +668,29 @@ export class Farm {
     L.push(this._pd);
     L.sort((a, b) => a.depth - b.depth || a.wy - b.wy);
 
+    // Что нельзя закрывать: фермер, клетка под курсором, клетка последнего тапа.
+    // Высокие объекты перед ними становятся полупрозрачными.
+    const F = this.focus; F.length = 0;
+    F.push({ x0: tmp.x - 11, y0: tmp.y - 50, x1: tmp.x + 11, y1: tmp.y, depth: p.x + p.y, gx: -1, gy: -1 });
+    for (const t of [this.hover, this.tapFx]) {
+      if (!t || !w.inside(t.x, t.y)) continue;
+      toWorld(t.x + 0.5, t.y + 0.5, tmp);
+      F.push({ x0: tmp.x - HW + 6, y0: tmp.y - HH + 3, x1: tmp.x + HW - 6, y1: tmp.y + HH - 3, depth: t.x + t.y + 1, gx: t.x, gy: t.y });
+    }
+    let playerHidden = false;
+
     for (const d of L) {
       if (d.kind === 'o') {
         let s = this.objSprite(d);
         if (!w.isOpen(d.gx, d.gy)) s = dimSprite(s);
         const sh = d.shake > 0 ? Math.sin(this.time * 70) * 2.2 * (d.shake / 0.25) : 0;
+        const fade = this.occludes(d, s, F);
+        d.fade = (d.fade || 0) + (fade - (d.fade || 0)) * 0.3;
+        if (d.fade < 0.02) d.fade = 0;
+        if (fade && F[0].hit) playerHidden = true;
+        if (d.fade) ctx.globalAlpha = 1 - 0.62 * d.fade;
         ctx.drawImage(s.canvas, d.wx - s.ax + sh, d.wy - s.ay, s.w, s.h);
+        ctx.globalAlpha = 1;
       } else if (d.kind === 'c') {
         const b = d.bed, info = this.cropInfo(b);
         const s = S.crops[b.crop][info.stage];
@@ -684,6 +699,14 @@ export class Farm {
         p.draw(r);
       }
     }
+
+    // фермер за объектом: полупрозрачная копия поверх
+    if (playerHidden) { ctx.globalAlpha = 0.4; p.draw(r); ctx.globalAlpha = 1; }
+
+    // рамки поверх объектов: граница участка (бледно), клетка под курсором, тап
+    ctx.globalAlpha = 0.45; this.drawBorder(ctx); ctx.globalAlpha = 1;
+    if (this.hover && w.inside(this.hover.x, this.hover.y)) this.tileOutline(ctx, this.hover.x, this.hover.y, 'rgba(255,255,255,0.75)', 1.8);
+    if (this.tapFx) this.tileOutline(ctx, this.tapFx.x, this.tapFx.y, `rgba(255,250,200,${Math.min(1, this.tapFx.t * 2.4)})`, 2.5);
 
     // значки над грядками
     const bob = Math.sin(this.time * 4) * 1.5;
@@ -720,6 +743,22 @@ export class Farm {
       if (f.icon && this.iconImg[f.icon]) ctx.drawImage(this.iconImg[f.icon], x + tw + 1, y - 6, 12, 12);
     }
     ctx.globalAlpha = 1;
+  }
+
+  // Закрывает ли объект что-то из списка F (фермер, выделенная клетка): объект
+  // должен стоять ближе к камере и пересекаться по картинке. Низкие объекты не трогаем.
+  occludes(o, s, F) {
+    if (s.h < 30) return 0;
+    const x0 = o.wx - s.ax, y0 = o.wy - s.ay, x1 = x0 + s.w, y1 = o.wy - s.h * 0.08;
+    let r = 0;
+    for (const f of F) {
+      f.hit = false;
+      if (o.depth <= f.depth + 0.05) continue;
+      if (f.gx >= o.gx && f.gx < o.gx + o.w && f.gy >= o.gy && f.gy < o.gy + o.h) continue; // сам выделенный объект
+      if (x1 < f.x0 || x0 > f.x1 || y1 < f.y0 || y0 > f.y1) continue;
+      f.hit = true; r = 1;
+    }
+    return r;
   }
 
   tileOutline(ctx, x, y, color, lw) {
