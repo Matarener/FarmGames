@@ -6,7 +6,6 @@ import { Renderer } from './engine/Renderer.js';
 import { Camera } from './engine/Camera.js';
 import { Input } from './engine/Input.js';
 import { setSpriteScale } from './engine/Sprite.js';
-import { SPRITE_DENSITY } from './game/assets.js';
 import { TelegramBridge } from './telegram/TelegramBridge.js';
 import { Save } from './game/Save.js';
 import { Farm } from './game/Farm.js';
@@ -24,8 +23,7 @@ async function main() {
   const ui = new UI(document.getElementById('app'));
   const save = new Save(tg);
   const farm = new Farm({ renderer, camera, ui, tg, save, perf });
-  const loading = document.getElementById('loading');
-  await farm.loadArt((k) => { loading.textContent = `Ферма загружается… ${Math.round(k * 100)}%`; });
+  window.__farm = farm; // для тестов в браузере
   ui.bind(farm, farm.icons);
 
   const fitZoom = () => {
@@ -39,10 +37,7 @@ async function main() {
     camera.setViewport(renderer.cssW, renderer.cssH);
     const big = Math.min(renderer.cssW, renderer.cssH) > 600;
     camera.minZoom = big ? 0.6 : 0.5;
-    // не приближаем сильнее, чем позволяет разрешение спрайтов (4 px на единицу мира):
-    // иначе картинка растягивается и мылится
-    camera.maxZoom = Math.max(1.2, Math.min(2.6, SPRITE_DENSITY / renderer.scale));
-    if (camera.zoom > camera.maxZoom) camera.zoom = camera.maxZoom;
+    camera.maxZoom = 2.6;
   };
   perf.onScaleChange = () => renderer.resize();
 

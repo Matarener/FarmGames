@@ -25,7 +25,7 @@ export function makeSprite(w, h, ax, ay, draw, scale = SCALE) {
 }
 
 // Затемнённая копия (для закрытых территорий) — создаётся лениво.
-export function dimSprite(s, k = 0.5, tint = [14, 34, 24]) {
+export function dimSprite(s, k = 0.62, tint = [16, 38, 26]) {
   if (s.dim) return s.dim;
   const c = makeCanvas(s.canvas.width, s.canvas.height);
   const g = c.getContext('2d');

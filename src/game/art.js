@@ -24,16 +24,15 @@ function inTile(rnd, k = 0.85) {
 
 // ---------------- Тайлы земли ----------------
 
-// одна базовая заливка для всех вариантов — без «шахматки»; различаются только детали
-const GRASS = [['#7cc44f', '#92d55e', '#63a93f'], ['#7cc44f', '#94d760', '#62a83e'], ['#7cc44f', '#96d862', '#66ad41'], ['#7cc44f', '#8fd35c', '#5fa53c']];
+const GRASS = [['#7cc44f', '#8fd35c', '#69b043'], ['#78c04c', '#90d45f', '#64aa40'], ['#80c853', '#9ad866', '#6cb246'], ['#74bb49', '#88cd58', '#61a63d']];
 
-export function grassTile(variant, deco) {
+export function grassTile(variant) {
   const [base, light, dark] = GRASS[variant % 4];
   const rnd = mulberry32(100 + variant);
   return makeSprite(HW * 2 + 2, HH * 2 + 2, HW + 1, HH + 1, (g) => {
     g.fillStyle = base; diamond(g, HW + 0.7, HH + 0.35); g.fill();
-    for (let i = 0; i < 22; i++) {
-      const [x, y] = inTile(rnd, 0.95);
+    for (let i = 0; i < 14; i++) {
+      const [x, y] = inTile(rnd);
       g.strokeStyle = rnd() < 0.5 ? light : dark; g.lineWidth = 0.9;
       g.beginPath(); g.moveTo(x, y); g.lineTo(x - 1 + rnd() * 2, y - 2 - rnd() * 2); g.stroke();
     }
@@ -43,11 +42,6 @@ export function grassTile(variant, deco) {
         g.fillStyle = ['#fff6d5', '#ffd1e3', '#ffe066'][i]; blob(g, x, y, 1.3);
         g.fillStyle = '#f4b73a'; blob(g, x, y, 0.5);
       }
-    }
-    // мелкий декор из листа художника (трава, цветы) — запечён прямо в тайл
-    if (deco) {
-      const [x, y] = inTile(rnd, 0.45);
-      g.drawImage(deco.canvas, x - deco.ax, y - deco.ay, deco.w, deco.h);
     }
   });
 }
@@ -67,7 +61,7 @@ export function pathTile(variant) {
 
 export function soilTile(wet) {
   return makeSprite(HW * 2 + 2, HH * 2 + 2, HW + 1, HH + 1, (g) => {
-    g.fillStyle = '#7cc44f'; diamond(g, HW + 0.7, HH + 0.35); g.fill();
+    g.fillStyle = '#78c04c'; diamond(g, HW + 0.7, HH + 0.35); g.fill();
     g.fillStyle = wet ? '#5a3a1f' : '#8a5a30'; diamond(g, HW * 0.9, HH * 0.9, 0, 0.6); g.fill();
     g.fillStyle = wet ? '#6b4526' : '#a06a3a'; diamond(g, HW * 0.86, HH * 0.86); g.fill();
     // борозды вдоль одной оси
@@ -95,7 +89,7 @@ export function waterTile(mask, lily) {
   const rnd = mulberry32(500 + mask * 3 + (lily ? 1 : 0));
   const T = [0, -HH], R = [HW, 0], B = [0, HH], L = [-HW, 0];
   return makeSprite(HW * 2 + 2, HH * 2 + 2, HW + 1, HH + 1, (g) => {
-    g.fillStyle = '#7cc44f'; diamond(g, HW + 0.7, HH + 0.35); g.fill();
+    g.fillStyle = '#78c04c'; diamond(g, HW + 0.7, HH + 0.35); g.fill();
     g.fillStyle = '#3f97d6'; diamond(g, HW + 0.5, HH + 0.25); g.fill();
     g.fillStyle = '#56ade6'; diamond(g, HW * 0.75, HH * 0.75, 0, 1.5); g.fill();
     g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 0.9;
@@ -112,7 +106,7 @@ export function waterTile(mask, lily) {
       g.lineTo(b[0] + ix, b[1] + iy); g.lineTo(a[0] + ix, a[1] + iy); g.closePath(); g.fill();
       g.strokeStyle = front ? 'rgba(255,255,255,0.8)' : 'rgba(30,60,90,0.35)'; g.lineWidth = 1;
       g.beginPath(); g.moveTo(a[0] + ix, a[1] + iy); g.lineTo(b[0] + ix, b[1] + iy); g.stroke();
-      g.fillStyle = '#7cc44f';
+      g.fillStyle = '#78c04c';
       g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]);
       g.lineTo(b[0] + ix * 0.35, b[1] + iy * 0.35); g.lineTo(a[0] + ix * 0.35, a[1] + iy * 0.35); g.closePath(); g.fill();
     };
@@ -637,75 +631,4 @@ export function makeIcons(crops) {
   });
   for (const crop of Object.values(crops)) I[crop.key] = iconURL(cropIcon(crop));
   return I;
-}
-
-// Грядка с растениями из листа художника. Стадии 0–1 — ростки, 2 — молодое растение, 3 — созревшее.
-const BURY = { carrot: 0.42, beet: 0.25 }; // корнеплоды «сидят» в земле — видна только верхушка
-const FEW = new Set(['cabbage', 'pumpkin', 'corn', 'sunflower']);
-export function cropSpriteArt(crop, stage, A) {
-  const img = A['crop_' + crop.key];
-  if (!img) return null;
-  const sprout = stage === 0 ? A.sprout_1 : A.sprout_3;
-  const pts = FEW.has(crop.key) && stage >= 2 ? [[-9, -3], [9, 3]] : [[0, -7], [-13, 0], [13, 0], [0, 7]];
-  return makeSprite(64, 72, 32, 52, (g) => {
-    for (const [x, y] of pts) {
-      if (stage <= 1) {
-        if (!sprout) continue;
-        const k = stage === 0 ? 0.75 : 1;
-        g.drawImage(sprout.canvas, x - sprout.ax * k, y - sprout.ay * k, sprout.w * k, sprout.h * k);
-        continue;
-      }
-      const k = stage === 2 ? 0.62 : 1;
-      const bury = BURY[crop.key] || 0;
-      const iw = img.img.naturalWidth, ih = img.img.naturalHeight;
-      const w = img.w * k, h = img.h * k * (1 - bury);
-      g.drawImage(img.img, 0, 0, iw, ih * (1 - bury), x - w / 2, y + 2 - h, w, h);
-    }
-  });
-}
-
-// Тайл из квадратной текстуры художника: квадрат проецируется в ромб 2:1.
-// k — размер ромба относительно клетки, rim — травяной край вокруг (для грядок).
-export function texTile(tex, { k = 1, rim = false, shade = 0, lily = false, mask = 0 } = {}) {
-  const img = tex.img, iw = img.naturalWidth, ih = img.naturalHeight;
-  const rnd = mulberry32(900 + mask * 3 + (lily ? 1 : 0));
-  return makeSprite(HW * 2 + 2, HH * 2 + 2, HW + 1, HH + 1, (g) => {
-    if (rim) { g.fillStyle = '#7cc44f'; diamond(g, HW + 0.7, HH + 0.35); g.fill(); g.fillStyle = 'rgba(60,35,15,0.45)'; diamond(g, HW * k, HH * k, 0, 1.2); g.fill(); }
-    g.save();
-    diamond(g, HW * k + (rim ? 0 : 0.7), HH * k + (rim ? 0 : 0.35)); g.clip();
-    const hw = HW * k * 1.03, hh = HH * k * 1.03;
-    g.transform(hw / iw, hh / iw, -hw / ih, hh / ih, 0, -hh);
-    g.drawImage(img, 0, 0, iw, ih);
-    g.restore();
-    if (shade) { g.fillStyle = `rgba(40,20,5,${shade})`; diamond(g, HW * k, HH * k); g.fill(); }
-    if (mask) waterEdges(g, mask);
-    if (lily) {
-      for (let i = 0; i < 2; i++) {
-        const [x, y] = inTile(rnd, 0.45);
-        g.fillStyle = '#3f9a3a'; ell(g, x, y, 4, 2.2); g.fill();
-        g.fillStyle = '#5cbf4f'; ell(g, x - 0.5, y - 0.4, 3.2, 1.6); g.fill();
-        if (i === 0) { g.fillStyle = '#ffb3cf'; blob(g, x + 1, y - 1, 1.2); }
-      }
-    }
-  });
-}
-
-function waterEdges(g, mask) {
-  const T = [0, -HH], R = [HW, 0], B = [0, HH], L = [-HW, 0];
-  const edge = (a, b, front) => {
-    const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2;
-    const ix = -cx * 0.2, iy = -cy * 0.2;
-    g.fillStyle = front ? '#e9d39a' : '#7a5a3a';
-    g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]);
-    g.lineTo(b[0] + ix, b[1] + iy); g.lineTo(a[0] + ix, a[1] + iy); g.closePath(); g.fill();
-    g.strokeStyle = front ? 'rgba(255,255,255,0.85)' : 'rgba(30,60,90,0.35)'; g.lineWidth = 1;
-    g.beginPath(); g.moveTo(a[0] + ix, a[1] + iy); g.lineTo(b[0] + ix, b[1] + iy); g.stroke();
-    g.fillStyle = '#7cc44f';
-    g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]);
-    g.lineTo(b[0] + ix * 0.35, b[1] + iy * 0.35); g.lineTo(a[0] + ix * 0.35, a[1] + iy * 0.35); g.closePath(); g.fill();
-  };
-  if (mask & 1) edge(T, R, false);
-  if (mask & 8) edge(L, T, false);
-  if (mask & 2) edge(R, B, true);
-  if (mask & 4) edge(B, L, true);
 }

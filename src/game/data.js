@@ -32,14 +32,6 @@ export const OBJECTS = {
   rock:    { name: 'Камень',  hp: 2, action: 'mine', drops: { stone: [1, 2] }, xp: 2 },
   boulder: { name: 'Валун',   hp: 5, action: 'mine', drops: { stone: [4, 6] }, xp: 5, oreChance: 0.6, w: 2, h: 2 },
   house:   { name: 'Дом',     static: true, w: 2, h: 2 },
-  // декор: стоит на клетке, не рубится
-  mailbox: { name: 'Почтовый ящик', static: true, decor: true },
-  barrel:  { name: 'Бочка',   static: true, decor: true },
-  lantern: { name: 'Фонарь',  static: true, decor: true },
-  planter: { name: 'Клумба',  static: true, decor: true },
-  tulips:  { name: 'Тюльпаны', static: true, decor: true },
-  sign:    { name: 'Указатель', static: true, decor: true },
-  hay:     { name: 'Стог',    static: true, decor: true },
 };
 
 // Стоимость энергии за удар/действие

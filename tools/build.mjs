@@ -1,5 +1,4 @@
-// Сборка в dist/: один минифицированный JS-бандл, CSS, index.html и только
-// те спрайты, которые использует игра. Результат — статическая папка для
+// Сборка в dist/: один минифицированный JS-бандл, CSS и index.html. Результат — статическая папка для
 // GitHub Pages или любого HTTPS-хостинга Telegram Mini App.
 //
 //   npm install
@@ -7,7 +6,7 @@
 
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,18 +15,10 @@ const DIST = join(ROOT, 'dist');
 const hash = (buf) => createHash('sha1').update(buf).digest('hex').slice(0, 8);
 
 rmSync(DIST, { recursive: true, force: true });
-mkdirSync(join(DIST, 'assets', 'sprites'), { recursive: true });
-
-// Версия спрайтов для сброса кэша
-const { DEFS, ICON_FILES, SPRITE_DIR, USE_ART } = await import('../src/game/assets.js');
-const used = USE_ART ? [...new Set([...Object.keys(DEFS), ...Object.values(ICON_FILES)])].sort() : [];
-const vh = createHash('sha1');
-for (const name of used) { const f = join(ROOT, SPRITE_DIR, name + '.webp'); if (existsSync(f)) vh.update(readFileSync(f)); }
-const assetV = vh.digest('hex').slice(0, 8);
+mkdirSync(DIST, { recursive: true });
 
 // JS
 const js = await build({
-  define: { __ASSET_V__: JSON.stringify(assetV) },
   entryPoints: [join(ROOT, 'src', 'main.js')],
   bundle: true, minify: true, format: 'esm', target: ['es2020', 'safari14'],
   write: false, legalComments: 'none',
@@ -50,15 +41,7 @@ html = html.replace('href="style.css"', `href="${cssName}"`)
   .replace(/\n\s*\n/g, '\n');
 writeFileSync(join(DIST, 'index.html'), html);
 
-// Спрайты: только используемые
-let bytes = 0, n = 0;
-for (const name of used) {
-  const src = join(ROOT, SPRITE_DIR, name + '.webp');
-  if (!existsSync(src)) { console.warn('нет файла', src); continue; }
-  copyFileSync(src, join(DIST, SPRITE_DIR, name + '.webp'));
-  bytes += readFileSync(src).length; n++;
-}
 writeFileSync(join(DIST, '.nojekyll'), '');
 
 const kb = (b) => (b / 1024).toFixed(0) + ' КБ';
-console.log(`dist/ готов: ${jsName} ${kb(jsCode.length)}, ${cssName} ${kb(cssCode.length)}, спрайтов ${n} (${kb(bytes)})`);
+console.log(`dist/ готов: ${jsName} ${kb(jsCode.length)}, ${cssName} ${kb(cssCode.length)}`);

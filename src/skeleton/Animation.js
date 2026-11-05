@@ -5,8 +5,7 @@
 //                                         translate: [[t, x, y, curve?]...],
 //                                         scale: [[t, sx, sy, curve?]...] } },
 //   slots: { slotName: [[t, attachmentName|null]...] },
-//   events: [[t, 'name']...],
-//   footIK?: false — ноги по ключам, а не через IK; kneesOut?: true — приседание, колени в стороны }
+//   events: [[t, 'name']...] }
 // Значения rotate/translate — смещения от позы покоя, scale — множители.
 // curve: 0 — линейно, 1 — ступенька, 2 — плавно, 3 — ускорение, 4 — замедление.
 
@@ -47,8 +46,6 @@ export class Animation {
     this.bones = data.bones || {};
     this.slots = data.slots || {};
     this.events = data.events || [];
-    this.footIK = data.footIK !== false;
-    this.kneesOut = !!data.kneesOut;
     // Нормализуем кривые: rotate [t, v, c], translate/scale [t, x, y, c]
     for (const tl of Object.values(this.bones)) {
       if (tl.rotate) tl.rotate = tl.rotate.map((k) => [k[0], k[1], k[2] || 0]);

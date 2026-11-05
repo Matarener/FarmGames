@@ -5,7 +5,6 @@ import { AnimationState } from '../skeleton/Animation.js';
 import { toWorld } from '../engine/Iso.js';
 import { findPath } from '../engine/Pathfinding.js';
 import { N } from './World.js';
-import { makeGait, advanceGait, solveRig } from './gait.js';
 
 const TOOL_ANIM = {
   chop: ['swing', 'axe'], mine: ['swing', 'pickaxe'], dig: ['swing', 'hoe'],
@@ -13,7 +12,6 @@ const TOOL_ANIM = {
 };
 const MAX_QUEUE = 6;
 const tmp = { x: 0, y: 0 };
-const TWO_HANDED = { axe: 1, pickaxe: 1, hoe: 1 };
 
 export class Player {
   constructor(world, data, x, y) {
@@ -23,7 +21,7 @@ export class Player {
     this.queue = [];
     this.current = null;
     this.state = 'idle';
-    this.speed = 2.6; // клеток в секунду
+    this.speed = 3.4; // клеток в секунду
     this.flip = false; this.back = false;
     this.sk = new Skeleton(data);
     this.anim = new AnimationState(this.sk, data.animations);
@@ -32,11 +30,6 @@ export class Player {
     this.anim.onComplete = (name) => { if (name === 'happy') this.anim.play('idle'); };
     this.handlers = null; // { perform(action) → bool продолжать, fail(action, reason) }
     this.idleTime = 0;
-    this.gait = makeGait();
-    this.legs = data.legs || null;  // { hipX, len } — опоры стоп для IK
-    this.grip2 = data.grip2 || 0;   // где на рукояти вторая рука
-    this.gripBone = data.gripBone;
-    this.hands = data.hands;
   }
 
   get tx() { return Math.floor(this.x); }
@@ -130,24 +123,7 @@ export class Player {
     }
     this.idleTime = this.busy || this.anim.name !== 'idle' ? 0 : this.idleTime + dt;
     this.anim.update(dt);
-    toWorld(this.x, this.y, tmp);
-    advanceGait(this.gait, tmp.x, tmp.y, this.state === 'walk', dt, this.anim);
     this.anim.apply();
-    this.solveIK(dt);
-  }
-
-  solveIK(dt) {
-    if (!this.legs) return;
-    const tool = this.sk.override.tool;
-    const twoHand = this.state === 'work' && TWO_HANDED[tool] && this.anim.name === 'swing';
-    // с инструментом кисть сжата в кулак
-    if (this.hands) { this.sk.override.handF = tool ? 'fist' : 'hand'; this.sk.override.handB = twoHand ? 'fist' : 'hand'; }
-    solveRig(this.sk, this.gait, {
-      legs: this.legs, grip2: this.grip2, gripBone: this.gripBone, flip: this.flip, dt,
-      squat: !!(this.anim.cur && this.anim.cur.kneesOut),
-      legsIK: !this.anim.cur || this.anim.cur.footIK,
-      twoHand,
-    });
   }
 
   worldPos(out) { return toWorld(this.x, this.y, out); }
