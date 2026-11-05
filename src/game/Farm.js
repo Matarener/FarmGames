@@ -4,7 +4,7 @@ import { toWorld, toGrid, HW, HH } from '../engine/Iso.js';
 import { dimSprite, hash2 } from '../engine/Sprite.js';
 import { World, N, CHUNK, CHUNKS, T, START_CHUNK } from './World.js';
 import { Player } from './Player.js';
-import { makeFarmerData } from './farmer.js';
+import { makeGhostData } from './ghost.js';
 import * as art from './art.js';
 import { CROPS, OBJECTS, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
@@ -108,7 +108,7 @@ export class Farm {
       this.st.can = 2;
     }
     for (const i of w.startBeds) if (w.tiles[i] !== T.SOIL) w.tiles[i] = T.SOIL;
-    this.player = new Player(w, makeFarmerData(), px, py);
+    this.player = new Player(w, makeGhostData(), px, py);
     this.player.handlers = {
       canStart: (a) => this.canStart(a),
       perform: (a) => this.perform(a),

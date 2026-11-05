@@ -16,7 +16,7 @@ function cap(g, w, len, fill, outline = OUT) {
 }
 function ell(g, x, y, rx, ry) { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); }
 
-function parts() {
+export function parts() {
   const P = {};
   const limb = (w, len, fill, extra) => makeSprite(w + 4, len + 6, w / 2 + 2, 2, (g) => { cap(g, w, len, fill); extra && extra(g); });
 
