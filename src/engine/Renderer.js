@@ -24,7 +24,7 @@ export class Renderer {
       this.canvas.height = h;
     }
     this.ctx.imageSmoothingEnabled = true;
-    this.ctx.imageSmoothingQuality = this.perf.tier === 'low' ? 'low' : 'medium';
+    this.ctx.imageSmoothingQuality = this.perf.tier === 'low' ? 'low' : this.perf.tier === 'mid' ? 'medium' : 'high';
   }
 
   begin(cam, bg) {

@@ -6,6 +6,7 @@ import { Renderer } from './engine/Renderer.js';
 import { Camera } from './engine/Camera.js';
 import { Input } from './engine/Input.js';
 import { setSpriteScale } from './engine/Sprite.js';
+import { SPRITE_DENSITY } from './game/assets.js';
 import { TelegramBridge } from './telegram/TelegramBridge.js';
 import { Save } from './game/Save.js';
 import { Farm } from './game/Farm.js';
@@ -38,7 +39,10 @@ async function main() {
     camera.setViewport(renderer.cssW, renderer.cssH);
     const big = Math.min(renderer.cssW, renderer.cssH) > 600;
     camera.minZoom = big ? 0.6 : 0.5;
-    camera.maxZoom = 2.6;
+    // не приближаем сильнее, чем позволяет разрешение спрайтов (4 px на единицу мира):
+    // иначе картинка растягивается и мылится
+    camera.maxZoom = Math.max(1.2, Math.min(2.6, SPRITE_DENSITY / renderer.scale));
+    if (camera.zoom > camera.maxZoom) camera.zoom = camera.maxZoom;
   };
   perf.onScaleChange = () => renderer.resize();
 

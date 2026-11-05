@@ -6,6 +6,8 @@
 import { loadImage } from '../engine/Sprite.js';
 
 export const SPRITE_DIR = 'assets/sprites/';
+// Пикселей картинки на единицу мира (так режет tools/slice_sprites.py, DENSITY)
+export const SPRITE_DENSITY = 4;
 // В сборке __ASSET_V__ — хеш всех спрайтов: новые картинки не застревают в кэше браузера
 const EXT = '.webp' + (typeof __ASSET_V__ !== 'undefined' ? '?v=' + __ASSET_V__ : '');
 

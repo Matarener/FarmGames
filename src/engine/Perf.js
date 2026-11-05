@@ -19,7 +19,7 @@ export class Perf {
     this.maxScale = tier === 'low' ? 1 : tier === 'mid' ? 1.5 : 2;
     this.renderScale = Math.min(dpr, this.maxScale);
     // Разрешение, в котором заранее рисуются спрайты (мир → пиксели).
-    this.spriteScale = tier === 'low' ? 1.5 : Math.min(3, Math.max(2, Math.ceil(dpr * 1.25)));
+    this.spriteScale = tier === 'low' ? 1.5 : tier === 'mid' ? 3 : 4;
     this.targetFps = tier === 'low' ? 30 : 60;
     this.idleFps = 20; // когда на экране ничего не происходит
     this.fps = 60;

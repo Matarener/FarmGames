@@ -28,7 +28,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_DIR = os.path.join(ROOT, 'assets', 'source')
 OUT = os.path.join(ROOT, 'assets', 'sprites')
 ASSETS_JS = os.path.join(ROOT, 'src', 'game', 'assets.js')
-DENSITY = 3.0        # пикселей спрайта на единицу мира (экран ПК ×1.7, телефон ~×2)
+DENSITY = 4.0        # пикселей спрайта на единицу мира (= SPRITE_DENSITY в src/game/assets.js)
 FALLBACK_UP = 2      # увеличение для спрайтов без размера в DEFS
 TEX_PX = 256         # сторона квадратной текстуры земли
 
