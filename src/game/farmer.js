@@ -142,28 +142,51 @@ function artParts(P, A) {
   P.torso = part(A.torso_34, TX0, 0, TX1, 1, TW, 0.5, 0.8);
   P.torsoBack = A.torso_back ? part(A.torso_back, TX0, 0, TX1, 1, TW, 0.5, 0.8) : P.torso;
   if (A.farmer_back) P.headBack = part(A.farmer_back, 0.04, 0, 0.96, 0.3, 17, 0.5, 0.95);
-  // Рука из трёх частей: рукав художника + плечо, предплечье + кисть художника.
-  // Кожа дорисовывается кодом в палитре листа (на листе есть только короткая
-  // «рука-культя», поэтому длину рук задаём сами).
+  // Рука: рукав художника + плечо, предплечье и кисть, нарисованные кодом
+  // в палитре листа: сужение к локтю и запястью, светлая и теневая сторона,
+  // кисть с большим пальцем (на листе годных частей рук нет).
   const sleeve = cropImage(A.arm_4.img, 0, 0, 1, 0.42);
-  const SW = 6.4, SH = SW * sleeve.height / sleeve.width;
-  const UL = 6.8, FL = 5.6, AW = 3.5;
-  const skinLimb = (g, len, w, fill) => {
-    g.fillStyle = OUT; g.beginPath(); g.roundRect(-w / 2 - 0.6, -0.6, w + 1.2, len + 1.2, w / 2 + 0.6); g.fill();
-    g.fillStyle = fill; g.beginPath(); g.roundRect(-w / 2, 0, w, len, w / 2); g.fill();
-    g.fillStyle = 'rgba(160,90,60,0.25)'; g.beginPath(); g.roundRect(w / 2 - 1.1, 0.6, 0.9, len - 1.2, 0.45); g.fill();
+  const SW = 6.2, SH = SW * sleeve.height / sleeve.width;
+  const UL = 6.2, FL = 5.4;
+  const SK = { base: '#f0b994', light: '#f8d0b2', dark: '#d4936c' };
+  const SKD = { base: '#e2ab88', light: '#ecc2a4', dark: '#c4865f' };
+  // конечность-«веретено»: ширина w0 у начала, wm в середине, w1 в конце
+  const limb = (g, len, w0, wm, w1, c) => {
+    const path = (k) => {
+      g.beginPath();
+      g.moveTo(-w0 / 2 - k, 0);
+      g.quadraticCurveTo(-wm / 2 - k, len * 0.45, -w1 / 2 - k, len);
+      g.arc(0, len, w1 / 2 + k, Math.PI, 0, true);
+      g.quadraticCurveTo(wm / 2 + k, len * 0.45, w0 / 2 + k, 0);
+      g.arc(0, 0, w0 / 2 + k, 0, Math.PI, true);
+      g.closePath();
+    };
+    g.fillStyle = OUT; path(0.55); g.fill();
+    const gr = g.createLinearGradient(-wm / 2, 0, wm / 2, 0);
+    gr.addColorStop(0, c.light); gr.addColorStop(0.45, c.base); gr.addColorStop(1, c.dark);
+    g.fillStyle = gr; path(0); g.fill();
   };
-  const upper = (shade) => makeSprite(SW + 2, UL + SH, SW / 2 + 1, 1, (g) => {
-    skinLimb(g, UL, AW, shade ? C.skinD : C.skin);
-    g.drawImage(sleeve, -SW / 2, -0.8, SW, SH);
-    if (shade) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(20,30,60,0.12)'; g.fillRect(-SW, -2, SW * 2, UL + SH + 4); }
+  const handShape = (g, y, c) => {
+    // ладонь-«варежка» и большой палец, пальцы вниз
+    const draw = (k) => {
+      g.beginPath(); g.ellipse(0.1, y + 1.6, 1.45 + k, 1.75 + k, 0, 0, Math.PI * 2);
+      g.moveTo(-0.9, y + 0.9); g.ellipse(-1.25, y + 1.4, 0.6 + k, 1.05 + k, 0.5, 0, Math.PI * 2);
+    };
+    g.fillStyle = OUT; draw(0.55); g.fill();
+    const gr = g.createLinearGradient(-1.8, 0, 1.8, 0);
+    gr.addColorStop(0, c.light); gr.addColorStop(0.5, c.base); gr.addColorStop(1, c.dark);
+    g.fillStyle = gr; draw(0); g.fill();
+    g.strokeStyle = 'rgba(120,60,35,0.55)'; g.lineWidth = 0.35;
+    g.beginPath(); for (const x of [-0.4, 0.35, 1.05]) { g.moveTo(x, y + 2.3); g.lineTo(x, y + 3.1); } g.stroke();
+  };
+  const upper = (shade) => makeSprite(SW + 2, UL + SH + 1, SW / 2 + 1, 1, (g) => {
+    limb(g, UL, 2.9, 2.7, 2.4, shade ? SKD : SK);
+    g.drawImage(sleeve, -SW / 2, -0.9, SW, SH);
+    if (shade) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(20,30,60,0.1)'; g.fillRect(-SW, -2, SW * 2, UL + SH + 4); }
   });
-  const hand = A.hand_1 ? A.hand_1.img : null;
-  const HW2 = 4.2, HH2 = hand ? HW2 * hand.naturalHeight / hand.naturalWidth : 4;
-  const fore = (shade) => makeSprite(HW2 + 2, FL + HH2 + 2, HW2 / 2 + 1, 1, (g) => {
-    skinLimb(g, FL, AW * 0.92, shade ? C.skinD : C.skin);
-    if (hand) g.drawImage(hand, -HW2 / 2, FL - 1.6, HW2, HH2);
-    if (shade) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(20,30,60,0.12)'; g.fillRect(-HW2, -2, HW2 * 2, FL + HH2 + 4); }
+  const fore = (shade) => makeSprite(6, FL + 6, 3, 1.5, (g) => {
+    limb(g, FL, 2.4, 2.5, 1.9, shade ? SKD : SK);
+    handShape(g, FL - 0.6, shade ? SKD : SK);
   });
   P.upperArm = upper(false); P.upperArmFar = upper(true);
   P.foreArm = fore(false); P.foreArmFar = fore(true);
@@ -259,22 +282,29 @@ export function makeFarmerData(A = {}) {
         armB: { rotate: [[0, -4, 2], [0.9, -7, 2], [1.8, -4]] },
       },
     },
-    // Походка для вида 3/4: короткий шаг, колено сгибается на выносе ноги,
-    // лёгкое покачивание корпуса, руки идут навстречу ногам.
+    // Походка для вида 3/4: ноги не раскачиваются в стороны, а поочерёдно
+    // поднимаются (подъём бедра + сгиб колена), корпус чуть пружинит,
+    // руки — встречно ногам. Цикл = два шага.
     walk: {
-      duration: 0.6,
+      duration: 0.5,
       bones: {
-        hip: { translate: [[0, 0, 0, 2], [0.15, 0, -1, 2], [0.3, 0, 0, 2], [0.45, 0, -1, 2], [0.6, 0, 0]] },
-        torso: { rotate: [[0, -2, 2], [0.3, 2, 2], [0.6, -2]] },
-        head: { rotate: [[0, 1.5, 2], [0.3, -1.5, 2], [0.6, 1.5]] },
-        thighF: { rotate: [[0, -14, 2], [0.3, 14, 2], [0.6, -14]] },
-        shinF: { rotate: [[0, 4, 2], [0.15, 2, 2], [0.3, 6, 2], [0.45, 32, 2], [0.6, 4]] },
-        thighB: { rotate: [[0, 14, 2], [0.3, -14, 2], [0.6, 14]] },
-        shinB: { rotate: [[0, 6, 2], [0.15, 32, 2], [0.3, 4, 2], [0.45, 2, 2], [0.6, 6]] },
-        armF: { rotate: [[0, 12, 2], [0.3, -12, 2], [0.6, 12]] },
-        foreF: { rotate: [[0, -10, 2], [0.3, -22, 2], [0.6, -10]] },
-        armB: { rotate: [[0, -12, 2], [0.3, 12, 2], [0.6, -12]] },
-        foreB: { rotate: [[0, -22, 2], [0.3, -10, 2], [0.6, -22]] },
+        hip: { translate: [[0, 0, 0, 2], [0.125, 0, -0.9, 2], [0.25, 0, 0, 2], [0.375, 0, -0.9, 2], [0.5, 0, 0]] },
+        torso: { rotate: [[0, -1.5, 2], [0.25, 1.5, 2], [0.5, -1.5]] },
+        head: { rotate: [[0, 1, 2], [0.25, -1, 2], [0.5, 1]] },
+        thighF: {
+          translate: [[0, 0, 0, 2], [0.125, 0, -2.2, 2], [0.25, 0, 0], [0.5, 0, 0]],
+          rotate: [[0, -7, 2], [0.25, 7, 2], [0.5, -7]],
+        },
+        shinF: { rotate: [[0, 0, 2], [0.125, 16, 2], [0.25, 0], [0.5, 0]] },
+        thighB: {
+          translate: [[0, 0, 0], [0.25, 0, 0, 2], [0.375, 0, -2.2, 2], [0.5, 0, 0]],
+          rotate: [[0, 7, 2], [0.25, -7, 2], [0.5, 7]],
+        },
+        shinB: { rotate: [[0, 0], [0.25, 0, 2], [0.375, 16, 2], [0.5, 0]] },
+        armF: { rotate: [[0, 9, 2], [0.25, -9, 2], [0.5, 9]] },
+        foreF: { rotate: [[0, -8, 2], [0.25, -18, 2], [0.5, -8]] },
+        armB: { rotate: [[0, -9, 2], [0.25, 9, 2], [0.5, -9]] },
+        foreB: { rotate: [[0, -18, 2], [0.25, -8, 2], [0.5, -18]] },
       },
     },
     // Замах двумя руками: топор, кирка, мотыга. Событие hit — момент удара.

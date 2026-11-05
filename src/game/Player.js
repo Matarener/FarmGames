@@ -21,7 +21,7 @@ export class Player {
     this.queue = [];
     this.current = null;
     this.state = 'idle';
-    this.speed = 3.4; // клеток в секунду
+    this.speed = 3.0; // клеток в секунду
     this.flip = false; this.back = false;
     this.sk = new Skeleton(data);
     this.anim = new AnimationState(this.sk, data.animations);
