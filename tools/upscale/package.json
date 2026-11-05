@@ -1,0 +1,11 @@
+{
+  "name": "farm-upscale",
+  "private": true,
+  "description": "Нейросетевое увеличение листа спрайтов ×4 (ESRGAN). Нужно только при замене assets/source/sprites.png.",
+  "scripts": { "upscale": "node upscale.js" },
+  "dependencies": {
+    "@tensorflow/tfjs-node": "4.22.0",
+    "@upscalerjs/esrgan-thick": "1.0.0",
+    "upscaler": "1.0.0"
+  }
+}

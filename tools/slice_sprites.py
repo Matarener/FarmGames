@@ -7,9 +7,17 @@
 Объекты находятся автоматически: фон — белая область, связанная с краем листа,
 всё остальное — связные компоненты. Имя спрайту даётся по точке внутри него
 (координаты в листе 1536×1024), поэтому новый лист в той же раскладке
-режется без правок. Результат: assets/sprites/<имя>.webp (увеличено ×2, WebP — в разы легче PNG).
+режется без правок. Результат: assets/sprites/<имя>.webp.
+
+Чёткость: в листе объекты нарисованы с разной детализацией (дерево ~100 px,
+бочка ~60 px), а в игре дерево в разы больше бочки. Чтобы всё выглядело
+одинаково резко, цвет берётся из листа, увеличенного нейросетью ×4
+(assets/source/sprites@4x.png, делает tools/upscale), и каждый спрайт
+приводится к одной плотности DENSITY пикселей на единицу мира
+(размеры объектов в мире — из DEFS в src/game/assets.js).
+Если увеличенного листа нет, используется обычное увеличение Lanczos.
 """
-import os, sys
+import os, re, sys
 import numpy as np
 from PIL import Image, ImageFilter
 from scipy import ndimage as nd
@@ -17,7 +25,13 @@ from scipy import ndimage as nd
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'assets', 'source', 'sprites.png')
 OUT = os.path.join(ROOT, 'assets', 'sprites')
-UPSCALE = 2
+HIRES = os.path.join(ROOT, 'assets', 'source', 'sprites@4x.png')
+ASSETS_JS = os.path.join(ROOT, 'src', 'game', 'assets.js')
+DENSITY = 3.0        # пикселей спрайта на единицу мира (экран ПК ×1.7, телефон ~×2)
+FALLBACK_UP = 2      # увеличение для спрайтов без размера в DEFS (значки и т.п.)
+TEX_PX = 256         # размер стороны текстуры земли
+# у этих спрайтов белые области внутри — часть рисунка (шерсть, яйцо, глаза)
+KEEP_WHITE = ('boy_', 'girl_', 'res_wool', 'res_milk', 'res_egg', 'res_cheese', 'ui_', 'item_', 'birdhouse')
 
 # имя: (x, y) точки внутри объекта, необязательно ('split', x0, x1) — вырезать полосу
 SPRITES = {
@@ -69,6 +83,27 @@ TEXTURES = {
 }
 
 
+def world_widths():
+    try:
+        src = open(ASSETS_JS, encoding='utf-8').read()
+    except OSError:
+        return {}
+    return {n: float(w) for n, w in re.findall(r'(\w+): \{ w: (\d+(?:\.\d+)?)', src)}
+
+
+def soft_alpha(a, bg):
+    """Мягкая альфа: светлые пиксели у края полупрозрачны, белая кайма срезается."""
+    fg = nd.binary_opening(~bg, iterations=1)
+    dist = nd.distance_transform_edt(fg)
+    light = a.min(axis=2).astype(np.float32)
+    edge_alpha = np.clip((226 - light) / 70.0, 0, 1)
+    inner = np.clip((dist - 2.0) / 2.0, 0, 1)
+    al = np.where(fg, np.maximum(edge_alpha, inner), 0.0)
+    # светлая кайма у самого края (1–2 px) — убираем полностью
+    al[(dist < 2.5) & (light > 205)] = 0
+    return fg, al
+
+
 def main():
     im = Image.open(SRC).convert('RGB')
     a = np.asarray(im).astype(np.int16)
@@ -76,14 +111,22 @@ def main():
     lab, _ = nd.label(white)
     border = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
     bg = np.isin(lab, list(border))
-    fg = nd.binary_opening(~bg, iterations=1)
+    # белые «дырки» внутри силуэта (просветы в кроне, между ветками) — тоже фон
+    sizes = nd.sum(white, lab, index=np.arange(lab.max() + 1))
+    holes = np.isin(lab, [i for i in range(1, len(sizes)) if sizes[i] >= 3 and i not in border])
+    # вместе с их светлой каймой
+    pale = (a.min(axis=2) > 200) & ((a.max(axis=2) - a.min(axis=2)) < 34)
+    holes = holes | (nd.binary_dilation(holes, iterations=1) & pale)
+    fg, alpha_keep = soft_alpha(a, bg)
+    _, alpha_cut = soft_alpha(a, bg | holes)
     comp, _ = nd.label(fg, structure=np.ones((3, 3)))
 
-    # мягкая альфа по краю: светлые пиксели рядом с фоном становятся полупрозрачными
-    dist = nd.distance_transform_edt(fg)
-    light = a.min(axis=2).astype(np.float32)
-    edge_alpha = np.clip((238 - light) / 60.0, 0, 1)
-    alpha = np.where(dist >= 3.5, 1.0, np.where(fg, np.maximum(edge_alpha, np.clip((dist - 1.5) / 2, 0, 1)), 0.0))
+    hires = None
+    if os.path.exists(HIRES):
+        hires = Image.open(HIRES).convert('RGB')
+        F = hires.width // im.width
+        print('цвет из увеличенного листа ×%d' % F)
+    widths = world_widths()
 
     os.makedirs(OUT, exist_ok=True)
     for name, spec in SPRITES.items():
@@ -98,23 +141,37 @@ def main():
         if len(spec) > 2 and spec[2] == 'split':
             m2 = np.zeros_like(mask); m2[:, spec[3]:spec[4]] = mask[:, spec[3]:spec[4]]; mask = m2
         # дырки внутри объекта (белая шерсть, глаза) остаются непрозрачными
-        mask = nd.binary_fill_holes(mask) & ~bg | mask
+        keep = name.startswith(KEEP_WHITE)
+        alpha = alpha_keep if keep else alpha_cut
+        if keep:   # дырки внутри объекта (белая шерсть, глаза) остаются непрозрачными
+            mask = nd.binary_fill_holes(mask) & ~bg | mask
         ys, xs = np.nonzero(mask)
         y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-        rgb = a[y0:y1, x0:x1].astype(np.float32)
         al = (alpha[y0:y1, x0:x1] * mask[y0:y1, x0:x1]).astype(np.float32)
+        nw, nh = x1 - x0, y1 - y0
+        tw = round(widths[name] * DENSITY) if name in widths else nw * FALLBACK_UP
+        th = max(1, round(nh * tw / nw))
+        if hires is not None:
+            rgb = np.asarray(hires.crop((x0 * F, y0 * F, x1 * F, y1 * F)).resize((tw, th), Image.LANCZOS)).astype(np.float32)
+        else:
+            rgb = np.asarray(im.crop((x0, y0, x1, y1)).resize((tw, th), Image.LANCZOS)).astype(np.float32)
+        al = np.asarray(Image.fromarray((al * 255).astype(np.uint8)).resize((tw, th), Image.LANCZOS)).astype(np.float32) / 255
+        # чуть «поджимаем» край: убирает остаток светлой каймы после масштабирования
+        al = np.clip((al - 0.12) / 0.88, 0, 1)
         # убираем примесь белого фона у полупрозрачных краёв
         k = np.clip(al, 0.05, 1)[..., None]
         rgb = np.clip((rgb - (1 - k) * 255) / k, 0, 255)
         out = np.dstack([rgb, al * 255]).astype(np.uint8)
         img = Image.fromarray(out, 'RGBA')
-        if UPSCALE != 1:
-            img = img.resize((img.width * UPSCALE, img.height * UPSCALE), Image.LANCZOS)
+        if hires is None:
             img = img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=50, threshold=2))
         img.save(os.path.join(OUT, name + '.webp'), 'WEBP', quality=90, method=6, alpha_quality=95)
     for name, box in TEXTURES.items():
-        t = im.crop(box)
-        t = t.resize((t.width * UPSCALE, t.height * UPSCALE), Image.LANCZOS)
+        if hires is not None:
+            t = hires.crop(tuple(v * F for v in box))
+        else:
+            t = im.crop(box)
+        t = t.resize((TEX_PX, TEX_PX), Image.LANCZOS)
         t.save(os.path.join(OUT, name + '.webp'), 'WEBP', quality=90, method=6)
     print('готово:', len(SPRITES), 'спрайтов и', len(TEXTURES), 'текстур →', OUT)
 

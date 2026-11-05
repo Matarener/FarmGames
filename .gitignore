@@ -3,3 +3,5 @@ node_modules/
 Thumbs.db
 *.log
 .history/
+tools/upscale/node_modules
+assets/source/sprites@4x.png
