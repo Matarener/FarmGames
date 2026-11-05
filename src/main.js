@@ -118,7 +118,7 @@ async function main() {
     document.body.appendChild(fpsEl);
     const paint = () => {
       fpsEl.textContent = `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
-        (debug ? ` · ${perf.tier} · x${perf.renderScale} · слои ${farm.stats.layers}` : '');
+        (debug ? ` · ${perf.tier} · x${perf.renderScale} · квадратов ${farm.tiles ? farm.tiles.map.size : 0}, нарисовано ${farm.stats.layers}` : '');
     };
     paint(); fpsTimer = setInterval(paint, 500);
   };

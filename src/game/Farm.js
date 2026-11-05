@@ -9,6 +9,7 @@ import * as art from './art.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Mover } from './Mover.js';
+import { MapTiles } from './MapTiles.js';
 import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
@@ -31,6 +32,7 @@ export class Farm {
     this.time = 0;
     this.gDirty = []; this.oDirty = []; // изменившиеся прямоугольники мира: x0,y0,x1,y1,...
     this._st = new Map(); this._stamp = 0; // прошлое состояние объектов и грядок — для поиска изменений
+    this.bg = BG;
     this.stats = { layers: 0, parts: 0, live: 0 }; // сколько раз перерисованы слои; живых прямоугольников в кадре
     this.dirty = true;
     this.quests = new Quests(this);
@@ -124,7 +126,7 @@ export class Farm {
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.WATER) this.waterSprite(x, y);
     for (const o of w.objects) if (o && !w.isOpen(o.gx, o.gy)) dimSprite(this.objSprite(o));
     for (const k in this.S.crops) for (const s of this.S.crops[k]) if (s && s.canvas.decode) s.canvas.decode().catch(() => {});
-    this.render();
+    this._warm = true; this.render(); this._warm = false;
   }
 
   // Клетка земли изменилась: перерисовать только её окрестность (а не всю землю)
@@ -355,7 +357,7 @@ export class Farm {
   }
 
   pick(wx, wy) {
-    const L = this._ol ? this._ol.list : this.drawList; // объекты из слоя, по глубине
+    const L = this._vis || this.drawList; // видимые объекты, по глубине
     for (let i = L.length - 1; i >= 0; i--) {
       const d = L[i];
       if (d.kind !== 'o') continue;
@@ -893,39 +895,6 @@ export class Farm {
     this.drawBorder(ctx);
   }
 
-  // Слой — закэшированная картинка части мира с запасом по краям. Пока камера двигается в пределах
-  // запаса, слой только сдвигается; при щипке — растягивается, а перерисовывается, когда зум замер.
-  layerStale(L, key, settled, r, CW, CH) {
-    if (!L.c || L.key !== key) return true;
-    const k = r.va / L.va, x0 = r.ve - k * L.ox, y0 = r.vf - k * L.oy;
-    const covered = x0 <= 0.5 && y0 <= 0.5 && x0 + L.c.width * k >= CW - 0.5 && y0 + L.c.height * k >= CH - 0.5;
-    if (settled) return L.va !== r.va || !covered;
-    // идёт зум: слой растягивается; если при отдалении он уже не закрывает экран —
-    // пересобираем, но не чаще раза в 0.3 с (иначе пересборка на каждом кадре)
-    return !covered && performance.now() - (L.at || 0) > 300;
-  }
-
-  buildLayer(L, key, r, CW, CH, draw) {
-    const MX = Math.ceil(CW * 0.25), MY = Math.ceil(CH * 0.25);
-    if (!L.c || L.c.width !== CW + 2 * MX || L.c.height !== CH + 2 * MY) L.c = makeCanvas(CW + 2 * MX, CH + 2 * MY);
-    const g = L.c.getContext('2d');
-    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = r.ctx.imageSmoothingQuality;
-    L.key = key; L.va = r.va; L.ox = r.ve + MX; L.oy = r.vf + MY; L.ver = (L.ver || 0) + 1; L.at = performance.now();
-    const v = r.view, save = { ...v }, ex = MX / r.va, ey = MY / r.va;
-    v.minX -= ex; v.maxX += ex; v.minY -= ey; v.maxY += ey;
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    draw(g);
-    Object.assign(v, save);
-    this.stats.layers++;
-  }
-
-  // нарисовать слой в контекст с преобразованием (va, ox, oy); контекст в пикселях
-  blitLayer(ctx, L, va, ox, oy) {
-    const k = va / L.va;
-    if (k === 1) ctx.drawImage(L.c, Math.round(ox - L.ox), Math.round(oy - L.oy));
-    else ctx.drawImage(L.c, ox - k * L.ox, oy - k * L.oy, L.c.width * k, L.c.height * k);
-  }
-
   // Сравнить сцену с прошлым кадром: какие объекты и растения поменяли картинку или место,
   // какие грядки стали политыми/сухими. Их прямоугольники попадают в списки перерисовки.
   diffScene() {
@@ -958,25 +927,26 @@ export class Farm {
     for (const [k, e] of M) if (e.stamp !== stamp) { (k.kind === 'c' || k.kind === 'o' || k.type ? O : G).push(e.x0, e.y0, e.x1, e.y1); M.delete(k); }
   }
 
-  // Перерисовать в слое только прямоугольники R (в его собственном масштабе и сдвиге)
-  patchLayer(L, R, r, draw) {
-    const g = L.c.getContext('2d'), v = r.view, save = { ...v };
-    v.minX = Infinity; v.minY = Infinity; v.maxX = -Infinity; v.maxY = -Infinity;
-    g.save();
-    // прямоугольники по целым пикселям слоя: без полупрозрачных краёв у клипа
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.beginPath();
-    for (let i = 0; i < R.length; i += 4) {
-      const x0 = Math.floor(R[i] * L.va + L.ox), y0 = Math.floor(R[i + 1] * L.va + L.oy);
-      g.rect(x0, y0, Math.ceil(R[i + 2] * L.va + L.ox) - x0, Math.ceil(R[i + 3] * L.va + L.oy) - y0);
-      v.minX = Math.min(v.minX, R[i]); v.minY = Math.min(v.minY, R[i + 1]); v.maxX = Math.max(v.maxX, R[i + 2]); v.maxY = Math.max(v.maxY, R[i + 3]);
-    }
-    g.clip();
-    g.setTransform(L.va, 0, 0, L.va, L.ox, L.oy);
-    draw(g);
-    g.restore();
+  // Кусок мира [x0..x1]×[y0..y1] целиком: земля, объекты по глубине, граница.
+  // live — живой кадр: объекты с прозрачностью/качанием и фермер (для квадратов карты — null).
+  drawScene(g, x0, y0, x1, y1, live) {
+    const v = this.r.view, save = { ...v };
+    v.minX = x0; v.minY = y0; v.maxX = x1; v.maxY = y1 + 90; // объёмные грядки ниже края видны в нём
+    g.fillStyle = BG; g.fillRect(x0 - 1, y0 - 1, x1 - x0 + 2, y1 - y0 + 2);
+    this.drawGround(g);
+    v.maxY = y1;
+    const list = this.staticList(this._tl || (this._tl = []));
+    if (live) {
+      const pd = live.pd;
+      let pDone = !live.player;
+      for (const d of list) {
+        if (!pDone && (d.depth > pd.depth || (d.depth === pd.depth && d.wy > pd.wy))) { this.drawItem(g, pd, live); pDone = true; }
+        this.drawItem(g, d, live);
+      }
+      if (!pDone) this.drawItem(g, pd, live);
+    } else for (const d of list) this.drawItem(g, d, null);
+    g.globalAlpha = 0.45; this.drawBorder(g); g.globalAlpha = 1;
     Object.assign(v, save);
-    this.stats.parts++;
   }
 
   // статичные объекты и растения в пределах видимой области (с запасом), по глубине
@@ -1019,81 +989,24 @@ export class Farm {
       const b = d.bed, info = this.cropInfo(b);
       const s = this.S.crops[b.crop][info.stage];
       ctx.drawImage(s.canvas, b.wx - s.ax, b.wy - s.ay, s.w, s.h);
-    } else this.player.draw(this.r);
+    } else this.player.draw(live.view);
   }
 
   render() {
     const r = this.r, ctx = r.ctx, w = this.world, S = this.S;
     r.begin(this.cam, null);
-    const CW = r.canvas.width, CH = r.canvas.height;
 
-    // зум во время щипка: слои растягиваются, перерисовка — когда масштаб не меняется 0.2 с
-    const now = performance.now();
-    if (this.cam.zoom !== this._lastZoom) { this._lastZoom = this.cam.zoom; this._zoomAt = now; }
-    const settled = now - (this._zoomAt || 0) > 300;
+    // Карта из готовых квадратов: перерисовываются только квадраты, где что-то изменилось
+    const T = this.tiles || (this.tiles = new MapTiles(this, this.perf.tier === 'low' ? 90 : this.perf.tier === 'mid' ? 150 : 220));
+    const key = `${this.groundV}|${w.unlockedCount()}`;
+    if (T.key !== key) { T.key = key; T.invalidateAll(); this.gDirty.length = 0; this.oDirty.length = 0; this.diffScene(); }
+    else this.diffScene();
+    T.invalidate(this.gDirty); T.invalidate(this.oDirty);
+    this.gDirty.length = 0; this.oDirty.length = 0;
+    const lv = T.draw(ctx, this.perf.tier === 'low' ? 10 : 6, this._warm);
 
-    // Слой 1: земля, вода, грядки, туман, граница. Меняется редко.
-    this.diffScene();
-    const G = this._gl || (this._gl = {});
-    const gkey = `${CW}x${CH}|${this.groundV}|${w.unlockedCount()}`;
-    let gPatched = false;
-    if (this.layerStale(G, gkey, settled, r, CW, CH) || this.gDirty.length > 4 * 40) {
-      this.buildLayer(G, gkey, r, CW, CH, (g) => {
-        g.fillStyle = BG; g.fillRect(0, 0, G.c.width, G.c.height);
-        g.setTransform(r.va, 0, 0, r.va, G.ox, G.oy);
-        this.drawGround(g);
-      });
-    } else if (this.gDirty.length) {
-      this.patchLayer(G, this.gDirty, r, (g) => {
-        g.fillStyle = BG; g.fillRect(-1e5, -1e5, 2e5, 2e5);
-        this.drawGround(g);
-      });
-      gPatched = true;
-    }
-
-    // Слой 2: земля + все неподвижные объекты и растения. Перерисовывается, только когда что-то
-    // изменилось (срубили дерево, выросла морковка, переставили дом) или камера ушла за запас.
-    const O = this._ol || (this._ol = { list: [] });
-    const okey = `${G.ver}`;
-    // на изменённой земле объекты тоже надо положить заново
-    if (gPatched) for (const x of this.gDirty) this.oDirty.push(x);
-    this.gDirty.length = 0;
-    const OD = this.oDirty;
-    if (OD.length && O.c && O.key === okey && OD.length <= 4 * 40 && !this.layerStale(O, okey, settled, r, CW, CH)) {
-      this.patchLayer(O, OD, r, (g) => {
-        g.save(); g.setTransform(1, 0, 0, 1, 0, 0); this.blitLayer(g, G, O.va, O.ox, O.oy); g.restore();
-        // список объектов слоя: в границах слоя, а не экрана
-        const v = r.view, k = O.va;
-        v.minX = -O.ox / k; v.minY = -O.oy / k; v.maxX = (O.c.width - O.ox) / k; v.maxY = (O.c.height - O.oy) / k;
-        for (const d of this.staticList(O.list)) if (this.hitsRects(d, OD)) this.drawItem(g, d, false);
-        g.globalAlpha = 0.45; this.drawBorder(g); g.globalAlpha = 1;
-      });
-      OD.length = 0;
-    }
-    // во время зума объекты рисуются вживую (чётко), слой объектов не трогаем до конца зума
-    const zoomLive = !settled && O.c && O.key === okey;
-    if (!zoomLive && (this.layerStale(O, okey, settled, r, CW, CH) || OD.length)) {
-      OD.length = 0;
-      this.buildLayer(O, okey, r, CW, CH, (g) => {
-        g.clearRect(0, 0, O.c.width, O.c.height);
-        this.blitLayer(g, G, r.va, O.ox, O.oy);
-        g.setTransform(r.va, 0, 0, r.va, O.ox, O.oy);
-        for (const d of this.staticList(O.list)) this.drawItem(g, d, false);
-        g.globalAlpha = 0.45; this.drawBorder(g); g.globalAlpha = 1;
-      });
-    }
-    this._zoomPending = G.va !== r.va || O.va !== r.va; // слой растянут — после щипка перерисуем чётко
-    const zooming = O.va !== r.va;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (zooming) {
-      // зум: растягивается только земля, объекты рисуются вживую — без размытия
-      ctx.fillStyle = BG; ctx.fillRect(0, 0, CW, CH);
-      this.blitLayer(ctx, G, r.va, r.ve, r.vf);
-    } else this.blitLayer(ctx, O, r.va, r.ve, r.vf);
-    r.resetView();
-
-    // Живая часть кадра: фермер, качающиеся и полупрозрачные объекты. Только в их прямоугольниках
-    // заново рисуется земля и всё, что там стоит, по глубине — остальное берётся из слоя.
+    // Живая часть кадра: фермер, качающиеся и полупрозрачные объекты. В их прямоугольниках
+    // кусок мира рисуется заново (в масштабе квадратов, чтобы совпасть с ними пиксель в пиксель).
     const p = this.player;
     toWorld(p.x, p.y, tmp);
     const pd = this._pd || (this._pd = { kind: 'p' });
@@ -1109,7 +1022,7 @@ export class Farm {
       F.push({ x0: tmp.x - HW + 6, y0: tmp.y - HH + 3, x1: tmp.x + HW - 6, y1: tmp.y + HH - 3, depth: t.x + t.y + 1, gx: t.x, gy: t.y });
     }
     let playerHidden = false;
-    const list = zooming ? this.staticList(this._zl || (this._zl = [])) : O.list;
+    const list = this.staticList(this._vis || (this._vis = []));
     for (const d of list) {
       if (d.kind !== 'o') continue;
       const s = this.objSprite(d);
@@ -1121,26 +1034,30 @@ export class Farm {
       }
       if (d.fade || fade || d.shake > 0) R.push(d.wx - s.ax - 4, d.wy - s.ay - 1, d.wx - s.ax + s.w + 4, d.wy - s.ay + s.h + 1);
     }
-    if (zooming) R.splice(0, R.length, -1e6, -1e6, 1e6, 1e6); // весь экран — живой
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.beginPath();
-    for (let i = 0; i < R.length; i += 4) {
-      const x0 = Math.floor(R[i] * r.va + r.ve), y0 = Math.floor(R[i + 1] * r.va + r.vf);
-      ctx.rect(x0, y0, Math.ceil(R[i + 2] * r.va + r.ve) - x0, Math.ceil(R[i + 3] * r.va + r.vf) - y0);
+    // каждый прямоугольник — отдельный кусочек в масштабе квадратов карты
+    const sL = lv.s, live = this._live || (this._live = { pd, view: { ctx: null, va: 1, ve: 0, vf: 0 }, player: true });
+    let pc = this._pc;
+    for (let n = 0; n < R.length; n += 4) {
+      const px0 = Math.floor(R[n] * sL), py0 = Math.floor(R[n + 1] * sL), px1 = Math.ceil(R[n + 2] * sL), py1 = Math.ceil(R[n + 3] * sL);
+      const pw = px1 - px0, ph = py1 - py0;
+      if (pw <= 0 || ph <= 0) continue;
+      if (!pc || pc.width < pw || pc.height < ph) pc = this._pc = makeCanvas(Math.max(pw, pc ? pc.width : 0), Math.max(ph, pc ? pc.height : 0));
+      const g = pc.getContext('2d');
+      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = ctx.imageSmoothingQuality;
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, pw, ph);
+      g.save(); g.beginPath(); g.rect(0, 0, pw, ph); g.clip();
+      g.setTransform(sL, 0, 0, sL, -px0, -py0);
+      const V = live.view; V.ctx = g; V.va = sL; V.ve = -px0; V.vf = -py0;
+      toWorld(p.x, p.y, tmp);
+      live.player = R[n] < tmp.x + 30 && R[n + 2] > tmp.x - 30 && R[n + 1] < tmp.y + 12 && R[n + 3] > tmp.y - 95;
+      this.drawScene(g, px0 / sL, py0 / sL, px1 / sL, py1 / sL, live);
+      g.restore();
+      ctx.setTransform(lv.k, 0, 0, lv.k, r.ve, r.vf);
+      ctx.drawImage(pc, 0, 0, pw, ph, px0, py0, pw, ph);
     }
-    ctx.clip();
-    this.blitLayer(ctx, G, r.va, r.ve, r.vf);
     r.resetView();
-    let pDone = false;
-    for (const d of list) {
-      if (!pDone && (d.depth > pd.depth || (d.depth === pd.depth && d.wy > pd.wy))) { this.drawItem(ctx, pd, true); pDone = true; }
-      if (this.hitsRects(d, R)) this.drawItem(ctx, d, true);
-    }
-    if (!pDone) this.drawItem(ctx, pd, true);
-    ctx.globalAlpha = 0.45; this.drawBorder(ctx); ctx.globalAlpha = 1;
-    ctx.restore();
     this.stats.live = R.length / 4;
+    this._zoomPending = T.pending;
 
     // фермер за объектом: полупрозрачная копия поверх
     if (playerHidden) { ctx.globalAlpha = 0.4; p.draw(r); ctx.globalAlpha = 1; }
