@@ -18,8 +18,16 @@ const hash = (buf) => createHash('sha1').update(buf).digest('hex').slice(0, 8);
 rmSync(DIST, { recursive: true, force: true });
 mkdirSync(join(DIST, 'assets', 'sprites'), { recursive: true });
 
+// Версия спрайтов для сброса кэша
+const { DEFS, ICON_FILES, SPRITE_DIR } = await import('../src/game/assets.js');
+const used = [...new Set([...Object.keys(DEFS), ...Object.values(ICON_FILES)])].sort();
+const vh = createHash('sha1');
+for (const name of used) { const f = join(ROOT, SPRITE_DIR, name + '.webp'); if (existsSync(f)) vh.update(readFileSync(f)); }
+const assetV = vh.digest('hex').slice(0, 8);
+
 // JS
 const js = await build({
+  define: { __ASSET_V__: JSON.stringify(assetV) },
   entryPoints: [join(ROOT, 'src', 'main.js')],
   bundle: true, minify: true, format: 'esm', target: ['es2020', 'safari14'],
   write: false, legalComments: 'none',
@@ -42,8 +50,6 @@ html = html.replace('href="style.css"', `href="${cssName}"`)
 writeFileSync(join(DIST, 'index.html'), html);
 
 // Спрайты: только используемые
-const { DEFS, ICON_FILES, SPRITE_DIR } = await import('../src/game/assets.js');
-const used = new Set([...Object.keys(DEFS), ...Object.values(ICON_FILES)]);
 let bytes = 0, n = 0;
 for (const name of used) {
   const src = join(ROOT, SPRITE_DIR, name + '.webp');

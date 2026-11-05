@@ -6,7 +6,8 @@
 import { loadImage } from '../engine/Sprite.js';
 
 export const SPRITE_DIR = 'assets/sprites/';
-const EXT = '.webp';
+// В сборке __ASSET_V__ — хеш всех спрайтов: новые картинки не застревают в кэше браузера
+const EXT = '.webp' + (typeof __ASSET_V__ !== 'undefined' ? '?v=' + __ASSET_V__ : '');
 
 export const DEFS = {
   tree_oak: { w: 86, ay: 0.93 }, tree_oak2: { w: 84, ay: 0.93 }, tree_apple: { w: 88, ay: 0.93 }, tree_pine: { w: 64, ay: 0.96 },
