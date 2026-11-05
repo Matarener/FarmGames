@@ -36,20 +36,6 @@ const jsCode = js.outputFiles[0].contents;
 const jsName = `game.${hash(jsCode)}.js`;
 writeFileSync(join(DIST, jsName), jsCode);
 
-// Редактор анимаций (editor.html)
-const ed = await build({
-  define: { __ASSET_V__: JSON.stringify(assetV) },
-  entryPoints: [join(ROOT, 'src', 'editor', 'editor.js')],
-  bundle: true, minify: true, format: 'esm', target: ['es2020'],
-  write: false, legalComments: 'none',
-});
-const edCode = ed.outputFiles[0].contents;
-const edName = `editor.${hash(edCode)}.js`;
-writeFileSync(join(DIST, edName), edCode);
-writeFileSync(join(DIST, 'editor.html'), readFileSync(join(ROOT, 'editor.html'), 'utf8')
-  .replace('<script type="module" src="src/editor/editor.js"></script>', `<script type="module" src="${edName}"></script>`));
-// Анимации из редактора
-if (existsSync(join(ROOT, 'assets', 'anims.json'))) copyFileSync(join(ROOT, 'assets', 'anims.json'), join(DIST, 'assets', 'anims.json'));
 
 // CSS
 const css = await build({ entryPoints: [join(ROOT, 'style.css')], minify: true, write: false, loader: { '.css': 'css' } });

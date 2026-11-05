@@ -34,7 +34,9 @@ export class Player {
     this.idleTime = 0;
     this.gait = makeGait();
     this.legs = data.legs || null;  // { hipX, len } — опоры стоп для IK
-    this.grip2 = data.grip2 || 0;   // где на рукояти вторая рука (вдоль предплечья)
+    this.grip2 = data.grip2 || 0;   // где на рукояти вторая рука
+    this.gripBone = data.gripBone;
+    this.hands = data.hands;
   }
 
   get tx() { return Math.floor(this.x); }
@@ -136,11 +138,15 @@ export class Player {
 
   solveIK(dt) {
     if (!this.legs) return;
+    const tool = this.sk.override.tool;
+    const twoHand = this.state === 'work' && TWO_HANDED[tool] && this.anim.name === 'swing';
+    // с инструментом кисть сжата в кулак
+    if (this.hands) { this.sk.override.handF = tool ? 'fist' : 'hand'; this.sk.override.handB = twoHand ? 'fist' : 'hand'; }
     solveRig(this.sk, this.gait, {
-      legs: this.legs, grip2: this.grip2, flip: this.flip, dt,
+      legs: this.legs, grip2: this.grip2, gripBone: this.gripBone, flip: this.flip, dt,
       squat: !!(this.anim.cur && this.anim.cur.kneesOut),
       legsIK: !this.anim.cur || this.anim.cur.footIK,
-      twoHand: this.state === 'work' && TWO_HANDED[this.sk.override.tool] && this.anim.name === 'swing',
+      twoHand,
     });
   }
 

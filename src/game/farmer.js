@@ -301,72 +301,164 @@ export const DEFAULT_ANIMS = {
     },
   },
 };
-// anims — анимации из редактора (assets/anims.json); заменяют одноимённые стандартные.
-export function makeFarmerData(A = {}, anims = null) {
-  const animations = { ...clone(DEFAULT_ANIMS), ...(anims ? clone(anims) : {}) };
+// Фермер по частям (assets/source/body.png): голова, шея, туловище, плечо,
+// предплечье, кисть и кулак, бедро, голень с ботинком. Координаты — пиксели
+// листа: рамка части и её шарниры. Шкала одна на все части: S px = 1 единица мира.
+const BODY_S = 23;
+const BODY = {
+  body_head: { box: [21, 19], pivot: [157, 230] },           // низ головы, куда входит шея
+  body_neck: { box: [138, 275], pivot: [164, 342], top: [164, 292] },
+  body_torso: {
+    box: [58, 380], pivot: [160, 675],                          // середина таза
+    neck: [178, 405], shoulderF: [93, 465], shoulderB: [238, 428], hipF: [116, 684], hipB: [205, 665],
+  },
+  body_upper: { box: [474, 23], pivot: [517, 61], end: [524, 183] },
+  body_upper2: { box: [654, 23], pivot: [684, 49] },
+  body_fore: { box: [498, 223], pivot: [524.5, 247.5], end: [525.5, 343.5] },
+  body_fore2: { box: [670, 211], pivot: [698, 236] },
+  body_hand: { box: [486, 384], pivot: [526, 400], grip: [528, 450] },
+  body_fist: { box: [650, 395], pivot: [694, 412], grip: [695, 455] },
+  body_hand2: { box: [50, 803], pivot: [87, 815] },
+  body_fist2: { box: [206, 799], pivot: [250, 812] },
+  body_thigh: { box: [486, 555], pivot: [535, 599], end: [536.5, 758.5] },
+  body_shin: { box: [634, 547], pivot: [691, 596], end: [687, 1001] },  // конец — подошва
+};
+
+function bodyParts(P, A) {
+  if (!Object.keys(BODY).every((n) => A[n])) return null;
+  const S = BODY_S;
+  const part = (name, shade = 0) => {
+    const src = A[name], d = BODY[name];
+    let canvas = src.img;
+    if (shade) {
+      canvas = cropImage(src.img, 0, 0, 1, 1);
+      const g = canvas.getContext('2d');
+      g.globalCompositeOperation = 'source-atop';
+      g.fillStyle = `rgba(20,30,60,${shade})`; g.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    return { canvas, w: src.w, h: src.h, ax: (d.pivot[0] - d.box[0]) / S, ay: (d.pivot[1] - d.box[1]) / S };
+  };
+  const len = (name, key = 'end') => { const d = BODY[name]; return Math.hypot(d[key][0] - d.pivot[0], d[key][1] - d.pivot[1]) / S; };
+  const FAR = 0.14;
+  P.head = part('body_head'); P.neck = part('body_neck'); P.neckFar = part('body_neck', 0.15);
+  P.torso = part('body_torso');
+  P.upperArm = part('body_upper'); P.upperArmFar = part('body_upper2', FAR);
+  P.foreArm = part('body_fore'); P.foreArmFar = part('body_fore2', FAR);
+  P.hand = part('body_hand'); P.fist = part('body_fist');
+  P.handFar = part('body_hand2', FAR); P.fistFar = part('body_fist2', FAR);
+  P.thigh = part('body_thigh'); P.thighFar = part('body_thigh', FAR);
+  P.shin = part('body_shin'); P.shinFar = part('body_shin', FAR);
+  // вид сзади: пока со старого листа, подогнанный по ширине (новых частей сзади ещё нет)
+  const T = BODY.body_torso;
+  if (A.torso_back) {
+    const c = cropImage(A.torso_back.img, 0.22, 0, 0.84, 1), w = A.body_torso.w, h = w * c.height / c.width;
+    P.torsoBack = { canvas: c, w, h, ax: w * 0.5, ay: h * 0.8 };
+  } else P.torsoBack = P.torso;
+  if (A.farmer_back) {
+    const c = cropImage(A.farmer_back.img, 0.04, 0, 0.96, 0.3), w = A.body_head.w * 0.95, h = w * c.height / c.width;
+    P.headBack = { canvas: c, w, h, ax: w * 0.5, ay: h * 0.93 };
+  } else P.headBack = P.head;
+  const rel = (pt) => [(pt[0] - T.pivot[0]) / S, (pt[1] - T.pivot[1]) / S];
+  const thigh = len('body_thigh'), shin = len('body_shin');
+  const hipF = rel(T.hipF), hipB = rel(T.hipB);
+  const handGrip = len('body_fist', 'grip');
+  return {
+    // таз чуть ниже полной длины ноги: колени слегка согнуты, IK не упирается в предел
+    hip: -(thigh + shin) * 0.975 - (hipF[1] + hipB[1]) / 2,
+    neck: rel(T.neck), neckLen: len('body_neck', 'top'),
+    shoulderF: rel(T.shoulderF), shoulderB: rel(T.shoulderB),
+    fore: len('body_upper'), hand: len('body_fore'),
+    hipF, hipB, hipX: (hipB[0] - hipF[0]) / 2, knee: thigh, shin,
+    toolY: handGrip, armLen2: len('body_fore') + handGrip, grip2: handGrip + 3.5,
+    hands: true,
+  };
+}
+
+// Размеры костей старых частей → общий формат
+function legacyK(K) {
+  return {
+    hip: K.hip, neck: [0, K.head], neckLen: 0,
+    shoulderF: [-K.shoulderX, K.shoulderY], shoulderB: [K.shoulderX, K.shoulderY],
+    fore: K.fore, hand: K.grip, hipF: [-K.hipX, -0.6], hipB: [K.hipX, -0.6], hipX: K.hipX,
+    knee: K.knee, shin: -K.hip + 0.6 - K.knee + 0.25, toolY: 0, armLen2: K.grip, grip2: K.grip2 - K.grip,
+    hands: false,
+  };
+}
+
+export function makeFarmerData(A = {}) {
+  const animations = clone(DEFAULT_ANIMS);
   const P = parts();
-  // размеры костей: под части художника или под процедурные
-  const K = artParts(P, A) || (artHeads(P, A), {
+  // размеры костей: под новые части, под старые части листа или под процедурные
+  const K = bodyParts(P, A) || legacyK(artParts(P, A) || (artHeads(P, A), {
     hip: -12.6, head: -12, shoulderY: -10.5, shoulderX: 2.6, fore: 6.4, hipX: 2.3, knee: 6.3, grip: 6.6, grip2: 9.6,
-  });
+  }));
   const att = (sprite, x = 0, y = 0, rotation = 0) => ({ sprite, x, y, rotation });
   const bones = [
     { name: 'root' },
     { name: 'hip', parent: 'root', y: K.hip },
     { name: 'torso', parent: 'hip' },
-    { name: 'head', parent: 'torso', y: K.head },
-    { name: 'armB', parent: 'torso', x: K.shoulderX, y: K.shoulderY },
+    { name: 'neck', parent: 'torso', x: K.neck[0], y: K.neck[1] },
+    { name: 'head', parent: 'neck', y: -K.neckLen },
+    { name: 'armB', parent: 'torso', x: K.shoulderB[0], y: K.shoulderB[1] },
     { name: 'foreB', parent: 'armB', y: K.fore },
-    { name: 'armF', parent: 'torso', x: -K.shoulderX, y: K.shoulderY },
+    { name: 'handB', parent: 'foreB', y: K.hand },
+    { name: 'armF', parent: 'torso', x: K.shoulderF[0], y: K.shoulderF[1] },
     { name: 'foreF', parent: 'armF', y: K.fore },
-    { name: 'thighB', parent: 'hip', x: K.hipX, y: -0.6 },
+    { name: 'handF', parent: 'foreF', y: K.hand },
+    { name: 'thighB', parent: 'hip', x: K.hipB[0], y: K.hipB[1] },
     { name: 'shinB', parent: 'thighB', y: K.knee },
-    { name: 'thighF', parent: 'hip', x: -K.hipX, y: -0.6 },
+    { name: 'thighF', parent: 'hip', x: K.hipF[0], y: K.hipF[1] },
     { name: 'shinF', parent: 'thighF', y: K.knee },
   ];
+  const H = K.hands;
   const slots = [
     { name: 'armB', bone: 'armB', attachment: 'arm' },
     { name: 'foreB', bone: 'foreB', attachment: 'fore' },
-    { name: 'thighB', bone: 'thighB', attachment: 'thigh' },
+    { name: 'handB', bone: 'handB', attachment: H ? 'hand' : null },
+    { name: 'neck', bone: 'neck', attachment: P.neck ? 'neck' : null },
     { name: 'shinB', bone: 'shinB', attachment: 'shin' },
-    { name: 'thighF', bone: 'thighF', attachment: 'thigh' },
+    { name: 'thighB', bone: 'thighB', attachment: 'thigh' },
     { name: 'shinF', bone: 'shinF', attachment: 'shin' },
+    { name: 'thighF', bone: 'thighF', attachment: 'thigh' },
     { name: 'torso', bone: 'torso', attachment: 'torso' },
     { name: 'head', bone: 'head', attachment: 'head' },
     { name: 'armF', bone: 'armF', attachment: 'arm' },
-    { name: 'tool', bone: 'foreF', attachment: null },
     { name: 'foreF', bone: 'foreF', attachment: 'fore' },
+    { name: 'tool', bone: 'handF', attachment: null },
+    { name: 'handF', bone: 'handF', attachment: H ? 'hand' : null },
   ];
+  // инструмент: начало координат — точка хвата, +y — вдоль предплечья
+  const ty = K.toolY;
   const tools = {
-    axe: att(P.axe, 0, 6.6), pickaxe: att(P.pickaxe, 0, 6.6), hoe: att(P.hoe, 0, 6.6),
-    can: att(P.can, 0, 6.8), seedbag: att(P.seedbag, 0, 6.6),
+    axe: att(P.axe, 0, ty), pickaxe: att(P.pickaxe, 0, ty), hoe: att(P.hoe, 0, ty),
+    can: att(P.can, 0, ty + 0.2), seedbag: att(P.seedbag, 0, ty),
   };
+  const hands = (near) => (H ? { hand: att(near ? P.hand : P.handFar), fist: att(near ? P.fist : P.fistFar) } : {});
   const skins = {
     default: {
-      armB: { arm: att(P.upperArmFar) }, foreB: { fore: att(P.foreArmFar) },
+      armB: { arm: att(P.upperArmFar) }, foreB: { fore: att(P.foreArmFar) }, handB: hands(false),
       thighB: { thigh: att(P.thighFar) }, shinB: { shin: att(P.shinFar) },
       thighF: { thigh: att(P.thigh) }, shinF: { shin: att(P.shin) },
-      torso: { torso: att(P.torso) }, head: { head: att(P.head) },
-      armF: { arm: att(P.upperArm) }, foreF: { fore: att(P.foreArm) },
+      torso: { torso: att(P.torso) }, head: { head: att(P.head) }, neck: P.neck ? { neck: att(P.neck) } : {},
+      armF: { arm: att(P.upperArm) }, foreF: { fore: att(P.foreArm) }, handF: hands(true),
       tool: tools,
     },
     back: {
       torso: { torso: att(P.torsoBack) }, head: { head: att(P.headBack) },
       // сзади «передняя» рука дальше от камеры
-      armF: { arm: att(P.upperArmFar) }, foreF: { fore: att(P.foreArmFar) },
-      armB: { arm: att(P.upperArm) }, foreB: { fore: att(P.foreArm) },
+      armF: { arm: att(P.upperArmFar) }, foreF: { fore: att(P.foreArmFar) }, handF: hands(false),
+      armB: { arm: att(P.upperArm) }, foreB: { fore: att(P.foreArm) }, handB: hands(true),
     },
   };
   const drawOrders = {
-    back: ['armF', 'tool', 'foreF', 'thighB', 'shinB', 'thighF', 'shinF', 'torso', 'head', 'armB', 'foreB'],
+    back: ['armF', 'foreF', 'tool', 'handF', 'shinB', 'thighB', 'shinF', 'thighF', 'neck', 'torso', 'head', 'armB', 'foreB', 'handB'],
   };
-
 
   // IK: ноги (стопа на земле) и вторая рука на рукояти инструмента
   const ik = [
-    { name: 'legF', bone1: 'thighF', bone2: 'shinF', len2: -K.hip + 0.6 - K.knee + 0.25, bend: 1 },
-    { name: 'legB', bone1: 'thighB', bone2: 'shinB', len2: -K.hip + 0.6 - K.knee + 0.25, bend: 1 },
-    { name: 'armB', bone1: 'armB', bone2: 'foreB', len2: K.grip, bend: -1 },
+    { name: 'legF', bone1: 'thighF', bone2: 'shinF', len2: K.shin, bend: 1 },
+    { name: 'legB', bone1: 'thighB', bone2: 'shinB', len2: K.shin, bend: 1 },
+    { name: 'armB', bone1: 'armB', bone2: 'foreB', len2: K.armLen2, bend: -1 },
   ];
-  return { bones, slots, skins, drawOrders, animations, ik, legs: { hipX: K.hipX }, grip2: K.grip2 };
+  return { bones, slots, skins, drawOrders, animations, ik, legs: { hipX: K.hipX }, grip2: K.grip2, gripBone: 'handF', hands: H };
 }

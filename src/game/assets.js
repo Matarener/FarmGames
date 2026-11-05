@@ -30,6 +30,8 @@ export const DEFS = {
   // части фермера для скелета (второй лист)
   head_34: { w: 17 }, farmer_back: { w: 17 }, torso_34: { w: 14 }, torso_back: { w: 14 },
   arm_4: { w: 7 }, hand_1: { w: 4.2 }, thigh_1: { w: 6.6 }, leg_1: { w: 6.2 },
+  // фермер по частям (body.png): одна шкала 23 px листа на единицу мира
+  body_head: { w: 12.09 }, body_neck: { w: 2.3 }, body_torso: { w: 8.74 }, body_upper: { w: 4.09 }, body_upper2: { w: 3.52 }, body_fore: { w: 2.3 }, body_fore2: { w: 2.3 }, body_hand: { w: 4.04 }, body_fist: { w: 3.7 }, body_fist2: { w: 3.7 }, body_hand2: { w: 3.7 }, body_shin: { w: 5.13 }, body_thigh: { w: 4.39 },
   tex_soil: { w: 64 }, tex_water: { w: 64 }, tex_sand: { w: 64 }, tex_stone: { w: 64 },
 };
 
@@ -72,18 +74,3 @@ export function cropImage(img, fx0, fy0, fx1, fy1, flip) {
   return c;
 }
 
-// Анимации из редактора (editor.html). ?draft — черновик из localStorage
-// этого браузера, иначе assets/anims.json. Нет файла — стандартные анимации.
-export const ANIMS_DRAFT_KEY = 'farm.anims.draft';
-export async function loadAnims() {
-  try {
-    if (typeof location !== 'undefined' && /[?&]draft\b/.test(location.search)) {
-      const d = localStorage.getItem(ANIMS_DRAFT_KEY);
-      if (d) { const j = JSON.parse(d); return j.animations || j; }
-    }
-    const r = await fetch('assets/anims.json', { cache: 'no-cache' });
-    if (!r.ok) return null;
-    const j = await r.json();
-    return j && typeof j === 'object' ? (j.animations || j) : null;
-  } catch { return null; }
-}

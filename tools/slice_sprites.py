@@ -241,8 +241,11 @@ SPRITES_2 = {
 SHEETS_HI = {
     'rocks.png': {'rock_small': (360, 200), 'rock_small2': (900, 220), 'rock_big': (400, 560), 'rock_ore': (940, 620)},
     'shed.png': {'shed': (512, 420)},   # фон #FF00FF
+    # фермер по частям для скелета, фон #FF00FF
+    'body.png': {'body_head': (67, 131), 'body_neck': (142, 320), 'body_torso': (251, 550), 'body_upper': (557, 109), 'body_upper2': (691, 114), 'body_fore': (519, 290), 'body_fore2': (717, 282), 'body_hand': (529, 449), 'body_fist': (714, 447), 'body_fist2': (278, 864), 'body_hand2': (92, 884), 'body_shin': (719, 769), 'body_thigh': (500, 669)},
 }
-MAGENTA = ('shed.png',)
+MAGENTA = ('shed.png', 'body.png')
+BODY_DENSITY = 12.0  # части фермера — плотнее: в редакторе анимаций их смотрят крупно
 
 # Изометрические плитки второго листа: (x0, y0, x1, y1) — коробка плитки.
 # Верхняя грань (ромб) разворачивается обратно в квадратную текстуру.
@@ -300,6 +303,31 @@ def cut(im, hires, F, x0, y0, x1, y1, tw, th):
     return np.asarray(src.resize((tw, th), Image.LANCZOS)).astype(np.float32)
 
 
+# Закрасить коричневые «гнёзда» суставов на туловище (их закрывают руки и ноги,
+# но при движении они проглядывают): цвет берём у ближайших соседей.
+INPAINT = {'body.png': [(66, 420, 122, 516), (92, 646, 140, 722)]}
+
+
+def inpaint(im, boxes):
+    a = np.asarray(im).astype(np.int16).copy()
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    brown = (r > 90) & (r - b > 45) & (g < r - 15) & (r < 235)
+    m = np.zeros(brown.shape, bool)
+    for x0, y0, x1, y1 in boxes:
+        m[y0:y1, x0:x1] = brown[y0:y1, x0:x1]
+    m = nd.binary_dilation(m, iterations=3) & ~((r > 200) & (b > 200) & (g < 80))
+    lum = (r + g + b) / 3
+    for x0, y0, x1, y1 in boxes:
+        sub = m[y0:y1, x0:x1]
+        blk = a[y0:y1, x0:x1]
+        ok = ~sub & (lum[y0:y1, x0:x1] > 70) & ~((blk[..., 0] > 200) & (blk[..., 2] > 200) & (blk[..., 1] < 80))
+        # цвет ткани вокруг (самый частый светлый цвет рамки), без обводки
+        col = np.median(blk[ok], axis=0)
+        blk[sub] = col
+        a[y0:y1, x0:x1] = blk
+    return Image.fromarray(a.astype(np.uint8))
+
+
 def magenta_alpha(a):
     """Фон — сплошной пурпурный #FF00FF: альфа по «пурпурности» пикселя."""
     r, g, b = a[..., 0].astype(np.float32), a[..., 1].astype(np.float32), a[..., 2].astype(np.float32)
@@ -318,6 +346,8 @@ def magenta_alpha(a):
 def slice_sheet(path, sprites, checker, widths, only=None, magenta=False):
     print(os.path.basename(path))
     im = Image.open(path).convert('RGB')
+    if os.path.basename(path) in INPAINT:
+        im = inpaint(im, INPAINT[os.path.basename(path)])
     a = np.asarray(im).astype(np.int16)
     bg_level = 230 if checker else 238
     if magenta:
@@ -354,7 +384,7 @@ def slice_sheet(path, sprites, checker, widths, only=None, magenta=False):
         y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
         al = (alpha[y0:y1, x0:x1] * mask[y0:y1, x0:x1]).astype(np.float32)
         nw, nh = x1 - x0, y1 - y0
-        tw = round(widths[name] * DENSITY) if name in widths else nw * FALLBACK_UP
+        tw = round(widths[name] * (BODY_DENSITY if name.startswith('body_') else DENSITY)) if name in widths else nw * FALLBACK_UP
         th = max(1, round(nh * tw / nw))
         rgb = cut(im, hires, F, x0, y0, x1, y1, tw, th)
         al = np.asarray(Image.fromarray((al * 255).astype(np.uint8)).resize((tw, th), Image.LANCZOS)).astype(np.float32) / 255

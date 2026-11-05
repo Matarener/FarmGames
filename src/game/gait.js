@@ -52,7 +52,7 @@ export function solveRig(sk, g, opts) {
     if (arm.mix < 0.01) arm.mix = 0;
     if (opts.instant) arm.mix = want;
     if (arm.mix) {
-      const f = sk.boneMap.foreF, root = sk.bones[0];
+      const f = sk.boneMap[opts.gripBone || 'foreF'], root = sk.bones[0];
       arm.x = f.c * opts.grip2 + f.tx - root.tx;
       arm.y = f.d * opts.grip2 + f.ty - root.ty;
     }
