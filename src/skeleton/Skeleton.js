@@ -7,10 +7,18 @@
 //   slots: [{name, bone, attachment}],                          // порядок = порядок отрисовки
 //   skins: { default: { slotName: { attachmentName: {sprite, x, y, rotation} } }, back: {...} },
 //   drawOrders: { back: [slotName, ...] },                      // необязательно
+//   ik: [{name, bone1, bone2, len2, bend}],                      // необязательно
 //   animations: { name: Animation-данные }
 // }
+//
+// IK — двухкостная инверсная кинематика (бедро–голень, плечо–предплечье).
+// Решается точно по теореме косинусов, без итераций. Цель задаётся кодом
+// в координатах корневой кости: ik.x, ik.y, сила ik.mix (0 — только FK).
+// len2 — расстояние от начала второй кости до конечной точки (стопа, кисть),
+// bend = ±1 — в какую сторону сгибается сустав.
 
 const DEG = Math.PI / 180;
+const wrapDeg = (a) => ((a + 540) % 360) - 180;
 
 export class Bone {
   constructor(data, parent) {
@@ -70,6 +78,45 @@ export class Skeleton {
     this.skin = 'default';
     this.drawOrder = this.slots;
     this.override = {}; // slotName → имя вложения, задаётся кодом (например, инструмент)
+    this.ik = (data.ik || []).map((d) => ({
+      name: d.name, b1: this.boneMap[d.bone1], b2: this.boneMap[d.bone2],
+      len2: d.len2, bend: d.bend ?? 1, x: 0, y: 0, mix: 0,
+    }));
+    this.ikMap = {};
+    for (const k of this.ik) this.ikMap[k.name] = k;
+  }
+
+  // Решить все IK-ограничения с mix > 0 и пересчитать мировые матрицы.
+  // Вызывается после применения анимации (FK-поза уже посчитана).
+  solveIK() {
+    const root = this.bones[0];
+    let any = false;
+    for (const k of this.ik) {
+      if (k.mix <= 0) continue;
+      any = true;
+      const b1 = k.b1, b2 = k.b2, p = b1.parent;
+      // цель в мировых координатах скелета
+      const tx = root.tx + k.x, ty = root.ty + k.y;
+      const sx = b1.tx, sy = b1.ty;
+      const L1 = Math.hypot(b2.data.x || 0, b2.data.y || 0), L2 = k.len2;
+      let dx = tx - sx, dy = ty - sy;
+      let D = Math.hypot(dx, dy);
+      const maxD = (L1 + L2) * 0.999, minD = Math.abs(L1 - L2) + 0.01;
+      if (D < 1e-4) { dx = 0; dy = 1; D = 1e-4; }
+      const Dc = Math.min(maxD, Math.max(minD, D));
+      const base = Math.atan2(-dx, dy);           // угол направления «вдоль кости» (+y)
+      const cosA = (L1 * L1 + Dc * Dc - L2 * L2) / (2 * L1 * Dc);
+      const th1 = base + k.bend * Math.acos(Math.max(-1, Math.min(1, cosA)));
+      const jx = sx - Math.sin(th1) * L1, jy = sy + Math.cos(th1) * L1;
+      const th2 = Math.atan2(-(tx - jx), ty - jy);
+      const thp = p ? Math.atan2(-p.c, p.d) : 0;
+      const r1 = (th1 - thp) / DEG, r2 = (th2 - th1) / DEG;
+      b1.rotation += (wrapDeg(r1 - b1.rotation)) * k.mix;
+      b2.rotation += (wrapDeg(r2 - b2.rotation)) * k.mix;
+      // пересчитать эту цепочку сразу: следующие ограничения могут от неё зависеть
+      this.updateWorld();
+    }
+    return any;
   }
 
   setSkin(name) {

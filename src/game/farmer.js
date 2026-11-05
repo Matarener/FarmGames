@@ -196,7 +196,7 @@ function artParts(P, A) {
   P.shin = part(A.leg_1, 0, 0.14, 1, 1, 6.2, 0.5, 0.04);
   P.shinFar = part(A.leg_1, 0, 0.14, 1, 1, 6.2, 0.5, 0.04, 0.22);
   return {
-    hip: -15.4, head: -16.2, shoulderY: -13.6, shoulderX: 4.4, fore: UL - 0.4, hipX: 2.2, knee: 5.6,
+    hip: -15.4, head: -16.2, shoulderY: -13.6, shoulderX: 4.4, fore: UL - 0.4, hipX: 2.2, knee: 5.6, grip: 6.3, grip2: 9.8,
   };
 }
 
@@ -215,7 +215,7 @@ export function makeFarmerData(A = {}) {
   const P = parts();
   // размеры костей: под части художника или под процедурные
   const K = artParts(P, A) || (artHeads(P, A), {
-    hip: -12.6, head: -12, shoulderY: -10.5, shoulderX: 2.6, fore: 6.4, hipX: 2.3, knee: 6.3,
+    hip: -12.6, head: -12, shoulderY: -10.5, shoulderX: 2.6, fore: 6.4, hipX: 2.3, knee: 6.3, grip: 6.6, grip2: 9.6,
   });
   const att = (sprite, x = 0, y = 0, rotation = 0) => ({ sprite, x, y, rotation });
   const bones = [
@@ -291,16 +291,6 @@ export function makeFarmerData(A = {}) {
         hip: { translate: [[0, 0, 0, 2], [0.125, 0, -0.9, 2], [0.25, 0, 0, 2], [0.375, 0, -0.9, 2], [0.5, 0, 0]] },
         torso: { rotate: [[0, -1.5, 2], [0.25, 1.5, 2], [0.5, -1.5]] },
         head: { rotate: [[0, 1, 2], [0.25, -1, 2], [0.5, 1]] },
-        thighF: {
-          translate: [[0, 0, 0, 2], [0.125, 0, -2.2, 2], [0.25, 0, 0], [0.5, 0, 0]],
-          rotate: [[0, -7, 2], [0.25, 7, 2], [0.5, -7]],
-        },
-        shinF: { rotate: [[0, 0, 2], [0.125, 16, 2], [0.25, 0], [0.5, 0]] },
-        thighB: {
-          translate: [[0, 0, 0], [0.25, 0, 0, 2], [0.375, 0, -2.2, 2], [0.5, 0, 0]],
-          rotate: [[0, 7, 2], [0.25, -7, 2], [0.5, 7]],
-        },
-        shinB: { rotate: [[0, 0], [0.25, 0, 2], [0.375, 16, 2], [0.5, 0]] },
         armF: { rotate: [[0, 9, 2], [0.25, -9, 2], [0.5, 9]] },
         foreF: { rotate: [[0, -8, 2], [0.25, -18, 2], [0.5, -8]] },
         armB: { rotate: [[0, -9, 2], [0.25, 9, 2], [0.5, -9]] },
@@ -366,5 +356,11 @@ export function makeFarmerData(A = {}) {
       },
     },
   };
-  return { bones, slots, skins, drawOrders, animations };
+  // IK: ноги (стопа на земле) и вторая рука на рукояти инструмента
+  const ik = [
+    { name: 'legF', bone1: 'thighF', bone2: 'shinF', len2: -K.hip + 0.6 - K.knee + 0.25, bend: 1 },
+    { name: 'legB', bone1: 'thighB', bone2: 'shinB', len2: -K.hip + 0.6 - K.knee + 0.25, bend: 1 },
+    { name: 'armB', bone1: 'armB', bone2: 'foreB', len2: K.grip, bend: -1 },
+  ];
+  return { bones, slots, skins, drawOrders, animations, ik, legs: { hipX: K.hipX }, grip2: K.grip2 };
 }
