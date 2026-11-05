@@ -101,7 +101,12 @@ export class World {
       if (reserved.has(y * N + x)) continue;
       const edge = lx === 0 || ly === 0 || lx === CHUNK - 1 || ly === CHUNK - 1;
       const r = rnd();
-      if (edge) {
+      const front = lx === CHUNK - 1 || ly === CHUNK - 1; // передние края: деревья закрывали бы ферму
+      if (edge && front) {
+        if (r < 0.14) this.add('pine', x, y);
+        else if (r < 0.4) this.add('rock', x, y);
+        else if (r < 0.6) this.add(r < 0.5 ? 'bush' : 'berry', x, y);
+      } else if (edge) {
         if (r < 0.5) this.add(rnd() < 0.7 ? (rnd() < 0.5 ? 'oak' : 'oak2') : 'pine', x, y);
         else if (r < 0.68) this.add('rock', x, y);
         else if (r < 0.76) this.add('bush', x, y);
@@ -124,7 +129,7 @@ export class World {
       // валуны 2×2
       const nb = 1 + ((rnd() * 2) | 0);
       for (let i = 0; i < nb; i++) this.add('boulder', x0 + 1 + ((rnd() * (CHUNK - 3)) | 0), y0 + 1 + ((rnd() * (CHUNK - 3)) | 0));
-      const forest = 0.22 + rnd() * 0.2; // у каждого участка своя густота
+      const forest = 0.14 + rnd() * 0.18; // у каждого участка своя густота
       for (let y = y0; y < y0 + CHUNK; y++) for (let x = x0; x < x0 + CHUNK; x++) {
         const r = rnd(), k = rnd();
         if (r < forest) this.add(k < 0.4 ? 'oak' : k < 0.7 ? 'oak2' : k < 0.92 ? 'pine' : 'apple', x, y);

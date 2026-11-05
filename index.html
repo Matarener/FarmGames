@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#5ea83f">
+  <title>Ферма</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="game"></canvas>
+
+    <div class="hud-top ui-layer">
+      <div class="profile">
+        <div class="avatar">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="20" rx="9" ry="8.5" fill="#f6c9a0" stroke="#3d2b1f" stroke-width="1.4"/><ellipse cx="16" cy="11.5" rx="14" ry="4.2" fill="#e9c46a" stroke="#3d2b1f" stroke-width="1.4"/><path d="M9 11.5 Q9 3 16 3 Q23 3 23 11.5Z" fill="#e9c46a" stroke="#3d2b1f" stroke-width="1.4"/><rect x="9" y="9" width="14" height="2.6" fill="#d65a3c"/><circle cx="12.6" cy="20" r="1.2" fill="#3d2b1f"/><circle cx="19.4" cy="20" r="1.2" fill="#3d2b1f"/><path d="M13.5 24 Q16 26 18.5 24" stroke="#3d2b1f" stroke-width="1.1" fill="none" stroke-linecap="round"/></svg>
+        </div>
+        <div class="lvl">
+          <div class="lvl-row"><img data-icon="star" class="ic" alt=""><b id="hud-level">1</b><span class="lvl-cap">уровень</span></div>
+          <div class="xpbar"><i id="hud-xp"></i></div>
+        </div>
+      </div>
+      <div class="wallet">
+        <div class="pill"><img data-icon="coin" class="ic" alt=""><b id="hud-coins">0</b></div>
+        <div class="pill"><img data-icon="gem" class="ic" alt=""><b id="hud-gems">0</b></div>
+        <button class="pill" id="energy-pill"><img data-icon="energy" class="ic" alt=""><b id="hud-energy">0</b><small id="hud-energy-t"></small></button>
+      </div>
+    </div>
+
+    <div class="hud-res ui-layer">
+      <div class="chip"><img data-icon="wood" class="ic" alt=""><b id="hud-wood">0</b></div>
+      <div class="chip"><img data-icon="stone" class="ic" alt=""><b id="hud-stone">0</b></div>
+      <div class="chip" id="ore-chip" hidden><img data-icon="ore" class="ic" alt=""><b id="hud-ore">0</b></div>
+      <div class="chip"><img data-icon="water" class="ic" alt=""><b id="hud-can">0</b></div>
+    </div>
+
+    <nav class="hud-bottom ui-layer">
+      <button id="btn-bag" class="nav-btn"><img data-icon="bag" alt=""><span>Рюкзак</span></button>
+      <button id="btn-market" class="nav-btn"><img data-icon="market" alt=""><span>Рынок</span></button>
+      <button id="btn-house" class="nav-btn"><img data-icon="house" alt=""><span>Дом</span></button>
+      <button id="btn-center" class="nav-btn"><img data-icon="center" alt=""><span>К фермеру</span></button>
+    </nav>
+
+    <div id="popup" class="popup ui-layer"></div>
+    <div id="panel" class="panel"></div>
+    <div id="toast" class="toast"></div>
+    <div id="loading" class="loading">Ферма загружается…</div>
+  </div>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
