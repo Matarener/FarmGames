@@ -237,6 +237,11 @@ SPRITES_2 = {
     'fence_post': (1418, 956),
 }
 
+# Отдельные крупные листы (белый фон, объекты уже нужного размера — без апскейла)
+SHEETS_HI = {
+    'rocks.png': {'rock_small': (360, 200), 'rock_small2': (900, 220), 'rock_big': (400, 560), 'rock_ore': (940, 620)},
+}
+
 # Изометрические плитки второго листа: (x0, y0, x1, y1) — коробка плитки.
 # Верхняя грань (ромб) разворачивается обратно в квадратную текстуру.
 TILES_2 = {
@@ -282,7 +287,7 @@ def soft_alpha(a, bg, bg_level):
 def load_hires(path, im):
     hp = path[:-4] + '@4x.png'
     if not os.path.exists(hp):
-        print('  нет', os.path.basename(hp), '— обычное увеличение')
+        print('  нет', os.path.basename(hp), '— цвет из самого листа')
         return None, 1
     h = Image.open(hp).convert('RGB')
     return h, h.width // im.width
@@ -334,7 +339,7 @@ def slice_sheet(path, sprites, checker, widths, only=None):
         k = np.clip(al, 0.05, 1)[..., None]
         rgb = np.clip((rgb - (1 - k) * bgc) / k, 0, 255)  # убираем примесь фона
         img = Image.fromarray(np.dstack([rgb, al * 255]).astype(np.uint8), 'RGBA')
-        if hires is None:
+        if hires is None and tw > nw:
             img = img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=50, threshold=2))
         img.save(os.path.join(OUT, name + '.webp'), 'WEBP', quality=90, method=6, alpha_quality=95)
         n += 1
@@ -366,6 +371,10 @@ def main():
     widths = world_widths()
     im1, hires1, F1, _, n1 = slice_sheet(os.path.join(SRC_DIR, 'sprites.png'), SPRITES_1, False, widths, only=FROM_1)
     _, _, _, _, n2 = slice_sheet(os.path.join(SRC_DIR, 'sprites2.png'), SPRITES_2, True, widths)
+    for fname, sprites in SHEETS_HI.items():
+        p = os.path.join(SRC_DIR, fname)
+        if os.path.exists(p):
+            slice_sheet(p, sprites, False, widths)
     # второй вариант дуба — зеркальный первый (сакура в листе — отдельное дерево)
     Image.open(os.path.join(OUT, 'tree_oak.webp')).transpose(Image.FLIP_LEFT_RIGHT).save(
         os.path.join(OUT, 'tree_oak2.webp'), 'WEBP', quality=90, method=6, alpha_quality=95)

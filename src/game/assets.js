@@ -14,7 +14,7 @@ const EXT = '.webp' + (typeof __ASSET_V__ !== 'undefined' ? '?v=' + __ASSET_V__ 
 export const DEFS = {
   tree_oak: { w: 86, ay: 0.93 }, tree_oak2: { w: 84, ay: 0.93 }, tree_apple: { w: 88, ay: 0.93 }, tree_pine: { w: 64, ay: 0.96 }, tree_sakura: { w: 88, ay: 0.93 },
   stump: { w: 40, ay: 0.8 }, stump2: { w: 38, ay: 0.8 },
-  rock_small: { w: 42, ay: 0.78 }, rock_small2: { w: 44, ay: 0.78 }, rock_big: { w: 112, ay: 0.74 },
+  rock_small: { w: 42, ay: 0.78 }, rock_small2: { w: 44, ay: 0.78 }, rock_big: { w: 112, ay: 0.74 }, rock_ore: { w: 44, ay: 0.78 },
   bush: { w: 44, ay: 0.86 }, bush_yellow: { w: 36, ay: 0.86 },
   house: { w: 156, ay: 0.74, ax: 0.5 }, shed: { w: 134, ay: 0.73 },
   well: { w: 56, ay: 0.86 },
