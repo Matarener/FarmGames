@@ -1,0 +1,47 @@
+// Игровой цикл: requestAnimationFrame, ограничение FPS, пауза в фоне,
+// пониженная частота кадров в простое (экономия батареи).
+
+export class Game {
+  constructor(perf) {
+    this.perf = perf;
+    this.running = false;
+    this.last = 0;
+    this.update = () => {};
+    this.render = () => {};
+    this.isIdle = () => false; // сцена сообщает, что ничего не анимируется
+    this.onPause = null;
+    this.onResume = null;
+    this._frame = this._frame.bind(this);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.stop(); else this.start();
+    });
+  }
+
+  start() {
+    if (this.running) return;
+    this.running = true;
+    this.last = performance.now();
+    this.onResume && this.onResume();
+    this._raf = requestAnimationFrame(this._frame);
+  }
+
+  stop() {
+    if (!this.running) return;
+    this.running = false;
+    cancelAnimationFrame(this._raf);
+    this.onPause && this.onPause();
+  }
+
+  _frame(t) {
+    if (!this.running) return;
+    this._raf = requestAnimationFrame(this._frame);
+    const fps = this.isIdle() ? Math.min(this.perf.idleFps, this.perf.targetFps) : this.perf.targetFps;
+    const elapsed = t - this.last;
+    if (elapsed < 1000 / fps - 2) return;
+    this.last = t;
+    const dt = Math.min(elapsed / 1000, 0.1);
+    this.update(dt);
+    this.render();
+    this.perf.sample(elapsed / 1000, fps);
+  }
+}
