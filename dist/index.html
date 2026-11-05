@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#5ea83f">
   <title>Ферма маленького милого призрака</title>
-  <link rel="stylesheet" href="style.1f24944f.css">
+  <link rel="stylesheet" href="style.54611ba3.css">
   <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
 </head>
 <body>
@@ -43,7 +43,41 @@
     <div id="panel" class="panel"></div>
     <div id="toast" class="toast"></div>
     <div id="loading" class="loading">
-      <div class="ld-box">
+      <svg class="ld-bg" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="ldSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc8f2"/><stop offset=".55" stop-color="#bfe8ff"/><stop offset="1" stop-color="#e8f7ff"/></linearGradient>
+          <pattern id="ldRows" width="24" height="12" patternUnits="userSpaceOnUse"><rect width="24" height="12" fill="#a8693a"/><rect width="24" height="5" fill="#8a5330"/><circle cx="6" cy="2" r="2.6" fill="#5fb03a"/><circle cx="18" cy="2" r="2.6" fill="#6fc246"/></pattern>
+        </defs>
+        <rect width="400" height="800" fill="url(#ldSky)"/>
+        <g class="ld-sun"><circle cx="320" cy="120" r="44" fill="#fff3b0" opacity=".7"/><circle cx="320" cy="120" r="30" fill="#ffd04a" stroke="#f2a91d" stroke-width="3"/></g>
+        <g class="ld-cloud" fill="#fff" opacity=".95"><ellipse cx="80" cy="140" rx="38" ry="14"/><ellipse cx="62" cy="130" rx="18" ry="14"/><ellipse cx="94" cy="126" rx="22" ry="17"/></g>
+        <g class="ld-cloud ld-cloud2" fill="#fff" opacity=".85"><ellipse cx="230" cy="220" rx="30" ry="11"/><ellipse cx="218" cy="212" rx="14" ry="11"/><ellipse cx="242" cy="208" rx="17" ry="13"/></g>
+        <path d="M0 520 Q90 450 190 500 T400 480 V800 H0Z" fill="#8fd35c"/>
+        <path d="M0 560 Q120 510 240 555 T400 540 V800 H0Z" fill="#6fbf44"/>
+        <g transform="translate(276 468)">
+          <rect x="0" y="22" width="70" height="50" fill="#d8573a" stroke="#3d2b1f" stroke-width="3"/>
+          <path d="M-8 26 L35 -6 L78 26Z" fill="#a8382a" stroke="#3d2b1f" stroke-width="3" stroke-linejoin="round"/>
+          <rect x="24" y="40" width="22" height="32" fill="#fff3dd" stroke="#3d2b1f" stroke-width="2.5"/>
+          <path d="M24 40 L46 72 M46 40 L24 72" stroke="#d8573a" stroke-width="3"/>
+          <rect x="28" y="10" width="14" height="10" fill="#fff3dd" stroke="#3d2b1f" stroke-width="2"/>
+        </g>
+        <g transform="translate(48 470)"><rect x="-4" y="10" width="8" height="38" fill="#8a5a35"/><circle cx="0" cy="6" r="26" fill="#4f9e36"/><circle cx="-10" cy="-2" r="16" fill="#5fb03a"/><circle cx="10" cy="0" r="6" fill="#e2392f"/><circle cx="-12" cy="12" r="5" fill="#e2392f"/></g>
+        <path d="M0 610 Q200 585 400 610 V800 H0Z" fill="#5fae3a"/>
+        <path d="M-20 660 L420 640 L420 800 L-20 800Z" fill="url(#ldRows)"/>
+        <g stroke="#3d2b1f" stroke-width="2.5" fill="#e9c08a">
+          <rect x="10" y="585" width="8" height="40" rx="2"/><rect x="70" y="583" width="8" height="40" rx="2"/><rect x="130" y="581" width="8" height="40" rx="2"/>
+          <rect x="262" y="581" width="8" height="40" rx="2"/><rect x="322" y="583" width="8" height="40" rx="2"/><rect x="382" y="585" width="8" height="40" rx="2"/>
+          <path d="M0 596 L150 592 M0 612 L150 608 M250 592 L400 596 M250 608 L400 612" stroke-width="6" stroke-linecap="round"/>
+          <path d="M0 596 L150 592 M0 612 L150 608 M250 592 L400 596 M250 608 L400 612" stroke="#e9c08a" stroke-width="3" stroke-linecap="round"/>
+        </g>
+        <g class="ld-flowers">
+          <g transform="translate(176 600)"><path d="M0 0 V34" stroke="#4f9e36" stroke-width="3"/><circle r="9" fill="#ffd04a" stroke="#3d2b1f" stroke-width="2"/><circle r="4" fill="#7a4b28"/></g>
+          <g transform="translate(226 596)"><path d="M0 0 V38" stroke="#4f9e36" stroke-width="3"/><circle r="10" fill="#ffd04a" stroke="#3d2b1f" stroke-width="2"/><circle r="4.5" fill="#7a4b28"/></g>
+        </g>
+        <g transform="translate(330 720)"><ellipse cx="0" cy="8" rx="20" ry="14" fill="#f08a24" stroke="#3d2b1f" stroke-width="2.5"/><path d="M-7 -4 Q-9 8 -6 20 M7 -4 Q9 8 6 20" stroke="#c96a16" stroke-width="2" fill="none"/><path d="M0 -6 Q2 -12 6 -12" stroke="#4f9e36" stroke-width="3" fill="none"/></g>
+        <g transform="translate(70 740)"><ellipse cx="0" cy="8" rx="16" ry="11" fill="#f08a24" stroke="#3d2b1f" stroke-width="2.5"/><path d="M0 -3 Q2 -9 6 -9" stroke="#4f9e36" stroke-width="3" fill="none"/></g>
+      </svg>
+            <div class="ld-box">
         <svg class="ld-ghost" viewBox="0 0 64 72" aria-hidden="true">
           <ellipse cx="32" cy="68" rx="14" ry="3.5" fill="rgba(0,0,0,.18)"/>
           <path d="M12 34 A20 20 0 0 1 52 34 L53 56 Q48 62 43 57 Q38 63 32 57 Q26 63 21 57 Q16 62 11 56 Z" fill="#f7f8ff" stroke="#3d2b1f" stroke-width="2.2" stroke-linejoin="round"/>
