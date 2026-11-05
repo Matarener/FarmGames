@@ -85,6 +85,7 @@ export class Player {
     this.sk.override.tool = tool;
     this.state = 'work';
     this.anim.play(anim, { restart: true, mix: 0.12 });
+    if (this.handlers.started) this.handlers.started(a);
   }
 
   onHit() {

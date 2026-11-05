@@ -142,6 +142,7 @@ export class Quests {
     this.st.told = true;
     this.farm.ui.questDone(this.current);
     this.farm.tg.haptic('success');
+    this.farm.sfx('quest');
   }
 
   claim() {
@@ -149,6 +150,7 @@ export class Quests {
     const q = this.current, st = this.farm.st;
     st.coins += q.reward.coins || 0;
     st.gems += q.reward.gems || 0;
+    this.farm.sfx('coin');
     this.farm.addXp(5);
     this.farm.player.celebrate();
     st.quest = { i: this.st.i + 1, n: 0, seen: false };

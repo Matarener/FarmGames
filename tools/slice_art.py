@@ -34,7 +34,10 @@ SHEETS = {
 CROPS = {'crop_wheat': 'wheat', 'crop_carrot': 'carrot', 'crop_beet': 'beet',
          'crop_tomato': 'tomato', 'crop_sunflower': 'sunflower', 'crop_pumpkin': 'pumpkin',
          'crop_strawberry': 'strawberry', 'crop_cotton': 'cotton',
-         'crop_corn': ('corn', [0, 1, 2, 3])}  # у кукурузы на 5-й стадии лишние корнеплоды
+         'crop_corn': ('corn', [0, 1, 2, 3]),
+         'crop_cabbage': 'cabbage'}
+# культуры, где стадии на листе нарисованы в одном масштабе (росток маленький)
+CROP_UNIFORM = {'cabbage'}  # у кукурузы на 5-й стадии лишние корнеплоды
 CROP_STAGES = [0, 1, 3, 4]
 CROP_W = 54
 
@@ -210,6 +213,8 @@ def main():
             c = a[y0:y1, x0:x1].copy()
             c[lab[y0:y1, x0:x1] != i, 3] = 0
             k = CROP_W / (x1 - x0)
+            if crop in CROP_UNIFORM:  # общий масштаб по самой крупной стадии
+                k = CROP_W / max(b[3] - b[2] for b in boxes) * 1.05
             W, H = (x1 - x0) * k, (y1 - y0) * k
             img = Image.fromarray(c).resize((round(W * DENSITY), round(H * DENSITY)), Image.LANCZOS)
             save(img, f'crop_{crop}_{st}', W, H, W / 2, H - W / 4 - 2, man)

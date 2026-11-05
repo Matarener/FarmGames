@@ -14,7 +14,8 @@ const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 const BG = '#3d7a35';
 
 export class Farm {
-  constructor({ renderer, camera, ui, tg, save, perf }) {
+  constructor({ renderer, camera, ui, tg, save, perf, audio }) {
+    this.audio = audio;
     this.r = renderer; this.cam = camera; this.ui = ui; this.tg = tg; this.save = save; this.perf = perf;
     this.drawList = [];
     this.particles = [];
@@ -143,6 +144,7 @@ export class Farm {
     this.player.handlers = {
       canStart: (a) => this.canStart(a),
       perform: (a) => this.perform(a),
+      started: (a) => { if (a.kind === 'fish') this.sfx('cast'); },
       fail: (a, why) => this.toast(why === 'path' ? 'Туда не пройти' : 'Не получается'),
     };
     this.updateBounds();
@@ -238,6 +240,7 @@ export class Farm {
       st.coins += st.level * 10;
       const opened = Object.values(CROPS).filter((c) => c.level === st.level).map((c) => c.name);
       this.ui.levelUp(st.level, opened, st.level * 10);
+      this.sfx('level');
       this.player.celebrate();
       this.tg.haptic('success');
     }
@@ -385,6 +388,7 @@ export class Farm {
     this.burst(tmp.x, tmp.y - 10, '#ffe066', 24);
     this.float(tmp.x, tmp.y - 30, 'Новый участок!', null);
     this.quests.emit('expand');
+    this.sfx('unlock');
     this.addXp(10);
     this.tg.haptic('success');
     this.changed();
@@ -400,6 +404,7 @@ export class Farm {
     const h = this.world.objects.find((o) => o && o.type === 'house');
     if (h) { this.burst(h.wx, h.wy - 40, '#ffe066', 30); this.float(h.wx, h.wy - 110, `Дом ${this.st.house} ур.`, null); }
     this.addXp(20);
+    this.sfx('unlock');
     this.player.celebrate();
     this.tg.haptic('success');
     this.changed();
@@ -413,6 +418,7 @@ export class Farm {
     this.st.crops[key] = have - n;
     this.st.coins += n * GOODS[key].sell;
     this.quests.emit('sell', key, n);
+    this.sfx('coin');
     this.tg.haptic('light');
     this.changed();
   }
@@ -423,16 +429,20 @@ export class Farm {
     if (this.st.energy >= this.maxEnergy) return this.toast('Энергия уже полная');
     this.st.crops[key]--;
     this.st.energy = Math.min(this.maxEnergy, this.st.energy + c.food);
+    this.sfx('eat');
     this.tg.haptic('light');
     this.changed();
   }
 
   queue(a) {
     if (!this.player.enqueue(a)) { this.toast('Очередь заполнена'); return; }
+    this.sfx('tap');
     this.tg.haptic('select');
   }
 
-  toast(msg, kind) { this.ui.toast(msg, kind); if (kind === 'warn') this.tg.haptic('warning'); }
+  toast(msg, kind) { this.ui.toast(msg, kind); if (kind === 'warn') { this.tg.haptic('warning'); this.sfx('error'); } }
+
+  sfx(name) { if (this.audio) this.audio.play(name); }
 
   // ---------------- Выполнение действий ----------------
 
@@ -493,6 +503,7 @@ export class Farm {
         const o = a.obj;
         if (w.objects[o.id] !== o || !this.spend(1)) return false;
         o.hp--; o.shake = 0.25;
+        if (o.hp > 0) this.sfx(a.kind === 'chop' ? 'chop' : 'mine');
         const s = this.objSprite(o);
         const hy = o.type === 'stump' || o.type === 'rock' || o.type === 'bush' || o.type === 'berry' ? 8 : o.type === 'boulder' ? 20 : 26;
         this.burst(o.wx, o.wy - hy, a.kind === 'chop' ? '#b07a45' : '#b8bec3', 6);
@@ -508,6 +519,7 @@ export class Farm {
         const b = this.bedAt(w.idx(a.x, a.y)); b.crop = null; b.p = 0; b.w = 0;
         this.burst(b.wx, b.wy, '#8a5a30', 8);
         this.quests.emit('dig');
+        this.sfx('dig');
         this.addXp(1);
         this.changed();
         return false;
@@ -518,6 +530,7 @@ export class Farm {
         b.crop = a.crop; b.p = 0; b.w = 0;
         this.burst(b.wx, b.wy, '#7ccf4f', 6);
         this.quests.emit('plant', a.crop);
+        this.sfx('plant');
         this.addXp(1);
         this.changed();
         return false;
@@ -527,6 +540,7 @@ export class Farm {
         if (st.can <= 0 || !this.spend(ENERGY.water)) return false;
         st.can--; b.w++;
         this.quests.emit('water');
+        this.sfx('water');
         this.burst(b.wx, b.wy - 6, '#6fc2ff', 10);
         this.changed();
         return false;
@@ -536,6 +550,7 @@ export class Farm {
         toWorld(a.x + 0.5, a.y + 0.5, tmp);
         this.burst(tmp.x, tmp.y, '#9fd8f5', 8);
         this.float(tmp.x, tmp.y - 20, `${st.can}`, 'water');
+        this.sfx('fill');
         this.changed();
         return false;
       }
@@ -543,7 +558,7 @@ export class Farm {
         if (!this.spend(ENERGY.fish)) return false;
         toWorld(a.x + 0.5, a.y + 0.5, tmp);
         this.burst(tmp.x, tmp.y - 2, '#bfe6ff', 10);
-        if (Math.random() > FISH_CATCH) { this.float(tmp.x, tmp.y - 20, 'Сорвалась!', null); this.changed(); return false; }
+        if (Math.random() > FISH_CATCH) { this.float(tmp.x, tmp.y - 20, 'Сорвалась!', null); this.sfx('splash'); this.changed(); return false; }
         const list = Object.values(FISH), total = list.reduce((s, f) => s + f.chance, 0);
         let r = Math.random() * total, fish = list[0];
         for (const f of list) { if ((r -= f.chance) < 0) { fish = f; break; } }
@@ -551,6 +566,7 @@ export class Farm {
         if (!got) return false;
         this.float(tmp.x, tmp.y - 22, `+1 ${fish.name}`, fish.key);
         this.quests.emit('fish', fish.key);
+        this.sfx('catch');
         this.addXp(fish.xp);
         this.tg.haptic(fish.key === 'fish_gold' ? 'success' : 'medium');
         this.changed();
@@ -566,6 +582,7 @@ export class Farm {
         b.crop = null; b.p = 0; b.w = 0;
         st.stats.harvested++;
         this.quests.emit('harvest', c.key);
+        this.sfx('harvest');
         this.addXp(c.xp);
         this.tg.haptic('medium');
         this.changed();
@@ -597,6 +614,7 @@ export class Farm {
     st.stats.cleared++;
     this.quests.emit(def.stump ? 'chop' : o.type === 'stump' ? 'stump' : def.action === 'mine' ? 'mine' : 'clear');
     this.burst(o.wx, o.wy - 10, o.type === 'rock' || o.type === 'boulder' ? '#9aa1a7' : '#7a4b28', 12);
+    this.sfx('break');
     if (def.stump) { o.was = o.type; o.type = 'stump'; o.hp = OBJECTS.stump.hp; this.world.version++; }
     else this.world.remove(o);
     this.tg.haptic('medium');

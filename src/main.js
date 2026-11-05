@@ -10,10 +10,19 @@ import { TelegramBridge } from './telegram/TelegramBridge.js';
 import { Save } from './game/Save.js';
 import { Farm } from './game/Farm.js';
 import { UI } from './ui/UI.js';
+import { Audio } from './engine/Audio.js';
 
 async function main() {
   const tg = new TelegramBridge();
   tg.init();
+  // звук и вибрация (настройки в окне «Настройки»)
+  const audio = new Audio();
+  const haptic = tg.haptic.bind(tg);
+  tg.haptic = (k) => { if (audio.s.vibro) haptic(k); };
+  audio.setTheme('menu');
+  const unlock = () => audio.unlock();
+  window.addEventListener('pointerdown', unlock, true);
+  window.addEventListener('keydown', unlock, true);
   const perf = new Perf();
   setSpriteScale(perf.spriteScale);
 
@@ -25,7 +34,7 @@ async function main() {
   const fill = document.getElementById('ld-fill'), ltext = document.getElementById('ld-text');
   const progress = (k) => { fill.style.width = Math.round(k * 100) + '%'; ltext.textContent = k < 1 ? `Загрузка… ${Math.round(k * 100)}%` : 'Готово!'; };
   progress(0.05);
-  const farm = new Farm({ renderer, camera, ui, tg, save, perf });
+  const farm = new Farm({ renderer, camera, ui, tg, save, perf, audio });
   farm.onArtProgress = (k) => progress(0.1 + k * 0.85);
   window.__farm = farm; // для тестов в браузере
   ui.bind(farm, farm.icons);
@@ -80,7 +89,7 @@ async function main() {
   // ждём картинки (но не дольше 15 с: на плохой связи игра откроется с графикой из кода)
   await Promise.race([farm.artReady, new Promise((r) => setTimeout(r, 15000))]);
   progress(1);
-  setTimeout(() => document.getElementById('loading').classList.add('hide'), 150);
+  setTimeout(() => { document.getElementById('loading').classList.add('hide'); if (!ui.panelOpen) audio.setTheme('farm'); }, 150);
   // начало истории: новое задание показываем сразу
   if (farm.quests.current && !farm.quests.st.seen) setTimeout(() => ui.questPanel(farm), 700);
   if (new URLSearchParams(location.search).has('debug')) {

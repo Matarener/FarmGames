@@ -34,6 +34,7 @@ export class UI {
     $('#btn-center').onclick = () => { farm.player.worldPos(this._p = this._p || {}); farm.cam.centerOn(this._p.x, this._p.y - 20); };
     $('#energy-pill').onclick = () => this.bagPanel(farm);
     $('#quest-card').onclick = () => this.questPanel(farm);
+    $('#btn-settings').onclick = () => this.settingsPanel(farm);
   }
 
   refreshIcons() {
@@ -57,7 +58,8 @@ export class UI {
     if (this.last.xp !== pct) { this.last.xp = pct; $('#hud-xp').style.width = pct; }
     this.questCard(f);
     this.tick(f);
-    if (this.panelEl.dataset.kind && this.panelEl.classList.contains('show')) this.refreshPanel();
+    const kind = this.panelEl.dataset.kind;
+    if (kind && kind !== 'settings' && this.panelOpen) this.refreshPanel();
   }
 
   tick(f) {
@@ -151,6 +153,7 @@ export class UI {
     }
     p.appendChild(list);
     p.classList.add('show');
+    this.sfx('pop');
     // позиция: над точкой касания, в пределах экрана
     const R = this.root.getBoundingClientRect();
     const pw = p.offsetWidth, ph = p.offsetHeight;
@@ -171,9 +174,15 @@ export class UI {
     this._build = build;
     this._title = title;
     this.refreshPanel();
+    if (!this.panelOpen) this.sfx('open');
     p.classList.add('show');
     this.closePopup();
+    if (this.farm && this.farm.audio) this.farm.audio.setTheme('menu');
   }
+
+  get panelOpen() { return this.panelEl.classList.contains('show'); }
+
+  sfx(name) { if (this.farm) this.farm.sfx(name); }
 
   refreshPanel() {
     const p = this.panelEl;
@@ -190,7 +199,47 @@ export class UI {
     body.scrollTop = scroll;
   }
 
-  closePanel() { this.panelEl.classList.remove('show'); this.panelEl.dataset.kind = ''; }
+  closePanel() {
+    if (this.panelOpen) this.sfx('close');
+    this.panelEl.classList.remove('show'); this.panelEl.dataset.kind = '';
+    if (this.farm && this.farm.audio) this.farm.audio.setTheme('farm');
+  }
+
+  // ---------- Настройки ----------
+  settingsPanel(f) {
+    const A = f.audio;
+    this.openPanel('settings', 'Настройки', (body) => {
+      body.appendChild(h('div', 'pn-sub', 'Звук'));
+      const slider = (key, label) => {
+        const row = h('label', 'set-row' + (A.s.muted ? ' off' : ''), `<span>${label}</span><b>${Math.round(A.s[key] * 100)}%</b>`);
+        const inp = h('input', 'set-range');
+        inp.type = 'range'; inp.min = 0; inp.max = 100; inp.step = 5; inp.value = Math.round(A.s[key] * 100);
+        inp.disabled = A.s.muted;
+        const paint = () => inp.style.setProperty('--v', inp.value + '%');
+        paint();
+        inp.oninput = () => { A.set(key, inp.value / 100); row.querySelector('b').textContent = inp.value + '%'; paint(); };
+        if (key === 'sfx') inp.onchange = () => A.play('harvest');
+        row.appendChild(inp);
+        body.appendChild(row);
+      };
+      slider('music', 'Музыка');
+      slider('sfx', 'Звуки');
+      const toggle = (label, on, set) => {
+        const row = h('div', 'set-row tog', `<span>${label}</span>`);
+        const b = h('button', 'switch' + (on ? ' on' : ''), '<i></i>');
+        b.setAttribute('role', 'switch'); b.setAttribute('aria-checked', on);
+        b.onclick = () => { set(!on); this.refreshPanel(); };
+        row.appendChild(b);
+        body.appendChild(row);
+      };
+      toggle('Выключить весь звук', A.s.muted, (v) => { A.unlock(); A.set('muted', v); if (!v) A.play('tap'); });
+      body.appendChild(h('div', 'pn-sub', 'Телефон'));
+      toggle('Вибрация', A.s.vibro, (v) => { A.set('vibro', v); if (v) f.tg.haptic('medium'); });
+      const reset = h('button', 'btn-link', 'Начать заново');
+      reset.onclick = () => { if (confirm('Удалить сохранение и начать новую ферму?')) { f.save.reset(); location.reload(); } };
+      body.appendChild(reset);
+    });
+  }
 
   housePanel(f) {
     this.openPanel('house', 'Дом фермера', (body) => {
@@ -255,9 +304,6 @@ export class UI {
         for (const [k, n] of seeds) g.appendChild(h('div', 'cell', `${this.ic(k, 'ic mid')}<b>${n}</b><span>${CROPS[k].name}</span>`));
         body.appendChild(g);
       }
-      const reset = h('button', 'btn-link', 'Начать заново');
-      reset.onclick = () => { if (confirm('Удалить сохранение и начать новую ферму?')) { f.save.reset(); location.reload(); } };
-      body.appendChild(reset);
     });
   }
 }
