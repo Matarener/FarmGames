@@ -441,7 +441,28 @@ def main():
     for name, box in TEXTURES_1.items():
         t = hires1.crop(tuple(v * F1 for v in box)) if hires1 is not None else im1.crop(box)
         t.resize((TEX_PX, TEX_PX), Image.LANCZOS).save(os.path.join(OUT, name + '.webp'), 'WEBP', quality=90, method=6)
+    # Отдельные текстуры художника (assets/source/tex_*.png) заменяют текстуры листа
+    for name in TEXTURES_1:
+        p = os.path.join(SRC_DIR, name + '.png')
+        if os.path.exists(p):
+            seamless(Image.open(p).convert('RGB')).resize((TEX_PX, TEX_PX), Image.LANCZOS).save(
+                os.path.join(OUT, name + '.webp'), 'WEBP', quality=92, method=6)
+            print('  текстура', name, 'из', os.path.basename(p))
     print('готово:', n1 + n2, 'спрайтов и', len(TEXTURES_1), 'текстур →', OUT)
+
+
+def seamless(im):
+    """Квадрат из середины картинки, края сведены: копия со сдвигом на половину
+    подмешивается у краёв, поэтому плитки стыкуются без шва."""
+    w, h = im.size
+    n = min(w, h)
+    sq = np.asarray(im.crop(((w - n) // 2, (h - n) // 2, (w - n) // 2 + n, (h - n) // 2 + n))).astype(np.float32)
+    rolled = np.roll(sq, (n // 2, n // 2), axis=(0, 1))
+    t = np.abs(np.arange(n) - (n - 1) / 2) / ((n - 1) / 2)          # 0 в центре, 1 у края
+    edge = np.maximum(t[None, :], t[:, None])
+    wgt = np.clip((edge - 0.55) / 0.4, 0, 1)
+    wgt = (wgt * wgt * (3 - 2 * wgt))[..., None]
+    return Image.fromarray((sq * (1 - wgt) + rolled * wgt).astype(np.uint8))
 
 
 if __name__ == '__main__':
