@@ -85,30 +85,37 @@ export class Quests {
     return s.quest;
   }
 
+  // счётчики за всю игру
+  get life() { const s = this.farm.st.stats; return s.ev || (s.ev = { harvest: s.harvested || 0 }); }
+
   get current() { return QUESTS[this.st.i] || null; }
 
   progress() {
     const q = this.current;
     if (!q) return 0;
     if (q.goal.state) return Math.min(q.goal.n, this.farm.st[q.goal.state] || 0);
-    return Math.min(q.goal.n, this.st.n);
+    // засчитываем и то, что игрок сделал раньше (деревья могли кончиться до задания)
+    const life = this.life[q.goal.key ? q.goal.ev + ':' + q.goal.key : q.goal.ev] || 0;
+    return Math.min(q.goal.n, Math.max(this.st.n, life));
   }
 
   get done() { const q = this.current; return !!q && this.progress() >= q.goal.n; }
 
   // Событие игры: ev — тип, key — уточнение (культура), n — сколько
   emit(ev, key, n = 1) {
+    const L = this.life;
+    L[ev] = (L[ev] || 0) + n;
+    if (key) L[ev + ':' + key] = (L[ev + ':' + key] || 0) + n;
     const q = this.current;
     if (!q || q.goal.state || q.goal.ev !== ev || (q.goal.key && q.goal.key !== key)) return;
-    const was = this.done;
     this.st.n += n;
-    if (!was && this.done) this.completed();
+    this.check();
   }
 
-  // Задания по состоянию (дом, уровень) проверяются после каждого изменения
+  // Проверяется после каждого изменения: следующее задание может быть уже выполнено
   check() {
     const q = this.current;
-    if (q && q.goal.state && this.done && !this.st.told) this.completed();
+    if (q && this.done && !this.st.told) this.completed();
   }
 
   completed() {
