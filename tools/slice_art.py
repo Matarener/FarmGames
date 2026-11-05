@@ -49,6 +49,7 @@ ICON_SHEETS = {
     'ui_btn': ['bag', 'market', 'house', 'center', 'walk', 'dig', 'seed', 'lock'],
     'ui_crops': ['carrot', 'wheat', 'beet', 'cabbage', 'tomato', 'corn', 'sunflower', 'pumpkin', 'strawberry', 'cotton'],
     'ui_avatar': ['avatar'],
+    'ui_fish': ['fish_carp', 'fish_perch', 'fish_gold', 'fish'],  # прозрачный фон
 }
 ICON_PX = 128
 
@@ -78,7 +79,8 @@ def icons():
     names = []
     for sheet, items in ICON_SHEETS.items():
         a = np.array(Image.open(os.path.join(SRC, sheet + '.png')).convert('RGBA'))
-        a[..., 3] = np.where(cut_dark_bg(a), 255, 0)
+        if (a[..., 3] == 0).mean() > 0.2: a = load(sheet)  # уже прозрачный
+        else: a[..., 3] = np.where(cut_dark_bg(a), 255, 0)
         boxes, lab = components(a, len(items))
         for (y0, y1, x0, x1, i), name in zip(boxes, items):
             c = a[y0:y1, x0:x1].copy()
