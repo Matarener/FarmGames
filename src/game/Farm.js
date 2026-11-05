@@ -897,9 +897,12 @@ export class Farm {
   // запаса, слой только сдвигается; при щипке — растягивается, а перерисовывается, когда зум замер.
   layerStale(L, key, settled, r, CW, CH) {
     if (!L.c || L.key !== key) return true;
-    if (L.va !== r.va && settled) return true;
     const k = r.va / L.va, x0 = r.ve - k * L.ox, y0 = r.vf - k * L.oy;
-    return x0 > 0.5 || y0 > 0.5 || x0 + L.c.width * k < CW - 0.5 || y0 + L.c.height * k < CH - 0.5;
+    const covered = x0 <= 0.5 && y0 <= 0.5 && x0 + L.c.width * k >= CW - 0.5 && y0 + L.c.height * k >= CH - 0.5;
+    if (settled) return L.va !== r.va || !covered;
+    // идёт зум: слой растягивается; если при отдалении он уже не закрывает экран —
+    // пересобираем, но не чаще раза в 0.3 с (иначе пересборка на каждом кадре)
+    return !covered && performance.now() - (L.at || 0) > 300;
   }
 
   buildLayer(L, key, r, CW, CH, draw) {
@@ -907,7 +910,7 @@ export class Farm {
     if (!L.c || L.c.width !== CW + 2 * MX || L.c.height !== CH + 2 * MY) L.c = makeCanvas(CW + 2 * MX, CH + 2 * MY);
     const g = L.c.getContext('2d');
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = r.ctx.imageSmoothingQuality;
-    L.key = key; L.va = r.va; L.ox = r.ve + MX; L.oy = r.vf + MY; L.ver = (L.ver || 0) + 1;
+    L.key = key; L.va = r.va; L.ox = r.ve + MX; L.oy = r.vf + MY; L.ver = (L.ver || 0) + 1; L.at = performance.now();
     const v = r.view, save = { ...v }, ex = MX / r.va, ey = MY / r.va;
     v.minX -= ex; v.maxX += ex; v.minY -= ey; v.maxY += ey;
     g.setTransform(1, 0, 0, 1, 0, 0);
@@ -1027,7 +1030,7 @@ export class Farm {
     // зум во время щипка: слои растягиваются, перерисовка — когда масштаб не меняется 0.2 с
     const now = performance.now();
     if (this.cam.zoom !== this._lastZoom) { this._lastZoom = this.cam.zoom; this._zoomAt = now; }
-    const settled = now - (this._zoomAt || 0) > 200;
+    const settled = now - (this._zoomAt || 0) > 300;
 
     // Слой 1: земля, вода, грядки, туман, граница. Меняется редко.
     this.diffScene();
@@ -1079,6 +1082,7 @@ export class Farm {
     }
     this._zoomPending = G.va !== r.va || O.va !== r.va; // слой растянут — после щипка перерисуем чётко
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (this._zoomPending) { ctx.fillStyle = BG; ctx.fillRect(0, 0, CW, CH); } // растянутый слой может не закрыть края
     this.blitLayer(ctx, O, r.va, r.ve, r.vf);
     r.resetView();
 
