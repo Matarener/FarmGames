@@ -220,7 +220,8 @@ export class Farm {
     toGrid(tmp.x, tmp.y, tmp2);
     const gx = Math.floor(tmp2.x), gy = Math.floor(tmp2.y);
     this.tapFx = { x: gx, y: gy, t: 0.35 };
-    const o = this.pick(tmp.x, tmp.y);
+    // объект в выделенной клетке важнее спрайта, который её перекрывает сверху
+    const o = this.world.objectAt(gx, gy) || this.pick(tmp.x, tmp.y);
     if (o) this.tapObject(o, sx, sy);
     else this.tapTile(gx, gy, sx, sy);
   }
