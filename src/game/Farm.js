@@ -71,31 +71,16 @@ export class Farm {
     for (const [k, url] of Object.entries(this.icons)) { const im = new Image(); im.src = url; this.iconImg[k] = im; }
   }
 
-  // средний цвет травы (у арта свой оттенок) — им рисуется травяной край берега
-  grassColor() {
-    const g0 = this.S.grass && this.S.grass[0];
-    if (!g0 || !g0.canvas) return null;
-    if (this._gcOf === g0) return this._gc;
-    const c = makeCanvas(1, 1), x = c.getContext('2d');
-    x.drawImage(g0.canvas, g0.canvas.width * 0.3, g0.canvas.height * 0.3, g0.canvas.width * 0.4, g0.canvas.height * 0.4, 0, 0, 1, 1);
-    const d = x.getImageData(0, 0, 1, 1).data;
-    this._gcOf = g0; this._gc = `rgb(${d[0]},${d[1]},${d[2]})`;
-    return this._gc;
-  }
-
   waterSprite(x, y) {
     const w = this.world;
     const land = (xx, yy) => (!w.inside(xx, yy) || w.tile(xx, yy) !== T.WATER ? 1 : 0);
     const mask = land(x, y - 1) | (land(x + 1, y) << 1) | (land(x, y + 1) << 2) | (land(x - 1, y) << 3);
-    // суша только по диагонали (угол тайла): углы T, R, B, L
-    const dg = (land(x - 1, y - 1) && !(mask & 9) ? 1 : 0) | (land(x + 1, y - 1) && !(mask & 3) ? 2 : 0) |
-      (land(x + 1, y + 1) && !(mask & 6) ? 4 : 0) | (land(x - 1, y + 1) && !(mask & 12) ? 8 : 0);
     const h = hash2(x * 7, y * 13), WA = this.S.waterArt;
     // с водой художника: 0 — гладь, 1 — блики, 2 — кувшинка, 3 — камыш (камыш только у берега)
     const lily = WA ? (h < 0.55 ? 0 : h < 0.75 ? 1 : h < 0.88 ? 2 : mask ? 3 : 1) : h < 0.3 ? 1 : 0;
-    const key = (dg * 16 + mask) * 4 + lily;
+    const key = mask * 4 + lily;
     let s = this.S.water.get(key);
-    if (!s) { s = art.waterTile(mask, lily, WA && WA[lily], this.grassColor(), dg); this.S.water.set(key, s); }
+    if (!s) { s = art.waterTile(mask, lily, WA && WA[lily]); this.S.water.set(key, s); }
     return s;
   }
 
