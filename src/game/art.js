@@ -447,14 +447,19 @@ export function cropSprite(crop, stage) {
 
 export function bubbleSprite(kind) {
   return makeSprite(22, 26, 11, 24, (g) => {
-    g.fillStyle = OUT;
-    g.beginPath(); g.arc(0, -13, 10, 0, Math.PI * 2); g.moveTo(-4, -5); g.lineTo(0, 0); g.lineTo(4, -5); g.fill();
-    g.fillStyle = '#fffaf0';
-    g.beginPath(); g.arc(0, -13, 8.8, 0, Math.PI * 2); g.moveTo(-3, -5); g.lineTo(0, -1.4); g.lineTo(3, -5); g.fill();
+    // круг и хвостик заливаются отдельно: в одном пути их пересечение давало дырку
+    const bub = (r, tw, tip) => {
+      g.beginPath(); g.arc(0, -13, r, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.moveTo(-tw, -7); g.lineTo(0, tip); g.lineTo(tw, -7); g.closePath(); g.fill();
+    };
+    g.fillStyle = OUT; bub(10, 4.6, 0);
+    g.fillStyle = '#fffaf0'; bub(8.8, 3.4, -1.4);
     if (kind === 'water') {
-      g.fillStyle = '#3f97d6';
-      g.beginPath(); g.moveTo(0, -20); g.quadraticCurveTo(6, -12, 0, -8); g.quadraticCurveTo(-6, -12, 0, -20); g.fill();
-      g.fillStyle = '#bfe6ff'; blob(g, -1.5, -12, 1.2);
+      // капля: острый верх, круглый низ, сплошная заливка с маленьким бликом сбоку
+      const drop = () => { g.beginPath(); g.moveTo(0, -21); g.quadraticCurveTo(4.9, -15.6, 4.6, -11.6); g.arc(0, -11.6, 4.6, 0, Math.PI); g.quadraticCurveTo(-4.9, -15.6, 0, -21); g.closePath(); };
+      g.fillStyle = '#2a6fa8'; drop(); g.fill();
+      g.save(); g.translate(0, -12.4); g.scale(0.8, 0.84); g.translate(0, 12.4); g.fillStyle = '#4aa8ec'; drop(); g.fill(); g.restore();
+      g.fillStyle = 'rgba(255,255,255,0.85)'; g.beginPath(); g.ellipse(-1.9, -12.2, 0.8, 1.5, -0.35, 0, Math.PI * 2); g.fill();
     } else if (kind === 'ready') {
       g.strokeStyle = '#3fae3a'; g.lineWidth = 3;
       g.beginPath(); g.moveTo(-4.5, -13); g.lineTo(-1, -9.5); g.lineTo(5, -16.5); g.stroke();

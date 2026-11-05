@@ -290,7 +290,7 @@ export class Farm {
     const gems = Math.max(1, Math.ceil(info.left / GEM_SPEEDUP_SEC));
     this.ui.popup(sx, sy, {
       title: info.c.name, text: `Созреет через ${fmtTime(info.left)}`,
-      items: [{ icon: 'gem', label: 'Ускорить', sub: `${gems} 💎`, disabled: this.st.gems < gems, onClick: () => {
+      items: [{ icon: 'gem', label: 'Ускорить', sub: `${gems} ${this.ui.ic('gem', 'ic ic-s')}`, disabled: this.st.gems < gems, onClick: () => {
         this.st.gems -= gems; b.p = info.total; b.w = 2; this.burst(b.wx, b.wy - 8, '#ffe066', 10); this.changed();
       } }],
     });
@@ -303,7 +303,7 @@ export class Farm {
       const have = st.seeds[c.key] || 0;
       return {
         icon: c.key, label: c.name,
-        sub: locked ? `с ${c.level} ур.` : have ? `семян: ${have} · ${fmtTime(c.time)}` : `${c.seed} 🪙 · ${fmtTime(c.time)}`,
+        sub: locked ? `с ${c.level} ур.` : have ? `семян: ${have} · ${fmtTime(c.time)}` : `${c.seed} ${this.ui.ic('coin', 'ic ic-s')} · ${fmtTime(c.time)}`,
         disabled: locked || (!have && st.coins < c.seed),
         onClick: () => this.queue({ kind: 'plant', x: b.x, y: b.y, crop: c.key }),
       };
