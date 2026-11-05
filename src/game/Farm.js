@@ -8,6 +8,7 @@ import { makeGhostData, ROD_TIP } from './ghost.js';
 import * as art from './art.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
+import { Mover } from './Mover.js';
 import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
@@ -26,6 +27,7 @@ export class Farm {
     this.time = 0;
     this.dirty = true;
     this.quests = new Quests(this);
+    this.mover = new Mover(this);
     this.groundV = 0; // растёт, когда меняются клетки земли
     this.buildSprites();
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
@@ -121,6 +123,8 @@ export class Farm {
       Object.assign(this.st, saved.st);
       if (saved.objects && saved.v !== 2) w.importObjects(saved.objects);
       if (saved.chunks) for (const c of saved.chunks) w.unlocked[c] = 1;
+      // грядки переносили: стартовые клетки — трава, все грядки берём из сохранения
+      if (this.st.movedBeds) for (const i of w.startBeds) w.tiles[i] = T.GRASS;
       for (const [i, crop, p, wt] of saved.beds || []) {
         w.tiles[i] = T.SOIL;
         this.bedAt(i).crop = crop || null; this.bedAt(i).p = p; this.bedAt(i).w = wt;
@@ -137,7 +141,20 @@ export class Farm {
       const b = this.bedAt(w.startBeds[0]); b.crop = 'carrot'; b.p = CROPS.carrot.time; b.w = 2;
       this.st.can = 2;
     }
-    for (const i of w.startBeds) if (w.tiles[i] !== T.SOIL) w.tiles[i] = T.SOIL;
+    // стартовые грядки: если игрок их не переносил — на месте всегда (как раньше)
+    if (!this.st.movedBeds) for (const i of w.startBeds) if (w.tiles[i] !== T.SOIL) w.tiles[i] = T.SOIL;
+    // переставленные постройки
+    const pos = this.st.pos || {};
+    // сначала снимаем все свои постройки (новое место дома может быть старым местом колодца), потом ставим
+    const own = [w.objects.find((o) => o && o.type === 'house'), w.well].filter(Boolean);
+    const home = own.map((o) => [o.gx, o.gy]);
+    for (const o of own) w.lift(o);
+    own.forEach((o, k) => {
+      const at = pos[o.type];
+      if (at && w.freeFor(o, at[0], at[1])) w.put(o, at[0], at[1]);
+      else if (w.freeFor(o, home[k][0], home[k][1])) w.put(o, home[k][0], home[k][1]);
+      // иначе объект остался снятым: колодец найдёт место сам (fixWell)
+    });
     w.fixWell();
     // старые сохранения: первое задание ещё не выполнено — стартовая морковка созревает сразу
     if (saved && !this.st.stats.harvested && !(this.st.quest && this.st.quest.i > 0)) {
@@ -257,6 +274,7 @@ export class Farm {
     toGrid(tmp.x, tmp.y, tmp2);
     const gx = Math.floor(tmp2.x), gy = Math.floor(tmp2.y);
     this.tapFx = { x: gx, y: gy, t: 0.35 };
+    if (this.mover.active) return this.mover.tap(gx, gy, tmp.x, tmp.y);
     // объект в выделенной клетке важнее спрайта, который её перекрывает сверху
     const w = this.world;
     let o = w.objectAt(gx, gy);
@@ -463,6 +481,7 @@ export class Farm {
   }
 
   queue(a) {
+    if (this.mover.active) return;
     if (!this.player.enqueue(a)) { this.toast('Очередь заполнена'); return; }
     this.sfx('tap');
   }
@@ -542,6 +561,7 @@ export class Farm {
         return st.energy >= 1;
       }
       case 'dig': {
+        if (w.tiles[w.idx(a.x, a.y)] !== T.GRASS || w.occ[w.idx(a.x, a.y)] >= 0) return false;
         if (!this.spend(ENERGY.dig)) return false;
         w.tiles[w.idx(a.x, a.y)] = T.SOIL; this.groundV++;
         const b = this.bedAt(w.idx(a.x, a.y)); b.crop = null; b.p = 0; b.w = 0;
@@ -553,6 +573,7 @@ export class Farm {
         return false;
       }
       case 'plant': {
+        if (w.tiles[w.idx(a.x, a.y)] !== T.SOIL) return false;
         const b = this.bedAt(w.idx(a.x, a.y)), c = CROPS[a.crop];
         if (st.seeds[a.crop] > 0) st.seeds[a.crop]--; else if (st.coins >= c.seed) st.coins -= c.seed; else return false;
         b.crop = a.crop; b.p = 0; b.w = 0;
@@ -564,6 +585,7 @@ export class Farm {
         return false;
       }
       case 'water': {
+        if (w.tiles[w.idx(a.x, a.y)] !== T.SOIL) return false;
         const b = this.bedAt(w.idx(a.x, a.y));
         if (st.can <= 0 || !this.spend(ENERGY.water)) return false;
         st.can--; b.w++;
@@ -600,6 +622,7 @@ export class Farm {
         return false;
       }
       case 'harvest': {
+        if (w.tiles[w.idx(a.x, a.y)] !== T.SOIL) return false;
         const b = this.bedAt(w.idx(a.x, a.y)), c = CROPS[b.crop];
         const got = this.addItem('crops', c.key, 1);
         if (!got) return false;
@@ -743,7 +766,7 @@ export class Farm {
   }
 
   isIdle() {
-    return this.player.idleTime > 2 && !this.particles.length && !this.floaters.length && !this.tapFx && !this.cam.animating && !this.hover;
+    return !this.mover.active && this.player.idleTime > 2 && !this.particles.length && !this.floaters.length && !this.tapFx && !this.cam.animating && !this.hover;
   }
 
   // ---------------- Отрисовка ----------------
@@ -897,6 +920,7 @@ export class Farm {
 
     this.drawQueue(ctx);
     this.drawSigns(ctx);
+    this.mover.draw(ctx);
 
     this.drawFishing(ctx);
 

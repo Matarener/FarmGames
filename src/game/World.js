@@ -150,10 +150,42 @@ export class World {
     this.well = this.add('well', this.wellPos[0], this.wellPos[1]);
   }
 
+  // Снять объект с карты (клетки свободны) и поставить обратно — для загрузки сохранения
+  lift(o) {
+    for (let y = o.gy; y < o.gy + o.h; y++) for (let x = o.gx; x < o.gx + o.w; x++) {
+      if (this.occ[y * N + x] === o.id) this.occ[y * N + x] = -1;
+    }
+  }
+
+  put(o, gx, gy) { this.moveObject(o, gx, gy); }
+
+  // Перенос своей постройки (дом, колодец) на другие клетки; проверки — в Mover
+  moveObject(o, gx, gy) {
+    for (let y = o.gy; y < o.gy + o.h; y++) for (let x = o.gx; x < o.gx + o.w; x++) {
+      if (this.occ[y * N + x] === o.id) this.occ[y * N + x] = -1;
+    }
+    o.gx = gx; o.gy = gy;
+    toWorld(gx + o.w / 2, gy + o.h / 2, tmp);
+    o.wx = tmp.x; o.wy = tmp.y;
+    o.depth = gx + o.w / 2 + gy + o.h / 2;
+    for (let y = gy; y < gy + o.h; y++) for (let x = gx; x < gx + o.w; x++) this.occ[y * N + x] = o.id;
+    this.version++;
+  }
+
+  // Можно ли поставить объект сюда при загрузке (вся площадь — свободная трава открытой земли)
+  freeFor(o, gx, gy) {
+    for (let y = gy; y < gy + o.h; y++) for (let x = gx; x < gx + o.w; x++) {
+      if (!this.isOpen(x, y) || this.tiles[y * N + x] !== T.GRASS) return false;
+      const i = this.occ[y * N + x];
+      if (i >= 0 && i !== o.id) return false;
+    }
+    return true;
+  }
+
   // Старые сохранения: на месте колодца игрок мог вскопать грядку — ставим его на свободную траву рядом с домом
   fixWell() {
     const o = this.well;
-    if (o && this.tiles[o.gy * N + o.gx] === T.GRASS) return;
+    if (o && this.tiles[o.gy * N + o.gx] === T.GRASS && this.occ[o.gy * N + o.gx] === o.id) return;
     if (o) this.remove(o);
     const [hx, hy] = this.wellPos;
     let best = null, bd = Infinity;

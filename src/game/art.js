@@ -691,6 +691,18 @@ export function makeIcons(crops, fish) {
     g.fillStyle = '#9aa1a7'; g.fillRect(-9, -11, 18, 7); g.strokeRect(-9, -11, 18, 7);
     g.restore();
   });
+  I.move = iconURL((g) => {
+    // четыре стрелки крестом
+    g.fillStyle = '#ffe48a'; g.strokeStyle = OUT; g.lineWidth = 1.6; g.lineJoin = 'round';
+    g.beginPath();
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
+      const P = (x, y) => [x * c - y * s, x * s + y * c];
+      for (const [x, y] of [[3, -3], [3, -8], [7, -8], [0, -15], [-7, -8], [-3, -8], [-3, -3]].map(([x, y]) => P(x, y))) g.lineTo(x, y);
+    }
+    g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#b5773f'; blob(g, 0, 0, 3);
+  });
   I.center = iconURL((g) => {
     g.strokeStyle = OUT; g.lineWidth = 2.4; g.beginPath(); g.arc(0, 0, 9, 0, Math.PI * 2); g.stroke();
     g.strokeStyle = '#ffffff'; g.lineWidth = 1.4; g.beginPath(); g.arc(0, 0, 9, 0, Math.PI * 2); g.stroke();

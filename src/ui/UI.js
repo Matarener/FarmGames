@@ -36,6 +36,11 @@ export class UI {
     $('#energy-pill').onclick = () => this.bagPanel(farm);
     $('#quest-card').onclick = () => this.questPanel(farm);
     $('#btn-settings').onclick = () => this.settingsPanel(farm);
+    $('#btn-move').onclick = () => farm.mover.enter();
+    $('#mb-done').onclick = () => farm.mover.exit();
+    $('#mb-cancel').onclick = () => farm.mover.cancel();
+    $('#mb-place').onclick = () => farm.mover.place();
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && farm.mover.active) farm.mover.exit(); });
   }
 
   refreshIcons() {
@@ -170,6 +175,7 @@ export class UI {
 
   // ---------- Окна ----------
   openPanel(kind, title, build) {
+    if (this.farm && this.farm.mover && this.farm.mover.active) this.farm.mover.exit();
     const p = this.panelEl;
     p.dataset.kind = kind;
     this._build = build;
@@ -204,6 +210,25 @@ export class UI {
     if (this.panelOpen) this.sfx('close');
     this.panelEl.classList.remove('show'); this.panelEl.dataset.kind = '';
     if (this.farm && this.farm.audio) this.farm.audio.setTheme('farm');
+  }
+
+  // ---------- Перестановка ----------
+  moveBar(st) {
+    const bar = $('#move-bar');
+    document.body.classList.toggle('moving', !!st);
+    bar.hidden = !st;
+    if (!st) return;
+    const t = $('#mb-text');
+    t.textContent = st.text;
+    t.classList.toggle('bad', st.bad);
+    $('#mb-place').disabled = !st.canPlace;
+    $('#mb-cancel').hidden = !st.selected;
+    $('#mb-place').hidden = !st.selected;
+  }
+
+  moveBarShake() {
+    const bar = $('#move-bar');
+    bar.classList.remove('shake'); void bar.offsetWidth; bar.classList.add('shake');
   }
 
   // ---------- Настройки ----------

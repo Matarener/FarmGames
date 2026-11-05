@@ -314,3 +314,25 @@ button:disabled { cursor: default; }
 .switch i { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 2px solid var(--ink); transition: transform .15s; }
 .switch.on { background: #7cc84a; }
 .switch.on i { transform: translateX(22px); }
+
+/* ---------- Перестановка ---------- */
+.move-bar {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--safe-b) + 10px); z-index: 25;
+  width: min(440px, calc(100% - 16px)); background: var(--paper); border: 2.5px solid var(--ink); border-radius: 16px;
+  padding: 8px 10px 10px; box-shadow: 0 5px 0 rgba(0,0,0,.2);
+}
+.move-bar[hidden] { display: none; }
+.mb-text { font-size: 13.5px; font-weight: 700; text-align: center; padding: 2px 4px 8px; min-height: 2.4em; display: grid; place-items: center; }
+.mb-text.bad { color: #c0392b; }
+.mb-btns { display: flex; gap: 6px; justify-content: center; }
+.mb-btns .btn-s { flex: 1; min-width: 0; padding: 0 6px; justify-content: center; min-height: 40px; font-size: 13px; }
+.mb-btns .btn-s[hidden] { display: none; }
+.mb-btns .btn-s.done { background: linear-gradient(#9be06a, #5fb03a); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+body.moving .hud-bottom { display: none; }
+body.moving .toast { bottom: calc(var(--safe-b) + 112px); }
+.move-bar.shake { animation: mb-shake .32s; }
+@keyframes mb-shake { 20% { transform: translateX(calc(-50% - 6px)); } 45% { transform: translateX(calc(-50% + 5px)); } 70% { transform: translateX(calc(-50% - 3px)); } }
+@media (max-width: 360px) {
+  .hud-bottom { gap: 5px; }
+  .nav-btn span { font-size: 9.5px; white-space: nowrap; letter-spacing: -.2px; }
+}
