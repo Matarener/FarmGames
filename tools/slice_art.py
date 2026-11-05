@@ -25,8 +25,8 @@ SHEETS = {
     'bushes': [('bush_blue', 40), ('bush_rasp', 40), ('bush_pink', 40),
                ('bush_hydra', 40), ('bush_lav', 40), ('bush_rose', 40)],
     # отрицательная ширина: «пятачок» — весь ромб объекта (ширина по краям картинки)
-    'stumps': [('stump_oak', -58), ('stump_birch', -54), ('stump_pine', -58), ('stump_moss', -58)],
-    'stumps2': [('stump_apple', -58), ('stump_sakura', -58), ('stump_blossom', -58), ('stump_autumn', -58)],
+    'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_moss', -42)],
+    'stumps2': [('stump_apple', -42), ('stump_sakura', -42), ('stump_blossom', -42), ('stump_autumn', -42)],
     'house1': [('house_1', -132)], 'house2': [('house_2', -132)], 'house3': [('house_3', -132)], 'house4': [('house_4', -132)], 'house5': [('house_5', -132)],
 }
 # Урожай: лист = 5 стадий слева направо, сверху вниз; в игре 4 стадии (третью пропускаем).
@@ -169,6 +169,9 @@ def main():
                 base_w = -base_w
             else:
                 bw, bx, by = base_of(crop)
+                # у деревьев «пятачок» травы — ромб, его самая широкая строка и есть центр
+                # (как у пней, иначе пень встаёт выше дерева)
+                if sheet.startswith('trees'): by += bw / 4
             k = base_w / bw  # мир/пиксель
             W, H = (x1 - x0) * k, (y1 - y0) * k
             img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
