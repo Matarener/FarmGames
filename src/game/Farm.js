@@ -244,7 +244,14 @@ export class Farm {
     const gx = Math.floor(tmp2.x), gy = Math.floor(tmp2.y);
     this.tapFx = { x: gx, y: gy, t: 0.35 };
     // объект в выделенной клетке важнее спрайта, который её перекрывает сверху
-    const o = this.world.objectAt(gx, gy) || this.pick(tmp.x, tmp.y);
+    const w = this.world;
+    let o = w.objectAt(gx, gy);
+    if (!o) {
+      o = this.pick(tmp.x, tmp.y);
+      // крона соседнего дерева над открытой клеткой: если дерево за забором или под пальцем вода —
+      // важнее сама клетка (иначе вместо пруда открывалось «Новый участок»)
+      if (o && w.inside(gx, gy) && w.isOpen(gx, gy) && (!w.isOpen(o.gx, o.gy) || w.tile(gx, gy) === T.WATER)) o = null;
+    }
     if (o) this.tapObject(o, sx, sy);
     else this.tapTile(gx, gy, sx, sy);
   }
