@@ -125,6 +125,11 @@ export class Farm {
       if (saved.chunks) for (const c of saved.chunks) w.unlocked[c] = 1;
       // грядки переносили: стартовые клетки — трава, все грядки берём из сохранения
       if (this.st.movedBeds) for (const i of w.startBeds) w.tiles[i] = T.GRASS;
+      // тропинки переставляли: берём их из сохранения
+      if (this.st.paths) {
+        for (let i = 0; i < w.tiles.length; i++) if (w.tiles[i] === T.PATH) w.tiles[i] = T.GRASS;
+        for (const i of this.st.paths) if (w.tiles[i] === T.GRASS && w.occ[i] < 0) w.tiles[i] = T.PATH;
+      }
       for (const [i, crop, p, wt] of saved.beds || []) {
         w.tiles[i] = T.SOIL;
         this.bedAt(i).crop = crop || null; this.bedAt(i).p = p; this.bedAt(i).w = wt;

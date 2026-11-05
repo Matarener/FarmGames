@@ -45,7 +45,7 @@ export class Mover {
     const s = this.sel, t = this.to;
     let text = msg;
     if (!text) {
-      if (!s) text = 'Нажмите на дом, колодец или пустую грядку';
+      if (!s) text = 'Нажмите на дом, колодец, пустую грядку или тропинку';
       else if (!t) text = `${s.name}: нажмите на клетку, куда поставить`;
       else if (t.ok) text = `${s.name}: сюда можно. Нажмите «Поставить»`;
       else { text = t.why; bad = true; }
@@ -84,7 +84,7 @@ export class Mover {
     if (!w.isOpen(gx, gy)) return { why: 'Этот участок ещё не открыт' };
     const t = w.tile(gx, gy);
     if (t === T.WATER) return { why: 'Пруд передвинуть нельзя' };
-    if (t === T.PATH) return { why: 'Тропинку передвинуть нельзя' };
+    if (t === T.PATH) return { sel: { kind: 'path', name: 'Тропинка', w: 1, h: 1, gx, gy } };
     if (t === T.SOIL) {
       const b = f.bedAt(w.idx(gx, gy));
       if (b.crop) {
@@ -94,7 +94,7 @@ export class Mover {
       if (this.busy({ x: gx, y: gy })) return { why: 'Призрачок сейчас работает с этой грядкой, подождите' };
       return { sel: { kind: 'bed', b, name: 'Грядка', w: 1, h: 1, gx, gy } };
     }
-    return { why: 'Здесь пусто. Нажмите на дом, колодец или пустую грядку' };
+    return { why: 'Здесь пусто. Нажмите на дом, колодец, пустую грядку или тропинку' };
   }
 
   // Текущее действие призрачка касается этого места?
@@ -199,6 +199,15 @@ export class Mover {
       f.st.pos = f.st.pos || {};
       f.st.pos[s.o.type] = [t.gx, t.gy];
       f.burst(s.o.wx, s.o.wy - 6, '#e8d9a8', 14);
+    } else if (s.kind === 'path') {
+      // клетка тропинки переезжает, на старом месте — обычная трава
+      w.tiles[w.idx(s.gx, s.gy)] = T.GRASS;
+      w.tiles[w.idx(t.gx, t.gy)] = T.PATH;
+      f.st.paths = [];
+      for (let i = 0; i < w.tiles.length; i++) if (w.tiles[i] === T.PATH) f.st.paths.push(i);
+      f.groundV++;
+      toWorld(t.gx + 0.5, t.gy + 0.5, tmp);
+      f.burst(tmp.x, tmp.y, '#d9b98a', 8);
     } else {
       const from = s.b, ni = w.idx(t.gx, t.gy);
       w.tiles[from.i] = T.GRASS;
@@ -248,7 +257,7 @@ export class Mover {
         toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp);
         ctx.drawImage(sp.canvas, tmp.x - sp.ax, tmp.y - sp.ay, sp.w, sp.h);
       } else {
-        const sp = f.S.soil[0];
+        const sp = s.kind === 'path' ? f.S.path[0] : f.S.soil[0];
         toWorld(t.gx + 0.5, t.gy + 0.5, tmp);
         ctx.drawImage(sp.canvas, tmp.x - sp.ax, tmp.y - sp.ay, sp.w, sp.h);
       }
