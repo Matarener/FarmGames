@@ -27,7 +27,7 @@ SHEETS = {
 }
 # Урожай: лист = 5 стадий слева направо, сверху вниз; в игре 4 стадии (третью пропускаем).
 # Растения заполняют ромб грядки: масштаб по ширине, опора — центр ромба.
-CROPS = {'crop_wheat': 'wheat', 'crop_carrot': 'carrot'}
+CROPS = {'crop_wheat': 'wheat', 'crop_carrot': 'carrot', 'crop_beet': 'beet'}
 CROP_STAGES = [0, 1, 3, 4]
 CROP_W = 54
 
