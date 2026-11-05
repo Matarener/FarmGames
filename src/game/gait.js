@@ -33,15 +33,15 @@ export function solveRig(sk, g, opts) {
     const ux = opts.flip ? -g.ux : g.ux, uy = g.uy;
     const n = Math.hypot(ux, uy) || 1;
     // при приседании колени разводим в стороны, при ходьбе — вперёд
-    for (const [name, baseX, off, out] of [['legF', -L.hipX, 0, 1], ['legB', L.hipX, 0.5, -1]]) {
+    for (const [name, baseX, baseY, off, out] of [['legF', -L.hipX, L.yF || 0, 0, 1], ['legB', L.hipX, L.yB || 0, 0.5, -1]]) {
       const k = ik[name];
-      k.bend = opts.squat ? out : 1;
+      k.bend = opts.squat ? out : -1;   // -1: колено вперёд, по направлению взгляда
       const ph = (g.phase + off) % 1;
       let o, h = 0;
       if (ph < 0.5) o = STRIDE / 4 - ph * STRIDE;                  // опора: стопа стоит
       else { const t = (ph - 0.5) * 2; o = -STRIDE / 4 + smooth(t) * STRIDE / 2; h = Math.sin(Math.PI * t) * LIFT; }
       k.x = baseX + (ux / n) * o * g.amt * 0.9;
-      k.y = (uy / n) * o * g.amt * 0.5 - h * g.amt;
+      k.y = baseY + (uy / n) * o * g.amt * 0.5 - h * g.amt;
       k.mix = 1;
     }
   } else if (ik.legF) { ik.legF.mix = 0; ik.legB.mix = 0; }

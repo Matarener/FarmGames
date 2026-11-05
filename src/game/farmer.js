@@ -327,7 +327,7 @@ const BODY = {
 function bodyParts(P, A) {
   if (!Object.keys(BODY).every((n) => A[n])) return null;
   const S = BODY_S;
-  const part = (name, shade = 0) => {
+  const part = (name, shade = 0, k = 1) => {
     const src = A[name], d = BODY[name];
     let canvas = src.img;
     if (shade) {
@@ -336,9 +336,11 @@ function bodyParts(P, A) {
       g.globalCompositeOperation = 'source-atop';
       g.fillStyle = `rgba(20,30,60,${shade})`; g.fillRect(0, 0, canvas.width, canvas.height);
     }
-    return { canvas, w: src.w, h: src.h, ax: (d.pivot[0] - d.box[0]) / S, ay: (d.pivot[1] - d.box[1]) / S };
+    return { canvas, w: src.w * k, h: src.h * k, ax: (d.pivot[0] - d.box[0]) / S * k, ay: (d.pivot[1] - d.box[1]) / S * k };
   };
-  const len = (name, key = 'end') => { const d = BODY[name]; return Math.hypot(d[key][0] - d.pivot[0], d[key][1] - d.pivot[1]) / S; };
+  const len = (name, key = 'end', k = 1) => { const d = BODY[name]; return Math.hypot(d[key][0] - d.pivot[0], d[key][1] - d.pivot[1]) / S * k; };
+  // ноги на листе длинные и широкие для этого тела — уменьшаем их целиком
+  const LEG = 0.74;
   const FAR = 0.14;
   P.head = part('body_head'); P.neck = part('body_neck'); P.neckFar = part('body_neck', 0.15);
   P.torso = part('body_torso');
@@ -346,8 +348,8 @@ function bodyParts(P, A) {
   P.foreArm = part('body_fore'); P.foreArmFar = part('body_fore2', FAR);
   P.hand = part('body_hand'); P.fist = part('body_fist');
   P.handFar = part('body_hand2', FAR); P.fistFar = part('body_fist2', FAR);
-  P.thigh = part('body_thigh'); P.thighFar = part('body_thigh', FAR);
-  P.shin = part('body_shin'); P.shinFar = part('body_shin', FAR);
+  P.thigh = part('body_thigh', 0, LEG); P.thighFar = part('body_thigh', FAR, LEG);
+  P.shin = part('body_shin', 0, LEG); P.shinFar = part('body_shin', FAR, LEG);
   // вид сзади: пока со старого листа, подогнанный по ширине (новых частей сзади ещё нет)
   const T = BODY.body_torso;
   if (A.torso_back) {
@@ -359,12 +361,12 @@ function bodyParts(P, A) {
     P.headBack = { canvas: c, w, h, ax: w * 0.5, ay: h * 0.93 };
   } else P.headBack = P.head;
   const rel = (pt) => [(pt[0] - T.pivot[0]) / S, (pt[1] - T.pivot[1]) / S];
-  const thigh = len('body_thigh'), shin = len('body_shin');
+  const thigh = len('body_thigh', 'end', LEG), shin = len('body_shin', 'end', LEG);
   const hipF = rel(T.hipF), hipB = rel(T.hipB);
   const handGrip = len('body_fist', 'grip');
   return {
-    // таз чуть ниже полной длины ноги: колени слегка согнуты, IK не упирается в предел
-    hip: -(thigh + shin) * 0.975 - (hipF[1] + hipB[1]) / 2,
+    // таз чуть ниже полной длины ноги: колени почти прямые, но IK не упирается в предел
+    hip: -(thigh + shin) * 0.998 - (hipF[1] + hipB[1]) / 2,
     neck: rel(T.neck), neckLen: len('body_neck', 'top'),
     shoulderF: rel(T.shoulderF), shoulderB: rel(T.shoulderB),
     fore: len('body_upper'), hand: len('body_fore'),
@@ -460,5 +462,5 @@ export function makeFarmerData(A = {}) {
     { name: 'legB', bone1: 'thighB', bone2: 'shinB', len2: K.shin, bend: 1 },
     { name: 'armB', bone1: 'armB', bone2: 'foreB', len2: K.armLen2, bend: -1 },
   ];
-  return { bones, slots, skins, drawOrders, animations, ik, legs: { hipX: K.hipX }, grip2: K.grip2, gripBone: 'handF', hands: H };
+  return { bones, slots, skins, drawOrders, animations, ik, legs: { hipX: K.hipX, yF: K.hipF[1] - (K.hipF[1] + K.hipB[1]) / 2, yB: K.hipB[1] - (K.hipF[1] + K.hipB[1]) / 2 }, grip2: K.grip2, gripBone: 'handF', hands: H };
 }
