@@ -703,6 +703,33 @@ export function makeIcons(crops, fish) {
     g.closePath(); g.fill(); g.stroke();
     g.fillStyle = '#b5773f'; blob(g, 0, 0, 3);
   });
+  I.more = iconURL((g) => {
+    g.strokeStyle = OUT; g.lineWidth = 1.6;
+    for (const [x, y] of [[-7, -7], [7, -7], [-7, 7], [7, 7]]) { g.fillStyle = x < 0 === y < 0 ? '#ffd453' : '#7cc84a'; g.beginPath(); g.roundRect(x - 5.5, y - 5.5, 11, 11, 3); g.fill(); g.stroke(); }
+  });
+  I.gear = iconURL((g) => {
+    g.fillStyle = '#c9ced2'; g.strokeStyle = OUT; g.lineWidth = 1.6; g.beginPath();
+    for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, r = i % 2 ? 9 : 13; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#e9b85a'; blob(g, 0, 0, 4.5); g.beginPath(); g.arc(0, 0, 4.5, 0, Math.PI * 2); g.stroke();
+  });
+  I.paw = iconURL((g) => {
+    g.fillStyle = '#f2b98a'; g.strokeStyle = OUT; g.lineWidth = 1.6;
+    ell(g, 0, 5, 7.5, 6.5); g.fill(); g.stroke();
+    for (const [x, y] of [[-9, -3], [-4, -9], [4, -9], [9, -3]]) { ell(g, x, y, 3.3, 4); g.fill(); g.stroke(); }
+  });
+  I.decor = iconURL((g) => {
+    g.strokeStyle = '#3f8a2f'; g.lineWidth = 2.4; g.beginPath(); g.moveTo(0, 13); g.lineTo(0, 0); g.stroke();
+    g.fillStyle = '#f28ab2'; g.strokeStyle = OUT; g.lineWidth = 1.4;
+    for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / 5; ell(g, Math.cos(a) * 6, -4 + Math.sin(a) * 6, 4.2, 4.2); g.fill(); g.stroke(); }
+    g.fillStyle = '#ffd453'; blob(g, 0, -4, 3.4);
+  });
+  I.trophy = iconURL((g) => {
+    g.fillStyle = '#ffc93a'; g.strokeStyle = OUT; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(-9, -12); g.lineTo(9, -12); g.quadraticCurveTo(9, 4, 0, 5); g.quadraticCurveTo(-9, 4, -9, -12); g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.arc(-9, -6, 4, Math.PI * 0.5, Math.PI * 1.5); g.stroke(); g.beginPath(); g.arc(9, -6, 4, -Math.PI * 0.5, Math.PI * 0.5); g.stroke();
+    g.fillRect(-2, 5, 4, 5); g.strokeRect(-2, 5, 4, 5); g.fillStyle = '#b5773f'; g.fillRect(-7, 10, 14, 4); g.strokeRect(-7, 10, 14, 4);
+    g.fillStyle = '#fff1a8'; ell(g, -4, -8, 1.6, 3); g.fill();
+  });
   I.center = iconURL((g) => {
     g.strokeStyle = OUT; g.lineWidth = 2.4; g.beginPath(); g.arc(0, 0, 9, 0, Math.PI * 2); g.stroke();
     g.strokeStyle = '#ffffff'; g.lineWidth = 1.4; g.beginPath(); g.arc(0, 0, 9, 0, Math.PI * 2); g.stroke();

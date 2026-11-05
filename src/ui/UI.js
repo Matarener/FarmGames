@@ -22,6 +22,8 @@ export class UI {
     this.panelEl.addEventListener('click', (e) => { if (e.target === this.panelEl) this.closePanel(); });
     // Нажатия по интерфейсу не должны долетать до карты
     for (const el of root.querySelectorAll('.ui-layer')) el.addEventListener('pointerdown', (e) => e.stopPropagation());
+    // нажатие мимо меню «Ещё» закрывает его
+    document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#more-menu, #btn-more')) this.toggleMore(false); }, true);
   }
 
   bind(farm, icons) {
@@ -36,7 +38,7 @@ export class UI {
     $('#energy-pill').onclick = () => this.bagPanel(farm);
     $('#quest-card').onclick = () => this.questPanel(farm);
     $('#btn-settings').onclick = () => this.settingsPanel(farm);
-    $('#btn-move').onclick = () => farm.mover.enter();
+    $('#btn-more').onclick = () => this.toggleMore();
     $('#mb-done').onclick = () => farm.mover.exit();
     $('#mb-cancel').onclick = () => farm.mover.cancel();
     $('#mb-place').onclick = () => farm.mover.place();
@@ -171,7 +173,7 @@ export class UI {
     this._popupTick = null;
   }
 
-  closePopup() { this.popupEl.classList.remove('show'); this._popupTick = null; }
+  closePopup() { this.popupEl.classList.remove('show'); this._popupTick = null; this.toggleMore(false); }
 
   // ---------- Окна ----------
   openPanel(kind, title, build) {
@@ -210,6 +212,38 @@ export class UI {
     if (this.panelOpen) this.sfx('close');
     this.panelEl.classList.remove('show'); this.panelEl.dataset.kind = '';
     if (this.farm && this.farm.audio) this.farm.audio.setTheme('farm');
+  }
+
+  // ---------- Меню «Ещё» ----------
+  // Сюда добавляются новые разделы: { label, icon, open } — готовый, { soon: true } — заготовка.
+  moreItems(f) {
+    return [
+      { label: 'Переставить', icon: 'move', open: () => f.mover.enter() },
+      { label: 'Задания', icon: 'note', open: () => this.questPanel(f) },
+      { label: 'Животные', icon: 'paw', soon: true },
+      { label: 'Мастерская', icon: 'build', soon: true },
+      { label: 'Декор', icon: 'decor', soon: true },
+      { label: 'Достижения', icon: 'trophy', soon: true },
+    ];
+  }
+
+  toggleMore(show) {
+    const m = $('#more-menu');
+    show = show == null ? m.hidden : show;
+    if (!show) { if (!m.hidden) { m.hidden = true; $('#btn-more').classList.remove('on'); } return; }
+    this.closePopup();
+    m.innerHTML = '';
+    for (const it of this.moreItems(this.farm)) {
+      const b = h('button', 'more-it' + (it.soon ? ' soon' : ''), `${this.ic(it.icon, 'ic mid')}<span>${it.label}</span>${it.soon ? '<i>скоро</i>' : ''}`);
+      b.onclick = () => {
+        if (it.soon) { this.toast(`«${it.label}» появится в следующих обновлениях`); return; }
+        this.toggleMore(false); it.open();
+      };
+      m.appendChild(b);
+    }
+    m.hidden = false;
+    $('#btn-more').classList.add('on');
+    this.sfx('open');
   }
 
   // ---------- Перестановка ----------
