@@ -42,6 +42,7 @@ CROP_UNIFORM = {'cabbage'}  # у кукурузы на 5-й стадии лиш�
 CROP_STAGES = [0, 1, 3, 4]
 CROP_W = 54
 
+BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), ('bed_dry_g', 66), ('bed_wet_g', 66)]}
 TILE_SHEETS = [('tiles', ['tile_grass', 'tile_flowers', 'tile_soil', 'tile_sand']),
                ('tiles_water', ['water_0', 'water_lily', 'water_reed', 'water_spark']),
                ('tiles_path', ['tile_cobble', 'tile_planks', 'tile_sand2', 'tile_soil_wet'])]
@@ -184,6 +185,25 @@ def main():
             # опора — центр ромба основания (низ минус четверть ширины)
             save(img, name, W, H, bx * k, (by - bw / 4) * k, man)
             print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
+
+    # Грядки: объёмный ромб (верх + бортик). Ширина — по краям картинки, центр ромба —
+    # строка самой левой точки (левый угол верхней грани).
+    for sheet, items in BED_SHEETS.items():
+        if not os.path.exists(os.path.join(SRC, sheet + '.png')): continue
+        a = load(sheet)
+        boxes, lab = components(a, len(items))
+        for (y0, y1, x0, x1, i), (name, tw) in zip(boxes, items):
+            crop = a[y0:y1, x0:x1].copy()
+            crop[lab[y0:y1, x0:x1] != i, 3] = 0
+            m = crop[..., 3] > 128
+            xs = np.where(m.any(0))[0]
+            left = xs[0]; ly = np.where(m[:, left])[0]; cy = ly.mean()
+            right = xs[-1]; ry = np.where(m[:, right])[0].mean()
+            k = tw / (right - left)
+            W, H = (x1 - x0) * k, (y1 - y0) * k
+            img = Image.fromarray(crop).resize((round(W * DENSITY), round(H * DENSITY)), Image.LANCZOS)
+            save(img, name, W, H, (left + right) / 2 * k, (cy + ry) / 2 * k, man)
+            print(f'{name:14s} bed {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
 
     # Плитки земли: вырезаем ромб чуть внутри контура (без тёмной обводки)
     for sheet, names in TILE_SHEETS:

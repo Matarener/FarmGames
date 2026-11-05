@@ -257,7 +257,7 @@ export class Mover {
         toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp);
         ctx.drawImage(sp.canvas, tmp.x - sp.ax, tmp.y - sp.ay, sp.w, sp.h);
       } else {
-        const sp = s.kind === 'path' ? f.S.path[0] : f.S.soil[0];
+        const sp = s.kind === 'path' ? f.S.path[0] : f.S.bed ? f.S.bed.grass[0] : f.S.soil[0];
         toWorld(t.gx + 0.5, t.gy + 0.5, tmp);
         ctx.drawImage(sp.canvas, tmp.x - sp.ax, tmp.y - sp.ay, sp.w, sp.h);
       }

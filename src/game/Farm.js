@@ -12,6 +12,9 @@ import { Mover } from './Mover.js';
 import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
+// вид объёмной грядки: 'plain' — без каймы, 'grass' — с травяной каймой
+export let BED_STYLE = 'plain';
+export function setBedStyle(v) { BED_STYLE = v; }
 const BG = '#3d7a35';
 
 export class Farm {
@@ -31,7 +34,7 @@ export class Farm {
     this.groundV = 0; // растёт, когда меняются клетки земли
     this.buildSprites();
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
-      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, objArt: a.obj, stumpOf: a.stumpOf });
+      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, objArt: a.obj, stumpOf: a.stumpOf });
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
       a.well.forEach((s, i) => { if (s) this.S.well[i] = s; });
       if (a.water.every(Boolean)) { this.S.waterArt = a.water; this.S.water.clear(); }
@@ -80,6 +83,8 @@ export class Farm {
     if (!s) { s = art.waterTile(mask, lily, WA && WA[lily]); this.S.water.set(key, s); }
     return s;
   }
+
+  bedStyle(v) { setBedStyle(v); this.groundV++; this.dirty = true; }
 
   objSprite(o) {
     const S = this.S;
@@ -792,7 +797,7 @@ export class Farm {
     ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(N * HW, N * HH); ctx.lineTo(0, N * 2 * HH); ctx.lineTo(-N * HW, N * HH); ctx.closePath(); ctx.fill();
 
     // земля
-    const S = this.S;
+    const S = this.S, raised = [];
     for (let gy = gy0; gy <= gy1; gy++) {
       for (let gx = gx0; gx <= gx1; gx++) {
         const cx = (gx - gy) * HW, cy = (gx + gy + 1) * HH;
@@ -805,10 +810,20 @@ export class Farm {
         else {
           const b = this.beds.get(i);
           const wet = b && b.crop && !this.cropInfo(b).needsWater && !this.cropInfo(b).ready;
-          s = S.soil[wet ? 1 : 0];
+          if (S.bed) {
+            // объёмная грядка выше земли: сначала трава под ней, сама грядка — вторым проходом
+            raised.push([cx, cy, wet ? 1 : 0]);
+            s = S.grass[w.variant[i]];
+          } else s = S.soil[wet ? 1 : 0];
         }
         ctx.drawImage(s.canvas, cx - s.ax, cy - s.ay, s.w, s.h);
       }
+    }
+    // ближние грядки ложатся поверх дальних
+    if (raised.length) {
+      const BS = S.bed[BED_STYLE];
+      raised.sort((a, b) => a[1] - b[1]);
+      for (const [x, y, wet] of raised) { const s = BS[wet]; ctx.drawImage(s.canvas, x - s.ax, y - s.ay, s.w, s.h); }
     }
 
     // туман над закрытыми участками
