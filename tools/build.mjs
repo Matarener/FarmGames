@@ -6,7 +6,7 @@
 
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,8 +17,14 @@ const hash = (buf) => createHash('sha1').update(buf).digest('hex').slice(0, 8);
 rmSync(DIST, { recursive: true, force: true });
 mkdirSync(DIST, { recursive: true });
 
+// Картинки художника: версия по содержимому manifest, чтобы Pages не отдавал старый кэш
+const ART = join(ROOT, 'assets', 'art');
+const ASSET_V = hash(Buffer.concat(readdirSync(ART).sort().map((f) => readFileSync(join(ART, f)))));
+cpSync(ART, join(DIST, 'assets', 'art'), { recursive: true });
+
 // JS
 const js = await build({
+  define: { __ASSET_V__: JSON.stringify(ASSET_V) },
   entryPoints: [join(ROOT, 'src', 'main.js')],
   bundle: true, minify: true, format: 'esm', target: ['es2020', 'safari14'],
   write: false, legalComments: 'none',

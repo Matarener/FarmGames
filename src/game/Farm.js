@@ -6,6 +6,7 @@ import { World, N, CHUNK, CHUNKS, T, START_CHUNK } from './World.js';
 import { Player } from './Player.js';
 import { makeGhostData } from './ghost.js';
 import * as art from './art.js';
+import { loadArt } from './artSprites.js';
 import { CROPS, OBJECTS, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
@@ -23,6 +24,10 @@ export class Farm {
     this.time = 0;
     this.dirty = true;
     this.buildSprites();
+    loadArt().then((a) => {
+      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, objArt: a.obj });
+      this.dirty = true;
+    }).catch((e) => console.warn('art', e));
   }
 
   buildSprites() {
@@ -60,6 +65,8 @@ export class Farm {
 
   objSprite(o) {
     const S = this.S;
+    const v = S.objArt && S.objArt[o.type];
+    if (v && v.length) return v[o.id % v.length];
     switch (o.type) {
       case 'oak': case 'oak2': case 'apple': case 'pine': return S.trees[o.type];
       case 'stump': return S.stumps[o.id & 1];
