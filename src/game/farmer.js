@@ -3,11 +3,13 @@
 // Когда появятся PNG частей от художника, заменяются только спрайты в parts().
 
 import { makeSprite } from '../engine/Sprite.js';
+import { cropImage } from './assets.js';
 
 const OUT = '#3d2b1f';
 const C = {
-  skin: '#f6c9a0', skinD: '#e2a77d', hair: '#7a4a25', hat: '#e9c46a', hatD: '#c99a3e', band: '#d65a3c',
-  shirt: '#f6f1e4', shirtD: '#d9d1bd', over: '#3f7fd0', overD: '#2f62a8', boot: '#6b4226',
+  // цвета взяты с кадров фермера из листа спрайтов
+  skin: '#f5c6a5', skinD: '#dfa582', hair: '#7a4a25', hat: '#e9c46a', hatD: '#c99a3e', band: '#4a6fb0',
+  shirt: '#d9ecf8', shirtD: '#a8cbe6', over: '#2a80d8', overD: '#1d5aa6', boot: '#6b4226',
 };
 
 function cap(g, w, len, fill, outline = OUT) {
@@ -117,8 +119,20 @@ function parts() {
   return P;
 }
 
-export function makeFarmerData() {
+// Голова из кадров художника: 3/4 (отражаем, чтобы смотрел вправо) и вид сзади.
+function artHeads(P, A) {
+  const head = (img, flip, neckX) => {
+    const c = cropImage(img, 0, 0, 1, 0.465, flip);
+    const w = 25, h = w * c.height / c.width;
+    return { canvas: c, w, h, ax: w * neckX, ay: h * 0.97 };
+  };
+  if (A.boy_side) P.head = head(A.boy_side.img, true, 0.55);
+  if (A.boy_back) P.headBack = head(A.boy_back.img, false, 0.5);
+}
+
+export function makeFarmerData(A = {}) {
   const P = parts();
+  artHeads(P, A);
   const att = (sprite, x = 0, y = 0, rotation = 0) => ({ sprite, x, y, rotation });
   const bones = [
     { name: 'root' },

@@ -23,6 +23,8 @@ async function main() {
   const ui = new UI(document.getElementById('app'));
   const save = new Save(tg);
   const farm = new Farm({ renderer, camera, ui, tg, save, perf });
+  const loading = document.getElementById('loading');
+  await farm.loadArt((k) => { loading.textContent = `Ферма загружается… ${Math.round(k * 100)}%`; });
   ui.bind(farm, farm.icons);
 
   const fitZoom = () => {

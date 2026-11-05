@@ -6,6 +6,7 @@ import { World, N, CHUNK, CHUNKS, T, START_CHUNK } from './World.js';
 import { Player } from './Player.js';
 import { makeFarmerData } from './farmer.js';
 import * as art from './art.js';
+import { loadArt, iconURL } from './assets.js';
 import { CROPS, OBJECTS, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
@@ -14,7 +15,7 @@ const BG = '#3d7a35';
 export class Farm {
   constructor({ renderer, camera, ui, tg, save, perf }) {
     this.r = renderer; this.cam = camera; this.ui = ui; this.tg = tg; this.save = save; this.perf = perf;
-    this.buildSprites();
+    this.A = {};
     this.drawList = [];
     this.particles = [];
     this.floaters = [];
@@ -24,22 +25,35 @@ export class Farm {
     this.dirty = true;
   }
 
+  async loadArt(onProgress) {
+    this.A = await loadArt(onProgress);
+    this.buildSprites();
+  }
+
   buildSprites() {
-    const S = {};
-    S.grass = [0, 1, 2, 3].map((v) => art.grassTile(v));
-    S.path = [0, 1].map((v) => art.pathTile(v));
-    S.soil = [art.soilTile(false), art.soilTile(true)];
+    const S = {}, A = this.A;
+    const deco = [null, A.grass_tuft, A.flowers_white || null, A.grass_tall];
+    S.grass = [0, 1, 2, 3].map((v) => art.grassTile(v, deco[v]));
+    S.path = A.tex_sand ? [art.texTile(A.tex_sand), art.texTile(A.tex_sand, { shade: 0.06 })] : [0, 1].map((v) => art.pathTile(v));
+    S.soil = A.tex_soil ? [art.texTile(A.tex_soil, { k: 0.88, rim: true }), art.texTile(A.tex_soil, { k: 0.88, rim: true, shade: 0.35 })] : [art.soilTile(false), art.soilTile(true)];
     S.water = new Map();
-    S.trees = { oak: art.treeSprite('oak'), oak2: art.treeSprite('oak2'), apple: art.treeSprite('apple'), pine: art.treeSprite('pine') };
-    S.stump = art.stumpSprite();
-    S.bush = art.bushSprite(false); S.berry = art.bushSprite(true);
-    S.rock = art.rockSprite(false); S.boulder = art.rockSprite(true);
-    S.house = [null, 1, 2, 3, 4, 5].map((l) => l && art.houseSprite(l));
+    S.trees = {
+      oak: A.tree_oak || art.treeSprite('oak'), oak2: A.tree_oak2 || art.treeSprite('oak2'),
+      apple: A.tree_apple || art.treeSprite('apple'), pine: A.tree_pine || art.treeSprite('pine'),
+    };
+    const stump = art.stumpSprite(), rock = art.rockSprite(false);
+    S.stumps = [A.stump || stump, A.stump2 || A.stump || stump];
+    S.rocks = [A.rock_small || rock, A.rock_small2 || A.rock_small || rock];
+    S.bush = A.bush || art.bushSprite(false); S.berry = A.bush_yellow || art.bushSprite(true);
+    S.boulder = A.rock_big || art.rockSprite(true);
+    S.house = [null, 1, 2, 3, 4, 5].map((l) => l && (l === 1 ? A.shed : A.house) || (l && art.houseSprite(l)));
+    S.decor = { mailbox: A.mailbox, barrel: A.barrel, lantern: A.lantern, planter: A.planter_white, tulips: A.pot_tulips, sign: A.signpost, hay: A.haystack };
     S.crops = {};
-    for (const c of Object.values(CROPS)) S.crops[c.key] = [0, 1, 2, 3].map((s) => art.cropSprite(c, s));
+    for (const c of Object.values(CROPS)) S.crops[c.key] = [0, 1, 2, 3].map((s) => art.cropSpriteArt(c, s, A) || art.cropSprite(c, s));
     S.bubble = { water: art.bubbleSprite('water'), ready: art.bubbleSprite('ready'), lock: art.bubbleSprite('lock') };
     this.S = S;
     this.icons = art.makeIcons(CROPS);
+    for (const k of Object.keys(this.icons)) { const u = iconURL(k); if (u && (A['crop_' + k] || A.tree_oak)) this.icons[k] = u; }
     this.iconImg = {};
     for (const [k, url] of Object.entries(this.icons)) { const im = new Image(); im.src = url; this.iconImg[k] = im; }
   }
@@ -51,7 +65,7 @@ export class Farm {
     const lily = hash2(x * 7, y * 13) < 0.3 ? 1 : 0;
     const key = mask * 2 + lily;
     let s = this.S.water.get(key);
-    if (!s) { s = art.waterTile(mask, lily); this.S.water.set(key, s); }
+    if (!s) { s = this.A.tex_water ? art.texTile(this.A.tex_water, { mask, lily }) : art.waterTile(mask, lily); this.S.water.set(key, s); }
     return s;
   }
 
@@ -59,14 +73,14 @@ export class Farm {
     const S = this.S;
     switch (o.type) {
       case 'oak': case 'oak2': case 'apple': case 'pine': return S.trees[o.type];
-      case 'stump': return S.stump;
+      case 'stump': return S.stumps[o.id & 1];
       case 'bush': return S.bush;
       case 'berry': return S.berry;
-      case 'rock': return S.rock;
+      case 'rock': return S.rocks[o.id & 1];
       case 'boulder': return S.boulder;
       case 'house': return S.house[this.st.house];
     }
-    return S.rock;
+    return S.decor[o.type] || S.rocks[0];
   }
 
   // ---------------- Состояние ----------------
@@ -83,7 +97,7 @@ export class Farm {
       stats: { cleared: 0, harvested: 0 },
     };
     let px = w.playerStart[0], py = w.playerStart[1];
-    if (saved && saved.v === 1) {
+    if (saved && saved.v === 2) {
       Object.assign(this.st, saved.st);
       if (saved.objects) w.importObjects(saved.objects);
       if (saved.chunks) for (const c of saved.chunks) w.unlocked[c] = 1;
@@ -103,7 +117,7 @@ export class Farm {
       this.st.can = 2;
     }
     for (const i of w.startBeds) if (w.tiles[i] !== T.SOIL) w.tiles[i] = T.SOIL;
-    this.player = new Player(w, makeFarmerData(), px, py);
+    this.player = new Player(w, makeFarmerData(this.A), px, py);
     this.player.handlers = {
       canStart: (a) => this.canStart(a),
       perform: (a) => this.perform(a),
@@ -122,7 +136,7 @@ export class Farm {
     const chunks = [];
     this.world.unlocked.forEach((u, i) => u && chunks.push(i));
     return {
-      v: 1, seed: this.world.seed, st: this.st, objects: this.world.exportObjects(), chunks, beds,
+      v: 2, seed: this.world.seed, st: this.st, objects: this.world.exportObjects(), chunks, beds,
       player: [this.player.tx, this.player.ty],
     };
   }
@@ -245,6 +259,7 @@ export class Farm {
     if (!w.isOpen(o.gx, o.gy)) return this.expandPopup(w.chunkOf(o.gx, o.gy), sx, sy);
     if (o.type === 'house') return this.ui.housePanel(this);
     const def = OBJECTS[o.type];
+    if (def.decor) return this.toast(def.name);
     if (def.action) this.queue({ kind: def.action, obj: o });
   }
 
@@ -440,7 +455,7 @@ export class Farm {
         const s = this.objSprite(o);
         const hy = o.type === 'stump' || o.type === 'rock' || o.type === 'bush' || o.type === 'berry' ? 8 : o.type === 'boulder' ? 20 : 26;
         this.burst(o.wx, o.wy - hy, a.kind === 'chop' ? '#b07a45' : '#b8bec3', 6);
-        if (a.kind === 'chop' && s !== this.S.stump) this.burst(o.wx, o.wy - 60, '#5aa83a', 4, true);
+        if (a.kind === 'chop' && o.type !== 'stump') this.burst(o.wx, o.wy - 60, '#5aa83a', 4, true);
         this.tg.haptic('light');
         if (o.hp <= 0) { this.destroy(o); this.changed(); return false; }
         this.ui.update(this);
@@ -591,7 +606,7 @@ export class Farm {
     gx1 = Math.min(N - 1, Math.ceil(gx1) + 1); gy1 = Math.min(N - 1, Math.ceil(gy1) + 1);
 
     // основа карты (закрывает швы между тайлами)
-    ctx.fillStyle = '#78c04c';
+    ctx.fillStyle = '#7cc44f';
     ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(N * HW, N * HH); ctx.lineTo(0, N * 2 * HH); ctx.lineTo(-N * HW, N * HH); ctx.closePath(); ctx.fill();
 
     // земля

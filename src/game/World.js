@@ -86,6 +86,10 @@ export class World {
     this.startBeds = [];
     for (const [lx, ly] of [[2, 6], [3, 6]]) { const [x, y] = L(lx, ly); setT(x, y, T.SOIL); res(x, y); this.startBeds.push(y * N + x); }
     this.add('house', house[0], house[1]);
+    // немного уюта вокруг дома
+    for (const [t, lx, ly] of [['barrel', 4, 2], ['mailbox', 2, 4], ['lantern', 4, 4], ['planter', 1, 3], ['tulips', 1, 5], ['sign', 6, 5]]) {
+      const [x, y] = L(lx, ly); if (this.tiles[y * N + x] === T.GRASS) this.add(t, x, y);
+    }
     for (let y = house[1] - 1; y <= house[1] + 2; y++) for (let x = house[0] - 1; x <= house[0] + 2; x++) res(x, y);
     this.playerStart = L(4, 6);
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) res(this.playerStart[0] + dx, this.playerStart[1] + dy);

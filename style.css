@@ -180,7 +180,8 @@ button:disabled { cursor: default; }
 .levelup.hide { opacity: 0; }
 .lv-star { position: relative; }
 .lv-star b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; padding-top: 3px; }
-.lv-text b { display: block; font-size: 17px; }
+.lv-text b { display: block; font-size: 17px; white-space: nowrap; }
+.levelup { width: max-content; max-width: calc(100vw - 32px); }
 .lv-text span { font-size: 12.5px; font-weight: 500; }
 @keyframes pop { from { transform: translate(-50%, -50%) scale(.6); opacity: 0; } }
 .toast-item { animation-name: popt; }
