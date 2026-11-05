@@ -84,7 +84,7 @@ TEXTURES_1 = {
 }
 
 # Из первого листа берём только эти спрайты (остальное есть во втором)
-FROM_1 = ('boy_', 'girl_', 'res_', 'item_', 'ui_', 'shed', 'mailbox', 'crop_cotton', 'crop_bean', 'crop_rose',
+FROM_1 = ('boy_', 'girl_', 'res_', 'item_', 'ui_', 'mailbox', 'crop_cotton', 'crop_bean', 'crop_rose',
           'sprout_2', 'sprout_4', 'sprout_5', 'grass_reed', 'dock', 'bridge_pond', 'waterfall', 'hay_pen',
           'barrel_small', 'pot_', 'planter_box', 'birdhouse2', 'flowers_lav')
 
@@ -240,7 +240,9 @@ SPRITES_2 = {
 # Отдельные крупные листы (белый фон, объекты уже нужного размера — без апскейла)
 SHEETS_HI = {
     'rocks.png': {'rock_small': (360, 200), 'rock_small2': (900, 220), 'rock_big': (400, 560), 'rock_ore': (940, 620)},
+    'shed.png': {'shed': (512, 420)},   # фон #FF00FF
 }
+MAGENTA = ('shed.png',)
 
 # Изометрические плитки второго листа: (x0, y0, x1, y1) — коробка плитки.
 # Верхняя грань (ромб) разворачивается обратно в квадратную текстуру.
@@ -298,14 +300,35 @@ def cut(im, hires, F, x0, y0, x1, y1, tw, th):
     return np.asarray(src.resize((tw, th), Image.LANCZOS)).astype(np.float32)
 
 
-def slice_sheet(path, sprites, checker, widths, only=None):
+def magenta_alpha(a):
+    """Фон — сплошной пурпурный #FF00FF: альфа по «пурпурности» пикселя."""
+    r, g, b = a[..., 0].astype(np.float32), a[..., 1].astype(np.float32), a[..., 2].astype(np.float32)
+    m = np.minimum(r, b) - g                      # у фона ~255, у рисунка обычно < 60
+    key = m > 150
+    lab, _ = nd.label(key)
+    border = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
+    bg = np.isin(lab, list(border))
+    fg = nd.binary_opening(~bg, iterations=1)
+    al = np.clip((130 - m) / 80.0, 0, 1)
+    dist = nd.distance_transform_edt(fg)
+    al = np.where(fg, np.where(dist >= 3, 1.0, al), 0.0)
+    return bg, fg, al
+
+
+def slice_sheet(path, sprites, checker, widths, only=None, magenta=False):
     print(os.path.basename(path))
     im = Image.open(path).convert('RGB')
     a = np.asarray(im).astype(np.int16)
     bg_level = 230 if checker else 238
-    bg, holes = find_bg(a, checker)
-    fg, alpha_keep = soft_alpha(a, bg, bg_level)
-    _, alpha_cut = soft_alpha(a, bg | holes, bg_level)
+    if magenta:
+        bg, fg0, al0 = magenta_alpha(a)
+        holes = np.zeros_like(bg)
+        alpha_keep = alpha_cut = al0
+    else:
+        bg, holes = find_bg(a, checker)
+        fg0, alpha_keep = soft_alpha(a, bg, bg_level)
+        _, alpha_cut = soft_alpha(a, bg | holes, bg_level)
+    fg = fg0
     comp, _ = nd.label(fg, structure=np.ones((3, 3)))
     hires, F = load_hires(path, im)
     # цвет фона под полупрозрачными краями (для «шахматки» — средний серый)
@@ -337,7 +360,12 @@ def slice_sheet(path, sprites, checker, widths, only=None):
         al = np.asarray(Image.fromarray((al * 255).astype(np.uint8)).resize((tw, th), Image.LANCZOS)).astype(np.float32) / 255
         al = np.clip((al - 0.12) / 0.88, 0, 1)      # поджимаем край
         k = np.clip(al, 0.05, 1)[..., None]
-        rgb = np.clip((rgb - (1 - k) * bgc) / k, 0, 255)  # убираем примесь фона
+        if magenta:  # убираем пурпурную примесь у края
+            rgb = np.clip((rgb - (1 - k) * np.array([255.0, 0.0, 255.0])) / k, 0, 255)
+            ex = np.clip(np.minimum(rgb[..., 0], rgb[..., 2]) - rgb[..., 1] - 25, 0, None)
+            rgb[..., 0] -= ex; rgb[..., 2] -= ex
+        else:
+            rgb = np.clip((rgb - (1 - k) * bgc) / k, 0, 255)  # убираем примесь фона
         img = Image.fromarray(np.dstack([rgb, al * 255]).astype(np.uint8), 'RGBA')
         if hires is None and tw > nw:
             img = img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=50, threshold=2))
@@ -374,7 +402,7 @@ def main():
     for fname, sprites in SHEETS_HI.items():
         p = os.path.join(SRC_DIR, fname)
         if os.path.exists(p):
-            slice_sheet(p, sprites, False, widths)
+            slice_sheet(p, sprites, False, widths, magenta=fname in MAGENTA)
     # второй вариант дуба — зеркальный первый (сакура в листе — отдельное дерево)
     Image.open(os.path.join(OUT, 'tree_oak.webp')).transpose(Image.FLIP_LEFT_RIGHT).save(
         os.path.join(OUT, 'tree_oak2.webp'), 'WEBP', quality=90, method=6, alpha_quality=95)

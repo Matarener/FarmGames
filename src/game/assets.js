@@ -16,7 +16,7 @@ export const DEFS = {
   stump: { w: 40, ay: 0.8 }, stump2: { w: 38, ay: 0.8 },
   rock_small: { w: 42, ay: 0.78 }, rock_small2: { w: 44, ay: 0.78 }, rock_big: { w: 112, ay: 0.74 }, rock_ore: { w: 44, ay: 0.78 },
   bush: { w: 44, ay: 0.86 }, bush_yellow: { w: 36, ay: 0.86 },
-  house: { w: 156, ay: 0.74, ax: 0.5 }, shed: { w: 134, ay: 0.73 },
+  house: { w: 156, ay: 0.74, ax: 0.5 }, shed: { w: 128, ay: 0.722 },
   well: { w: 56, ay: 0.86 },
   mailbox: { w: 22, ay: 0.92 }, barrel: { w: 24, ay: 0.88 }, lantern: { w: 16, ay: 0.95 },
   planter_white: { w: 30, ay: 0.9 }, pot_tulips: { w: 24, ay: 0.9 }, signpost: { w: 26, ay: 0.95 },
