@@ -1070,7 +1070,9 @@ export class Farm {
       });
       OD.length = 0;
     }
-    if (this.layerStale(O, okey, settled, r, CW, CH) || OD.length) {
+    // во время зума объекты рисуются вживую (чётко), слой объектов не трогаем до конца зума
+    const zoomLive = !settled && O.c && O.key === okey;
+    if (!zoomLive && (this.layerStale(O, okey, settled, r, CW, CH) || OD.length)) {
       OD.length = 0;
       this.buildLayer(O, okey, r, CW, CH, (g) => {
         g.clearRect(0, 0, O.c.width, O.c.height);
@@ -1081,9 +1083,13 @@ export class Farm {
       });
     }
     this._zoomPending = G.va !== r.va || O.va !== r.va; // слой растянут — после щипка перерисуем чётко
+    const zooming = O.va !== r.va;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (this._zoomPending) { ctx.fillStyle = BG; ctx.fillRect(0, 0, CW, CH); } // растянутый слой может не закрыть края
-    this.blitLayer(ctx, O, r.va, r.ve, r.vf);
+    if (zooming) {
+      // зум: растягивается только земля, объекты рисуются вживую — без размытия
+      ctx.fillStyle = BG; ctx.fillRect(0, 0, CW, CH);
+      this.blitLayer(ctx, G, r.va, r.ve, r.vf);
+    } else this.blitLayer(ctx, O, r.va, r.ve, r.vf);
     r.resetView();
 
     // Живая часть кадра: фермер, качающиеся и полупрозрачные объекты. Только в их прямоугольниках
@@ -1103,7 +1109,7 @@ export class Farm {
       F.push({ x0: tmp.x - HW + 6, y0: tmp.y - HH + 3, x1: tmp.x + HW - 6, y1: tmp.y + HH - 3, depth: t.x + t.y + 1, gx: t.x, gy: t.y });
     }
     let playerHidden = false;
-    const list = O.list;
+    const list = zooming ? this.staticList(this._zl || (this._zl = [])) : O.list;
     for (const d of list) {
       if (d.kind !== 'o') continue;
       const s = this.objSprite(d);
@@ -1115,6 +1121,7 @@ export class Farm {
       }
       if (d.fade || fade || d.shake > 0) R.push(d.wx - s.ax - 4, d.wy - s.ay - 1, d.wx - s.ax + s.w + 4, d.wy - s.ay + s.h + 1);
     }
+    if (zooming) R.splice(0, R.length, -1e6, -1e6, 1e6, 1e6); // весь экран — живой
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.beginPath();

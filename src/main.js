@@ -70,6 +70,9 @@ async function main() {
   });
 
   new ResizeObserver(resize).observe(canvas);
+  // запасной путь: эмулятор DevTools, поворот в Telegram и т.п. иногда не присылают ResizeObserver
+  window.addEventListener('resize', resize);
+  window.visualViewport && window.visualViewport.addEventListener('resize', resize);
   resize();
   camera.zoom = fitZoom();
 
@@ -85,7 +88,11 @@ async function main() {
     camera.update(dt);
     farm.update(dt);
   };
-  game.render = () => farm.render();
+  game.render = () => {
+    // размер канваса разошёлся с экраном — подстроиться до отрисовки (иначе картинка сплющена)
+    if (canvas.clientWidth !== Math.round(renderer.cssW) || canvas.clientHeight !== Math.round(renderer.cssH)) resize();
+    farm.render();
+  };
   game.isIdle = () => farm.isIdle() && input.pointers.size === 0;
   game.onPause = () => save.flush();
   window.addEventListener('pagehide', () => save.flush());
