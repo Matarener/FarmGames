@@ -44,10 +44,8 @@ export class Farm {
       if (a.water.every(Boolean) || a.waterTex) { this.S.waterArt = a.waterTex ? null : a.water; this.S.water.clear(); }
       this.groundV++;
       for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
-      for (const [k, url] of Object.entries(a.icons)) {
-        const im = new Image(); im.src = url;
-        im.onload = () => { this.icons[k] = url; this.iconImg[k] = im; this.dirty = true; this.onIcons && this.onIcons(k); };
-      }
+      Object.assign(this.icons, a.icons); Object.assign(this.iconImg, a.iconImg);
+      this.onIcons && this.onIcons();
       this.dirty = true;
     }).catch((e) => console.warn('art', e));
   }
@@ -117,6 +115,16 @@ export class Farm {
     let s = this.S.water.get(key);
     if (!s) { s = art.waterTile(mask, lily, this.S.waterTex ? 'none' : WA && WA[lily], this.grassColor(), dg); this.S.water.set(key, s); }
     return s;
+  }
+
+  // Подготовить всё, что иначе создавалось бы при первом показе: тайлы берега, тусклые
+  // спрайты закрытых участков, слои земли и объектов. Вызывается под экраном загрузки.
+  warmup() {
+    const w = this.world;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.WATER) this.waterSprite(x, y);
+    for (const o of w.objects) if (o && !w.isOpen(o.gx, o.gy)) dimSprite(this.objSprite(o));
+    for (const k in this.S.crops) for (const s of this.S.crops[k]) if (s && s.canvas.decode) s.canvas.decode().catch(() => {});
+    this.render();
   }
 
   // Клетка земли изменилась: перерисовать только её окрестность (а не всю землю)

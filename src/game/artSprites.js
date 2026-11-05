@@ -38,18 +38,26 @@ export async function loadArt(onProgress) {
   const man = typeof __ART_MANIFEST__ !== 'undefined' ? __ART_MANIFEST__ : await (await fetch(BASE + 'manifest.json?v=' + V)).json();
   const A = {};
   const list = Object.entries(man);
-  let done = 0;
-  await Promise.all(list.map(async ([name, m]) => {
-    const img = await loadImage(BASE + name + '.webp?v=' + V);
-    onProgress && onProgress(++done / list.length);
-    A[name] = { canvas: img, w: m.w, h: m.h, ax: m.ax, ay: m.ay, name };
-  }));
   // иконки интерфейса (ic_<имя>.webp); старые, нарисованные кодом, остаются запасными
-  const icons = {};
-  try {
-    const list = typeof __ART_ICONS__ !== 'undefined' ? __ART_ICONS__ : await (await fetch(BASE + 'icons.json?v=' + V)).json();
-    for (const n of list) icons[n] = BASE + 'ic_' + n + '.webp?v=' + V;
-  } catch (e) { /* без иконок */ }
+  let iconList = [];
+  try { iconList = typeof __ART_ICONS__ !== 'undefined' ? __ART_ICONS__ : await (await fetch(BASE + 'icons.json?v=' + V)).json(); } catch (e) { /* без иконок */ }
+  const total = list.length + iconList.length;
+  let done = 0;
+  const tick = () => onProgress && onProgress(++done / total);
+  const icons = {}, iconImg = {};
+  // всё грузится во время экрана загрузки: спрайты и иконки вместе
+  await Promise.all([
+    ...list.map(async ([name, m]) => {
+      const img = await loadImage(BASE + name + '.webp?v=' + V);
+      tick();
+      A[name] = { canvas: img, w: m.w, h: m.h, ax: m.ax, ay: m.ay, name };
+    }),
+    ...iconList.map(async (n) => {
+      const url = BASE + 'ic_' + n + '.webp?v=' + V;
+      try { iconImg[n] = await loadImage(url); icons[n] = url; } catch (e) { /* останется запасная */ }
+      tick();
+    }),
+  ]);
   const obj = {};
   for (const [type, names] of Object.entries(OBJ)) obj[type] = names.map((n) => A[n]).filter(Boolean);
   const crops = {};
@@ -58,7 +66,7 @@ export async function loadArt(onProgress) {
     if (m) (crops[m[1]] = crops[m[1]] || [])[+m[2]] = A[name];
   }
   return {
-    obj, crops, icons,
+    obj, crops, icons, iconImg,
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {
       const k = tree && tree.name && tree.name.replace('tree_', '');

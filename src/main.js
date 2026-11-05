@@ -93,6 +93,9 @@ async function main() {
 
   // ждём картинки (но не дольше 15 с: на плохой связи игра откроется с графикой из кода)
   await Promise.race([farm.artReady, new Promise((r) => setTimeout(r, 15000))]);
+  progress(0.97);
+  await new Promise((r) => setTimeout(r, 0)); // дать экрану загрузки обновиться
+  farm.warmup();
   progress(1);
   setTimeout(() => { document.getElementById('loading').classList.add('hide'); if (!ui.panelOpen) audio.setTheme('farm'); }, 150);
   // начало истории: новое задание показываем сразу

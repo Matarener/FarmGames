@@ -40,7 +40,8 @@ export function dimSprite(s, k = 0.62, tint = [16, 38, 26]) {
 export function loadImage(url) {
   return new Promise((res, rej) => {
     const img = new Image();
-    img.onload = () => res(img);
+    // decode(): картинка распакована заранее, первый показ не подтормаживает
+    img.onload = () => (img.decode ? img.decode().catch(() => {}) : Promise.resolve()).then(() => res(img));
     img.onerror = rej;
     img.src = url;
   });
