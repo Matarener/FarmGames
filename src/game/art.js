@@ -85,15 +85,18 @@ export function soilTile(wet) {
 
 // mask: биты соседей-суши: 1 — (x, y-1) задний правый край, 2 — (x+1, y) передний правый,
 // 4 — (x, y+1) передний левый, 8 — (x-1, y) задний левый
-export function waterTile(mask, lily) {
+export function waterTile(mask, lily, base) {
   const rnd = mulberry32(500 + mask * 3 + (lily ? 1 : 0));
   const T = [0, -HH], R = [HW, 0], B = [0, HH], L = [-HW, 0];
   return makeSprite(HW * 2 + 2, HH * 2 + 2, HW + 1, HH + 1, (g) => {
-    g.fillStyle = '#78c04c'; diamond(g, HW + 0.7, HH + 0.35); g.fill();
-    g.fillStyle = '#3f97d6'; diamond(g, HW + 0.5, HH + 0.25); g.fill();
-    g.fillStyle = '#56ade6'; diamond(g, HW * 0.75, HH * 0.75, 0, 1.5); g.fill();
+    if (base) g.drawImage(base.canvas, -base.ax, -base.ay, base.w, base.h); // вода художника, берег — кодом
+    else {
+      g.fillStyle = '#78c04c'; diamond(g, HW + 0.7, HH + 0.35); g.fill();
+      g.fillStyle = '#3f97d6'; diamond(g, HW + 0.5, HH + 0.25); g.fill();
+      g.fillStyle = '#56ade6'; diamond(g, HW * 0.75, HH * 0.75, 0, 1.5); g.fill();
+    }
     g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 0.9;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < (base ? 0 : 4); i++) {
       const [x, y] = inTile(rnd, 0.6);
       g.beginPath(); g.moveTo(x - 3, y); g.quadraticCurveTo(x, y - 1.2, x + 3, y); g.stroke();
     }
@@ -114,7 +117,7 @@ export function waterTile(mask, lily) {
     if (mask & 8) edge(L, T, false);
     if (mask & 2) edge(R, B, true);
     if (mask & 4) edge(B, L, true);
-    if (lily) {
+    if (lily && !base) {
       for (let i = 0; i < 2; i++) {
         const [x, y] = inTile(rnd, 0.45);
         g.fillStyle = '#3f9a3a'; ell(g, x, y, 4, 2.2); g.fill();

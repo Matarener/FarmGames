@@ -24,14 +24,22 @@ SHEETS = {
     'rocks':  [('rock_big', 118), ('rock_mid', 54), ('rock_small', 40), ('rock_moss', 116)],
     'bushes': [('bush_blue', 40), ('bush_rasp', 40), ('bush_pink', 40),
                ('bush_hydra', 40), ('bush_lav', 40), ('bush_rose', 40)],
+    # отрицательная ширина: «пятачок» — весь ромб объекта (ширина по краям картинки)
+    'stumps': [('stump_oak', -58), ('stump_birch', -54), ('stump_pine', -58), ('stump_moss', -58)],
+    'house1': [('house_1', -132)], 'house2': [('house_2', -132)], 'house3': [('house_3', -132)], 'house4': [('house_4', -132)], 'house5': [('house_5', -132)],
 }
 # Урожай: лист = 5 стадий слева направо, сверху вниз; в игре 4 стадии (третью пропускаем).
 # Растения заполняют ромб грядки: масштаб по ширине, опора — центр ромба.
-CROPS = {'crop_wheat': 'wheat', 'crop_carrot': 'carrot', 'crop_beet': 'beet'}
+CROPS = {'crop_wheat': 'wheat', 'crop_carrot': 'carrot', 'crop_beet': 'beet',
+         'crop_tomato': 'tomato', 'crop_sunflower': 'sunflower', 'crop_pumpkin': 'pumpkin',
+         'crop_strawberry': 'strawberry', 'crop_cotton': 'cotton',
+         'crop_corn': ('corn', [0, 1, 2, 3])}  # у кукурузы на 5-й стадии лишние корнеплоды
 CROP_STAGES = [0, 1, 3, 4]
 CROP_W = 54
 
-TILES = ('tiles', ['tile_grass', 'tile_flowers', 'tile_soil', 'tile_sand'])
+TILE_SHEETS = [('tiles', ['tile_grass', 'tile_flowers', 'tile_soil', 'tile_sand']),
+               ('tiles_water', ['water_0', 'water_lily', 'water_reed', 'water_spark']),
+               ('tiles_path', ['tile_cobble', 'tile_planks', 'tile_sand2', 'tile_soil_wet'])]
 
 
 def load(name):
@@ -101,7 +109,13 @@ def main():
         for (y0, y1, x0, x1, i), (name, base_w) in zip(boxes, items):
             crop = a[y0:y1, x0:x1].copy()
             crop[lab[y0:y1, x0:x1] != i, 3] = 0
-            bw, bx, by = base_of(crop)
+            if base_w < 0:  # ромб на всю ширину: опора — его центр
+                m = crop[..., 3] > 128
+                xs = np.where(m.any(0))[0]; ys = np.where(m.any(1))[0]
+                bw, bx, by = xs[-1] - xs[0], (xs[0] + xs[-1]) / 2, ys[-1]
+                base_w = -base_w
+            else:
+                bw, bx, by = base_of(crop)
             k = base_w / bw  # мир/пиксель
             W, H = (x1 - x0) * k, (y1 - y0) * k
             img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
@@ -110,25 +124,30 @@ def main():
             print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
 
     # Плитки земли: вырезаем ромб чуть внутри контура (без тёмной обводки)
-    sheet, names = TILES
-    a = load(sheet)
-    boxes, lab = components(a, len(names))
-    TW, TH = (TILE_W + 2) * DENSITY, (TILE_H + 1) * DENSITY
-    yy, xx = np.mgrid[0:TH, 0:TW]
-    diamond = (np.abs(xx + 0.5 - TW / 2) / (TW / 2) + np.abs(yy + 0.5 - TH / 2) / (TH / 2)) <= 1.0
-    for (y0, y1, x0, x1, i), name in zip(boxes, names):
-        inset = 0.045
-        w, h = x1 - x0, y1 - y0
-        crop = a[y0 + int(h * inset):y1 - int(h * inset), x0 + int(w * inset):x1 - int(w * inset)]
-        img = np.array(Image.fromarray(crop).resize((TW, TH), Image.LANCZOS))
-        img[..., 3] = np.where(diamond, 255, 0)
-        save(Image.fromarray(img), name, TILE_W + 2, TILE_H + 1, (TILE_W + 2) / 2, (TILE_H + 1) / 2, man)
-        print(f'{name:14s} tile')
+    for sheet, names in TILE_SHEETS:
+        a = load(sheet)
+        boxes, lab = components(a, len(names))
+        TW, TH = (TILE_W + 2) * DENSITY, (TILE_H + 1) * DENSITY
+        yy, xx = np.mgrid[0:TH, 0:TW]
+        diamond = (np.abs(xx + 0.5 - TW / 2) / (TW / 2) + np.abs(yy + 0.5 - TH / 2) / (TH / 2)) <= 1.0
+        for (y0, y1, x0, x1, i), name in zip(boxes, names):
+            inset = 0.045
+            w, h = x1 - x0, y1 - y0
+            crop = a[y0 + int(h * inset):y1 - int(h * inset), x0 + int(w * inset):x1 - int(w * inset)]
+            img = np.array(Image.fromarray(crop).resize((TW, TH), Image.LANCZOS))
+            img[..., 3] = np.where(diamond, 255, 0)
+            save(Image.fromarray(img), name, TILE_W + 2, TILE_H + 1, (TILE_W + 2) / 2, (TILE_H + 1) / 2, man)
+            print(f'{name:14s} tile')
 
     for sheet, crop in CROPS.items():
+        crop, stages = crop if isinstance(crop, tuple) else (crop, CROP_STAGES)
         a = load(sheet)
-        boxes, lab = components(a, 5, dilate=30)
-        for st, si in enumerate(CROP_STAGES):
+        # подбираем склейку: ростки одной стадии вместе, соседние стадии отдельно
+        for d in (30, 24, 18, 14, 10):
+            boxes, lab = components(a, 5, dilate=d)
+            if len(boxes) == 5 and max(b[3] - b[2] for b in boxes) < a.shape[1] * 0.42:
+                break
+        for st, si in enumerate(stages):
             y0, y1, x0, x1, i = boxes[si]
             c = a[y0:y1, x0:x1].copy()
             c[lab[y0:y1, x0:x1] != i, 3] = 0

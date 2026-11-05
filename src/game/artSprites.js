@@ -17,6 +17,7 @@ const OBJ = {
   boulder: ['rock_big', 'rock_moss'],
   bush: ['bush_pink', 'bush_hydra', 'bush_lav', 'bush_rose'],
   berry: ['bush_blue', 'bush_rasp'],
+  stump: ['stump_oak', 'stump_birch', 'stump_pine', 'stump_moss'],
 };
 
 function flipped(s) {
@@ -48,9 +49,11 @@ export async function loadArt() {
   }
   return {
     obj, crops,
+    house: [null, A.house_1, A.house_2, A.house_3, A.house_4, A.house_5],
+    water: [A.water_0, A.water_spark, A.water_lily, A.water_reed],
     // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%)
     grass: [A.tile_grass, flipped(A.tile_grass), A.tile_flowers, flipped(A.tile_flowers)],
     path: [A.tile_sand, flipped(A.tile_sand)],
-    soil: [A.tile_soil, tinted(A.tile_soil, 'rgba(40,20,10,0.32)')],
+    soil: [A.tile_soil, A.tile_soil_wet || tinted(A.tile_soil, 'rgba(40,20,10,0.32)')],
   };
 }

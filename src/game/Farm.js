@@ -26,6 +26,8 @@ export class Farm {
     this.buildSprites();
     loadArt().then((a) => {
       Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, objArt: a.obj });
+      a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
+      if (a.water.every(Boolean)) { this.S.waterArt = a.water; this.S.water.clear(); }
       for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
       this.dirty = true;
     }).catch((e) => console.warn('art', e));
@@ -57,10 +59,12 @@ export class Farm {
     const w = this.world;
     const land = (xx, yy) => (!w.inside(xx, yy) || w.tile(xx, yy) !== T.WATER ? 1 : 0);
     const mask = land(x, y - 1) | (land(x + 1, y) << 1) | (land(x, y + 1) << 2) | (land(x - 1, y) << 3);
-    const lily = hash2(x * 7, y * 13) < 0.3 ? 1 : 0;
-    const key = mask * 2 + lily;
+    const h = hash2(x * 7, y * 13), WA = this.S.waterArt;
+    // с водой художника: 0 — гладь, 1 — блики, 2 — кувшинка, 3 — камыш (камыш только у берега)
+    const lily = WA ? (h < 0.55 ? 0 : h < 0.75 ? 1 : h < 0.88 ? 2 : mask ? 3 : 1) : h < 0.3 ? 1 : 0;
+    const key = mask * 4 + lily;
     let s = this.S.water.get(key);
-    if (!s) { s = art.waterTile(mask, lily); this.S.water.set(key, s); }
+    if (!s) { s = art.waterTile(mask, lily, WA && WA[lily]); this.S.water.set(key, s); }
     return s;
   }
 
