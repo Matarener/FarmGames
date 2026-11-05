@@ -71,3 +71,19 @@ export function cropImage(img, fx0, fy0, fx1, fy1, flip) {
   g.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
   return c;
 }
+
+// Анимации из редактора (editor.html). ?draft — черновик из localStorage
+// этого браузера, иначе assets/anims.json. Нет файла — стандартные анимации.
+export const ANIMS_DRAFT_KEY = 'farm.anims.draft';
+export async function loadAnims() {
+  try {
+    if (typeof location !== 'undefined' && /[?&]draft\b/.test(location.search)) {
+      const d = localStorage.getItem(ANIMS_DRAFT_KEY);
+      if (d) { const j = JSON.parse(d); return j.animations || j; }
+    }
+    const r = await fetch('assets/anims.json', { cache: 'no-cache' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && typeof j === 'object' ? (j.animations || j) : null;
+  } catch { return null; }
+}

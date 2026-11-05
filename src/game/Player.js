@@ -5,6 +5,7 @@ import { AnimationState } from '../skeleton/Animation.js';
 import { toWorld } from '../engine/Iso.js';
 import { findPath } from '../engine/Pathfinding.js';
 import { N } from './World.js';
+import { makeGait, advanceGait, solveRig } from './gait.js';
 
 const TOOL_ANIM = {
   chop: ['swing', 'axe'], mine: ['swing', 'pickaxe'], dig: ['swing', 'hoe'],
@@ -13,13 +14,6 @@ const TOOL_ANIM = {
 const MAX_QUEUE = 6;
 const tmp = { x: 0, y: 0 };
 const TWO_HANDED = { axe: 1, pickaxe: 1, hoe: 1 };
-
-// Походка через IK: стопа стоит на земле, пока тело проходит над ней,
-// затем переносится вперёд по дуге. Шаг привязан к пройденному расстоянию,
-// поэтому ноги не проскальзывают при любой скорости.
-const STRIDE = 22;     // длина цикла из двух шагов, единицы мира
-const LIFT = 3.2;      // высота подъёма стопы
-const smooth = (t) => t * t * (3 - 2 * t);
 
 export class Player {
   constructor(world, data, x, y) {
@@ -38,7 +32,7 @@ export class Player {
     this.anim.onComplete = (name) => { if (name === 'happy') this.anim.play('idle'); };
     this.handlers = null; // { perform(action) → bool продолжать, fail(action, reason) }
     this.idleTime = 0;
-    this.gait = { phase: 0, amt: 0, ux: 1, uy: 0, px: null, py: 0 };
+    this.gait = makeGait();
     this.legs = data.legs || null;  // { hipX, len } — опоры стоп для IK
     this.grip2 = data.grip2 || 0;   // где на рукояти вторая рука (вдоль предплечья)
   }
@@ -134,55 +128,20 @@ export class Player {
     }
     this.idleTime = this.busy || this.anim.name !== 'idle' ? 0 : this.idleTime + dt;
     this.anim.update(dt);
-    const g = this.gait;
     toWorld(this.x, this.y, tmp);
-    const mdx = g.px === null ? 0 : tmp.x - g.px, mdy = tmp.y - g.py;
-    g.px = tmp.x; g.py = tmp.y;
-    const md = Math.hypot(mdx, mdy);
-    const walking = this.state === 'walk' && md > 1e-4;
-    if (walking) {
-      g.phase = (g.phase + md / STRIDE) % 1;
-      g.ux += (mdx / md - g.ux) * 0.5; g.uy += (mdy / md - g.uy) * 0.5;
-      // ритм корпуса и рук — по фазе шага
-      if (this.anim.name === 'walk') this.anim.time = g.phase * this.anim.cur.duration;
-    }
-    g.amt += ((walking || this.state === 'walk' ? 1 : 0) - g.amt) * Math.min(1, dt * 10);
+    advanceGait(this.gait, tmp.x, tmp.y, this.state === 'walk', dt, this.anim);
     this.anim.apply();
     this.solveIK(dt);
   }
 
   solveIK(dt) {
-    const sk = this.sk, ik = sk.ikMap, L = this.legs;
-    if (!L || !ik.legF) return;
-    const g = this.gait;
-    const ux = this.flip ? -g.ux : g.ux, uy = g.uy;
-    const n = Math.hypot(ux, uy) || 1;
-    // при приседании колени разводим в стороны, при ходьбе — вперёд
-    const squat = this.anim.name === 'pick';
-    for (const [name, baseX, off, out] of [['legF', -L.hipX, 0, 1], ['legB', L.hipX, 0.5, -1]]) {
-      const k = ik[name];
-      k.bend = squat ? out : 1;
-      const ph = (g.phase + off) % 1;
-      let o, h = 0;
-      if (ph < 0.5) o = STRIDE / 4 - ph * STRIDE;                  // опора: стопа стоит
-      else { const t = (ph - 0.5) * 2; o = -STRIDE / 4 + smooth(t) * STRIDE / 2; h = Math.sin(Math.PI * t) * LIFT; }
-      k.x = baseX + (ux / n) * o * g.amt * 0.9;
-      k.y = (uy / n) * o * g.amt * 0.5 - h * g.amt;
-      k.mix = 1;
-    }
-    // вторая рука на рукояти двуручного инструмента
-    const arm = ik.armB;
-    if (arm) {
-      const want = this.state === 'work' && TWO_HANDED[sk.override.tool] && this.anim.name === 'swing' ? 1 : 0;
-      arm.mix += (want - arm.mix) * Math.min(1, dt * 14);
-      if (arm.mix < 0.01) arm.mix = 0;
-      if (arm.mix) {
-        const f = sk.boneMap.foreF, root = sk.bones[0];
-        arm.x = f.c * this.grip2 + f.tx - root.tx;
-        arm.y = f.d * this.grip2 + f.ty - root.ty;
-      }
-    }
-    sk.solveIK();
+    if (!this.legs) return;
+    solveRig(this.sk, this.gait, {
+      legs: this.legs, grip2: this.grip2, flip: this.flip, dt,
+      squat: !!(this.anim.cur && this.anim.cur.kneesOut),
+      legsIK: !this.anim.cur || this.anim.cur.footIK,
+      twoHand: this.state === 'work' && TWO_HANDED[this.sk.override.tool] && this.anim.name === 'swing',
+    });
   }
 
   worldPos(out) { return toWorld(this.x, this.y, out); }
