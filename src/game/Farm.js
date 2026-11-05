@@ -127,10 +127,16 @@ export class Farm {
     } else {
       for (const i of w.startBeds) this.bedAt(i);
       // одна грядка уже посажена — сразу видно, как всё работает
-      const b = this.bedAt(w.startBeds[0]); b.crop = 'carrot'; b.p = 0; b.w = 1;
+      // и уже созрела: первое задание — собрать её
+      const b = this.bedAt(w.startBeds[0]); b.crop = 'carrot'; b.p = CROPS.carrot.time; b.w = 2;
       this.st.can = 2;
     }
     for (const i of w.startBeds) if (w.tiles[i] !== T.SOIL) w.tiles[i] = T.SOIL;
+    // старые сохранения: первое задание ещё не выполнено — стартовая морковка созревает сразу
+    if (saved && !this.st.stats.harvested && !(this.st.quest && this.st.quest.i > 0)) {
+      const b = this.beds.get(w.startBeds[0]);
+      if (b && b.crop === 'carrot') { b.p = CROPS.carrot.time; b.w = 2; }
+    }
     this.player = new Player(w, makeGhostData(), px, py);
     this.player.handlers = {
       canStart: (a) => this.canStart(a),
