@@ -6,16 +6,26 @@
 
 Модули не работают через `file://`, поэтому нужен любой локальный веб-сервер:
 
-- `tools\run-local.cmd` — двойной клик (нужен Python или Node.js), затем откройте http://localhost:8080
-- или вручную: `python -m http.server 8080` / `npx serve -l 8080`
+- `tools\run-local.cmd` — двойной клик (нужен Node.js или Python), откроется http://localhost:8080
+- или `npm run dev`
 
 Полезные параметры адреса:
 - `?debug` — FPS, уровень качества и масштаб рендера
 - `?quality=low|mid|high` — принудительно выбрать качество (проверка поведения на слабом телефоне)
 
+## Сборка
+
+```
+npm install
+npm run build      # → dist/: один минифицированный бандл, CSS, index.html и только нужные спрайты
+npm run preview    # открыть собранную версию на http://localhost:8080
+```
+
+Папка `dist/` лежит в репозитории. При каждом пуше в `main` GitHub Actions пересобирает её и публикует на GitHub Pages (`.github/workflows/pages.yml`). Адрес: https://matarener.github.io/FarmGames/
+
 ## Подключение к Telegram
 
-1. Залейте папку на любой HTTPS-хостинг (GitHub Pages, Netlify, Cloudflare Pages, свой сервер).
+1. Адрес игры — GitHub Pages (выше) или любой другой HTTPS-хостинг с содержимым `dist/`.
 2. В @BotFather: `/newapp` (или `/mybots → Bot Settings → Menu Button`) и укажите адрес `index.html`.
 3. Внутри Telegram игра сама разворачивается на весь экран, отключает закрытие свайпом вниз, учитывает вырезы экрана, использует вибрацию и сохраняет прогресс в CloudStorage аккаунта (плюс localStorage).
 

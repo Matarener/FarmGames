@@ -1,0 +1,15 @@
+{
+  "name": "farmgames",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Изометрическая ферма для Telegram Mini App на чистом JavaScript",
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "build": "node tools/build.mjs",
+    "preview": "node tools/serve.mjs dist"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}
