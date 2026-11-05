@@ -4,11 +4,11 @@ import { toWorld, toGrid, HW, HH } from '../engine/Iso.js';
 import { dimSprite, hash2 } from '../engine/Sprite.js';
 import { World, N, CHUNK, CHUNKS, T, START_CHUNK } from './World.js';
 import { Player } from './Player.js';
-import { makeGhostData } from './ghost.js';
+import { makeGhostData, ROD_TIP } from './ghost.js';
 import * as art from './art.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
-import { CROPS, OBJECTS, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 const BG = '#3d7a35';
@@ -56,7 +56,7 @@ export class Farm {
     for (const c of Object.values(CROPS)) S.crops[c.key] = [0, 1, 2, 3].map((s) => art.cropSprite(c, s));
     S.bubble = { water: art.bubbleSprite('water'), ready: art.bubbleSprite('ready'), lock: art.bubbleSprite('lock') };
     this.S = S;
-    this.icons = art.makeIcons(CROPS);
+    this.icons = art.makeIcons(CROPS, FISH);
     this.iconImg = {};
     for (const [k, url] of Object.entries(this.icons)) { const im = new Image(); im.src = url; this.iconImg[k] = im; }
   }
@@ -296,7 +296,12 @@ export class Farm {
     if (!w.inside(x, y)) return;
     if (!w.isOpen(x, y)) return this.expandPopup(w.chunkOf(x, y), sx, sy);
     const t = w.tile(x, y);
-    if (t === T.WATER) return this.queue({ kind: 'fill', x, y });
+    if (t === T.WATER) {
+      return this.ui.popup(sx, sy, { items: [
+        { icon: 'water', label: 'Набрать воды', sub: `${this.st.can}/${this.canMax}`, disabled: this.st.can >= this.canMax, onClick: () => this.queue({ kind: 'fill', x, y }) },
+        { icon: 'fish', label: 'Рыбачить', sub: `⚡ ${ENERGY.fish}`, onClick: () => this.queue({ kind: 'fish', x, y }) },
+      ] });
+    }
     if (t === T.SOIL) return this.tapBed(this.bedAt(w.idx(x, y)), sx, sy);
     if (w.occ[w.idx(x, y)] >= 0) return;
     const items = [{ icon: 'walk', label: 'Идти сюда', onClick: () => this.queue({ kind: 'walk', x, y }) }];
@@ -403,14 +408,14 @@ export class Farm {
     n = Math.min(n, have);
     if (!n) return;
     this.st.crops[key] = have - n;
-    this.st.coins += n * CROPS[key].sell;
+    this.st.coins += n * GOODS[key].sell;
     this.quests.emit('sell', key, n);
     this.tg.haptic('light');
     this.changed();
   }
 
   eat(key) {
-    const c = CROPS[key];
+    const c = GOODS[key];
     if (!c.food || !(this.st.crops[key] > 0)) return;
     if (this.st.energy >= this.maxEnergy) return this.toast('Энергия уже полная');
     this.st.crops[key]--;
@@ -473,6 +478,7 @@ export class Farm {
       case 'fill':
         if (st.can >= this.canMax) { this.toast('Лейка уже полная'); return false; }
         return t === T.WATER;
+      case 'fish': return t === T.WATER;
     }
     return true;
   }
@@ -530,6 +536,23 @@ export class Farm {
         this.changed();
         return false;
       }
+      case 'fish': {
+        if (!this.spend(ENERGY.fish)) return false;
+        toWorld(a.x + 0.5, a.y + 0.5, tmp);
+        this.burst(tmp.x, tmp.y - 2, '#bfe6ff', 10);
+        if (Math.random() > FISH_CATCH) { this.float(tmp.x, tmp.y - 20, 'Сорвалась!', null); this.changed(); return false; }
+        const list = Object.values(FISH), total = list.reduce((s, f) => s + f.chance, 0);
+        let r = Math.random() * total, fish = list[0];
+        for (const f of list) { if ((r -= f.chance) < 0) { fish = f; break; } }
+        const got = this.addItem('crops', fish.key, 1);
+        if (!got) return false;
+        this.float(tmp.x, tmp.y - 22, `+1 ${fish.name}`, fish.key);
+        this.quests.emit('fish', fish.key);
+        this.addXp(fish.xp);
+        this.tg.haptic(fish.key === 'fish_gold' ? 'success' : 'medium');
+        this.changed();
+        return false;
+      }
       case 'harvest': {
         const b = this.bedAt(w.idx(a.x, a.y)), c = CROPS[b.crop];
         const got = this.addItem('crops', c.key, 1);
@@ -577,6 +600,32 @@ export class Farm {
   }
 
   // ---------------- Эффекты ----------------
+
+  // Рыбалка: леска от кончика удочки к поплавку на клетке воды
+  drawFishing(ctx) {
+    const p = this.player, an = p.anim, a = p.current;
+    if (p.state !== 'work' || !a || a.kind !== 'fish' || an.name !== 'fish' || an.time < 0.42 || an.time > 2.3) return;
+    const bn = p.sk.boneMap.foreF, ly = 3.4 + ROD_TIP;
+    let x = bn.c * ly + bn.tx, y = bn.d * ly + bn.ty; if (p.flip) x = -x;
+    p.worldPos(tmp); x += tmp.x; y += tmp.y;
+    toWorld(a.x + 0.5, a.y + 0.5, tmp2);
+    const t = an.time;
+    // поплавок: летит после заброса, качается, перед подсечкой ныряет (клюёт)
+    const k = Math.min(1, (t - 0.42) / 0.22);
+    const bite = t > 1.72 ? Math.min(1, (t - 1.72) / 0.12) : 0;
+    const yank = t > 2.12 ? (t - 2.12) / 0.18 : 0; // подсечка: поплавок выдёргивается к удочке
+    let bx = x + (tmp2.x - x) * k, by = y + (tmp2.y - y) * k - Math.sin(k * Math.PI) * 14 + (k >= 1 ? Math.sin(t * 7) * 0.7 + bite * 2.4 : 0);
+    if (yank) { bx += (x - bx) * yank * 0.6; by += (y - 10 - by) * yank * 0.6; }
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo((x + bx) / 2, Math.max(y, by) + 6, bx, by); ctx.stroke();
+    if (k >= 1 && !yank) { // круги на воде
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.ellipse(bx, by + 1.5, 4 + bite * 3, 1.8 + bite * 1.2, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.fillStyle = '#3d2b1f'; ctx.beginPath(); ctx.arc(bx, by, 2.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bx, by + 0.4, 1.5, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = '#e2392f'; ctx.beginPath(); ctx.arc(bx, by - 0.2, 1.5, Math.PI, 0); ctx.fill();
+  }
 
   // Полив: пока лейка наклонена, из носика падают капли
   pourWater(dt) {
@@ -776,6 +825,8 @@ export class Farm {
 
     this.drawQueue(ctx);
     this.drawSigns(ctx);
+
+    this.drawFishing(ctx);
 
     // частицы
     for (const q of this.particles) {

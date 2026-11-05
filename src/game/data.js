@@ -14,6 +14,18 @@ export const CROPS = {
 };
 for (const [k, v] of Object.entries(CROPS)) v.key = k;
 
+// Рыба из пруда: хранится вместе с урожаем, её можно съесть или продать
+export const FISH = {
+  fish_carp:   { name: 'Карась',        chance: 60, sell: 4,  food: 3, xp: 1, color: '#c9a24a', belly: '#f0d98a' },
+  fish_perch:  { name: 'Окунь',         chance: 30, sell: 8,  food: 5, xp: 2, color: '#6f9a4a', belly: '#d9e8a0', stripes: true },
+  fish_gold:   { name: 'Золотая рыбка', chance: 10, sell: 40, food: 8, xp: 5, color: '#f29a1d', belly: '#ffd75a' },
+};
+for (const [k, v] of Object.entries(FISH)) v.key = k;
+export const FISH_CATCH = 0.75; // шанс, что рыба не сорвётся
+
+// Всё, что лежит в рюкзаке как еда/товар
+export const GOODS = { ...CROPS, ...FISH };
+
 export const RESOURCES = {
   wood: { name: 'Дерево' },
   stone: { name: 'Камень' },
@@ -35,7 +47,7 @@ export const OBJECTS = {
 };
 
 // Стоимость энергии за удар/действие
-export const ENERGY = { chop: 1, mine: 1, dig: 2, water: 1, plant: 0, harvest: 0, fill: 0 };
+export const ENERGY = { chop: 1, mine: 1, dig: 2, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1 };
 export const ENERGY_REGEN_SEC = 120;
 
 export const HOUSE = [

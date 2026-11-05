@@ -74,7 +74,7 @@ button:disabled { cursor: default; }
 
 /* ---------- Задание ---------- */
 .quest-card {
-  pointer-events: auto; margin-top: 4px; width: 168px; display: flex; align-items: center; gap: 6px; padding: 5px 8px 6px 5px;
+  pointer-events: auto; width: 168px; display: flex; align-items: center; gap: 6px; padding: 5px 8px 6px 5px;
   background: rgba(255,246,227,.94); border: 2px solid rgba(61,43,31,.6); border-radius: 12px; font: inherit; color: var(--ink); text-align: left;
   box-shadow: 0 2px 0 rgba(0,0,0,.18);
 }

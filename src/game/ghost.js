@@ -67,6 +67,18 @@ function hatSprite() {
   });
 }
 
+// Удочка: рукоять в ладони, кончик — по +y на 26 единиц (там крепится леска)
+export const ROD_TIP = 26;
+function rodSprite() {
+  return makeSprite(10, 36, 5, 6, (g) => {
+    g.strokeStyle = OUT; g.lineWidth = 2.6; g.beginPath(); g.moveTo(0, -4); g.lineTo(0, ROD_TIP); g.stroke();
+    g.strokeStyle = '#c98b4a'; g.lineWidth = 1.3; g.beginPath(); g.moveTo(0, -3.4); g.lineTo(0, ROD_TIP - 0.6); g.stroke();
+    g.fillStyle = OUT; g.fillRect(-1.9, -4.6, 3.8, 7.4); g.fillStyle = '#7a4b28'; g.fillRect(-1.2, -4, 2.4, 6.2);
+    g.fillStyle = OUT; ell(g, -2.6, 4.6, 2.2, 2.2); g.fill(); g.fillStyle = '#b8c0c6'; ell(g, -2.6, 4.6, 1.4, 1.4); g.fill();
+    g.fillStyle = OUT; ell(g, 0, ROD_TIP, 1.1, 1.1); g.fill();
+  });
+}
+
 function handSprite(fill) {
   return makeSprite(8, 8, 4, 4, (g) => {
     g.fillStyle = OUT; ell(g, 0, 0, 2.9, 2.7); g.fill();
@@ -98,7 +110,7 @@ export function makeGhostData() {
   ];
   const tools = {
     axe: att(T.axe, 0, HY), pickaxe: att(T.pickaxe, 0, HY), hoe: att(T.hoe, 0, HY),
-    can: att(T.can, 0, HY + 0.2), seedbag: att(T.seedbag, 0, HY),
+    can: att(T.can, 0, HY + 0.2), seedbag: att(T.seedbag, 0, HY), rod: att(rodSprite(), 0, HY),
   };
   const hand = handSprite(C.body), handFar = handSprite(C.shade), hat = hatSprite();
   const skins = {
@@ -173,6 +185,23 @@ export function makeGhostData() {
         armF: { rotate: [[0, -30, 2], [0.25, -68, 2], [0.85, -68, 2], [1.1, -30]] },
         foreF: { rotate: [[0, 0, 2], [0.25, -6, 2], [0.45, 38, 2], [0.75, 38, 2], [0.9, -6, 2], [1.1, 0]] },
         armB: { rotate: [[0, -20, 2], [0.5, -30, 2], [1.1, -20]] },
+      },
+    },
+    // Рыбалка: замах назад, заброс, ожидание (поплавок рисует Farm), подсечка — hit
+    fish: {
+      duration: 2.5,
+      events: [[2.3, 'hit']],
+      slots: { body: tail(2.5, 12) },
+      bones: {
+        float: { translate: [[0, 0, 0, 2], [0.2, 0, -2, 2], [0.42, 0, 1, 2], [0.6, 0, 0, 2], [1.3, 0, -1.2, 2], [2, 0, 0, 2], [2.12, 0, -3, 2], [2.5, 0, 0]] },
+        body: {
+          rotate: [[0, 0, 2], [0.2, -8, 2], [0.42, 10, 2], [0.7, 4, 2], [2, 4, 2], [2.12, -8, 2], [2.5, 0]],
+          scale: [[0, 1, 1, 2], [0.2, 0.94, 1.08, 2], [0.42, 1.1, 0.9, 2], [0.65, 1, 1, 2], [2.12, 0.92, 1.1, 2], [2.3, 1.06, 0.95, 2], [2.5, 1, 1]],
+        },
+        hat: { rotate: [[0, 0, 2], [0.2, 8, 2], [0.42, -8, 2], [0.7, 0, 2], [2.12, 8, 2], [2.5, 0]] },
+        armF: { rotate: [[0, -60, 2], [0.2, -200, 3], [0.42, -112, 2], [1.1, -116, 2], [1.7, -112, 2], [1.85, -104, 2], [2.12, -175, 2], [2.5, -120]] },
+        foreF: { rotate: [[0, 0, 2], [0.2, -10, 2], [0.42, 6, 2], [2.12, -6, 2], [2.5, 0]] },
+        armB: { rotate: [[0, -30, 2], [0.42, -60, 2], [2, -60, 2], [2.12, -150, 2], [2.5, -40]] },
       },
     },
     // Нырок к земле: посадка, сбор урожая, набрать воды

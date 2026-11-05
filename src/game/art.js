@@ -539,7 +539,25 @@ function cropIcon(crop) {
   };
 }
 
-export function makeIcons(crops) {
+function fishIcon(f) {
+  return (g) => {
+    g.save(); g.translate(1.5, 1); g.rotate(-0.12);
+    const body = () => { g.beginPath(); g.ellipse(0, 0, 10.5, 7.5, 0, 0, Math.PI * 2); };
+    const tail = () => { g.beginPath(); g.moveTo(-8, 0); g.lineTo(-14.5, -6.5); g.quadraticCurveTo(-12, 0, -14.5, 6.5); g.closePath(); };
+    g.fillStyle = f.color; g.strokeStyle = OUT; g.lineWidth = 1.8;
+    tail(); g.fill(); g.stroke(); body(); g.fill(); g.stroke();
+    g.save(); body(); g.clip();
+    g.fillStyle = f.belly; ell(g, 0, 5.5, 10, 4.2); g.fill();
+    if (f.stripes) { g.fillStyle = 'rgba(40,60,20,.45)'; for (const x of [-4, 0, 4]) g.fillRect(x - 0.9, -8, 1.8, 10); }
+    g.fillStyle = 'rgba(255,255,255,.55)'; ell(g, -1, -3.5, 4, 1.4); g.fill();
+    g.restore();
+    g.beginPath(); g.moveTo(-4, -6.5); g.quadraticCurveTo(0, -12.5, 4, -6.8); g.fillStyle = f.color; g.fill(); g.stroke();
+    g.fillStyle = OUT; blob(g, 5.5, -1.8, 1.7); g.fillStyle = '#fff'; blob(g, 6, -2.4, 0.6);
+    g.restore();
+  };
+}
+
+export function makeIcons(crops, fish) {
   const I = {};
   I.coin = iconURL((g) => {
     g.fillStyle = OUT; blob(g, 0, 0, 14); g.fillStyle = '#f2b51d'; blob(g, 0, 0, 12.5);
@@ -645,5 +663,7 @@ export function makeIcons(crops) {
     g.fillStyle = '#e2392f'; blob(g, 7, 9, 3.4); g.restore();
   });
   for (const crop of Object.values(crops)) I[crop.key] = iconURL(cropIcon(crop));
+  for (const f of Object.values(fish || {})) I[f.key] = iconURL(fishIcon(f));
+  I.fish = I.fish_carp;
   return I;
 }

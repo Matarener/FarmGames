@@ -2,7 +2,7 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { CROPS, HOUSE, xpToNext } from '../game/data.js';
+import { CROPS, GOODS, HOUSE, xpToNext } from '../game/data.js';
 import { fmtTime } from '../game/Farm.js';
 import { QUEST_END } from '../game/quests.js';
 
@@ -52,13 +52,9 @@ export class UI {
     this.set('hud-coins', fmtNum(st.coins));
     this.set('hud-gems', fmtNum(st.gems));
     this.set('hud-energy', `${st.energy}/${f.maxEnergy}`);
-    this.set('hud-wood', st.inv.wood || 0);
-    this.set('hud-stone', st.inv.stone || 0);
-    this.set('hud-ore', st.inv.ore || 0);
     this.set('hud-can', `${st.can}/${f.canMax}`);
     const pct = Math.min(100, (st.xp / xpToNext(st.level)) * 100).toFixed(1) + '%';
     if (this.last.xp !== pct) { this.last.xp = pct; $('#hud-xp').style.width = pct; }
-    $('#ore-chip').hidden = !(st.inv.ore > 0);
     this.questCard(f);
     this.tick(f);
     if (this.panelEl.dataset.kind && this.panelEl.classList.contains('show')) this.refreshPanel();
@@ -219,7 +215,7 @@ export class UI {
 
   marketPanel(f) {
     this.openPanel('market', 'Рынок', (body) => {
-      const list = Object.values(CROPS).filter((c) => (f.st.crops[c.key] || 0) > 0);
+      const list = Object.values(GOODS).filter((c) => (f.st.crops[c.key] || 0) > 0);
       if (!list.length) { body.appendChild(h('div', 'pn-empty', 'Пока нечего продать. Соберите урожай с грядок.')); return; }
       for (const c of list) {
         const n = f.st.crops[c.key];
@@ -243,7 +239,7 @@ export class UI {
 
       const full = st.energy >= f.maxEnergy;
       body.appendChild(h('div', 'pn-sub', `Еда · энергия ${st.energy}/${f.maxEnergy}${full ? '' : ', +1 через ' + fmtClock(f.energyLeftSec())}`));
-      const food = Object.values(CROPS).filter((c) => c.food && (st.crops[c.key] || 0) > 0);
+      const food = Object.values(GOODS).filter((c) => c.food && (st.crops[c.key] || 0) > 0);
       if (!food.length) body.appendChild(h('div', 'pn-empty', 'Урожай можно съесть, чтобы восстановить энергию.'));
       for (const c of food) {
         const r = h('div', 'item', `${this.ic(c.key, 'ic mid')}<div class="it-t"><b>${c.name} × ${st.crops[c.key]}</b><span>+${c.food} ${this.ic('energy')}</span></div>`);
