@@ -89,11 +89,13 @@ export function parts() {
     g.fillStyle = '#b8c0c6'; g.beginPath(); g.moveTo(0, 9.2); g.lineTo(-5.8, 8.4); g.quadraticCurveTo(-7, 11.5, -5.8, 14.6); g.lineTo(0, 13.6); g.closePath(); g.fill();
     g.fillStyle = '#eef3f6'; g.fillRect(-6.4, 9.4, 1.2, 4.4);
   });
-  P.pickaxe = makeSprite(20, 22, 10, 4, (g) => {
+  P.pickaxe = makeSprite(22, 24, 11, 4, (g) => {
     handle(g, 13);
-    g.fillStyle = OUT; g.beginPath(); g.moveTo(-9, 15.5); g.quadraticCurveTo(0, 8.5, 9, 15.5); g.quadraticCurveTo(0, 12.5, -9, 15.5); g.fill();
-    g.strokeStyle = OUT; g.lineWidth = 3.4; g.beginPath(); g.moveTo(-8.5, 15); g.quadraticCurveTo(0, 9.5, 8.5, 15); g.stroke();
-    g.strokeStyle = '#9aa1a7'; g.lineWidth = 1.8; g.beginPath(); g.moveTo(-8.2, 14.8); g.quadraticCurveTo(0, 9.8, 8.2, 14.8); g.stroke();
+    // головка на конце рукояти, острия загнуты назад к руке
+    const arc = (w, c) => { g.strokeStyle = c; g.lineWidth = w; g.beginPath(); g.moveTo(-9.5, 10); g.quadraticCurveTo(0, 18.5, 9.5, 10); g.stroke(); };
+    arc(3.6, OUT); arc(2, '#9aa1a7');
+    g.strokeStyle = '#d4dade'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(-6, 12.6); g.quadraticCurveTo(0, 16.4, 6, 12.6); g.stroke();
+    g.fillStyle = OUT; g.fillRect(-1.9, 12.6, 3.8, 3.6); g.fillStyle = '#7d858b'; g.fillRect(-1.2, 13.2, 2.4, 2.4);
   });
   P.hoe = makeSprite(14, 24, 8, 4, (g) => {
     handle(g, 15);
