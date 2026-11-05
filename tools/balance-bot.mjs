@@ -52,7 +52,7 @@ for (let run = 0; run < RUNS; run++) {
   for (let step = 0; step < 60; step++) {
     while (xp >= xpToNext(level)) { xp -= xpToNext(level); level++; }
     const H = HOUSE[house], next = HOUSE[house + 1];
-    const store = H.storage;
+    const store = Infinity;
     let did = false;
     // 1) расширение (если дом позволяет)
     if (open.size < H.chunks) {

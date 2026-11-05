@@ -8,7 +8,7 @@ import { makeGhostData, ROD_TIP } from './ghost.js';
 import * as art from './art.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
-import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, houseNeedChunks, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 const BG = '#3d7a35';
@@ -194,7 +194,7 @@ export class Farm {
 
   get maxEnergy() { return HOUSE[this.st.house].energy; }
   get canMax() { return HOUSE[this.st.house].can; }
-  get storage() { return HOUSE[this.st.house].storage; }
+  get storage() { return STORAGE; }
 
   tickEnergy() {
     const st = this.st, now = Date.now(), period = ENERGY_REGEN_SEC * 1000;

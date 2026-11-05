@@ -195,11 +195,10 @@ export class UI {
   housePanel(f) {
     this.openPanel('house', 'Дом фермера', (body) => {
       const lvl = f.st.house, cur = HOUSE[lvl], next = HOUSE[lvl + 1];
-      body.appendChild(h('div', 'pn-hero', `${this.ic('house', 'ic big')}<div><b>${lvl} уровень</b><span>Главное здание: от него зависят энергия, склад, лейка и размер фермы.</span></div>`));
+      body.appendChild(h('div', 'pn-hero', `${this.ic('house', 'ic big')}<div><b>${lvl} уровень</b><span>Главное здание: от него зависят энергия, лейка и размер фермы.</span></div>`));
       const row = (label, a, b) => `<div class="stat"><span>${label}</span><b>${a}${b != null ? ` <i>→ ${b}</i>` : ''}</b></div>`;
       body.appendChild(h('div', 'stats',
         row('Энергия', cur.energy, next && next.energy) +
-        row('Склад (каждого ресурса)', cur.storage, next && next.storage) +
         row('Лейка, поливов', cur.can, next && next.can) +
         row('Участков земли', cur.chunks, next && next.chunks)));
       if (next) {
@@ -233,7 +232,7 @@ export class UI {
   bagPanel(f) {
     this.openPanel('bag', 'Рюкзак', (body) => {
       const st = f.st;
-      body.appendChild(h('div', 'pn-sub', `Ресурсы · склад до ${f.storage}`));
+      body.appendChild(h('div', 'pn-sub', 'Ресурсы'));
       const res = h('div', 'grid');
       for (const k of ['wood', 'stone', 'ore']) res.appendChild(h('div', 'cell', `${this.ic(k, 'ic mid')}<b>${st.inv[k] || 0}</b><span>${RES_NAMES[k]}</span>`));
       res.appendChild(h('div', 'cell', `${this.ic('water', 'ic mid')}<b>${st.can}/${f.canMax}</b><span>Лейка</span>`));
