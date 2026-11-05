@@ -25,6 +25,12 @@ SHEETS = {
     'bushes': [('bush_blue', 40), ('bush_rasp', 40), ('bush_pink', 40),
                ('bush_hydra', 40), ('bush_lav', 40), ('bush_rose', 40)],
 }
+# Урожай: лист = 5 стадий слева направо, сверху вниз; в игре 4 стадии (третью пропускаем).
+# Растения заполняют ромб грядки: масштаб по ширине, опора — центр ромба.
+CROPS = {'crop_wheat': 'wheat'}
+CROP_STAGES = [0, 1, 3, 4]
+CROP_W = 54
+
 TILES = ('tiles', ['tile_grass', 'tile_flowers', 'tile_soil', 'tile_sand'])
 
 
@@ -40,9 +46,10 @@ def load(name):
     return a
 
 
-def components(a, n):
+def components(a, n, dilate=0):
     m = a[..., 3] > 0
-    lab, k = ndimage.label(m, structure=np.ones((3, 3)))
+    g = ndimage.binary_dilation(m, iterations=dilate) if dilate else m  # ростки по отдельности — склеить
+    lab, k = ndimage.label(g, structure=np.ones((3, 3)))
     sizes = ndimage.sum(m, lab, range(1, k + 1))
     main = list(np.argsort(sizes)[::-1][:n] + 1)
     # мелкие кусочки (цветы, камешки у основания) — к ближайшему крупному объекту
@@ -117,6 +124,19 @@ def main():
         img[..., 3] = np.where(diamond, 255, 0)
         save(Image.fromarray(img), name, TILE_W + 2, TILE_H + 1, (TILE_W + 2) / 2, (TILE_H + 1) / 2, man)
         print(f'{name:14s} tile')
+
+    for sheet, crop in CROPS.items():
+        a = load(sheet)
+        boxes, lab = components(a, 5, dilate=30)
+        for st, si in enumerate(CROP_STAGES):
+            y0, y1, x0, x1, i = boxes[si]
+            c = a[y0:y1, x0:x1].copy()
+            c[lab[y0:y1, x0:x1] != i, 3] = 0
+            k = CROP_W / (x1 - x0)
+            W, H = (x1 - x0) * k, (y1 - y0) * k
+            img = Image.fromarray(c).resize((round(W * DENSITY), round(H * DENSITY)), Image.LANCZOS)
+            save(img, f'crop_{crop}_{st}', W, H, W / 2, H - W / 4 - 2, man)
+            print(f'crop_{crop}_{st}  {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
 
     with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
         json.dump(man, f, indent=1)

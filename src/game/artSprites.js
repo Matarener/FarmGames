@@ -41,8 +41,13 @@ export async function loadArt() {
   }));
   const obj = {};
   for (const [type, names] of Object.entries(OBJ)) obj[type] = names.map((n) => A[n]).filter(Boolean);
+  const crops = {};
+  for (const name of Object.keys(A)) {
+    const m = /^crop_(\w+)_(\d)$/.exec(name);
+    if (m) (crops[m[1]] = crops[m[1]] || [])[+m[2]] = A[name];
+  }
   return {
-    obj,
+    obj, crops,
     // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%)
     grass: [A.tile_grass, flipped(A.tile_grass), A.tile_flowers, flipped(A.tile_flowers)],
     path: [A.tile_sand, flipped(A.tile_sand)],

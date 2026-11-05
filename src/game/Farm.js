@@ -26,6 +26,7 @@ export class Farm {
     this.buildSprites();
     loadArt().then((a) => {
       Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, objArt: a.obj });
+      for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
       this.dirty = true;
     }).catch((e) => console.warn('art', e));
   }
