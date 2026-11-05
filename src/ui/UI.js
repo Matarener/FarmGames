@@ -293,6 +293,8 @@ export class UI {
         body.appendChild(row);
       };
       toggle('Выключить весь звук', A.s.muted, (v) => { A.unlock(); A.set('muted', v); if (!v) A.play('tap'); });
+      body.appendChild(h('div', 'pn-sub', 'Экран'));
+      toggle('Показывать FPS и время кадра', f.perf.showFps, (v) => { f.perf.showFps = v; });
       const reset = h('button', 'btn-link', 'Начать заново');
       reset.onclick = () => { if (confirm('Удалить сохранение и начать новую ферму?')) { f.save.reset(); location.reload(); } };
       body.appendChild(reset);

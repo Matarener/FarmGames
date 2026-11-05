@@ -16,6 +16,7 @@ const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 export let BED_STYLE = 'plain';
 export function setBedStyle(v) { BED_STYLE = v; }
 const BG = '#3d7a35';
+let SID = 0; // номер спрайта для отпечатка сцены
 
 export class Farm {
   constructor({ renderer, camera, ui, tg, save, perf, audio }) {
@@ -28,6 +29,7 @@ export class Farm {
     this.focus = [];
     this.tapFx = null;
     this.time = 0;
+    this.stats = { layers: 0, live: 0 }; // сколько раз перерисованы слои; живых прямоугольников в кадре
     this.dirty = true;
     this.quests = new Quests(this);
     this.mover = new Mover(this);
@@ -337,7 +339,7 @@ export class Farm {
   }
 
   pick(wx, wy) {
-    const L = this.drawList;
+    const L = this._ol ? this._ol.list : this.drawList; // объекты из слоя, по глубине
     for (let i = L.length - 1; i >= 0; i--) {
       const d = L[i];
       if (d.kind !== 'o') continue;
@@ -807,7 +809,7 @@ export class Farm {
   }
 
   isIdle() {
-    return !this.mover.active && this.player.idleTime > 2 && !this.particles.length && !this.floaters.length && !this.tapFx && !this.cam.animating && !this.hover;
+    return !this.mover.active && this.player.idleTime > 2 && !this.particles.length && !this.floaters.length && !this.tapFx && !this.cam.animating && !this.hover && !this._zoomPending;
   }
 
   // ---------------- Отрисовка ----------------
@@ -875,53 +877,137 @@ export class Farm {
     this.drawBorder(ctx);
   }
 
-  render() {
-    const r = this.r, ctx = r.ctx, w = this.world, S = this.S;
-    r.begin(this.cam, BG);
+  // Слой — закэшированная картинка части мира с запасом по краям. Пока камера двигается в пределах
+  // запаса, слой только сдвигается; при щипке — растягивается, а перерисовывается, когда зум замер.
+  layerStale(L, key, settled, r, CW, CH) {
+    if (!L.c || L.key !== key) return true;
+    if (L.va !== r.va && settled) return true;
+    const k = r.va / L.va, x0 = r.ve - k * L.ox, y0 = r.vf - k * L.oy;
+    return x0 > 0.5 || y0 > 0.5 || x0 + L.c.width * k < CW - 0.5 || y0 + L.c.height * k < CH - 0.5;
+  }
 
-    // Земля, туман и граница меняются редко: рисуем их в отдельный холст и, пока камера
-    // и клетки те же, только копируем его (на слабых телефонах это половина кадра).
-    let wet = 0;
-    for (const b of this.beds.values()) if (b.crop) { const i = this.cropInfo(b); if (!i.needsWater && !i.ready) wet = (wet * 31 + b.i) % 1e9; }
-    const key = `${this.cam.x.toFixed(2)}|${this.cam.y.toFixed(2)}|${this.cam.zoom.toFixed(4)}|${r.canvas.width}x${r.canvas.height}|${this.groundV}|${w.unlockedCount()}|${wet}`;
-    let gc = this._ground;
-    if (!gc || gc.width !== r.canvas.width || gc.height !== r.canvas.height) {
-      gc = this._ground = makeCanvas(r.canvas.width, r.canvas.height); this._groundKey = '';
-    }
-    if (key !== this._groundKey) {
-      this._groundKey = key;
-      const g = gc.getContext('2d');
-      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = ctx.imageSmoothingQuality;
-      g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = BG; g.fillRect(0, 0, gc.width, gc.height);
-      g.setTransform(r.va, 0, 0, r.va, r.ve, r.vf);
-      this.drawGround(g);
-    }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(gc, 0, 0);
-    r.resetView();
+  buildLayer(L, key, r, CW, CH, draw) {
+    const MX = Math.ceil(CW * 0.25), MY = Math.ceil(CH * 0.25);
+    if (!L.c || L.c.width !== CW + 2 * MX || L.c.height !== CH + 2 * MY) L.c = makeCanvas(CW + 2 * MX, CH + 2 * MY);
+    const g = L.c.getContext('2d');
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = r.ctx.imageSmoothingQuality;
+    L.key = key; L.va = r.va; L.ox = r.ve + MX; L.oy = r.vf + MY; L.ver = (L.ver || 0) + 1;
+    const v = r.view, save = { ...v }, ex = MX / r.va, ey = MY / r.va;
+    v.minX -= ex; v.maxX += ex; v.minY -= ey; v.maxY += ey;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    draw(g);
+    Object.assign(v, save);
+    this.stats.layers++;
+  }
 
-    // объекты + растения + персонаж, по глубине
-    const L = this.drawList; L.length = 0;
+  // нарисовать слой в контекст с преобразованием (va, ox, oy); контекст в пикселях
+  blitLayer(ctx, L, va, ox, oy) {
+    const k = va / L.va;
+    if (k === 1) ctx.drawImage(L.c, Math.round(ox - L.ox), Math.round(oy - L.oy));
+    else ctx.drawImage(L.c, ox - k * L.ox, oy - k * L.oy, L.c.width * k, L.c.height * k);
+  }
+
+  // Отпечаток статичной сцены: если он не изменился, слой объектов не перерисовывается
+  staticSig() {
+    let h = 7;
+    for (const o of this.world.objects) {
+      if (!o) continue;
+      const s = this.objSprite(o);
+      if (!s._sid) s._sid = ++SID;
+      h = (Math.imul(h, 31) + o.id * 7 + o.gx * 131 + o.gy * 8191 + s._sid) | 0;
+    }
+    for (const b of this.beds.values()) {
+      if (!b.crop) continue;
+      const i = this.cropInfo(b);
+      h = (Math.imul(h, 31) + b.i * 13 + i.stage * 5 + (i.needsWater || i.ready ? 1 : 2) + b.crop.length) | 0;
+    }
+    return h;
+  }
+
+  // статичные объекты и растения в пределах видимой области (с запасом), по глубине
+  staticList(out) {
+    const r = this.r, w = this.world;
+    out.length = 0;
     for (const o of w.objects) {
       if (!o) continue;
       const s = this.objSprite(o);
       if (!r.visible(o.wx - s.ax - 4, o.wy - s.ay, s.w + 8, s.h)) continue;
       o.kind = 'o';
-      L.push(o);
+      out.push(o);
     }
     for (const b of this.beds.values()) {
       if (!b.crop || !r.visible(b.wx - 32, b.wy - 44, 64, 60)) continue;
-      L.push(b.dr);
+      out.push(b.dr);
     }
+    out.sort((a, b) => a.depth - b.depth || a.wy - b.wy);
+    return out;
+  }
+
+  drawItem(ctx, d, live) {
+    if (d.kind === 'o') {
+      let s = this.objSprite(d);
+      if (!this.world.isOpen(d.gx, d.gy)) s = dimSprite(s);
+      const sh = live && d.shake > 0 ? Math.sin(this.time * 70) * 2.2 * (d.shake / 0.25) : 0;
+      if (live && d.fade) ctx.globalAlpha = 1 - 0.62 * d.fade;
+      ctx.drawImage(s.canvas, d.wx - s.ax + sh, d.wy - s.ay, s.w, s.h);
+      ctx.globalAlpha = 1;
+    } else if (d.kind === 'c') {
+      const b = d.bed, info = this.cropInfo(b);
+      const s = this.S.crops[b.crop][info.stage];
+      ctx.drawImage(s.canvas, b.wx - s.ax, b.wy - s.ay, s.w, s.h);
+    } else this.player.draw(this.r);
+  }
+
+  render() {
+    const r = this.r, ctx = r.ctx, w = this.world, S = this.S;
+    r.begin(this.cam, null);
+    const CW = r.canvas.width, CH = r.canvas.height;
+
+    // зум во время щипка: слои растягиваются, перерисовка — когда масштаб не меняется 0.2 с
+    const now = performance.now();
+    if (this.cam.zoom !== this._lastZoom) { this._lastZoom = this.cam.zoom; this._zoomAt = now; }
+    const settled = now - (this._zoomAt || 0) > 200;
+
+    // Слой 1: земля, вода, грядки, туман, граница. Меняется редко.
+    let wet = 0;
+    for (const b of this.beds.values()) if (b.crop) { const i = this.cropInfo(b); if (!i.needsWater && !i.ready) wet = (wet * 31 + b.i) % 1e9; }
+    const G = this._gl || (this._gl = {});
+    const gkey = `${CW}x${CH}|${this.groundV}|${w.unlockedCount()}|${wet}`;
+    if (this.layerStale(G, gkey, settled, r, CW, CH)) {
+      this.buildLayer(G, gkey, r, CW, CH, (g) => {
+        g.fillStyle = BG; g.fillRect(0, 0, G.c.width, G.c.height);
+        g.setTransform(r.va, 0, 0, r.va, G.ox, G.oy);
+        this.drawGround(g);
+      });
+    }
+
+    // Слой 2: земля + все неподвижные объекты и растения. Перерисовывается, только когда что-то
+    // изменилось (срубили дерево, выросла морковка, переставили дом) или камера ушла за запас.
+    const O = this._ol || (this._ol = { list: [] });
+    const okey = `${G.ver}|${this.staticSig()}`;
+    if (this.layerStale(O, okey, settled, r, CW, CH)) {
+      this.buildLayer(O, okey, r, CW, CH, (g) => {
+        g.clearRect(0, 0, O.c.width, O.c.height);
+        this.blitLayer(g, G, r.va, O.ox, O.oy);
+        g.setTransform(r.va, 0, 0, r.va, O.ox, O.oy);
+        for (const d of this.staticList(O.list)) this.drawItem(g, d, false);
+        g.globalAlpha = 0.45; this.drawBorder(g); g.globalAlpha = 1;
+      });
+    }
+    this._zoomPending = G.va !== r.va || O.va !== r.va; // слой растянут — после щипка перерисуем чётко
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.blitLayer(ctx, O, r.va, r.ve, r.vf);
+    r.resetView();
+
+    // Живая часть кадра: фермер, качающиеся и полупрозрачные объекты. Только в их прямоугольниках
+    // заново рисуется земля и всё, что там стоит, по глубине — остальное берётся из слоя.
     const p = this.player;
     toWorld(p.x, p.y, tmp);
-    this._pd = this._pd || { kind: 'p' };
-    this._pd.depth = p.x + p.y; this._pd.wy = tmp.y;
-    L.push(this._pd);
-    L.sort((a, b) => a.depth - b.depth || a.wy - b.wy);
-
+    const pd = this._pd || (this._pd = { kind: 'p' });
+    pd.depth = p.x + p.y; pd.wy = tmp.y;
+    const R = this._rects || (this._rects = []); R.length = 0;
+    R.push(tmp.x - 30, tmp.y - 95, tmp.x + 30, tmp.y + 12);
     // Что нельзя закрывать: фермер, клетка под курсором, клетка последнего тапа.
-    // Высокие объекты перед ними становятся полупрозрачными.
     const F = this.focus; F.length = 0;
     F.push({ x0: tmp.x - 11, y0: tmp.y - 50, x1: tmp.x + 11, y1: tmp.y, depth: p.x + p.y, gx: -1, gy: -1 });
     for (const t of [this.hover, this.tapFx]) {
@@ -930,33 +1016,43 @@ export class Farm {
       F.push({ x0: tmp.x - HW + 6, y0: tmp.y - HH + 3, x1: tmp.x + HW - 6, y1: tmp.y + HH - 3, depth: t.x + t.y + 1, gx: t.x, gy: t.y });
     }
     let playerHidden = false;
-
-    for (const d of L) {
-      if (d.kind === 'o') {
-        let s = this.objSprite(d);
-        if (!w.isOpen(d.gx, d.gy)) s = dimSprite(s);
-        const sh = d.shake > 0 ? Math.sin(this.time * 70) * 2.2 * (d.shake / 0.25) : 0;
-        const fade = this.occludes(d, s, F);
+    const list = O.list;
+    for (const d of list) {
+      if (d.kind !== 'o') continue;
+      const s = this.objSprite(d);
+      const fade = this.occludes(d, s, F);
+      if (fade && F[0].hit) playerHidden = true;
+      if (fade || d.fade) {
         d.fade = (d.fade || 0) + (fade - (d.fade || 0)) * 0.3;
         if (d.fade < 0.02) d.fade = 0;
-        if (fade && F[0].hit) playerHidden = true;
-        if (d.fade) ctx.globalAlpha = 1 - 0.62 * d.fade;
-        ctx.drawImage(s.canvas, d.wx - s.ax + sh, d.wy - s.ay, s.w, s.h);
-        ctx.globalAlpha = 1;
-      } else if (d.kind === 'c') {
-        const b = d.bed, info = this.cropInfo(b);
-        const s = S.crops[b.crop][info.stage];
-        ctx.drawImage(s.canvas, b.wx - s.ax, b.wy - s.ay, s.w, s.h);
-      } else {
-        p.draw(r);
       }
+      if (d.fade || fade || d.shake > 0) R.push(d.wx - s.ax - 4, d.wy - s.ay - 1, d.wx - s.ax + s.w + 4, d.wy - s.ay + s.h + 1);
     }
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i < R.length; i += 4) ctx.rect(R[i], R[i + 1], R[i + 2] - R[i], R[i + 3] - R[i + 1]);
+    ctx.clip();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.blitLayer(ctx, G, r.va, r.ve, r.vf);
+    r.resetView();
+    let pDone = false;
+    for (const d of list) {
+      if (!pDone && (d.depth > pd.depth || (d.depth === pd.depth && d.wy > pd.wy))) { this.drawItem(ctx, pd, true); pDone = true; }
+      const s = d.kind === 'o' ? this.objSprite(d) : null;
+      const x0 = s ? d.wx - s.ax - 4 : d.bed.wx - 32, y0 = s ? d.wy - s.ay : d.bed.wy - 44, x1 = s ? x0 + s.w + 8 : x0 + 64, y1 = s ? y0 + s.h : y0 + 60;
+      let hit = false;
+      for (let i = 0; i < R.length; i += 4) if (x0 < R[i + 2] && x1 > R[i] && y0 < R[i + 3] && y1 > R[i + 1]) { hit = true; break; }
+      if (hit) this.drawItem(ctx, d, true);
+    }
+    if (!pDone) this.drawItem(ctx, pd, true);
+    ctx.globalAlpha = 0.45; this.drawBorder(ctx); ctx.globalAlpha = 1;
+    ctx.restore();
+    this.stats.live = R.length / 4;
 
     // фермер за объектом: полупрозрачная копия поверх
     if (playerHidden) { ctx.globalAlpha = 0.4; p.draw(r); ctx.globalAlpha = 1; }
 
-    // рамки поверх объектов: граница участка (бледно), клетка под курсором, тап
-    ctx.globalAlpha = 0.45; this.drawBorder(ctx); ctx.globalAlpha = 1;
+    // рамки поверх объектов: клетка под курсором, тап
     if (this.hover && w.inside(this.hover.x, this.hover.y)) this.tileOutline(ctx, this.hover.x, this.hover.y, 'rgba(255,255,255,0.75)', 1.8);
     if (this.tapFx) this.tileOutline(ctx, this.tapFx.x, this.tapFx.y, `rgba(255,250,200,${Math.min(1, this.tapFx.t * 2.4)})`, 2.5);
 

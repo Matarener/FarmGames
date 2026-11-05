@@ -26,7 +26,20 @@ export class Perf {
     this.onScaleChange = null;
 
     this._acc = 0; this._n = 0; this._slow = 0; this._warmup = 2;
+    // время работы кадра (логика + отрисовка), мс: среднее и худшее за секунду
+    this.frameMs = 0; this.frameMax = 0; this._work = 0; this._workMax = 0;
+    try { this._showFps = localStorage.getItem('farm.fps') === '1'; } catch { this._showFps = false; }
+    this.onShowFps = null;
   }
+
+  get showFps() { return this._showFps; }
+  set showFps(v) {
+    this._showFps = !!v;
+    try { localStorage.setItem('farm.fps', v ? '1' : '0'); } catch { /* приватный режим */ }
+    this.onShowFps && this.onShowFps(this._showFps);
+  }
+
+  work(ms) { this._work += ms; if (ms > this._workMax) this._workMax = ms; }
 
   // dt — реальная длительность кадра, сек. Если кадры долго не укладываются
   // в бюджет, сначала уменьшаем разрешение, затем ограничиваем FPS до 30.
@@ -35,6 +48,7 @@ export class Perf {
     if (this._acc < 1) return;
     const avg = this._acc / this._n;
     this.fps = 1 / avg;
+    this.frameMs = this._work / this._n; this.frameMax = this._workMax; this._work = 0; this._workMax = 0;
     this._acc = 0; this._n = 0;
     if (this._warmup > 0) { this._warmup--; return; }
     if (budgetFps < this.targetFps) return; // в режиме простоя не меряем

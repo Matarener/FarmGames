@@ -40,8 +40,10 @@ export class Game {
     if (elapsed < 1000 / fps - 2) return;
     this.last = t;
     const dt = Math.min(elapsed / 1000, 0.1);
+    const t0 = performance.now();
     this.update(dt);
     this.render();
+    this.perf.work(performance.now() - t0);
     this.perf.sample(elapsed / 1000, fps);
   }
 }

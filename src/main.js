@@ -38,11 +38,14 @@ async function main() {
   ui.bind(farm, farm.icons);
 
   const fitZoom = () => {
-    // mobile-first: на телефоне ~6.5 клеток по ширине, на больших экранах — крупнее, но не огромно
-    const w = renderer.cssW, hgt = renderer.cssH;
-    if (w > hgt && hgt < 500) return Math.min(1.7, Math.max(0.8, Math.min(w / (64 * 10), hgt / (32 * 8)))); // горизонтальный телефон
-    return Math.min(1.7, Math.max(0.8, Math.min(w / (64 * 6.5), hgt / (32 * 13))));
+    // mobile-first: на телефоне ~6.5 клеток по ширине, на больших экранах крупнее, но не огромно
+    const w = renderer.cssW, hgt = renderer.cssH, cap = Math.min(w, hgt) > 600 ? 1.3 : 1.7;
+    const z = w > hgt ? Math.min(w / (64 * 10), hgt / (32 * 8)) : Math.min(w / (64 * 6.5), hgt / (32 * 13));
+    return Math.min(cap, Math.max(0.8, z));
   };
+  // При любом изменении размера окна (поворот, растягивание) масштаб пересчитывается,
+  // а приближение, выбранное игроком щипком, сохраняется относительно подобранного.
+  let fit = 0;
   const resize = () => {
     renderer.resize();
     input.updateRect();
@@ -50,12 +53,10 @@ async function main() {
     const big = Math.min(renderer.cssW, renderer.cssH) > 600;
     camera.minZoom = big ? 0.6 : 0.5;
     camera.maxZoom = 2.6;
-    // телефон повернули: подбираем масштаб под новую форму экрана
-    const land = renderer.cssW > renderer.cssH;
-    if (lastLand !== null && land !== lastLand) camera.zoom = fitZoom();
-    lastLand = land;
+    const f = fitZoom();
+    if (fit && Math.abs(f - fit) > 1e-4) { camera.zoom = Math.min(camera.maxZoom, Math.max(camera.minZoom, camera.zoom * f / fit)); camera.clamp(); camera.moved = true; }
+    fit = f;
   };
-  let lastLand = null;
   perf.onScaleChange = () => renderer.resize();
 
   const input = new Input(canvas, {
@@ -96,12 +97,23 @@ async function main() {
   setTimeout(() => { document.getElementById('loading').classList.add('hide'); if (!ui.panelOpen) audio.setTheme('farm'); }, 150);
   // начало истории: новое задание показываем сразу
   if (farm.quests.current && !farm.quests.st.seen) setTimeout(() => ui.questPanel(farm), 700);
-  if (new URLSearchParams(location.search).has('debug')) {
-    const d = document.createElement('div');
-    d.className = 'debug';
-    document.body.appendChild(d);
-    setInterval(() => { d.textContent = `${perf.fps.toFixed(0)} fps · ${perf.tier} · x${perf.renderScale}`; }, 500);
-  }
+  // Счётчик FPS и времени кадра: включается в настройках (или ?debug в адресе)
+  let fpsEl = null, fpsTimer = 0;
+  const debug = new URLSearchParams(location.search).has('debug');
+  const showFps = (on) => {
+    if (!on) { if (fpsEl) fpsEl.remove(); fpsEl = null; clearInterval(fpsTimer); return; }
+    if (fpsEl) return;
+    fpsEl = document.createElement('div');
+    fpsEl.className = 'debug';
+    document.body.appendChild(fpsEl);
+    const paint = () => {
+      fpsEl.textContent = `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
+        (debug ? ` · ${perf.tier} · x${perf.renderScale} · слои ${farm.stats.layers}` : '');
+    };
+    paint(); fpsTimer = setInterval(paint, 500);
+  };
+  perf.onShowFps = showFps;
+  showFps(perf.showFps || debug);
   window.__farm = farm;
 }
 

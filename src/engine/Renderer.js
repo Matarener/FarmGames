@@ -30,12 +30,11 @@ export class Renderer {
   begin(cam, bg) {
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height); }
     const s = this.scale * cam.zoom;
     this.va = s;
-    this.ve = (this.cssW / 2 - cam.x * cam.zoom) * this.scale;
-    this.vf = (this.cssH / 2 - cam.y * cam.zoom) * this.scale;
+    this.ve = Math.round((this.cssW / 2 - cam.x * cam.zoom) * this.scale); // целые пиксели: слои ложатся без сдвига
+    this.vf = Math.round((this.cssH / 2 - cam.y * cam.zoom) * this.scale);
     ctx.setTransform(s, 0, 0, s, this.ve, this.vf);
     const v = this.view;
     v.minX = cam.x - this.cssW / 2 / cam.zoom;
