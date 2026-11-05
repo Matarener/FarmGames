@@ -8,7 +8,7 @@ const RUNS = +process.argv[2] || 200;
 const avg = ([a, b]) => (a + b) / 2;
 
 function objsIn(w, c) {
-  return w.objects.filter((o) => o && o.type !== 'house' && w.chunkOf(o.gx, o.gy) === c);
+  return w.objects.filter((o) => o && o.type !== 'house' && o.type !== 'well' && w.chunkOf(o.gx, o.gy) === c);
 }
 
 // сколько даёт расчистка участка: ресурсы, энергия (удары), опыт

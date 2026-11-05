@@ -8,7 +8,7 @@ import { makeGhostData, ROD_TIP } from './ghost.js';
 import * as art from './art.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
-import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 const BG = '#3d7a35';
@@ -31,6 +31,7 @@ export class Farm {
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
       Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, objArt: a.obj, stumpOf: a.stumpOf });
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
+      a.well.forEach((s, i) => { if (s) this.S.well[i] = s; });
       if (a.water.every(Boolean)) { this.S.waterArt = a.water; this.S.water.clear(); }
       this.groundV++;
       for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
@@ -55,6 +56,7 @@ export class Farm {
     S.bush = art.bushSprite(false); S.berry = art.bushSprite(true);
     S.boulder = art.rockSprite(true);
     S.house = [null, 1, 2, 3, 4, 5].map((l) => l && art.houseSprite(l));
+    S.well = [art.wellSprite(false), art.wellSprite(true)];
     S.crops = {};
     for (const c of Object.values(CROPS)) S.crops[c.key] = [0, 1, 2, 3].map((s) => art.cropSprite(c, s));
     S.bubble = { water: art.bubbleSprite('water'), ready: art.bubbleSprite('ready'), lock: art.bubbleSprite('lock') };
@@ -94,6 +96,7 @@ export class Farm {
       case 'rock': return S.rocks[o.id & 1];
       case 'boulder': return S.boulder;
       case 'house': return S.house[this.st.house];
+      case 'well': return S.well[this.st.well ? 1 : 0];
     }
     return S.rocks[0];
   }
@@ -107,7 +110,7 @@ export class Farm {
     this.beds = new Map();
     this.st = {
       coins: START.coins, gems: START.gems, xp: 0, level: 1,
-      energy: START.energy, energyAt: Date.now(), can: 0, house: 1,
+      energy: START.energy, energyAt: Date.now(), can: 0, house: 1, well: 0,
       inv: { wood: 0, stone: 0, ore: 0 }, seeds: { carrot: 4 }, crops: {},
       stats: { cleared: 0, harvested: 0 },
     };
@@ -135,6 +138,7 @@ export class Farm {
       this.st.can = 2;
     }
     for (const i of w.startBeds) if (w.tiles[i] !== T.SOIL) w.tiles[i] = T.SOIL;
+    w.fixWell();
     // старые сохранения: первое задание ещё не выполнено — стартовая морковка созревает сразу
     if (saved && !this.st.stats.harvested && !(this.st.quest && this.st.quest.i > 0)) {
       const b = this.beds.get(w.startBeds[0]);
@@ -290,6 +294,7 @@ export class Farm {
     const w = this.world;
     if (!w.isOpen(o.gx, o.gy)) return this.expandPopup(w.chunkOf(o.gx, o.gy), sx, sy);
     if (o.type === 'house') return this.ui.housePanel(this);
+    if (o.type === 'well') return this.wellPopup(o, sx, sy);
     const def = OBJECTS[o.type];
     if (!def) return;
     if (def.action) this.queue({ kind: def.action, obj: o });
@@ -314,6 +319,34 @@ export class Farm {
     if (items.length === 1) { this.ui.closePopup(); return items[0].onClick(); }
     this.ui.popup(sx, sy, { items });
   }
+
+  wellPopup(o, sx, sy) {
+    if (this.st.well) {
+      return this.ui.popup(sx, sy, { title: 'Колодец', items: [
+        { icon: 'water', label: 'Набрать воды', sub: `${this.st.can}/${this.canMax}`, disabled: this.st.can >= this.canMax, onClick: () => this.queue({ kind: 'fill', x: o.gx, y: o.gy }) },
+      ] });
+    }
+    this.ui.popup(sx, sy, {
+      title: 'Старый колодец', text: 'Бабушкин колодец развалился. Если починить, воду можно будет набирать прямо у грядок.',
+      cost: WELL_COST, items: [{ icon: 'water', label: 'Починить', disabled: !this.canPay(WELL_COST), onClick: () => this.repairWell() }],
+    });
+  }
+
+  repairWell() {
+    const o = this.world.well;
+    if (!o || this.st.well || !this.pay(WELL_COST)) return false;
+    this.st.well = 1;
+    this.burst(o.wx, o.wy - 20, '#9fd8f5', 20);
+    this.float(o.wx, o.wy - 60, 'Колодец починен!', null);
+    this.sfx('unlock');
+    this.addXp(5);
+    this.player.celebrate();
+    this.dirty = true;
+    this.changed();
+    return true;
+  }
+
+  isWell(x, y) { const o = this.world.well; return !!o && this.st.well > 0 && o.gx === x && o.gy === y; }
 
   tapBed(b, sx, sy) {
     if (!b.crop) return this.seedPopup(b, sx, sy);
@@ -448,6 +481,8 @@ export class Farm {
       const d = Math.hypot(x - p.x, y - p.y);
       if (d < bd) { bd = d; best = { x, y }; }
     }
+    const o = w.well;
+    if (o && this.st.well > 0 && w.isOpen(o.gx, o.gy) && Math.hypot(o.gx - p.x, o.gy - p.y) < bd) best = { x: o.gx, y: o.gy };
     return best;
   }
 
@@ -484,7 +519,7 @@ export class Farm {
       case 'harvest': { const b = this.bedAt(w.idx(a.x, a.y)); return !!b.crop && this.cropInfo(b).ready; }
       case 'fill':
         if (st.can >= this.canMax) { this.toast('Лейка уже полная'); return false; }
-        return t === T.WATER;
+        return t === T.WATER || this.isWell(a.x, a.y);
       case 'fish': return t === T.WATER;
     }
     return true;

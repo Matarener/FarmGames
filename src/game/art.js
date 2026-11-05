@@ -239,6 +239,70 @@ export function rockSprite(big) {
   });
 }
 
+// ---------------- Колодец ----------------
+
+export function wellSprite(fixed) {
+  return makeSprite(64, 96, 32, 72, (g) => {
+    shadow(g, 22, 9, 0.24);
+    const RX = 17, RY = 8.5, Hh = fixed ? 15 : 11;
+    // каменная стенка-цилиндр
+    g.fillStyle = OUT; ell(g, 0, -1, RX + 1.3, RY + 1.3); g.fill(); g.fillRect(-RX - 1.3, -Hh - 1, (RX + 1.3) * 2, Hh);
+    g.fillStyle = '#a7a39a'; ell(g, 0, -1, RX, RY); g.fill(); g.fillRect(-RX, -Hh, RX * 2, Hh - 1);
+    g.save(); g.beginPath(); ell(g, 0, -1, RX, RY); g.rect(-RX, -Hh, RX * 2, Hh - 1); g.clip();
+    // камни рядами
+    const rows = fixed ? 3 : 2;
+    for (let r = 0; r < rows; r++) {
+      const y = -Hh + 2 + r * 5;
+      for (let i = 0; i < 6; i++) {
+        const x = -RX + (i + (r % 2) * 0.5) * 6.4;
+        g.fillStyle = (i + r) % 3 === 0 ? '#8f8b83' : (i + r) % 3 === 1 ? '#b9b5ac' : '#a09c93';
+        g.beginPath(); g.ellipse(x, y + 2 + Math.abs(x) * 0.12, 3, 2, 0, 0, Math.PI * 2); g.fill();
+      }
+    }
+    g.fillStyle = 'rgba(40,30,20,.22)'; g.fillRect(4, -Hh, RX, Hh + 9);
+    g.restore();
+    // верх стенки и вода
+    g.fillStyle = OUT; ell(g, 0, -Hh, RX + 1.3, RY + 1.3); g.fill();
+    g.fillStyle = '#c4c0b6'; ell(g, 0, -Hh, RX, RY); g.fill();
+    g.fillStyle = OUT; ell(g, 0, -Hh, RX - 4, RY - 2.5); g.fill();
+    g.fillStyle = fixed ? '#4f9fd6' : '#3b4a3a'; ell(g, 0, -Hh + 0.5, RX - 5, RY - 3.3); g.fill();
+    if (fixed) { g.fillStyle = '#9fd8f5'; ell(g, -3, -Hh - 0.5, 4, 1.2); g.fill(); }
+    if (!fixed) {
+      // выпавшие камни, мох, сломанное ведро
+      g.fillStyle = '#5aa83a'; for (const [x, y, r] of [[-12, -Hh - 2, 3.4], [-6, -Hh + 5, 2.4], [10, -Hh - 4, 2.6], [14, -4, 3], [-15, -3, 2.5]]) blob(g, x, y, r);
+      g.fillStyle = '#7ccf4f'; for (const [x, y, r] of [[-12.5, -Hh - 3, 1.8], [10, -Hh - 5, 1.4], [14, -5, 1.6]]) blob(g, x, y, r);
+      g.fillStyle = OUT; ell(g, 7, -Hh - 1, 4.5, 2.6); g.fill(); g.fillStyle = '#c4c0b6'; ell(g, 7, -Hh - 1.4, 3.6, 1.9); g.fill();
+      for (const [x, y] of [[-21, 5], [19, 4]]) { g.fillStyle = OUT; ell(g, x, y, 3.8, 2.6); g.fill(); g.fillStyle = '#a7a39a'; ell(g, x, y - 0.4, 3, 1.9); g.fill(); }
+      // ведро на боку
+      g.save(); g.translate(17, 9); g.rotate(-0.4);
+      g.fillStyle = OUT; g.fillRect(-5.4, -4.4, 10.8, 8.8); g.fillStyle = '#9a6a3a'; g.fillRect(-4.4, -3.4, 8.8, 6.8);
+      g.fillStyle = '#6c4222'; g.fillRect(-4.4, -1, 8.8, 1.4); g.restore();
+      // одна сломанная стойка
+      g.fillStyle = OUT; g.fillRect(-RX - 2, -Hh - 17, 5, 17); g.fillStyle = '#8a5a30'; g.fillRect(-RX - 1, -Hh - 16, 3, 16);
+      g.fillStyle = OUT; g.beginPath(); g.moveTo(-RX - 2, -Hh - 17); g.lineTo(-RX + 1, -Hh - 21); g.lineTo(-RX + 3, -Hh - 17); g.fill();
+      return;
+    }
+    // стойки
+    for (const x of [-RX + 1, RX - 4]) { g.fillStyle = OUT; g.fillRect(x - 1, -Hh - 30, 5, 30); g.fillStyle = '#9a6a3a'; g.fillRect(x, -Hh - 29, 3, 29); g.fillStyle = '#7a4b28'; g.fillRect(x + 2, -Hh - 29, 1, 29); }
+    // ворот с верёвкой и ведро
+    g.fillStyle = OUT; g.fillRect(-RX + 1, -Hh - 25, (RX - 2) * 2, 4.4); g.fillStyle = '#b5773f'; g.fillRect(-RX + 2, -Hh - 24.2, (RX - 2) * 2 - 2, 2.8);
+    g.fillStyle = '#e4cf9a'; g.fillRect(-3, -Hh - 25, 6, 4.4);
+    g.strokeStyle = OUT; g.lineWidth = 1.6; g.beginPath(); g.moveTo(RX - 1, -Hh - 23); g.lineTo(RX + 3, -Hh - 23); g.lineTo(RX + 3, -Hh - 18); g.stroke();
+    g.strokeStyle = '#d9c38c'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -Hh - 21); g.lineTo(0, -Hh - 9); g.stroke();
+    g.fillStyle = OUT; g.beginPath(); g.moveTo(-4.6, -Hh - 9.5); g.lineTo(4.6, -Hh - 9.5); g.lineTo(3.6, -Hh - 1.5); g.lineTo(-3.6, -Hh - 1.5); g.fill();
+    g.fillStyle = '#a8703f'; g.beginPath(); g.moveTo(-3.6, -Hh - 8.5); g.lineTo(3.6, -Hh - 8.5); g.lineTo(2.8, -Hh - 2.5); g.lineTo(-2.8, -Hh - 2.5); g.fill();
+    g.fillStyle = '#6c4222'; g.fillRect(-3.2, -Hh - 6, 6.4, 1.2);
+    // двускатная крыша
+    const top = -Hh - 46, eave = -Hh - 28;
+    const roof = (pts, c) => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fillStyle = c; g.fill(); g.strokeStyle = OUT; g.lineWidth = 1.6; g.stroke(); };
+    roof([[-RX - 6, eave + 4], [-4, top], [6, top - 4], [RX + 6, eave - 2], [10, eave + 6]], '#c0533a');
+    roof([[-RX - 6, eave + 4], [-4, top], [-1, top + 4], [-RX - 3, eave + 9]], '#8f3a28');
+    g.strokeStyle = 'rgba(61,43,31,.45)'; g.lineWidth = 1;
+    for (let k = 1; k < 4; k++) { const t = k / 4; g.beginPath(); g.moveTo(-RX - 6 + t * (RX + 2), eave + 4 + t * (top - eave - 4)); g.lineTo(10 + t * (-4), eave + 6 + t * (top - 4 - eave - 6) * 0.92); g.stroke(); }
+    g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.moveTo(-3, top + 2); g.lineTo(5, top - 2); g.lineTo(7, top); g.lineTo(-1, top + 4); g.fill();
+  });
+}
+
 // ---------------- Дом ----------------
 
 export function houseSprite(level) {

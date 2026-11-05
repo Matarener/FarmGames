@@ -44,6 +44,7 @@ export const OBJECTS = {
   rock:    { name: 'Камень',  hp: 2, action: 'mine', drops: { stone: [2, 4] }, xp: 2, oreChance: 0.1, ore: [1, 1] },
   boulder: { name: 'Валун',   hp: 5, action: 'mine', drops: { stone: [6, 9] }, xp: 5, oreChance: 1, ore: [1, 3], w: 2, h: 2 },
   house:   { name: 'Дом',     static: true, w: 2, h: 2 },
+  well:    { name: 'Колодец', static: true },
 };
 
 // Стоимость энергии за удар/действие
@@ -63,6 +64,8 @@ export const HOUSE = [
 export const STORAGE = 999999;
 
 export const START = { coins: 50, gems: 5, energy: 30 };
+// Починка бабушкиного колодца: после него воду можно набирать у грядок
+export const WELL_COST = { wood: 5, stone: 4, coins: 15 };
 
 export function xpToNext(level) { return Math.round(20 * Math.pow(level, 1.5)); }
 

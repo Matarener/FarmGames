@@ -145,6 +145,24 @@ export class World {
       if (this.chunkOf(x, y) !== START_CHUNK && r < 0.055) this.add('rock', x, y);
     }
     this.genCount = this.objects.length;
+    // Колодец бабушки — после счётчика: он не сохраняется в разнице и всегда на месте
+    this.wellPos = L(5, 4); // у тропинки к дому, на виду
+    this.well = this.add('well', this.wellPos[0], this.wellPos[1]);
+  }
+
+  // Старые сохранения: на месте колодца игрок мог вскопать грядку — ставим его на свободную траву рядом с домом
+  fixWell() {
+    const o = this.well;
+    if (o && this.tiles[o.gy * N + o.gx] === T.GRASS) return;
+    if (o) this.remove(o);
+    const [hx, hy] = this.wellPos;
+    let best = null, bd = Infinity;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (this.chunkOf(x, y) !== START_CHUNK || this.tiles[y * N + x] !== T.GRASS || this.occ[y * N + x] >= 0) continue;
+      const d = Math.hypot(x - hx, y - hy);
+      if (d < bd) { bd = d; best = [x, y]; }
+    }
+    this.well = best ? this.add('well', best[0], best[1]) : null;
   }
 
   // --- Сохранение разницы с генерацией ---

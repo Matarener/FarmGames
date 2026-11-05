@@ -27,6 +27,7 @@ SHEETS = {
     # отрицательная ширина: «пятачок» — весь ромб объекта (ширина по краям картинки)
     'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_moss', -42)],
     'stumps2': [('stump_apple', -42), ('stump_sakura', -42), ('stump_blossom', -42), ('stump_autumn', -42)],
+    'well': [('well_broken', 41), ('well_fixed', 42)],
     'house1': [('house_1', -132)], 'house2': [('house_2', -132)], 'house3': [('house_3', -132)], 'house4': [('house_4', -132)], 'house5': [('house_5', -132)],
 }
 # Урожай: лист = 5 стадий слева направо, сверху вниз; в игре 4 стадии (третью пропускаем).

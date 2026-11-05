@@ -66,6 +66,7 @@ export async function loadArt(onProgress) {
       return (k === 'oak' && id % 3 === 0 && A.stump_moss) || A['stump_' + k] || null;
     },
     house: [null, A.house_1, A.house_2, A.house_3, A.house_4, A.house_5],
+    well: [A.well_broken, A.well_fixed],
     water: [A.water_0, A.water_spark, A.water_lily, A.water_reed],
     // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%)
     grass: [A.tile_grass, flipped(A.tile_grass), A.tile_flowers, flipped(A.tile_flowers)],
