@@ -34,10 +34,10 @@ export class Farm {
     this.groundV = 0; // растёт, когда меняются клетки земли
     this.buildSprites();
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
-      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, objArt: a.obj, stumpOf: a.stumpOf });
+      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, waterTex: a.waterTex, objArt: a.obj, stumpOf: a.stumpOf });
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
       a.well.forEach((s, i) => { if (s) this.S.well[i] = s; });
-      if (a.water.every(Boolean)) { this.S.waterArt = a.water; this.S.water.clear(); }
+      if (a.water.every(Boolean) || a.waterTex) { this.S.waterArt = a.waterTex ? null : a.water; this.S.water.clear(); }
       this.groundV++;
       for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
       for (const [k, url] of Object.entries(a.icons)) {
@@ -83,6 +83,22 @@ export class Farm {
     return this._gc;
   }
 
+  // Текстура воды по координатам карты: одна картинка на весь пруд, без повторов по клеткам
+  waterFill(ctx, gx, gy) {
+    const t = this.S.waterTex;
+    if (!this._wpat) {
+      const p = ctx.createPattern(t.canvas, 'repeat');
+      if (!p || !p.setTransform) { this.S.waterTex = null; this.S.water.clear(); return; }
+      p.setTransform(new DOMMatrix().scale(1 / 128));
+      this._wpat = p;
+    }
+    ctx.save();
+    ctx.transform(HW, HH, -HW, HH, 0, 0); // клетка сетки → ромб на карте
+    ctx.fillStyle = this._wpat;
+    ctx.fillRect(gx - 0.02, gy - 0.02, 1.04, 1.04);
+    ctx.restore();
+  }
+
   waterSprite(x, y) {
     const w = this.world;
     const land = (xx, yy) => (!w.inside(xx, yy) || w.tile(xx, yy) !== T.WATER ? 1 : 0);
@@ -95,7 +111,7 @@ export class Farm {
     const lily = WA ? (h < 0.55 ? 0 : h < 0.75 ? 1 : h < 0.88 ? 2 : mask ? 3 : 1) : h < 0.3 ? 1 : 0;
     const key = (dg * 16 + mask) * 4 + lily;
     let s = this.S.water.get(key);
-    if (!s) { s = art.waterTile(mask, lily, WA && WA[lily], this.grassColor(), dg); this.S.water.set(key, s); }
+    if (!s) { s = art.waterTile(mask, lily, this.S.waterTex ? 'none' : WA && WA[lily], this.grassColor(), dg); this.S.water.set(key, s); }
     return s;
   }
 
@@ -821,7 +837,7 @@ export class Farm {
         let s;
         if (t === T.GRASS) s = S.grass[w.variant[i]];
         else if (t === T.PATH) s = S.path[(gx + gy) & 1];
-        else if (t === T.WATER) s = this.waterSprite(gx, gy);
+        else if (t === T.WATER) { if (S.waterTex) this.waterFill(ctx, gx, gy); s = this.waterSprite(gx, gy); }
         else {
           const b = this.beds.get(i);
           const wet = b && b.crop && !this.cropInfo(b).needsWater && !this.cropInfo(b).ready;

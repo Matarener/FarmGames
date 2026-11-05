@@ -73,6 +73,7 @@ export async function loadArt(onProgress) {
     path: [A.tile_sand, flipped(A.tile_sand)],
     // объёмные грядки: [сухая, политая] без каймы и с травяной каймой
     bed: A.bed_dry && { plain: [A.bed_dry, A.bed_wet], grass: [A.bed_dry_g, A.bed_wet_g] },
+    waterTex: A.tex_water || null,
     soil: [A.tile_soil, A.tile_soil_wet || tinted(A.tile_soil, 'rgba(40,20,10,0.32)')],
   };
 }
