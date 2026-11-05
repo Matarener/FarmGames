@@ -41,7 +41,7 @@ export async function loadArt(onProgress) {
   await Promise.all(list.map(async ([name, m]) => {
     const img = await loadImage(BASE + name + '.webp?v=' + V);
     onProgress && onProgress(++done / list.length);
-    A[name] = { canvas: img, w: m.w, h: m.h, ax: m.ax, ay: m.ay };
+    A[name] = { canvas: img, w: m.w, h: m.h, ax: m.ax, ay: m.ay, name };
   }));
   const obj = {};
   for (const [type, names] of Object.entries(OBJ)) obj[type] = names.map((n) => A[n]).filter(Boolean);
@@ -52,6 +52,12 @@ export async function loadArt(onProgress) {
   }
   return {
     obj, crops,
+    // спрайт дерева → его пень (у дуба иногда мшистый)
+    stumpOf: (tree, id) => {
+      const k = tree && tree.name && tree.name.replace('tree_', '');
+      if (!k) return null;
+      return (k === 'oak' && id % 3 === 0 && A.stump_moss) || A['stump_' + k] || null;
+    },
     house: [null, A.house_1, A.house_2, A.house_3, A.house_4, A.house_5],
     water: [A.water_0, A.water_spark, A.water_lily, A.water_reed],
     // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%)

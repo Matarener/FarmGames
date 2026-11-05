@@ -160,7 +160,7 @@ export class World {
       const o = this.objects[i];
       if (!o) continue;
       if (s === 2) this.remove(o);
-      else if (s === 1) { o.type = 'stump'; o.hp = OBJECTS.stump.hp; }
+      else if (s === 1) { o.was = o.type; o.type = 'stump'; o.hp = OBJECTS.stump.hp; }
     }
     this.version++;
   }

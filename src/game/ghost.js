@@ -161,7 +161,7 @@ export function makeGhostData() {
     },
     water: {
       duration: 1.1,
-      events: [[0.6, 'hit']],
+      events: [[0.84, 'hit']],
       slots: { body: tail(1.1, 6) },
       bones: {
         float: { translate: [[0, 0, 0, 2], [0.25, 0, -1.5, 2], [0.85, 0, -1.5, 2], [1.1, 0, 0]] },

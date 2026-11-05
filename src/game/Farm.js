@@ -25,7 +25,7 @@ export class Farm {
     this.dirty = true;
     this.buildSprites();
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
-      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, objArt: a.obj });
+      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, objArt: a.obj, stumpOf: a.stumpOf });
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
       if (a.water.every(Boolean)) { this.S.waterArt = a.water; this.S.water.clear(); }
       for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
@@ -70,6 +70,11 @@ export class Farm {
 
   objSprite(o) {
     const S = this.S;
+    if (o.type === 'stump' && o.was && S.stumpOf) {
+      // пень того дерева, которое срубили
+      const tree = S.objArt[o.was], st = tree && S.stumpOf(tree[o.id % tree.length], o.id);
+      if (st) return st;
+    }
     const v = S.objArt && S.objArt[o.type];
     if (v && v.length) return v[o.id % v.length];
     switch (o.type) {
@@ -540,12 +545,32 @@ export class Farm {
     this.addXp(def.xp || 1);
     st.stats.cleared++;
     this.burst(o.wx, o.wy - 10, o.type === 'rock' || o.type === 'boulder' ? '#9aa1a7' : '#7a4b28', 12);
-    if (def.stump) { o.type = 'stump'; o.hp = OBJECTS.stump.hp; this.world.version++; }
+    if (def.stump) { o.was = o.type; o.type = 'stump'; o.hp = OBJECTS.stump.hp; this.world.version++; }
     else this.world.remove(o);
     this.tg.haptic('medium');
   }
 
   // ---------------- Эффекты ----------------
+
+  // Полив: пока лейка наклонена, из носика падают капли
+  pourWater(dt) {
+    const p = this.player, an = p.anim;
+    if (p.state !== 'work' || !p.current || p.current.kind !== 'water' || an.name !== 'water') return;
+    if (an.time < 0.4 || an.time > 0.84) return;
+    this._pour = (this._pour || 0) + dt;
+    const P = this.particles, max = this.perf.tier === 'low' ? 60 : 160;
+    // носик лейки: точка на кости кисти (крепление лейки + носик в спрайте)
+    const bn = p.sk.boneMap.foreF, lx = -2.6, ly = 3.6 + 14;
+    let x = bn.a * lx + bn.c * ly + bn.tx, y = bn.b * lx + bn.d * ly + bn.ty;
+    if (p.flip) x = -x;
+    p.worldPos(tmp);
+    x += tmp.x; y += tmp.y;
+    while (this._pour > 0.022 && P.length < max) {
+      this._pour -= 0.022;
+      P.push({ x: x + (Math.random() - 0.5) * 2, y, vx: (p.flip ? -1 : 1) * (8 + Math.random() * 10), vy: 10 + Math.random() * 15,
+        life: 0.3 + Math.random() * 0.12, t: 0, c: Math.random() < 0.3 ? '#d8f0ff' : '#3f9be6', s: 2 + Math.random() * 1.2, g: 320 });
+    }
+  }
 
   burst(x, y, color, n, leaves) {
     const P = this.particles;
@@ -580,6 +605,7 @@ export class Farm {
     this._eT = (this._eT || 0) + dt;
     if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.ui.tick(this); }
     this.player.update(dt);
+    this.pourWater(dt);
     for (const o of this.world.objects) if (o && o.shake > 0) o.shake = Math.max(0, o.shake - dt);
     const P = this.particles;
     for (let i = P.length - 1; i >= 0; i--) {
