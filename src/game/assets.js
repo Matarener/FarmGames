@@ -43,7 +43,12 @@ export const ICON_FILES = {
   pumpkin: 'crop_pumpkin', cotton: 'crop_cotton2',
 };
 
+// false — вся графика процедурная (art.js), картинки художника не грузятся.
+// Нарезанные спрайты остаются в assets/sprites: чтобы вернуть их, поставить true.
+export const USE_ART = false;
+
 export async function loadArt(onProgress) {
+  if (!USE_ART) { onProgress && onProgress(1); return {}; }
   const names = Object.keys(DEFS);
   const out = {};
   let done = 0;
