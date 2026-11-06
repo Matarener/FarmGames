@@ -393,7 +393,7 @@ export class UI {
 
   marketBuy(f, body, card, M) {
     const st = f.st;
-    const tabs = h('div', 'inv-tabs');
+    const tabs = h('div', 'inv-tabs c2');
     for (const t of SHOP_TABS) {
       const b = h('button', 'inv-tab' + (M.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
       b.onclick = () => { if (M.tab !== t.key) { M.tab = t.key; M.sel = null; this.sfx('tap'); this.refreshPanel(); } };
@@ -471,15 +471,13 @@ export class UI {
         const b = h('button', 'inv-tab' + (S.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
         b.onclick = () => {
           if (S.tab === t.key) return;
-          S.tab = t.key; S.tabsX = tabs.scrollLeft;
+          S.tab = t.key;
           if (S.sel && t.key !== 'all' && !ITEMS[S.sel].tabs.includes(t.key)) S.sel = null; // карточка чужого раздела
           this.sfx('tap'); this.refreshPanel();
         };
         tabs.appendChild(b);
       }
       body.appendChild(tabs);
-      tabs.scrollLeft = S.tabsX || 0; // полоса разделов не прыгает в начало при обновлении
-      tabs.onscroll = () => { S.tabsX = tabs.scrollLeft; };
 
       const sorts = h('div', 'inv-sort', '<span>Порядок:</span>');
       for (const [k, name] of [['auto', 'Обычный'], ['price', 'По цене'], ['name', 'А–Я']]) {
