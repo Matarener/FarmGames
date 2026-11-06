@@ -121,6 +121,11 @@ export async function loadArt(onProgress) {
     if (A[s.name + '_bare']) flora[type].bare = A[s.name + '_bare'];
     try { if (BARE[type] && !A[s.name + '_bare']) flora[type].bare = bare(s, BARE[type]); floraIcons['sap_' + type] = floraIcons['own_' + type] = iconOf(s); } catch (e) { /* */ }
   }
+  // вишня: цветёт, пока плоды отрастают, а созревшая — с ягодами (картинки художника наоборот)
+  if (A.tree_blossom_bare && obj.cherry && obj.cherry[0] && flora.cherry) {
+    const bloom = obj.cherry[0];
+    obj.cherry = [A.tree_blossom_bare]; flora.cherry.bare = bloom;
+  }
   try { if (A.tile_sand) floraIcons.path = iconOf(A.tile_sand); } catch (e) { /* */ }
   const crops = {};
   for (const name of Object.keys(A)) {
@@ -137,7 +142,7 @@ export async function loadArt(onProgress) {
     sprouts: { tree: A.sprout_tree || null, bush: A.sprout_bush || null },
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {
-      const k = tree && tree.name && tree.name.replace('tree_', '');
+      const k = tree && tree.name && tree.name.replace('tree_', '').replace(/_bare$/, '');
       if (!k) return null;
       return (k === 'oak' && id % 3 === 0 && A.stump_moss) || A['stump_' + k] || null;
     },
