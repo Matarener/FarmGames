@@ -86,6 +86,8 @@ export const FLORA_GOODS = {
 };
 for (const [k, v] of Object.entries(FLORA_GOODS)) v.key = k;
 export const floraSeedId = (sp) => 'sap_' + sp;
+// своё взрослое растение, выкопанное в рюкзак: сажается обратно сразу взрослым
+export const floraOwnId = (sp) => 'own_' + sp;
 
 // Препятствия: hp — число ударов, action — какой инструмент нужен.
 // Деревья и кусты собираются из FLORA (ниже), здесь — остальное.
@@ -183,12 +185,18 @@ for (const f of Object.values(FLORA)) ITEMS[floraSeedId(f.key)] = {
   key: floraSeedId(f.key), name: (f.kind === 'tree' ? 'Саженец: ' : 'Отросток: ') + f.name.toLowerCase(), icon: floraSeedId(f.key), badge: 'seed', tabs: ['plants'], floraOf: f.key,
   desc: `Посадите на свободную траву. Вырастет ${f.name.toLowerCase()} за ${fmtMin(f.grow)} и будет давать плоды.`,
 };
+for (const f of Object.values(FLORA)) ITEMS[floraOwnId(f.key)] = {
+  key: floraOwnId(f.key), name: f.name + (f.kind === 'tree' ? ' (взрослое)' : ' (взрослый куст)'), icon: floraOwnId(f.key), tabs: ['plants'], floraOf: f.key, grown: true,
+  desc: `Ваше выкопанное растение. Посадите на свободную траву — встанет сразу взрослым, первые плоды через ${fmtMin(f.regrow)}. Можно и в режиме «Переставить».`,
+};
 // Еда из магазина: её не выращивают и не продают, зато она даёт больше энергии
 export const SHOP_FOOD = {
   milk:  { name: 'Молоко',  food: 6,  price: 10, level: 1, desc: 'Свежее молоко из деревни.' },
   bread: { name: 'Хлеб',    food: 10, price: 18, level: 2, desc: 'Тёплый хлеб из пекарни.' },
   pie:   { name: 'Пирожок', food: 18, price: 35, level: 4, desc: 'Пирожок с яблоками, очень сытный.' },
 };
+// Постройки и декор, убранные в рюкзак в режиме перестановки (place — как ставится обратно)
+ITEMS.path = { key: 'path', name: 'Тропинка', icon: 'path', tabs: ['build'], place: 'path', desc: 'Клетка тропинки. Поставить: «Ещё» → «Переставить», затем нажмите на свободную траву.' };
 for (const [k, f] of Object.entries(SHOP_FOOD)) ITEMS[k] = { key: k, name: f.name, icon: k, food: f.food, tabs: ['food'], desc: f.desc + ' Восстанавливает энергию.' };
 // порядок «по умолчанию»: как в таблице (инструменты, урожай, рыба, семена, ресурсы)
 let _ord = 0;

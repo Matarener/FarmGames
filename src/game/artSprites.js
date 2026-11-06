@@ -106,8 +106,9 @@ export async function loadArt(onProgress) {
     // file:// не даёт читать пиксели — тогда без перекраски и своих иконок
     // картинка художника «без плодов» (<имя>_bare), иначе — временная перекраска
     if (A[s.name + '_bare']) flora[type].bare = A[s.name + '_bare'];
-    try { if (BARE[type] && !A[s.name + '_bare']) flora[type].bare = bare(s, BARE[type]); floraIcons['sap_' + type] = iconOf(s); } catch (e) { /* */ }
+    try { if (BARE[type] && !A[s.name + '_bare']) flora[type].bare = bare(s, BARE[type]); floraIcons['sap_' + type] = floraIcons['own_' + type] = iconOf(s); } catch (e) { /* */ }
   }
+  try { if (A.tile_sand) floraIcons.path = iconOf(A.tile_sand); } catch (e) { /* */ }
   const crops = {};
   for (const name of Object.keys(A)) {
     const m = /^crop_(\w+)_(\d)$/.exec(name);

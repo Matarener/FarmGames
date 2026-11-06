@@ -11,7 +11,7 @@ import { Quests } from './quests.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
 import * as Flora from './flora.js';
-import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 // вид объёмной грядки: 'plain' — без каймы, 'grass' — с травяной каймой
@@ -71,6 +71,7 @@ export class Farm {
     S.bubble = { water: art.bubbleSprite('water'), ready: art.bubbleSprite('ready'), lock: art.bubbleSprite('lock') };
     this.S = S;
     this.icons = art.makeIcons(CROPS, FISH, FLORA_GOODS);
+    try { this.icons.path = S.path[0].canvas.toDataURL(); } catch (e) { /* */ }
     this.iconImg = {};
     for (const [k, url] of Object.entries(this.icons)) { const im = new Image(); im.src = url; this.iconImg[k] = im; }
   }
@@ -381,7 +382,7 @@ export class Farm {
     toGrid(tmp.x, tmp.y, tmp2);
     const gx = Math.floor(tmp2.x), gy = Math.floor(tmp2.y);
     this.tapFx = { x: gx, y: gy, t: 0.35 };
-    if (this.mover.active) return this.mover.tap(gx, gy, tmp.x, tmp.y);
+    if (this.mover.active) return this.mover.tap(gx, gy, tmp.x, tmp.y, sx, sy);
     // объект в выделенной клетке важнее спрайта, который её перекрывает сверху
     const w = this.world;
     let o = w.objectAt(gx, gy);
@@ -433,7 +434,8 @@ export class Farm {
       const f = FLORA[o.tree];
       return this.ui.popup(sx, sy, {
         title: `Росток: ${f.name.toLowerCase()}`, text: `Вырастет через ${fmtTime(Flora.growLeft(o.tree, o.born, now))}`,
-        items: [{ icon: 'dig', label: 'Выкопать', sub: `⚡ ${ENERGY.chop}`, onClick: () => this.queue({ kind: 'chop', obj: o }) }],
+        items: o.own ? [] : [{ icon: 'dig', label: 'Выкопать', sub: `⚡ ${ENERGY.chop}`, onClick: () => this.queue({ kind: 'chop', obj: o }) }],
+        ...(o.own ? { text: `Вырастет через ${fmtTime(Flora.growLeft(o.tree, o.born, now))}. Убрать в рюкзак: «Ещё» → «Переставить»` } : {}),
       });
     }
     const f = FLORA[o.type], left = Flora.fruitLeft(this.st, o, now), fruit = FLORA_GOODS[f.fruit];
@@ -446,14 +448,28 @@ export class Farm {
     });
   }
 
+  // Посадить своё растение из рюкзака на свободную траву: саженец — ростком, выкопанное — сразу взрослым.
+  // → объект на карте или null (нет предмета)
+  plantOwn(species, x, y, grown) {
+    const st = this.st, w = this.world, now = Date.now();
+    if (!(grown ? Flora.sowGrown : Flora.sow)(st, species, x, y, now)) return null;
+    const o = w.add(grown ? species : 'sapling', x, y);
+    o.own = 1; o.tree = species; o.born = st.plants[st.plants.length - 1][3]; o.stage = grown ? 2 : 0;
+    if (grown) { o.bare = true; w.version++; }
+    return o;
+  }
+
   // Свободная трава: что можно посадить из рюкзака (саженцы деревьев и отростки кустов)
   sowPopup(x, y, sx, sy) {
     const st = this.st;
-    const items = Object.values(FLORA).filter((f) => Inv.count(st, floraSeedId(f.key))).map((f) => ({
-      icon: floraSeedId(f.key), label: f.name, sub: `есть: ${Inv.count(st, floraSeedId(f.key))} · ${fmtTime(f.grow)}`,
-      onClick: () => this.queue({ kind: 'sow', x, y, species: f.key }),
-    }));
-    this.ui.popup(sx, sy, { title: 'Что посадить?', items, wide: true });
+    const grown = [], items = [];
+    for (const f of Object.values(FLORA)) {
+      const own = Inv.count(st, floraOwnId(f.key)), sap = Inv.count(st, floraSeedId(f.key));
+      // свои выкопанные — первыми: встают сразу взрослыми
+      if (own) grown.push({ icon: floraOwnId(f.key), label: `${f.name}, взрослое`, sub: `есть: ${own} · сразу`, onClick: () => this.queue({ kind: 'sow', x, y, species: f.key, grown: true }) });
+      if (sap) items.push({ icon: floraSeedId(f.key), label: f.name, sub: `есть: ${sap} · ${fmtTime(f.grow)}`, onClick: () => this.queue({ kind: 'sow', x, y, species: f.key }) });
+    }
+    this.ui.popup(sx, sy, { title: 'Что посадить?', items: [...grown, ...items], wide: true });
   }
 
   tapTile(x, y, sx, sy) {
@@ -471,7 +487,7 @@ export class Farm {
     if (w.occ[w.idx(x, y)] >= 0) return;
     const items = [{ icon: 'walk', label: 'Идти сюда', onClick: () => this.queue({ kind: 'walk', x, y }) }];
     if (t === T.GRASS) items.push({ icon: 'dig', label: 'Вскопать грядку', sub: `⚡ ${ENERGY.dig}`, onClick: () => this.queue({ kind: 'dig', x, y }) });
-    if (t === T.GRASS && Object.keys(FLORA).some((k) => Inv.count(this.st, floraSeedId(k)))) {
+    if (t === T.GRASS && Object.keys(FLORA).some((k) => Inv.count(this.st, floraSeedId(k)) || Inv.count(this.st, floraOwnId(k)))) {
       items.push({ icon: 'seed', label: 'Посадить дерево или куст', onClick: () => setTimeout(() => this.sowPopup(x, y, sx, sy), 0) });
     }
     // одно действие (например, дорожка: только «идти») — выполняем сразу, без меню
@@ -664,7 +680,7 @@ export class Farm {
     const t = a.obj ? -1 : w.tile(a.x, a.y);
     switch (a.kind) {
       case 'dig': return t === T.GRASS && w.occ[w.idx(a.x, a.y)] < 0;
-      case 'sow': return t === T.GRASS && w.occ[w.idx(a.x, a.y)] < 0 && Inv.count(st, floraSeedId(a.species)) > 0;
+      case 'sow': return t === T.GRASS && w.occ[w.idx(a.x, a.y)] < 0 && Inv.count(st, (a.grown ? floraOwnId : floraSeedId)(a.species)) > 0;
       case 'plant': {
         const b = this.bedAt(w.idx(a.x, a.y));
         if (t !== T.SOIL || b.crop) return false;
@@ -726,10 +742,8 @@ export class Farm {
       case 'sow': {
         const i = w.idx(a.x, a.y);
         if (w.tiles[i] !== T.GRASS || w.occ[i] >= 0) return false;
-        const now = Date.now();
-        if (!Flora.sow(st, a.species, a.x, a.y, now)) return false;
-        const o = w.add('sapling', a.x, a.y);
-        o.own = 1; o.tree = a.species; o.born = now; o.stage = 0;
+        const o = this.plantOwn(a.species, a.x, a.y, a.grown);
+        if (!o) return false;
         this.burst(o.wx, o.wy, '#7ccf4f', 8);
         this.quests.emit('sow', a.species);
         this.sfx('plant');

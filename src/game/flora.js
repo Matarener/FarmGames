@@ -5,7 +5,7 @@
 // st.fruit  = { "x,y": когда созреют плоды (мс) } — нет записи: плоды висят.
 // st.plants = [[x, y, вид, когда посажено (мс)], ...] — растения, посаженные игроком.
 
-import { FLORA, OBJECTS, floraSeedId } from './data.js';
+import { FLORA, OBJECTS, floraSeedId, floraOwnId } from './data.js';
 import { addItem } from './inventory.js';
 
 const cell = (o) => o.gx + ',' + o.gy;
@@ -79,6 +79,41 @@ export function sow(st, species, x, y, now) {
   (st.plants || (st.plants = [])).push([x, y, species, now]);
   // только что выросшее растение — без плодов: они появятся через regrow после взросления
   (st.fruit || (st.fruit = {}))[x + ',' + y] = now + (FLORA[species].grow + FLORA[species].regrow) * 1000;
+  return { species };
+}
+
+// Убрать своё растение в рюкзак (режим перестановки). Взрослое ложится предметом own_<вид>,
+// висящие плоды собираются; росток возвращается саженцем (рост начнётся заново).
+// → { items } или null (не своё / склад полон)
+export function storeOwn(st, o, now, rng) {
+  if (!o.own) return null;
+  const items = [];
+  if (o.type === 'sapling') {
+    if (!FLORA[o.tree] || !give(st, items, floraSeedId(o.tree), 1)) return null;
+  } else {
+    const f = floraOf(o);
+    if (!f || !give(st, items, floraOwnId(f.key), 1)) return null;
+    if (!fruitLeft(st, o, now)) give(st, items, f.fruit, roll(rng, f.n));
+  }
+  forget(st, o);
+  return { items };
+}
+
+// Своё растение переставили на (x, y): переносим запись о посадке и таймер плодов
+export function moveOwn(st, o, x, y) {
+  const p = st.plants && st.plants.find((q) => q[0] === o.gx && q[1] === o.gy);
+  if (p) { p[0] = x; p[1] = y; }
+  const k = cell(o);
+  if (st.fruit && k in st.fruit) { st.fruit[x + ',' + y] = st.fruit[k]; delete st.fruit[k]; }
+}
+
+// Посадить выкопанное взрослое растение: сразу взрослое, плоды — через regrow
+export function sowGrown(st, species, x, y, now) {
+  const f = FLORA[species], id = floraOwnId(species), n = st.items[id] || 0;
+  if (!f || !n) return null;
+  if (n === 1) delete st.items[id]; else st.items[id] = n - 1;
+  (st.plants || (st.plants = [])).push([x, y, species, now - f.grow * 1000]);
+  (st.fruit || (st.fruit = {}))[x + ',' + y] = now + f.regrow * 1000;
   return { species };
 }
 
