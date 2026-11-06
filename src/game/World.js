@@ -179,9 +179,6 @@ export class World {
         if (toLand) { const L = land(j); if (L.length) { const [dx, dy] = L[(rnd() * L.length) | 0]; ox += dx * 0.28; oy += dy * 0.28; } }
         this.decor.push({ type, gx: x, gy: y, x: x + 0.5 + ox, y: y + 0.5 + oy });
       };
-      // мостик: с берега, где можно встать (трава), смотрит в воду
-      const pierAt = pond.length < 4 ? -1 : take(shore.filter((j) => land(j).some(([dx, dy]) => { const x = j % N + dx, y = ((j / N) | 0) + dy; return this.tiles[y * N + x] === T.GRASS; })));
-      if (pierAt >= 0) { this.pier.add(pierAt); this.decor.push({ type: 'pier', gx: pierAt % N, gy: (pierAt / N) | 0, x: pierAt % N + 0.5, y: ((pierAt / N) | 0) + 0.5 }); }
       put('cattail', take(shore), true);
       if (pond.length > 8) put('cattail', take(shore), true);
       put('reeds', take(shore), true);

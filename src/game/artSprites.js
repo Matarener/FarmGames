@@ -77,7 +77,7 @@ export async function loadArt(onProgress) {
     bed: A.bed_dry && { plain: [A.bed_dry, A.bed_wet], grass: [A.bed_dry_g, A.bed_wet_g] },
     waterTex: A.tex_water || null,
     // украшения пруда (World.genDecor): у берега и на воде
-    decor: { cattail: A.pond_cattail, reeds: A.pond_reeds, rocks: A.pond_rocks, lily: A.pond_lily, leaves: A.pond_leaves, pier: A.pond_pier },
+    decor: { cattail: A.pond_cattail, reeds: A.pond_reeds, rocks: A.pond_rocks, lily: A.pond_lily, leaves: A.pond_leaves },
     soil: [A.tile_soil, A.tile_soil_wet || tinted(A.tile_soil, 'rgba(40,20,10,0.32)')],
   };
 }

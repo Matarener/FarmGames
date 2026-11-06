@@ -352,6 +352,10 @@ export class PixiScene {
     for (const o of w.objects || []) { if (!o) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
     if (S.stumpOf && S.objArt) for (const arr of Object.values(S.objArt)) for (const t of arr || []) for (const id of [0, 1, 3]) { const st = S.stumpOf(t, id); if (st) { this.atlas.tex(st); this.atlas.tex(dimSprite(st)); } }
     for (const im of Object.values(f.iconImg)) if (im.complete && im.naturalWidth) this.iconTex(im);
+    // все вложения скелета фермера (кадры хвоста, инструменты) — иначе они грузятся в видеокарту
+    // посреди игры, когда фермер впервые берёт топор или удочку
+    const skins = f.player && f.player.sk && f.player.sk.data.skins;
+    if (skins) for (const sk of Object.values(skins)) for (const slot of Object.values(sk || {})) for (const att of Object.values(slot || {})) if (att && att.sprite && att.sprite.canvas) this.atlas.tex(att.sprite);
     this.atlas.flush(); this.groundAtlas.flush();
     this.atlas.sealed = this.groundAtlas.sealed = true; this.atlas.perf = this.groundAtlas.perf = f.perf;
     const R = this.app.renderer;
