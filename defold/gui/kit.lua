@@ -105,7 +105,14 @@ end
 
 -- размер текста в точках
 function M.measure(n)
-	local m = gui.get_text_metrics_from_node(n)
+	local m
+	if gui.get_text_metrics_from_node then
+		m = gui.get_text_metrics_from_node(n)
+	else
+		-- Defold 1.10+: метрики через ресурс шрифта
+		local font = gui.get_font_resource(gui.get_font(n))
+		m = resource.get_text_metrics(font, gui.get_text(n))
+	end
 	local s = gui.get_scale(n)
 	return m.width * s.x / app.dpi, m.height * s.y / app.dpi
 end
