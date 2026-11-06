@@ -193,10 +193,12 @@ button:disabled { cursor: default; }
 /* ---------- Рюкзак: клетки ---------- */
 .inv-en { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; }
 .inv-en span { font-size: 12px; font-weight: 500; color: #6b5442; }
-.inv-tabs { display: flex; gap: 6px; overflow-x: auto; margin: 0 -14px; padding: 0 14px 6px; scrollbar-width: none; touch-action: pan-x; }
-.inv-tabs::-webkit-scrollbar { display: none; }
+/* разделы переносятся на вторую строку, а не прокручиваются: на компьютере мышью вбок не прокрутить */
+.inv-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-bottom: 6px; }
+.inv-tabs.c2 { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 700px) { .inv-tabs.c2 { grid-template-columns: repeat(4, 1fr); } }
 .inv-tab {
-  flex: none; display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 11px; border-radius: 18px;
+  min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 36px; padding: 0 6px; white-space: nowrap; border-radius: 18px;
   background: var(--paper-2); border: 2px solid transparent; font-size: 13px; color: #5a4434;
 }
 .inv-tab.on { background: #fff; border-color: var(--ink); color: var(--ink); }
@@ -449,3 +451,4 @@ body.moving .toast { bottom: calc(var(--safe-b) + 112px); }
 .ng-row { display: flex; gap: 8px; }
 .ng-row .btn-s { flex: 1; justify-content: center; min-height: 42px; font-size: 13.5px; }
 .ng-yes { background: linear-gradient(#f08a6a, #c9452b); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+@media (max-width: 380px) { .inv-tab { font-size: 12px; gap: 3px; padding: 0 4px; } .inv-tab .ic { width: 15px; height: 15px; } }
