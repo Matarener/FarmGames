@@ -41,7 +41,7 @@ end
 -- ---------------- Состояние ----------------
 
 function Farm:init(saved)
-	local seed = saved and saved.seed or math.random(0, 2 ^ 31 - 1)
+	local seed = saved and saved.seed or math.floor(math.random() * 2147483646) -- без math.random(m, n): в wasm-сборке большой интервал падает
 	self.world = W.new(seed, self.map)
 	local w = self.world
 	self.beds = {}

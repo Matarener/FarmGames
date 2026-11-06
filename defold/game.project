@@ -49,6 +49,7 @@ scale_mode = stretch
 heap_size = 128
 show_fullscreen_button = 0
 show_made_with_defold = 0
+splash_image = /assets/web/splash.png
 retry_time = 1
 retry_count = 10
 
