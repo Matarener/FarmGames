@@ -75,6 +75,9 @@ ICON_SHEETS = {
     'ui_crops': ['carrot', 'wheat', 'beet', 'cabbage', 'tomato', 'corn', 'sunflower', 'pumpkin', 'strawberry', 'cotton'],
     'ui_avatar': ['avatar'],
     'ui_fish': ['fish_carp', 'fish_perch', 'fish_gold', 'fish'],  # прозрачный фон
+    # плоды деревьев и кустов
+    'ui_flora1': ['acorn', 'birch_bark', 'sakura_petal', 'cherry', 'maple_leaf', 'apple', 'pinecone'],
+    'ui_flora2': ['blueberry', 'raspberry', 'rosehip', 'hydrangea', 'lavender', 'rose_petal'],
 }
 ICON_PX = 128
 
@@ -100,9 +103,12 @@ def cut_dark_bg(a):
     return np.isin(lab, np.where(sizes > 1500)[0] + 1)
 
 
-def icons():
+def icons(only=None):
     names = []
+    if only:
+        with open(os.path.join(OUT, 'icons.json')) as f: names = json.load(f)
     for sheet, items in ICON_SHEETS.items():
+        if only and sheet not in only: continue
         a = np.array(Image.open(os.path.join(SRC, sheet + '.png')).convert('RGBA'))
         if (a[..., 3] == 0).mean() > 0.2: a = load(sheet)  # уже прозрачный
         else: a[..., 3] = np.where(cut_dark_bg(a), 255, 0)
@@ -116,7 +122,7 @@ def icons():
             sq = Image.new('RGBA', (ICON_PX, ICON_PX))
             sq.paste(img, ((ICON_PX - img.width) // 2, (ICON_PX - img.height) // 2))
             sq.save(os.path.join(OUT, 'ic_' + name + '.webp'), 'WEBP', quality=90, method=6)
-            names.append(name)
+            if name not in names: names.append(name)
             print(f'ic_{name}')
     with open(os.path.join(OUT, 'icons.json'), 'w') as f:
         json.dump(names, f)
@@ -220,6 +226,7 @@ def main(only=None):
     if only:
         with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
             json.dump(man, f, indent=1)
+        icons([n for n in only if n in ICON_SHEETS])
         return
     for sheet, items in BED_SHEETS.items():
         if not os.path.exists(os.path.join(SRC, sheet + '.png')): continue
