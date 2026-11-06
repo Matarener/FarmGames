@@ -187,6 +187,11 @@ def main():
                 # у деревьев «пятачок» травы — ромб, его самая широкая строка и есть центр
                 # (как у пней, иначе пень встаёт выше дерева)
                 if sheet.startswith('trees'): by += bw / 4
+                # у колодца самая широкая строка — середина круглой кладки; опора — от низа кладки
+                # под центром (иначе колодец «съезжает» на клетку перед собой)
+                if sheet == 'well':
+                    mm = crop[..., 3] > 128; c = int(bx)
+                    by = np.where(mm[:, max(0, c - 3):c + 3].any(1))[0].max()
             k = base_w / bw  # мир/пиксель
             W, H = (x1 - x0) * k, (y1 - y0) * k
             img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
