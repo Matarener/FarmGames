@@ -40,10 +40,22 @@ function M.apply()
 	pcall(sys.set_update_frequency, M.fps == 30 and 30 or 0)
 end
 
+-- отладочная сборка (сайт /debug/): вместе со счётчиком — профайлер движка на экране
+function M.engine_profiler(on)
+	local ok, info = pcall(sys.get_engine_info)
+	if ok and info and info.is_debug and profiler and profiler.enable_ui then
+		pcall(profiler.enable_ui, on)
+		if on and profiler.set_ui_view_mode and profiler.VIEW_MODE_MINIMIZED then
+			pcall(profiler.set_ui_view_mode, profiler.VIEW_MODE_MINIMIZED)
+		end
+	end
+end
+
 function M.set(k, v)
 	M[k] = v
 	M.save()
 	M.apply()
+	if k == 'stats' then M.engine_profiler(v) end
 end
 
 return M

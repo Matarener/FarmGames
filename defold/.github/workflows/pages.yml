@@ -1,0 +1,80 @@
+# Сборка веб-версии (HTML5/wasm) через bob и публикация на GitHub Pages.
+# Версия движка — та же, что у редактора на ПК (Defold 1.14.0).
+name: Web build → GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  DEFOLD_SHA: d295ed4edff2e49072719835713e625f409849f1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Download bob
+        run: curl -fsSL -o bob.jar "https://d.defold.com/archive/stable/${DEFOLD_SHA}/bob/bob.jar"
+      - name: Build HTML5
+        run: |
+          java -jar bob.jar --platform wasm-web --architectures wasm-web --variant release \
+            --archive --bundle-output dist resolve build bundle
+      - name: Build HTML5 debug (engine profiler)
+        run: |
+          java -jar bob.jar --platform wasm-web --architectures wasm-web --variant debug \
+            --archive --output build/debugweb --bundle-output dist_debug resolve build bundle
+      - name: Build Android APK
+        continue-on-error: true
+        run: |
+          java -jar bob.jar --platform armv7-android --architectures armv7-android,arm64-android --variant release \
+            --bundle-format apk --archive --output build/android --bundle-output dist_apk resolve build bundle
+          find dist_apk -name "*.apk" -exec ls -la {} \;
+      - name: Prepare site
+        run: |
+          mkdir site
+          cp -r dist/*/* site/
+          touch site/.nojekyll
+          # свои имена файлов у каждой сборки: Pages разрешает браузеру 10 минут держать старые файлы.
+          # Новый index.html ссылается на dmloader_<v>.js и archive_<v>/; старые имена тоже остаются
+          # (копии), чтобы закэшированный старый index.html не сломался.
+          V=${GITHUB_SHA::8}
+          if grep -q '"archive" + path' site/dmloader.js; then
+            cp -r site/archive "site/archive_$V"
+            sed "s|\"archive\" + path|\"archive_$V\" + path|" site/dmloader.js > "site/dmloader_$V.js"
+            sed -i "s|dmloader\.js|dmloader_$V.js|g; s|archive/archive_files\.json|archive_$V/archive_files.json|g" site/index.html
+          fi
+          grep -n "dmloader\|archive" site/index.html | head || true
+          grep -n '"archive' site/dmloader_*.js | head  || true
+          APK=$(find dist_apk -name "*.apk" 2>/dev/null | head -1)
+          if [ -n "$APK" ]; then cp "$APK" site/ghostfarm.apk; fi
+          mkdir site/debug
+          cp -r dist_debug/*/* site/debug/
+          ls -la site site/debug
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

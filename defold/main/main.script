@@ -41,6 +41,7 @@ function init(self)
 	gfx.load()
 	gfx.apply()
 	prof.set(gfx.stats)
+	gfx.engine_profiler(gfx.stats)
 	app.gfx, app.prof = gfx, prof
 	app.cam = camera.new()
 	layout(self)
