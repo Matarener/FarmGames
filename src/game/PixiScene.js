@@ -47,7 +47,7 @@ class Atlases {
   }
 
   // новые спрайты попадают в видеопамять раз за кадр
-  flush() { for (const p of this.dirty) p.source.update(); this.dirty.clear(); }
+  flush(perf) { for (const p of this.dirty) { p.source.update(); perf && perf.mark('текстура в видеокарту'); } this.dirty.clear(); }
 }
 
 // ---------- фермер: спрайты вложений скелета ----------
@@ -123,7 +123,8 @@ export class PixiScene {
   // ---------- земля ----------
   // Каждый кусок земли — одна сетка из ромбов (а не 100 прямоугольных спрайтов): у клетки рисуется
   // только сам ромб, прозрачные углы видеокарта не трогает — заливка экрана вдвое меньше.
-  syncGround() {
+  syncGround() { const _t = performance.now(); try { this._syncGround(); } finally { this.f.perf.mark('syncGround', performance.now() - _t); } }
+  _syncGround() {
     const f = this.f, w = f.world, S = f.S;
     const BS = S.bed && S.bed[f.bedStyleName()];
     const per = this.chunks.map(() => []);
@@ -178,7 +179,8 @@ export class PixiScene {
     }
   }
 
-  syncFog() {
+  syncFog() { const _t = performance.now(); try { this._syncFog(); } finally { this.f.perf.mark('syncFog', performance.now() - _t); } }
+  _syncFog() {
     const w = this.f.world;
     // закрытые куски — затемнение цветом самого куска (без лишнего слоя поверх)
     const gray = (k) => { const v = Math.round(k * 255); return (v << 16) | (v << 8) | v; };
@@ -202,7 +204,8 @@ export class PixiScene {
     b.stroke({ width: 1.5, color: 0xfff0be, alpha: 0.55 });
   }
 
-  syncSigns() {
+  syncSigns() { const _t = performance.now(); try { this._syncSigns(); } finally { this.f.perf.mark('syncSigns', performance.now() - _t); } }
+  _syncSigns() {
     const f = this.f, w = f.world;
     for (const ch of this.signsC.removeChildren()) ch.destroy({ children: true });
     const blocked = w.unlockedCount() >= HOUSE[f.st.house].chunks;
@@ -352,8 +355,10 @@ export class PixiScene {
     this.syncFx();
     this.syncFloaters();
 
-    this.atlas.flush();
+    const P = this.f.perf; this.atlas.flush(P);
+    const tr = performance.now();
     this.app.renderer.render(this.app.stage);
+    const pm = performance.now() - tr; if (pm >= 3) P.mark('отрисовка', pm);
   }
 
   // номера в очереди дел
@@ -442,7 +447,7 @@ export class PixiScene {
       const fl = f.floaters[i];
       box.visible = !!fl;
       if (!fl) return;
-      if (box.tx.text !== fl.text) box.tx.text = fl.text;
+      if (box.tx.text !== fl.text) { box.tx.text = fl.text; this.f.perf.mark('текст'); }
       const img = fl.icon && f.iconImg[fl.icon];
       const iconOk = img && img.complete && img.naturalWidth;
       box.ic.visible = !!iconOk;

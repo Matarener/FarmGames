@@ -32,6 +32,8 @@ export class Perf {
     this.frameMs = 0; this.frameMax = 0; this._work = 0; this._workMax = 0;
     try { this._showFps = localStorage.getItem('farm.fps') === '1'; } catch { this._showFps = false; }
     this.onShowFps = null;
+    // ловушка фризов: что происходило в самых долгих кадрах
+    this.spikes = []; this._tags = {}; this._t0 = performance.now();
   }
 
   get showFps() { return this._showFps; }
@@ -43,6 +45,22 @@ export class Perf {
 
   // после экрана загрузки меряем заново: загрузка картинок не должна снижать качество
   restart() { this._slow = 0; this._warmup = 2; this._acc = 0; this._n = 0; }
+
+  // отметка внутри кадра: что и сколько мс заняло (попадает в описание фриза)
+  mark(name, ms = 0) { const t = this._tags[name]; this._tags[name] = t ? { n: t.n + 1, ms: t.ms + ms } : { n: 1, ms }; }
+
+  // итог кадра: ms — работа JS, gap — сколько прошло с прошлого кадра, part — разбивка
+  frame(ms, gap, interval, part) {
+    const long = ms > 34 || gap > Math.max(120, interval * 2.5);
+    if (long) {
+      const tags = Object.entries(this._tags).map(([k, v]) => `${k}${v.n > 1 ? '×' + v.n : ''}${v.ms >= 1 ? ' ' + v.ms.toFixed(0) : ''}`);
+      for (const [k, v] of Object.entries(part)) if (v >= 3) tags.push(`${k} ${v.toFixed(0)}`);
+      if (gap - ms > 80) tags.push(`пауза ${(gap - ms).toFixed(0)}`); // браузер/видеокарта/сборка мусора
+      this.spikes.unshift({ at: (performance.now() - this._t0) / 1000, ms: Math.max(ms, gap), tags: tags.join(', ') || '?' });
+      if (this.spikes.length > 5) this.spikes.length = 5;
+    }
+    this._tags = {};
+  }
 
   work(ms) { this._work += ms; if (ms > this._workMax) this._workMax = ms; }
 

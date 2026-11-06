@@ -34,6 +34,7 @@ async function main() {
   const camera = new Camera();
   const ui = new UI(document.getElementById('app'));
   const save = new Save(tg);
+  { const fl = save.flush.bind(save); save.flush = () => { const t = performance.now(); fl(); perf.mark('сохранение', performance.now() - t); }; }
   const fill = document.getElementById('ld-fill'), ltext = document.getElementById('ld-text');
   const progress = (k) => { fill.style.width = Math.round(k * 100) + '%'; ltext.textContent = k < 1 ? `Загрузка… ${Math.round(k * 100)}%` : 'Готово!'; };
   progress(0.05);
@@ -114,8 +115,10 @@ async function main() {
     fpsEl.className = 'debug';
     document.body.appendChild(fpsEl);
     const paint = () => {
+      const now = (performance.now() - perf._t0) / 1000;
+      const sp = perf.spikes.map((x) => `${x.ms.toFixed(0)} мс ${Math.round(now - x.at)} с назад: ${x.tags}`).join('\n');
       fpsEl.textContent = `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
-        ` · ${app ? 'WebGL' : '2D'} · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}${perf.idle ? " · покой" : ""}`;
+        ` · ${app ? 'WebGL' : '2D'} · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}${perf.idle ? " · покой" : ""}` + (sp ? `\nфризы:\n${sp}` : '');
     };
     paint(); fpsTimer = setInterval(paint, 500);
   };

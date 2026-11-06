@@ -43,8 +43,11 @@ export class Game {
     const dt = Math.min(elapsed / 1000, 0.1);
     const t0 = performance.now();
     this.update(dt);
+    const t1 = performance.now();
     this.render();
-    this.perf.work(performance.now() - t0);
+    const t2 = performance.now();
+    this.perf.work(t2 - t0);
+    this.perf.frame(t2 - t0, elapsed, 1000 / fps, { логика: t1 - t0, кадр: t2 - t1 });
     this.perf.sample(elapsed / 1000, fps);
   }
 }
