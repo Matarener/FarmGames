@@ -361,10 +361,8 @@ export class UI {
       if (!list.length) { body.appendChild(h('div', 'pn-empty', 'Пока нечего продать. Соберите урожай с грядок.')); return; }
       for (const c of list) {
         const n = Inv.count(f.st, c.key);
-        const r = h('div', 'item', `${this.ic(c.icon, 'ic mid')}<div class="it-t"><b>${c.name}</b><span>${n} шт. · ${c.sell} ${this.ic('coin')} за шт.</span></div>`);
-        const b1 = h('button', 'btn-s', 'Продать 1'); b1.onclick = () => f.sell(c.key, 1);
-        const b2 = h('button', 'btn-s gold', `Все: ${n * c.sell} ${this.ic('coin')}`); b2.onclick = () => f.sell(c.key, n);
-        const acts = h('div', 'it-a'); acts.append(b1, b2); r.appendChild(acts);
+        const r = h('div', 'item mk-item', `${this.ic(c.icon, 'ic mid')}<div class="it-t"><b>${c.name}</b><span>${n} шт. · ${c.sell} ${this.ic('coin')} за шт.</span></div>`);
+        r.appendChild(this.sellRow(f, c, n));
         body.appendChild(r);
       }
     });
@@ -425,6 +423,30 @@ export class UI {
     });
   }
 
+  // Продажа с выбором количества: −10 −1 [N] +1 +10, «Продать N» и «Все»
+  sellRow(f, it, n) {
+    const Q = this.sellQty || (this.sellQty = {}); // выбранное количество — своё у каждого предмета
+    const q = Q[it.key] = Math.max(1, Math.min(n, Q[it.key] || 1));
+    const row = h('div', 'ii-sell');
+    if (n > 1) {
+      const step = h('div', 'ii-step');
+      for (const d of [-10, -1, 0, 1, 10]) {
+        if (!d) { step.appendChild(h('b', 'ii-q', String(q))); continue; }
+        const b = h('button', 'btn-s', d > 0 ? '+' + d : '−' + -d);
+        b.disabled = d < 0 ? q <= 1 : q >= n;
+        b.onclick = () => { Q[it.key] = q + d; this.refreshPanel(); };
+        step.appendChild(b);
+      }
+      row.appendChild(step);
+    }
+    const acts = h('div', 'ii-a');
+    const b1 = h('button', 'btn-s', `Продать ${q} · ${q * it.sell} ${this.ic('coin')}`); b1.onclick = () => f.sell(it.key, q);
+    acts.appendChild(b1);
+    if (n > 1) { const b2 = h('button', 'btn-s gold', `Все ${n}: ${n * it.sell} ${this.ic('coin')}`); b2.onclick = () => f.sell(it.key, n); acts.appendChild(b2); }
+    row.appendChild(acts);
+    return row;
+  }
+
   itemInfo(f, it) {
     const st = f.st, n = Inv.count(st, it.key);
     const tags = it.tabs.map((k) => INV_TABS.find((t) => t.key === k).name).join(' · ');
@@ -445,12 +467,8 @@ export class UI {
       b.disabled = st.energy >= f.maxEnergy; b.onclick = () => f.eat(it.key);
       acts.appendChild(b);
     }
-    if (it.sell) {
-      const b1 = h('button', 'btn-s', `Продать 1 · ${it.sell} ${this.ic('coin')}`); b1.onclick = () => f.sell(it.key, 1);
-      acts.appendChild(b1);
-      if (n > 1) { const b2 = h('button', 'btn-s gold', `Все: ${n * it.sell} ${this.ic('coin')}`); b2.onclick = () => f.sell(it.key, n); acts.appendChild(b2); }
-    }
     if (acts.children.length) box.appendChild(acts);
+    if (it.sell && n > 0) box.appendChild(this.sellRow(f, it, n));
     return box;
   }
 }

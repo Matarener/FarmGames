@@ -226,6 +226,11 @@ button:disabled { cursor: default; }
 .ii-x { position: absolute; right: 8px; top: 8px; width: 30px; height: 30px; border-radius: 8px; background: rgba(0,0,0,.08); font-size: 14px; }
 .ii-a { display: flex; gap: 6px; width: 100%; flex-wrap: wrap; }
 .ii-a .btn-s { flex: 1; justify-content: center; }
+.mk-item { flex-wrap: wrap; }
+.ii-sell { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.ii-step { display: flex; align-items: center; gap: 6px; }
+.ii-step .btn-s { flex: 1; justify-content: center; padding: 0 4px; }
+.ii-q { min-width: 44px; text-align: center; font-size: 17px; }
 @media (min-width: 700px) and (min-height: 500px) { .inv-grid { grid-template-columns: repeat(7, 1fr); } }
 @media (max-height: 500px) and (orientation: landscape) { .inv-grid { grid-template-columns: repeat(8, 1fr); } .inv-info { padding: 6px 14px 8px; } }
 
