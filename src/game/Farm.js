@@ -287,11 +287,10 @@ export class Farm {
   }
 
   // Поставить дикую траву, куст или дерево (растение — ростком, если ещё не выросло).
-  // Деревья у тумана могут стоять и на закрытом участке: растут там до его открытия.
   placeWild(ev) {
-    const w = this.world, sp = ev.kind, fd = FLORA[sp];
-    if (sp !== 'grass' && !fd) return null;
-    if (!w.isOpen(ev.x, ev.y) && !(fd && fd.kind === 'tree' && w.inside(ev.x, ev.y))) return null;
+    const w = this.world, sp = ev.kind;
+    if (sp !== 'grass' && !FLORA[sp]) return null;
+    if (!w.isOpen(ev.x, ev.y)) return null;
     const grown = sp !== 'grass' && Flora.plantStage(sp, ev.born, Date.now()) >= 2;
     const o = w.add(sp === 'grass' ? 'grass' : grown ? sp : 'sapling', ev.x, ev.y);
     if (!o) return null;

@@ -107,16 +107,16 @@ export function wildTick(st, world, { now, rng, blocked, reach, place }) {
 
 const TREES = Object.values(FLORA).filter((f) => f.kind === 'tree').map((f) => f.key);
 
-// Клетка у границы тумана: не дальше band от края карты (открытый участок или ещё закрытый)
+// Клетка у границы тумана: не дальше band от края карты
 export const nearFog = (x, y) => Math.min(x, y, N - 1 - x, N - 1 - y) < WILD_TREES.band;
 
-// Можно ли вырасти дереву: свободная трава у тумана, вокруг (space) нет других диких деревьев у тумана
+// Можно ли вырасти дереву: свободная трава у тумана на открытом участке, вокруг (space) нет других диких деревьев
 // Подойти к клетке пока не обязательно: игрок расчистит дорогу к лесу у тумана сам.
 function treeCell(world, x, y, blocked) {
-  if (!nearFog(x, y)) return false;
+  if (!nearFog(x, y) || !world.isOpen(x, y)) return false;
   const i = y * N + x;
   if (world.tiles[i] !== T.GRASS || world.occ[i] >= 0) return false;
-  if (blocked && world.isOpen(x, y) && blocked(x, y)) return false;
+  if (blocked && blocked(x, y)) return false;
   const s = WILD_TREES.space;
   for (let dy = -s; dy <= s; dy++) for (let dx = -s; dx <= s; dx++) {
     const o = (dx || dy) && world.objectAt(x + dx, y + dy);
