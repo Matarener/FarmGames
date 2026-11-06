@@ -9,7 +9,8 @@ import * as art from './art.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Mover } from './Mover.js';
-import { CROPS, GOODS, FISH, FISH_CATCH, OBJECTS, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import * as Inv from './inventory.js';
+import { CROPS, FISH, FISH_CATCH, OBJECTS, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 // вид объёмной грядки: 'plain' — без каймы, 'grass' — с травяной каймой
@@ -155,7 +156,7 @@ export class Farm {
     this.st = {
       coins: START.coins, gems: START.gems, xp: 0, level: 1,
       energy: START.energy, energyAt: Date.now(), can: 0, house: 1, well: 0,
-      inv: { wood: 0, stone: 0, ore: 0 }, seeds: { carrot: 4 }, crops: {},
+      items: { [seedId('carrot')]: 4 },
       stats: { cleared: 0, harvested: 0 },
     };
     let px = w.playerStart[0], py = w.playerStart[1];
@@ -163,6 +164,7 @@ export class Farm {
     // поэтому из них берём только прогресс, а деревья и камни генерируются заново
     if (saved && (saved.v === 1 || saved.v === 2 || saved.v === 3)) {
       Object.assign(this.st, saved.st);
+      Inv.migrateInventory(this.st);
       // карту поменяли в редакторе: прогресс (монеты, уровень, участки, рюкзак) остаётся,
       // а деревья, камни, тропинки и постройки — как на новой карте
       const sameMap = (saved.map || null) === (w.mapId || null);
@@ -303,11 +305,8 @@ export class Farm {
     return true;
   }
 
-  addItem(group, key, n) {
-    const bag = this.st[group];
-    const have = bag[key] || 0;
-    const add = group === 'seeds' ? n : Math.max(0, Math.min(n, this.storage - have));
-    bag[key] = have + add;
+  addItem(id, n) {
+    const add = Inv.addItem(this.st, id, n);
     if (add < n) this.toast('Склад полон. Улучшите дом, чтобы хранить больше.', 'warn');
     return add;
   }
@@ -445,7 +444,7 @@ export class Farm {
     const st = this.st;
     const items = Object.values(CROPS).filter((c) => c.level <= st.level + 1).map((c) => {
       const locked = c.level > st.level;
-      const have = st.seeds[c.key] || 0;
+      const have = Inv.count(st, seedId(c.key));
       return {
         icon: c.key, label: c.name,
         sub: locked ? `с ${c.level} ур.` : have ? `семян: ${have} · ${fmtTime(c.time)}` : `${c.seed} ${this.ui.ic('coin', 'ic ic-s')} · ${fmtTime(c.time)}`,
@@ -475,7 +474,7 @@ export class Farm {
   canPay(cost) {
     const st = this.st;
     for (const [k, v] of Object.entries(cost)) {
-      const have = k === 'coins' ? st.coins : k === 'gems' ? st.gems : st.inv[k] || 0;
+      const have = k === 'coins' ? st.coins : k === 'gems' ? st.gems : Inv.count(st, k);
       if (have < v) return false;
     }
     return true;
@@ -484,7 +483,7 @@ export class Farm {
   pay(cost) {
     if (!this.canPay(cost)) return false;
     for (const [k, v] of Object.entries(cost)) {
-      if (k === 'coins') this.st.coins -= v; else if (k === 'gems') this.st.gems -= v; else this.st.inv[k] -= v;
+      if (k === 'coins') this.st.coins -= v; else if (k === 'gems') this.st.gems -= v; else Inv.takeItem(this.st, k, v);
     }
     return true;
   }
@@ -521,22 +520,17 @@ export class Farm {
   }
 
   sell(key, n) {
-    const have = this.st.crops[key] || 0;
-    n = Math.min(n, have);
-    if (!n) return;
-    this.st.crops[key] = have - n;
-    this.st.coins += n * GOODS[key].sell;
-    this.quests.emit('sell', key, n);
+    const r = Inv.sellItem(this.st, key, n);
+    if (!r) return;
+    this.quests.emit('sell', key, r.n);
     this.sfx('coin');
     this.changed();
   }
 
   eat(key) {
-    const c = GOODS[key];
-    if (!c.food || !(this.st.crops[key] > 0)) return;
-    if (this.st.energy >= this.maxEnergy) return this.toast('Энергия уже полная');
-    this.st.crops[key]--;
-    this.st.energy = Math.min(this.maxEnergy, this.st.energy + c.food);
+    const r = Inv.eatItem(this.st, key, this.maxEnergy);
+    if (!r) return;
+    if (r.full) return this.toast('Энергия уже полная');
     this.sfx('eat');
     this.changed();
   }
@@ -581,7 +575,7 @@ export class Farm {
       case 'plant': {
         const b = this.bedAt(w.idx(a.x, a.y));
         if (t !== T.SOIL || b.crop) return false;
-        if (!(st.seeds[a.crop] > 0) && st.coins < CROPS[a.crop].seed) { this.toast('Не хватает монет на семена', 'warn'); return false; }
+        if (!Inv.count(st, seedId(a.crop)) && st.coins < CROPS[a.crop].seed) { this.toast('Не хватает монет на семена', 'warn'); return false; }
         return true;
       }
       case 'water': {
@@ -636,7 +630,7 @@ export class Farm {
       case 'plant': {
         if (w.tiles[w.idx(a.x, a.y)] !== T.SOIL) return false;
         const b = this.bedAt(w.idx(a.x, a.y)), c = CROPS[a.crop];
-        if (st.seeds[a.crop] > 0) st.seeds[a.crop]--; else if (st.coins >= c.seed) st.coins -= c.seed; else return false;
+        if (Inv.takeItem(st, seedId(a.crop), 1)) { /* свои семена */ } else if (st.coins >= c.seed) st.coins -= c.seed; else return false;
         b.crop = a.crop; b.p = 0; b.w = 0;
         this.burst(b.wx, b.wy, '#7ccf4f', 6);
         this.quests.emit('plant', a.crop);
@@ -673,7 +667,7 @@ export class Farm {
         const list = Object.values(FISH), total = list.reduce((s, f) => s + f.chance, 0);
         let r = Math.random() * total, fish = list[0];
         for (const f of list) { if ((r -= f.chance) < 0) { fish = f; break; } }
-        const got = this.addItem('crops', fish.key, 1);
+        const got = this.addItem(fish.key, 1);
         if (!got) return false;
         this.float(tmp.x, tmp.y - 22, `+1 ${fish.name}`, fish.key);
         this.quests.emit('fish', fish.key);
@@ -685,10 +679,10 @@ export class Farm {
       case 'harvest': {
         if (w.tiles[w.idx(a.x, a.y)] !== T.SOIL) return false;
         const b = this.bedAt(w.idx(a.x, a.y)), c = CROPS[b.crop];
-        const got = this.addItem('crops', c.key, 1);
+        const got = this.addItem(c.key, 1);
         if (!got) return false;
         this.float(b.wx, b.wy - 20, '+1', c.key);
-        if (Math.random() < 0.25) { this.addItem('seeds', c.key, 1); this.float(b.wx + 12, b.wy - 34, '+1', 'seed'); }
+        if (Math.random() < 0.25) { this.addItem(seedId(c.key), 1); this.float(b.wx + 12, b.wy - 34, '+1', 'seed'); }
         this.burst(b.wx, b.wy - 6, '#ffe066', 8);
         b.crop = null; b.p = 0; b.w = 0;
         st.stats.harvested++;
@@ -707,17 +701,17 @@ export class Farm {
     let dy = -30;
     for (const [res, [a, b]] of Object.entries(def.drops || {})) {
       const n = a + Math.floor(Math.random() * (b - a + 1));
-      const got = this.addItem('inv', res, n);
+      const got = this.addItem(res, n);
       if (got) { this.float(o.wx, o.wy + dy, `+${got}`, res); dy -= 14; }
     }
     if (def.oreChance && Math.random() < def.oreChance) {
-      const [o0, o1] = def.ore || [1, 2], got = this.addItem('inv', 'ore', o0 + Math.floor(Math.random() * (o1 - o0 + 1)));
+      const [o0, o1] = def.ore || [1, 2], got = this.addItem('ore', o0 + Math.floor(Math.random() * (o1 - o0 + 1)));
       if (got) { this.float(o.wx + 14, o.wy + dy, `+${got}`, 'ore'); dy -= 14; }
     }
     if (def.seedChance && Math.random() < def.seedChance) {
       const opts = Object.values(CROPS).filter((c) => c.level <= st.level);
       const c = opts[Math.floor(Math.random() * opts.length)];
-      this.addItem('seeds', c.key, 1);
+      this.addItem(seedId(c.key), 1);
       this.float(o.wx - 14, o.wy + dy, '+1', 'seed');
     }
     this.addXp(def.xp || 1);
