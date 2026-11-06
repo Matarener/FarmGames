@@ -337,14 +337,16 @@ export class PixiScene {
     try {
       for (const [name, o] of modes) {
         set(o); sync();
-        const times = [];
-        for (let i = 0; i < 40; i++) {
-          cam.x = x0 + Math.sin(i / 6) * 40; cam.y = y0 + Math.cos(i / 6) * 20;
-          const t = performance.now(); this.render(); sync(); times.push(performance.now() - t);
-          if (i % 8 === 7) await wait();
+        // кадры подряд, ожидание видеокарты — раз в 10 кадров (как в игре: кадры идут конвейером)
+        const runs = [];
+        for (let k = 0; k < 4; k++) {
+          const t = performance.now();
+          for (let i = 0; i < 10; i++) { const j = k * 10 + i; cam.x = x0 + Math.sin(j / 6) * 40; cam.y = y0 + Math.cos(j / 6) * 20; this.render(); }
+          sync(); runs.push((performance.now() - t) / 10);
+          await wait();
         }
-        times.sort((a, b) => a - b);
-        const med = times[times.length >> 1];
+        runs.sort((a, b) => a - b);
+        const med = (runs[1] + runs[2]) / 2;
         lines.push(`${name}: ${med.toFixed(1)} мс (${Math.round(1000 / med)} fps)`);
         onText && onText(lines.join('\n') + '\n…');
         await wait();
