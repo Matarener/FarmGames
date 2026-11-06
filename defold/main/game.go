@@ -6,6 +6,13 @@ components {
   id: "hud"
   component: "/gui/hud.gui"
 }
+components {
+  id: "map"
+  component: "/map/farm.tilemap"
+  position {
+    z: -500.0
+  }
+}
 embedded_components {
   id: "ground_f"
   type: "factory"

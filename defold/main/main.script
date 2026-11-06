@@ -7,6 +7,8 @@ local view_mod = require('farm.view')
 local save_mod = require('farm.save')
 local iso = require('farm.iso')
 local autotest = require('farm.autotest')
+local map_mod = require('farm.map')
+local W = require('farm.world')
 
 local handle_input -- тело on_input; автотест зовёт его напрямую (Defold прячет on_input из глобальных)
 local function now_ms() return socket.gettime() * 1000 end
@@ -42,7 +44,11 @@ function init(self)
 	end)
 	app.autotest = autotest.enabled()
 	app.save = save_mod.new()
-	local f = farm_mod.new({ ui = app.ui, now = now_ms, cam = app.cam, save = app.save, low = false,
+	-- карта из map/farm.tilemap (компонент #map, сам не рисуется); нет карты — мир генерируется
+	local map = map_mod.read(msg.url('#map'), W.N)
+	msg.post('#map', 'disable')
+	print('map: ' .. (map and (#map.objects .. ' objects, sig ' .. map.sig) or 'none, generated world'))
+	local f = farm_mod.new({ map = map, ui = app.ui, now = now_ms, cam = app.cam, save = app.save, low = false,
 		audio = function(name) if app.sfx then app.sfx(name) end end })
 	app.farm = f
 	local saved = (not app.autotest) and app.save:load() or nil

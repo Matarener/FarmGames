@@ -111,11 +111,12 @@ function V:obj_sprite(o)
 	local f = self.f
 	if o.type == 'stump' and o.was and OBJ[o.was] then
 		local list = OBJ[o.was]
-		local k = list[o.id % #list + 1]:gsub('^tree_', '')
+		local k = (o.sprite or list[o.id % #list + 1]):gsub('^tree_', '')
 		if k == 'oak' and o.id % 3 == 0 then return 'stump_moss' end
 		if META['stump_' .. k] then return 'stump_' .. k end
 	end
 	local v = OBJ[o.type]
+	if o.sprite and v and o.type ~= 'stump' then return o.sprite end -- картинка, выбранная на карте
 	if v then return v[o.id % #v + 1] end
 	if o.type == 'house' then return 'house_' .. f.st.house end
 	if o.type == 'well' then return f.st.well > 0 and 'well_fixed' or 'well_broken' end

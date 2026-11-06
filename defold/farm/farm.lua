@@ -29,6 +29,7 @@ function M.new(opts)
 	self.cam = opts.cam
 	self.save = opts.save
 	self.low = opts.low -- слабое устройство: меньше частиц
+	self.map = opts.map -- нарисованная карта (farm/map.lua) или nil — тогда мир генерируется
 	self.particles, self.floaters = {}, {}
 	self.hover, self.tap_fx = nil, nil
 	self.time = 0
@@ -41,7 +42,7 @@ end
 
 function Farm:init(saved)
 	local seed = saved and saved.seed or math.random(0, 2 ^ 31 - 1)
-	self.world = W.new(seed)
+	self.world = W.new(seed, self.map)
 	local w = self.world
 	self.beds = {}
 	self.st = {
@@ -53,7 +54,8 @@ function Farm:init(saved)
 	local px, py = w.player_start[1], w.player_start[2]
 	if saved and (saved.v == 1 or saved.v == 2 or saved.v == 3) then
 		for k, v in pairs(saved.st or {}) do self.st[k] = v end
-		if saved.objects and saved.v ~= 2 then w:import_objects(saved.objects) end
+		-- «разница» объектов подходит, только если карта та же (при правке карты объекты берутся с неё заново)
+		if saved.objects and saved.v ~= 2 and saved.map_sig == w.map_sig then w:import_objects(saved.objects) end
 		if saved.chunks then for _, c in ipairs(saved.chunks) do w.unlocked[c] = 1 end end
 		if self.st.movedBeds then for _, i in ipairs(w.start_beds) do w.tiles[i] = T.GRASS end end
 		if self.st.paths then
@@ -62,9 +64,12 @@ function Farm:init(saved)
 		end
 		for _, b in ipairs(saved.beds or {}) do
 			local i = b[1]
-			w.tiles[i] = T.SOIL
-			local bed = self:bed_at(i)
-			bed.crop = (b[2] ~= '' and b[2]) or nil; bed.p = b[3]; bed.w = b[4]
+			-- грядка, на месте которой по новой карте стоит объект или вода, пропадает
+			if w.occ[i] < 0 and w.tiles[i] ~= T.WATER then
+				w.tiles[i] = T.SOIL
+				local bed = self:bed_at(i)
+				bed.crop = (b[2] ~= '' and b[2]) or nil; bed.p = b[3]; bed.w = b[4]
+			end
 		end
 		if saved.player and w:walkable(saved.player[1], saved.player[2]) then px, py = saved.player[1], saved.player[2] end
 		local away = math.max(0, (self.now() - (saved.t or self.now())) / 1000)
@@ -125,7 +130,7 @@ function Farm:serialize()
 	table.sort(beds, function(a, b) return a[1] < b[1] end)
 	local chunks = {}
 	for c = 0, CHUNKS * CHUNKS - 1 do if self.world.unlocked[c] == 1 then chunks[#chunks + 1] = c end end
-	return { v = 3, seed = self.world.seed, st = self.st, objects = self.world:export_objects(), chunks = chunks, beds = beds,
+	return { v = 3, seed = self.world.seed, map_sig = self.world.map_sig, st = self.st, objects = self.world:export_objects(), chunks = chunks, beds = beds,
 		player = { self.player:tx(), self.player:ty() }, t = self.now() }
 end
 

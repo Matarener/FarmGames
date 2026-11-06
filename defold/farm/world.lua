@@ -17,7 +17,7 @@ M.T = T
 local World = {}
 World.__index = World
 
-function M.new(seed)
+function M.new(seed, map)
 	local self = setmetatable({}, World)
 	self.seed = seed % 4294967296
 	self.N = N
@@ -29,8 +29,46 @@ function M.new(seed)
 	for c = 0, CHUNKS * CHUNKS - 1 do self.unlocked[c] = 0 end
 	self.unlocked[M.START_CHUNK] = 1
 	self.version = 0   -- растёт при изменении объектов
-	self:generate()
+	if map then self:load_map(map) else self:generate() end
 	return self
+end
+
+-- Мир из нарисованной карты (farm/map.lua). Колодец, как и в генерации, — после gen_count.
+function World:load_map(m)
+	self.map_sig = m.sig
+	local G = { grass = T.GRASS, path = T.PATH, water = T.WATER, soil = T.SOIL }
+	for y = 0, N - 1 do for x = 0, N - 1 do
+		local h = util.hash2(x + self.seed % 1000, y)
+		self.variant[y * N + x] = h < 0.55 and 0 or h < 0.8 and 1 or h < 0.9 and 3 or 2
+	end end
+	self.start_beds = {}
+	for i = 0, N * N - 1 do
+		local t = G[m.ground[i] or 'grass'] or T.GRASS
+		self.tiles[i] = t
+		if t == T.SOIL then self.start_beds[#self.start_beds + 1] = i end
+	end
+	local any_open = false
+	for c = 0, CHUNKS * CHUNKS - 1 do self.unlocked[c] = 0 end
+	for i in pairs(m.open) do self.unlocked[self:chunk_of(i % N, math.floor(i / N))] = 1; any_open = true end
+	if not any_open then self.unlocked[M.START_CHUNK] = 1 end
+	local well
+	for _, d in ipairs(m.objects) do
+		if d.type == 'well' then well = d
+		else
+			local o = self:add(d.type, d.gx, d.gy)
+			if o then o.sprite = d.sprite
+			else print('map: ' .. d.type .. ' at ' .. d.gx .. ',' .. d.gy .. ' does not fit (needs free grass)') end
+		end
+	end
+	self.gen_count = self.nobj
+	local house
+	for id = 0, self.nobj - 1 do local o = self.objects[id]; if o and o.type == 'house' then house = o; break end end
+	local sx, sy = (M.START_CHUNK % CHUNKS) * CHUNK + 5, math.floor(M.START_CHUNK / CHUNKS) * CHUNK + 5
+	if house then sx, sy = house.gx + 2, house.gy + 3 end
+	self.player_start = m.player or { sx, sy }
+	self.well_pos = well and { well.gx, well.gy } or { sx + 1, sy - 2 }
+	if well then self.well = self:add('well', well.gx, well.gy) end
+	self:gen_decor()
 end
 
 function World:idx(x, y) return y * N + x end
@@ -272,7 +310,7 @@ function World:fix_well()
 	local hx, hy = self.well_pos[1], self.well_pos[2]
 	local best, bd = nil, math.huge
 	for y = 0, N - 1 do for x = 0, N - 1 do
-		if self:chunk_of(x, y) == M.START_CHUNK and self.tiles[y * N + x] == T.GRASS and self.occ[y * N + x] < 0 then
+		if self.unlocked[self:chunk_of(x, y)] == 1 and self.tiles[y * N + x] == T.GRASS and self.occ[y * N + x] < 0 then
 			local d = util.hypot(x - hx, y - hy)
 			if d < bd then bd = d; best = { x, y } end
 		end
