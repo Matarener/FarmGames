@@ -110,8 +110,10 @@ export class UI {
     if (!q) return;
     const done = Q.done, pct = (Q.progress() / q.goal.n) * 100;
     el.classList.toggle('done', done);
-    el.innerHTML = `${this.ic(q.who === 'note' ? 'note' : 'star', 'ic')}<div class="qc-t"><b>${done ? 'Забрать награду!' : q.task}</b>` +
-      `<div class="qc-bar"><i style="width:${pct}%"></i></div></div><span class="qc-n">${Q.progress()}/${q.goal.n}</span>`;
+    // число не отрывается от соседнего слова при переносе: «Полей грядки / 2 раза», а не «Полей грядки 2 / раза»
+    const task = (done ? 'Забрать награду!' : q.task).replace(/(\d+) /g, '$1\u00a0');
+    el.innerHTML = `${this.ic(q.who === 'note' ? 'note' : 'star', 'ic')}<div class="qc-t"><b>${task}</b>` +
+      `<div class="qc-row"><div class="qc-bar"><i style="width:${pct}%"></i></div><span class="qc-n">${Q.progress()}/${q.goal.n}</span></div></div>`;
   }
 
   questDone(q) {
