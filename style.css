@@ -336,7 +336,6 @@ button:disabled { cursor: default; }
   .avatar img { width: 38px; height: 38px; }
   .wallet { flex-direction: row; }
   .pill { height: 30px; }
-  .gear { width: 32px; height: 32px; }
   .hud-res { top: calc(var(--safe-t) + 54px); }
   .quest-card { width: 190px; }
   .hud-bottom { padding-bottom: calc(var(--safe-b) + 6px); }
@@ -363,12 +362,6 @@ button:disabled { cursor: default; }
 }
 
 /* ---------- Настройки ---------- */
-.gear {
-  width: 34px; height: 34px; border-radius: 10px; background: rgba(61,43,31,.72);
-  display: grid; place-items: center; align-self: flex-start;
-}
-.gear svg { width: 24px; height: 24px; }
-.gear:active { transform: scale(.92) rotate(30deg); }
 .set-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px 10px; padding: 8px 0 10px; font-size: 14px; border-bottom: 1px dashed rgba(61,43,31,.2); }
 .set-row b { font-size: 13px; color: #8a6a50; font-variant-numeric: tabular-nums; }
 .set-row.off { opacity: .45; }
