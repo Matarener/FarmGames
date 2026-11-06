@@ -47,7 +47,7 @@ CROP_W = 54
 # center — середина картинки (плоское на воде), (fx, fy) — доли ширины/высоты.
 GRID_SHEETS = {
     'pond_decor': (3, 2, [('pond_cattail', 40, 'base'), ('pond_lily', 56, 'center'), ('pond_rocks', 50, (0.5, 0.7)),
-                          ('pond_reeds', 46, 'base'), ('pond_pier', 70, (0.49, 0.59)), ('pond_leaves', 36, 'center')]),
+                          ('pond_reeds', 46, 'base'), ('pond_pier', 77, (0.5, 0.494)), ('pond_leaves', 36, 'center')]),
 }
 BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), ('bed_dry_g', 66), ('bed_wet_g', 66)]}
 WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)
