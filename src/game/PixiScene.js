@@ -39,6 +39,7 @@ class Atlases {
     if (p.y + h + PAD > ATLAS) { p = this.page(); }
     p.g.drawImage(img, p.x, p.y);
     t = new PIXI.Texture({ source: p.source, frame: new PIXI.Rectangle(p.x, p.y, w, h) });
+    t.page = p;
     p.x += w + PAD; p.rowH = Math.max(p.rowH, h);
     this.dirty.add(p);
     this.map.set(img, t);
@@ -84,13 +85,12 @@ export class PixiScene {
   constructor(farm, app) {
     this.f = farm; this.app = app;
     this.atlas = new Atlases();
+    this.groundAtlas = new Atlases(); // клетки земли — отдельно, для сеток по кускам
     const world = this.world = new PIXI.Container({ isRenderGroup: true });
     app.stage.addChild(world);
-    this.base = new PIXI.Graphics(); world.addChild(this.base);
     this.chunks = [];
     for (let c = 0; c < CHUNKS * CHUNKS; c++) { const cc = new PIXI.Container({ isRenderGroup: true }); cc.tiles = []; /* своя группа: неподвижная земля не пересобирается при движении камеры */ this.chunks.push(cc); world.addChild(cc); }
     this.bedsC = new PIXI.Container({ sortableChildren: true, isRenderGroup: true }); world.addChild(this.bedsC);
-    this.fog = new PIXI.Graphics(); world.addChild(this.fog);
     this.border = new PIXI.Graphics(); world.addChild(this.border);
     this.objC = new PIXI.Container({ sortableChildren: true }); world.addChild(this.objC);
     this.over = new PIXI.Container(); world.addChild(this.over);
@@ -121,16 +121,15 @@ export class PixiScene {
   }
 
   // ---------- земля ----------
+  // Каждый кусок земли — одна сетка из ромбов (а не 100 прямоугольных спрайтов): у клетки рисуется
+  // только сам ромб, прозрачные углы видеокарта не трогает — заливка экрана вдвое меньше.
   syncGround() {
     const f = this.f, w = f.world, S = f.S;
     const BS = S.bed && S.bed[f.bedStyleName()];
+    const per = this.chunks.map(() => []);
     for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
       const i = gy * N + gx, t = w.tiles[i];
       const cx = (gx - gy) * HW, cy = (gx + gy + 1) * HH;
-      const cc = this.chunks[w.chunkOf(gx, gy)];
-      const k = (gy % CHUNK) * CHUNK + (gx % CHUNK);
-      let sp = cc.tiles[k];
-      if (!sp) { sp = cc.tiles[k] = new PIXI.Sprite(); cc.addChild(sp); }
       let s, bed = null;
       if (t === T.GRASS) s = S.grass[w.variant[i]];
       else if (t === T.PATH) s = S.path[(gx + gy) & 1];
@@ -140,7 +139,7 @@ export class PixiScene {
         const wet = b && b.crop && !f.cropInfo(b).needsWater && !f.cropInfo(b).ready ? 1 : 0;
         if (BS) { s = S.grass[w.variant[i]]; bed = BS[wet]; } else s = S.soil[wet];
       }
-      this.put(sp, s, cx, cy);
+      per[w.chunkOf(gx, gy)].push(s, cx, cy);
       // объёмная грядка — поверх земли, ближние поверх дальних
       let bs = this.bedSp && this.bedSp[i];
       if (bed) {
@@ -149,18 +148,41 @@ export class PixiScene {
         bs.visible = true; this.put(bs, bed, cx, cy);
       } else if (bs) bs.visible = false;
     }
-    // основа карты под тайлами (закрывает швы)
-    this.base.clear().poly([0, 0, N * HW, N * HH, 0, N * 2 * HH, -N * HW, N * HH]).fill(0x7cc44f);
+    for (let c = 0; c < per.length; c++) this.chunkMesh(this.chunks[c], per[c]);
+    this.groundAtlas.flush();
+  }
+
+  chunkMesh(cc, list) {
+    // пересобираем, только если в куске что-то поменялось
+    const same = cc.list && cc.list.length === list.length && cc.list.every((v, i) => v === list[i]);
+    if (same) return;
+    cc.list = list;
+    const by = new Map(); // страница атласа → вершины
+    for (let j = 0; j < list.length; j += 3) {
+      const s = list[j], x0 = list[j + 1] - s.ax, y0 = list[j + 2] - s.ay;
+      const t = this.groundAtlas.tex(s), fr = t.frame, p = t.page || t.source;
+      let m = by.get(p); if (!m) by.set(p, m = { t, pos: [], uv: [] });
+      const W = t.source.width, H = t.source.height;
+      const u0 = fr.x / W, v0 = fr.y / H, u1 = (fr.x + fr.width) / W, v1 = (fr.y + fr.height) / H, um = (u0 + u1) / 2, vm = (v0 + v1) / 2;
+      m.pos.push(x0 + s.w / 2, y0, x0 + s.w, y0 + s.h / 2, x0 + s.w / 2, y0 + s.h, x0, y0 + s.h / 2);
+      m.uv.push(um, v0, u1, vm, um, v1, u0, vm);
+    }
+    for (const ch of cc.removeChildren()) ch.destroy();
+    for (const m of by.values()) {
+      const n = m.pos.length / 8, idx = new Uint16Array(n * 6);
+      for (let q = 0; q < n; q++) { const a = q * 4, o = q * 6; idx[o] = a; idx[o + 1] = a + 1; idx[o + 2] = a + 2; idx[o + 3] = a; idx[o + 4] = a + 2; idx[o + 5] = a + 3; }
+      const geometry = new PIXI.MeshGeometry({ positions: new Float32Array(m.pos), uvs: new Float32Array(m.uv), indices: idx });
+      const page = m.t.page;
+      const texture = page ? (page.full || (page.full = new PIXI.Texture({ source: page.source }))) : m.t;
+      cc.addChild(new PIXI.Mesh({ geometry, texture }));
+    }
   }
 
   syncFog() {
-    const w = this.f.world, g = this.fog.clear();
-    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
-      if (w.unlocked[c]) continue;
-      const x0 = (c % CHUNKS) * CHUNK, y0 = ((c / CHUNKS) | 0) * CHUNK, pts = [];
-      for (const [x, y] of [[x0, y0], [x0 + CHUNK, y0], [x0 + CHUNK, y0 + CHUNK], [x0, y0 + CHUNK]]) { toWorld(x, y, tmp); pts.push(tmp.x, tmp.y); }
-      g.poly(pts).fill(w.canUnlock(c) ? { color: 0x122c18, alpha: 0.34 } : { color: 0x0e2214, alpha: 0.5 });
-    }
+    const w = this.f.world;
+    // закрытые куски — затемнение цветом самого куска (без лишнего слоя поверх)
+    const gray = (k) => { const v = Math.round(k * 255); return (v << 16) | (v << 8) | v; };
+    for (let c = 0; c < CHUNKS * CHUNKS; c++) this.chunks[c].tint = w.unlocked[c] ? 0xffffff : gray(w.canUnlock(c) ? 0.66 : 0.5);
     // граница открытой земли: пунктир
     const b = this.border.clear();
     const dash = (ax, ay, bx, by) => {
@@ -217,12 +239,14 @@ export class PixiScene {
     };
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.WATER) f.waterSprite(x, y);
     const S = f.S;
-    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function') add(v, k !== 'bubble' && k !== 'water' && k !== 'waterArt');
+    const GROUND = ['grass', 'path', 'soil', 'water'];
+    for (const k of GROUND) for (const v of (S[k] instanceof Map ? S[k].values() : S[k] || [])) this.groundAtlas.tex(v);
+    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k) && k !== 'waterArt') add(v, k !== 'bubble');
     for (const o of w.objects || []) { if (!o) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
     for (const im of Object.values(f.iconImg)) if (im.complete && im.naturalWidth) this.iconTex(im);
-    this.atlas.flush();
+    this.atlas.flush(); this.groundAtlas.flush();
     const R = this.app.renderer;
-    for (const p of this.atlas.list) R.texture?.initSource?.(p.source);
+    for (const p of [...this.atlas.list, ...this.groundAtlas.list]) R.texture?.initSource?.(p.source);
   }
 
   iconTex(img) { return this.atlas.tex({ canvas: img }); }
