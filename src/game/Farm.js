@@ -10,7 +10,8 @@ import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
-import { CROPS, FISH, FISH_CATCH, OBJECTS, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import * as Flora from './flora.js';
+import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 // вид объёмной грядки: 'plain' — без каймы, 'grass' — с травяной каймой
@@ -35,13 +36,13 @@ export class Farm {
     this.groundV = 0; // растёт, когда меняются клетки земли
     this.buildSprites();
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
-      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, waterTex: a.waterTex, decor: a.decor, objArt: a.obj, stumpOf: a.stumpOf });
+      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, waterTex: a.waterTex, decor: a.decor, objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora });
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
       a.well.forEach((s, i) => { if (s) this.S.well[i] = s; });
       if (a.water.every(Boolean) || a.waterTex) { this.S.waterArt = a.waterTex ? null : a.water; this.S.water.clear(); }
       this.groundV++;
       for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
-      for (const [k, url] of Object.entries(a.icons)) {
+      for (const [k, url] of Object.entries({ ...a.floraIcons, ...a.icons })) {
         const im = new Image(); im.src = url;
         im.onload = () => { this.icons[k] = url; this.iconImg[k] = im; this.dirty = true; this.onIcons && this.onIcons(k); };
       }
@@ -60,6 +61,8 @@ export class Farm {
     S.stumps = [stump, stump];
     S.rocks = [rock, rock];
     S.bush = art.bushSprite(false); S.berry = art.bushSprite(true);
+    S.sprout = art.sproutSprite();
+    S.flora = {}; // из арта: { вид: { bare — без плодов, young — молодое } }
     S.boulder = art.rockSprite(true);
     S.house = [null, 1, 2, 3, 4, 5].map((l) => l && art.houseSprite(l));
     S.well = [art.wellSprite(false), art.wellSprite(true)];
@@ -67,7 +70,7 @@ export class Farm {
     for (const c of Object.values(CROPS)) S.crops[c.key] = [0, 1, 2, 3].map((s) => art.cropSprite(c, s));
     S.bubble = { water: art.bubbleSprite('water'), ready: art.bubbleSprite('ready'), lock: art.bubbleSprite('lock') };
     this.S = S;
-    this.icons = art.makeIcons(CROPS, FISH);
+    this.icons = art.makeIcons(CROPS, FISH, FLORA_GOODS);
     this.iconImg = {};
     for (const [k, url] of Object.entries(this.icons)) { const im = new Image(); im.src = url; this.iconImg[k] = im; }
   }
@@ -130,10 +133,17 @@ export class Farm {
       const tree = S.objArt[o.was], st = tree && S.stumpOf(tree[o.id % tree.length], o.id);
       if (st) return st;
     }
+    if (o.type === 'sapling') {
+      // свой росток: o.stage считает floraTick
+      const fl = S.flora[o.tree];
+      return o.stage >= 1 && fl ? fl.young : S.sprout;
+    }
+    if (o.bare && S.flora[o.type]) return S.flora[o.type].bare; // плоды собраны
     const v = S.objArt && S.objArt[o.type];
     if (v && v.length) return v[o.id % v.length];
+    const fd = FLORA[o.type];
+    if (fd) return fd.kind === 'tree' ? S.trees[fd.group] : fd.group === 'berry' ? S.berry : S.bush;
     switch (o.type) {
-      case 'oak': case 'oak2': case 'apple': case 'pine': return S.trees[o.type];
       case 'stump': return S.stumps[o.id & 1];
       case 'bush': return S.bush;
       case 'berry': return S.berry;
@@ -168,7 +178,7 @@ export class Farm {
       // карту поменяли в редакторе: прогресс (монеты, уровень, участки, рюкзак) остаётся,
       // а деревья, камни, тропинки и постройки — как на новой карте
       const sameMap = (saved.map || null) === (w.mapId || null);
-      if (!sameMap) { delete this.st.paths; delete this.st.pos; delete this.st.movedBeds; }
+      if (!sameMap) { delete this.st.paths; delete this.st.pos; delete this.st.movedBeds; delete this.st.fruit; delete this.st.plants; }
       if (saved.objects && saved.v !== 2 && sameMap) w.importObjects(saved.objects);
       if (saved.chunks) for (const c of saved.chunks) w.unlocked[c] = 1;
       // грядки переносили: стартовые клетки — трава, все грядки берём из сохранения
@@ -211,6 +221,9 @@ export class Farm {
       // иначе объект остался снятым: колодец найдёт место сам (fixWell)
     });
     w.fixWell();
+    this.restorePlants();
+    Flora.tidyFruit(this.st, Date.now());
+    this.floraTick(Date.now());
     // старые сохранения: первое задание ещё не выполнено — стартовая морковка созревает сразу
     if (saved && !this.st.stats.harvested && !(this.st.quest && this.st.quest.i > 0)) {
       const b = this.beds.get(w.startBeds[0]);
@@ -228,6 +241,40 @@ export class Farm {
     this.cam.centerOn(tmp.x, tmp.y - 20);
     this.tickEnergy();
     this.ui.update(this);
+  }
+
+  // Посаженные игроком растения → объекты на карте (место занято — растение пропадает)
+  restorePlants() {
+    const w = this.world, now = Date.now(), keep = [];
+    for (const p of this.st.plants || []) {
+      const [x, y, sp, born] = p;
+      if (!FLORA[sp]) continue;
+      const grown = Flora.plantStage(sp, born, now) >= 2;
+      const o = w.isOpen(x, y) && w.add(grown ? sp : 'sapling', x, y);
+      if (!o) continue;
+      o.own = 1; o.tree = sp; o.born = born;
+      keep.push(p);
+    }
+    if (this.st.plants) this.st.plants = keep;
+  }
+
+  // Раз в секунду: какие растения без плодов (другая картинка) и какие ростки подросли
+  floraTick(now) {
+    const w = this.world, st = this.st;
+    let changed = false;
+    for (const o of w.objects) {
+      if (!o) continue;
+      if (o.type === 'sapling') {
+        const stage = Flora.plantStage(o.tree, o.born, now);
+        if (stage >= 2) { o.type = o.tree; o.hp = OBJECTS[o.type].hp; o.stage = 2; changed = true; this.burst(o.wx, o.wy - 20, '#7ccf4f', 10, true); }
+        else if (o.stage !== stage) { o.stage = stage; changed = true; }
+      }
+      if (FLORA[o.type]) {
+        const bare = Flora.fruitLeft(st, o, now) > 0;
+        if (o.bare !== bare) { o.bare = bare; changed = true; }
+      }
+    }
+    if (changed) { w.version++; this.dirty = true; }
   }
 
   serialize() {
@@ -375,7 +422,38 @@ export class Farm {
     if (o.type === 'well') return this.wellPopup(o, sx, sy);
     const def = OBJECTS[o.type];
     if (!def) return;
+    if (o.type === 'sapling' || def.flora) return this.floraPopup(o, sx, sy);
     if (def.action) this.queue({ kind: def.action, obj: o });
+  }
+
+  // Дерево или куст: собрать плоды / срубить. Дикое без плодов рубится сразу, как раньше.
+  floraPopup(o, sx, sy) {
+    const now = Date.now();
+    if (o.type === 'sapling') {
+      const f = FLORA[o.tree];
+      return this.ui.popup(sx, sy, {
+        title: `Росток: ${f.name.toLowerCase()}`, text: `Вырастет через ${fmtTime(Flora.growLeft(o.tree, o.born, now))}`,
+        items: [{ icon: 'dig', label: 'Выкопать', sub: `⚡ ${ENERGY.chop}`, onClick: () => this.queue({ kind: 'chop', obj: o }) }],
+      });
+    }
+    const f = FLORA[o.type], left = Flora.fruitLeft(this.st, o, now), fruit = FLORA_GOODS[f.fruit];
+    if (left && !o.own) return this.queue({ kind: 'chop', obj: o });
+    const items = [];
+    if (!left) items.push({ icon: f.fruit, label: `Собрать: ${fruit.name.toLowerCase()}`, onClick: () => this.queue({ kind: 'pick', obj: o }) });
+    items.push({ icon: 'wood', label: o.own ? 'Срубить своё' : 'Срубить', sub: `⚡ ${ENERGY.chop} за удар`, onClick: () => this.queue({ kind: 'chop', obj: o }) });
+    this.ui.popup(sx, sy, {
+      title: (o.own ? 'Моё: ' : '') + f.name, text: left ? `${fruit.name} — через ${fmtTime(left)}` : undefined, items,
+    });
+  }
+
+  // Свободная трава: что можно посадить из рюкзака (саженцы деревьев и отростки кустов)
+  sowPopup(x, y, sx, sy) {
+    const st = this.st;
+    const items = Object.values(FLORA).filter((f) => Inv.count(st, floraSeedId(f.key))).map((f) => ({
+      icon: floraSeedId(f.key), label: f.name, sub: `есть: ${Inv.count(st, floraSeedId(f.key))} · ${fmtTime(f.grow)}`,
+      onClick: () => this.queue({ kind: 'sow', x, y, species: f.key }),
+    }));
+    this.ui.popup(sx, sy, { title: 'Что посадить?', items, wide: true });
   }
 
   tapTile(x, y, sx, sy) {
@@ -393,6 +471,9 @@ export class Farm {
     if (w.occ[w.idx(x, y)] >= 0) return;
     const items = [{ icon: 'walk', label: 'Идти сюда', onClick: () => this.queue({ kind: 'walk', x, y }) }];
     if (t === T.GRASS) items.push({ icon: 'dig', label: 'Вскопать грядку', sub: `⚡ ${ENERGY.dig}`, onClick: () => this.queue({ kind: 'dig', x, y }) });
+    if (t === T.GRASS && Object.keys(FLORA).some((k) => Inv.count(this.st, floraSeedId(k)))) {
+      items.push({ icon: 'seed', label: 'Посадить дерево или куст', onClick: () => setTimeout(() => this.sowPopup(x, y, sx, sy), 0) });
+    }
     // одно действие (например, дорожка: только «идти») — выполняем сразу, без меню
     if (items.length === 1) { this.ui.closePopup(); return items[0].onClick(); }
     this.ui.popup(sx, sy, { items });
@@ -575,13 +656,15 @@ export class Farm {
     if (a.obj) {
       if (w.objects[a.obj.id] !== a.obj) return false;
       const def = OBJECTS[a.obj.type];
-      if (def.action !== a.kind) return false;
+      if (a.kind === 'pick') { if (!Flora.hasFruit(st, a.obj, Date.now())) return false; }
+      else if (def.action !== a.kind) return false;
     }
     const cost = ENERGY[a.kind] || 0;
     if (cost && st.energy < cost) { this.spend(cost); this.player.queue.length = 0; return false; }
     const t = a.obj ? -1 : w.tile(a.x, a.y);
     switch (a.kind) {
       case 'dig': return t === T.GRASS && w.occ[w.idx(a.x, a.y)] < 0;
+      case 'sow': return t === T.GRASS && w.occ[w.idx(a.x, a.y)] < 0 && Inv.count(st, floraSeedId(a.species)) > 0;
       case 'plant': {
         const b = this.bedAt(w.idx(a.x, a.y));
         if (t !== T.SOIL || b.crop) return false;
@@ -618,12 +701,41 @@ export class Farm {
         o.hp--; o.shake = 0.25;
         if (o.hp > 0) this.sfx(a.kind === 'chop' ? 'chop' : 'mine');
         const s = this.objSprite(o);
-        const hy = o.type === 'stump' || o.type === 'rock' || o.type === 'bush' || o.type === 'berry' ? 8 : o.type === 'boulder' ? 20 : 26;
+        const od = OBJECTS[o.type];
+        const hy = o.type === 'stump' || o.type === 'rock' || o.type === 'sapling' || od.bush ? 8 : o.type === 'boulder' ? 20 : 26;
         this.burst(o.wx, o.wy - hy, a.kind === 'chop' ? '#b07a45' : '#b8bec3', 6);
-        if (a.kind === 'chop' && o.type !== 'stump') this.burst(o.wx, o.wy - 60, '#5aa83a', 4, true);
+        if (a.kind === 'chop' && o.type !== 'stump' && o.type !== 'sapling') this.burst(o.wx, o.wy - 60, '#5aa83a', 4, true);
         if (o.hp <= 0) { this.destroy(o); this.changed(); return false; }
         this.ui.update(this);
         return st.energy >= 1;
+      }
+      case 'pick': {
+        const o = a.obj, now = Date.now();
+        if (w.objects[o.id] !== o) return false;
+        const r = Flora.pickFruit(st, o, now, Math.random);
+        if (!r) { this.toast('Склад полон', 'warn'); return false; }
+        this.dropFx(o, r.items);
+        o.bare = true; w.version++;
+        this.burst(o.wx, o.wy - 30, FLORA_GOODS[FLORA[o.type].fruit].color, 8, true);
+        this.quests.emit('pick', FLORA[o.type].fruit);
+        this.sfx('harvest');
+        this.addXp(r.xp);
+        this.changed();
+        return false;
+      }
+      case 'sow': {
+        const i = w.idx(a.x, a.y);
+        if (w.tiles[i] !== T.GRASS || w.occ[i] >= 0) return false;
+        const now = Date.now();
+        if (!Flora.sow(st, a.species, a.x, a.y, now)) return false;
+        const o = w.add('sapling', a.x, a.y);
+        o.own = 1; o.tree = a.species; o.born = now; o.stage = 0;
+        this.burst(o.wx, o.wy, '#7ccf4f', 8);
+        this.quests.emit('sow', a.species);
+        this.sfx('plant');
+        this.addXp(1);
+        this.changed();
+        return false;
       }
       case 'dig': {
         if (w.tiles[w.idx(a.x, a.y)] !== T.GRASS || w.occ[w.idx(a.x, a.y)] >= 0) return false;
@@ -706,8 +818,37 @@ export class Farm {
     return false;
   }
 
+  // Всплывающие «+N» с иконками над объектом
+  dropFx(o, items) {
+    let dy = -30, dx = 0;
+    for (const { id, n } of items) { this.float(o.wx + dx, o.wy + dy, `+${n}`, id); dy -= 14; dx = dx ? 0 : 14; }
+  }
+
   destroy(o) {
     const def = OBJECTS[o.type], st = this.st;
+    if (o.type === 'sapling') {
+      // свой росток: выкопали — саженец вернулся в рюкзак
+      Flora.forget(st, o);
+      this.addItem(floraSeedId(o.tree), 1);
+      this.dropFx(o, [{ id: floraSeedId(o.tree), n: 1 }]);
+      this.burst(o.wx, o.wy - 4, '#8a5a30', 8);
+      this.sfx('dig');
+      this.world.remove(o);
+      return;
+    }
+    if (def.flora) {
+      const r = Flora.chopFlora(st, o, Date.now(), Math.random);
+      this.dropFx(o, r.items);
+      this.addXp(def.xp || 1);
+      st.stats.cleared++;
+      this.quests.emit(def.stump ? 'chop' : 'clear');
+      this.burst(o.wx, o.wy - 10, '#7a4b28', 12);
+      this.sfx('break');
+      // своё дерево уходит целиком, дикое оставляет пень
+      if (def.stump && !o.own) { o.was = o.type; o.type = 'stump'; o.hp = OBJECTS.stump.hp; o.bare = false; this.world.version++; }
+      else this.world.remove(o);
+      return;
+    }
     let dy = -30;
     for (const [res, [a, b]] of Object.entries(def.drops || {})) {
       const n = a + Math.floor(Math.random() * (b - a + 1));
@@ -717,12 +858,6 @@ export class Farm {
     if (def.oreChance && Math.random() < def.oreChance) {
       const [o0, o1] = def.ore || [1, 2], got = this.addItem('ore', o0 + Math.floor(Math.random() * (o1 - o0 + 1)));
       if (got) { this.float(o.wx + 14, o.wy + dy, `+${got}`, 'ore'); dy -= 14; }
-    }
-    if (def.seedChance && Math.random() < def.seedChance) {
-      const opts = Object.values(CROPS).filter((c) => c.level <= st.level);
-      const c = opts[Math.floor(Math.random() * opts.length)];
-      this.addItem(seedId(c.key), 1);
-      this.float(o.wx - 14, o.wy + dy, '+1', 'seed');
     }
     this.addXp(def.xp || 1);
     st.stats.cleared++;
@@ -824,7 +959,7 @@ export class Farm {
     this.grow(this._wall ? Math.min(Math.max(0, (now - this._wall) / 1000), 7 * 86400) : dt);
     this._wall = now;
     this._eT = (this._eT || 0) + dt;
-    if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.ui.tick(this); }
+    if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.floraTick(now); this.ui.tick(this); }
     this.player.update(dt);
     this.pourWater(dt);
     const OB = this.world.objects;

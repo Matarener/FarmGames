@@ -659,7 +659,59 @@ function fishIcon(f) {
   };
 }
 
-export function makeIcons(crops, fish) {
+// Временные иконки плодов деревьев и кустов (look — форма, color — цвет), пока нет арта
+function goodsIcon(it) {
+  return (g) => {
+    const c = it.color;
+    g.strokeStyle = OUT; g.lineWidth = 1.6;
+    const ball = (x, y, r, col = c) => { g.fillStyle = OUT; blob(g, x, y, r + 0.9); g.fillStyle = col; blob(g, x, y, r); g.fillStyle = 'rgba(255,255,255,.5)'; blob(g, x - r * 0.35, y - r * 0.35, r * 0.28); };
+    switch (it.look) {
+      case 'apple': ball(0, 2, 11); leaf(g, 1, -8, 0.7, 8, 2.6, '#5fb03a'); break;
+      case 'cherry':
+        g.strokeStyle = '#6b8a2a'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(-6, 4); g.quadraticCurveTo(-2, -8, 3, -12); g.moveTo(6, 6); g.quadraticCurveTo(5, -4, 3, -12); g.stroke();
+        ball(-6, 5, 6); ball(6, 7, 6); leaf(g, 3, -12, 1.1, 8, 2.4, '#5fb03a'); break;
+      case 'berry': for (const [x, y] of [[-6, 4], [6, 4], [0, -4], [0, 8], [-5, -6], [6, -5]]) ball(x, y, 5); break;
+      case 'hip': ball(-4, 3, 7); ball(5, -2, 6); g.fillStyle = OUT; blob(g, -4, -4, 1.4); blob(g, 5, -8, 1.3); break;
+      case 'nut':
+        g.fillStyle = OUT; ell(g, 0, 3, 9, 10.5); g.fill(); g.fillStyle = c; ell(g, 0, 3, 8, 9.5); g.fill();
+        g.fillStyle = OUT; ell(g, 0, -5, 10.5, 5); g.fill(); g.fillStyle = '#7a5530'; ell(g, 0, -5, 9.5, 4); g.fill();
+        g.fillStyle = OUT; g.fillRect(-1, -12, 2, 4); break;
+      case 'cone':
+        for (let i = 0; i < 5; i++) { const y = -10 + i * 5, w = 4 + Math.sin((i + 1) / 6 * Math.PI) * 6; g.fillStyle = OUT; ell(g, 0, y, w + 1, 3.6); g.fill(); g.fillStyle = i % 2 ? '#7a4b28' : c; ell(g, 0, y, w, 2.8); g.fill(); }
+        break;
+      case 'leaf': case 'petals': case 'flower': {
+        const n = it.look === 'leaf' ? 5 : 5, len = it.look === 'leaf' ? 13 : 10;
+        for (let i = 0; i < n; i++) leaf(g, 0, 2, -Math.PI / 2 + (i - (n - 1) / 2) * (it.look === 'leaf' ? 0.55 : 1.25), len, it.look === 'leaf' ? 3.2 : 4, c);
+        g.fillStyle = it.look === 'leaf' ? '#a8521a' : '#ffe58a'; blob(g, 0, 2, 2.4);
+        if (it.look === 'leaf') { g.strokeStyle = '#a8521a'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(0, 2); g.lineTo(0, 13); g.stroke(); }
+        break;
+      }
+      case 'spike':
+        for (const x of [-5, 0, 5]) {
+          g.strokeStyle = '#5c8a3a'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(x * 0.4, 13); g.lineTo(x, -4); g.stroke();
+          for (let k = 0; k < 4; k++) { g.fillStyle = OUT; blob(g, x, -12 + k * 3.5, 2.6); g.fillStyle = c; blob(g, x, -12 + k * 3.5, 1.9); }
+        }
+        break;
+      case 'bark':
+        g.fillStyle = OUT; g.beginPath(); g.roundRect(-12, -8, 24, 16, 4); g.fill(); g.fillStyle = c; g.beginPath(); g.roundRect(-11, -7, 22, 14, 3); g.fill();
+        g.fillStyle = OUT; for (const [x, y, w] of [[-7, -3, 6], [2, -4, 5], [-3, 2, 7], [5, 3, 4]]) g.fillRect(x, y, w, 1.4);
+        break;
+      default: ball(0, 0, 10);
+    }
+  };
+}
+
+// Росток, посаженный игроком (стадия 0), — пока нет арта
+export function sproutSprite() {
+  return makeSprite(30, 26, 15, 18, (g) => {
+    shadow(g, 9, 4);
+    g.fillStyle = '#6a4424'; ell(g, 0, 0, 8, 3.5); g.fill();
+    g.strokeStyle = '#4f8a2a'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -9); g.stroke();
+    leaf(g, 0, -7, -0.9, 8, 2.6, '#6cc24a'); leaf(g, 0, -9, 0.8, 9, 2.8, '#5fb03a');
+  });
+}
+
+export function makeIcons(crops, fish, goods) {
   const I = {};
   I.coin = iconURL((g) => {
     g.fillStyle = OUT; blob(g, 0, 0, 14); g.fillStyle = '#f2b51d'; blob(g, 0, 0, 12.5);
@@ -852,5 +904,6 @@ export function makeIcons(crops, fish) {
   for (const crop of Object.values(crops)) I[crop.key] = iconURL(cropIcon(crop));
   for (const f of Object.values(fish || {})) I[f.key] = iconURL(fishIcon(f));
   I.fish = I.fish_carp;
+  for (const it of Object.values(goods || {})) I[it.key] = iconURL(goodsIcon(it));
   return I;
 }

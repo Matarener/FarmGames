@@ -22,12 +22,19 @@ const TOOLS = [
   { id: 'water', name: 'Вода', tile: T.WATER, brush: true },
   { id: 'soil', name: 'Грядка', tile: T.SOIL, brush: true },
   { group: 'Природа' },
-  { id: 'oak', name: 'Дерево', obj: 'oak', brush: true },
-  { id: 'oak2', name: 'Дерево 2', obj: 'oak2', brush: true },
+  { id: 'oak', name: 'Дуб', obj: 'oak', brush: true },
+  { id: 'birch', name: 'Берёза', obj: 'birch', brush: true },
+  { id: 'sakura', name: 'Сакура', obj: 'sakura', brush: true },
+  { id: 'cherry', name: 'Вишня', obj: 'cherry', brush: true },
+  { id: 'maple', name: 'Клён', obj: 'maple', brush: true },
   { id: 'apple', name: 'Яблоня', obj: 'apple', brush: true },
   { id: 'pine', name: 'Ель', obj: 'pine', brush: true },
-  { id: 'bush', name: 'Куст', obj: 'bush', brush: true },
-  { id: 'berry', name: 'Ягоды', obj: 'berry', brush: true },
+  { id: 'blueberry', name: 'Голубика', obj: 'blueberry', brush: true },
+  { id: 'raspberry', name: 'Малина', obj: 'raspberry', brush: true },
+  { id: 'rosehip', name: 'Шиповник', obj: 'rosehip', brush: true },
+  { id: 'hydrangea', name: 'Гортензия', obj: 'hydrangea', brush: true },
+  { id: 'lavender', name: 'Лаванда', obj: 'lavender', brush: true },
+  { id: 'rose', name: 'Роза', obj: 'rose', brush: true },
   { id: 'rock', name: 'Камень', obj: 'rock', brush: true },
   { id: 'boulder', name: 'Валун 2×2', obj: 'boulder' },
   { id: 'forest', name: 'Лес (случайно)', obj: 'forest', brush: true },
@@ -39,7 +46,7 @@ const TOOLS = [
   { id: 'erase', name: 'Ластик', erase: true, brush: true },
   { id: 'move', name: 'Перенести', move: true },
 ];
-const FOREST = ['oak', 'oak', 'oak2', 'oak2', 'pine', 'pine', 'apple', 'bush', 'rock'];
+const FOREST = ['oak', 'birch', 'sakura', 'cherry', 'maple', 'pine', 'pine', 'apple', 'rosehip', 'rock'];
 
 // Какую карту открыть: черновик (несохранённая работа) или файл
 export function startMap(fileMap) {

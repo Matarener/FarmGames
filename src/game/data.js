@@ -32,23 +32,78 @@ export const RESOURCES = {
   ore: { name: 'Руда' },
 };
 
+// ---------------- Деревья и кусты ----------------
+// Каждый вид — свой тип объекта на карте. fruit — что собирается касанием без рубки (n — сколько),
+// regrow — через сколько секунд плоды отрастут снова. Рубка даёт дерево (wood), плоды, если они
+// висят, и с шансом seedChop — семя этого вида; сбор плодов — с шансом seedPick.
+// grow — сколько секунд растёт посаженное игроком семя до взрослого растения.
+// group — старое имя группы (карта v1, рисованная кодом графика).
+export const FLORA = {
+  oak:       { name: 'Дуб',       kind: 'tree', group: 'oak',   fruit: 'acorn',        n: [1, 3], regrow: 4 * 3600, wood: [2, 4], hp: 3, xp: 2, seedChop: 0.35, seedPick: 0.15, grow: 3 * 3600 },
+  birch:     { name: 'Берёза',    kind: 'tree', group: 'oak',   fruit: 'birch_bark',   n: [1, 2], regrow: 4 * 3600, wood: [2, 4], hp: 3, xp: 2, seedChop: 0.35, seedPick: 0.1,  grow: 3 * 3600 },
+  sakura:    { name: 'Сакура',    kind: 'tree', group: 'oak2',  fruit: 'sakura_petal', n: [2, 4], regrow: 3 * 3600, wood: [2, 3], hp: 3, xp: 2, seedChop: 0.3,  seedPick: 0.1,  grow: 4 * 3600 },
+  cherry:    { name: 'Вишня',     kind: 'tree', group: 'oak2',  fruit: 'cherry',       n: [2, 4], regrow: 3 * 3600, wood: [2, 3], hp: 3, xp: 2, seedChop: 0.3,  seedPick: 0.1,  grow: 4 * 3600 },
+  maple:     { name: 'Клён',      kind: 'tree', group: 'oak2',  fruit: 'maple_leaf',   n: [2, 3], regrow: 3 * 3600, wood: [2, 4], hp: 3, xp: 2, seedChop: 0.3,  seedPick: 0.1,  grow: 3 * 3600 },
+  apple:     { name: 'Яблоня',    kind: 'tree', group: 'apple', fruit: 'apple',        n: [2, 4], regrow: 3 * 3600, wood: [2, 3], hp: 3, xp: 2, seedChop: 0.35, seedPick: 0.15, grow: 4 * 3600 },
+  pine:      { name: 'Ель',       kind: 'tree', group: 'pine',  fruit: 'pinecone',     n: [1, 3], regrow: 4 * 3600, wood: [3, 5], hp: 4, xp: 3, seedChop: 0.35, seedPick: 0.15, grow: 3 * 3600 },
+  blueberry: { name: 'Голубика',  kind: 'bush', group: 'berry', fruit: 'blueberry',    n: [2, 4], regrow: 1.5 * 3600, wood: [1, 1], hp: 1, xp: 1, seedChop: 0.5, seedPick: 0.2, grow: 3600 },
+  raspberry: { name: 'Малина',    kind: 'bush', group: 'berry', fruit: 'raspberry',    n: [2, 4], regrow: 1.5 * 3600, wood: [1, 1], hp: 1, xp: 1, seedChop: 0.5, seedPick: 0.2, grow: 3600 },
+  rosehip:   { name: 'Шиповник',  kind: 'bush', group: 'bush',  fruit: 'rosehip',      n: [2, 3], regrow: 2 * 3600, wood: [1, 1], hp: 1, xp: 1, seedChop: 0.5, seedPick: 0.2, grow: 3600 },
+  hydrangea: { name: 'Гортензия', kind: 'bush', group: 'bush',  fruit: 'hydrangea',    n: [1, 2], regrow: 2 * 3600, wood: [1, 1], hp: 1, xp: 1, seedChop: 0.5, seedPick: 0.2, grow: 3600 },
+  lavender:  { name: 'Лаванда',   kind: 'bush', group: 'bush',  fruit: 'lavender',     n: [2, 3], regrow: 2 * 3600, wood: [1, 1], hp: 1, xp: 1, seedChop: 0.5, seedPick: 0.2, grow: 3600 },
+  rose:      { name: 'Роза',      kind: 'bush', group: 'bush',  fruit: 'rose_petal',   n: [2, 3], regrow: 2 * 3600, wood: [1, 1], hp: 1, xp: 1, seedChop: 0.5, seedPick: 0.2, grow: 3600 },
+};
+for (const [k, v] of Object.entries(FLORA)) v.key = k;
+
+// Карта v1 и генерация знают только группы: вид берётся по номеру объекта (как раньше выбиралась картинка)
+export const FLORA_GROUPS = {
+  oak: ['oak', 'birch'],
+  oak2: ['sakura', 'cherry', 'maple'],
+  bush: ['rosehip', 'hydrangea', 'lavender', 'rose'],
+  berry: ['blueberry', 'raspberry'],
+};
+export function floraByGroup(type, id) {
+  const g = FLORA_GROUPS[type];
+  return g ? g[id % g.length] : type;
+}
+
+// Плоды и прочее, что даёт растение. food — энергия (можно съесть), sell — цена продажи.
+// look/color — для временных иконок, нарисованных кодом.
+export const FLORA_GOODS = {
+  acorn:        { name: 'Жёлудь',          sell: 2, look: 'nut',    color: '#b9803f', desc: 'Жёлуди с дуба. Пригодятся для поделок.' },
+  birch_bark:   { name: 'Берёста',         sell: 3, look: 'bark',   color: '#f2eee2', desc: 'Кора берёзы. Пригодится для поделок.' },
+  sakura_petal: { name: 'Лепестки сакуры', sell: 6, look: 'petals', color: '#f7a8c8', desc: 'Нежные лепестки сакуры.' },
+  cherry:       { name: 'Вишня',           sell: 4, food: 2, look: 'cherry', color: '#c8213a', desc: 'Спелая вишня. Можно съесть или продать.' },
+  maple_leaf:   { name: 'Кленовый лист',   sell: 3, look: 'leaf',   color: '#ef7d22', desc: 'Яркий осенний лист клёна.' },
+  apple:        { name: 'Яблоко',          sell: 5, food: 4, look: 'apple',  color: '#e2392f', desc: 'Сочное яблоко. Можно съесть или продать.' },
+  pinecone:     { name: 'Шишка',           sell: 2, look: 'cone',   color: '#9a6538', desc: 'Еловая шишка. Пригодится для поделок.' },
+  blueberry:    { name: 'Голубика',        sell: 3, food: 2, look: 'berry',  color: '#3f5fc8', desc: 'Горсть голубики. Можно съесть или продать.' },
+  raspberry:    { name: 'Малина',          sell: 3, food: 2, look: 'berry',  color: '#e0335a', desc: 'Сладкая малина. Можно съесть или продать.' },
+  rosehip:      { name: 'Шиповник',        sell: 3, food: 1, look: 'hip',    color: '#e2552f', desc: 'Плоды шиповника. Полезные, но кислые.' },
+  hydrangea:    { name: 'Гортензия',       sell: 4, look: 'flower', color: '#6f8fe8', desc: 'Пышные цветы гортензии.' },
+  lavender:     { name: 'Лаванда',         sell: 4, look: 'spike',  color: '#9b6fd6', desc: 'Душистые веточки лаванды.' },
+  rose_petal:   { name: 'Лепестки розы',   sell: 5, look: 'petals', color: '#e8406a', desc: 'Ароматные лепестки розы.' },
+};
+for (const [k, v] of Object.entries(FLORA_GOODS)) v.key = k;
+export const floraSeedId = (sp) => 'sap_' + sp;
+
 // Препятствия: hp — число ударов, action — какой инструмент нужен.
+// Деревья и кусты собираются из FLORA (ниже), здесь — остальное.
 export const OBJECTS = {
-  oak:     { name: 'Дерево',  hp: 3, action: 'chop', drops: { wood: [2, 4] }, xp: 2, stump: true, seedChance: 0.1 },
-  oak2:    { name: 'Дерево',  hp: 3, action: 'chop', drops: { wood: [2, 4] }, xp: 2, stump: true, seedChance: 0.1 },
-  apple:   { name: 'Яблоня',  hp: 3, action: 'chop', drops: { wood: [2, 3] }, xp: 2, stump: true, seedChance: 0.25 },
-  pine:    { name: 'Ель',     hp: 4, action: 'chop', drops: { wood: [3, 5] }, xp: 3, stump: true },
   stump:   { name: 'Пень',    hp: 2, action: 'chop', drops: { wood: [1, 1] }, xp: 1 },
-  bush:    { name: 'Куст',    hp: 1, action: 'chop', drops: { wood: [1, 1] }, xp: 1, seedChance: 0.3 },
-  berry:   { name: 'Куст',    hp: 1, action: 'chop', drops: { wood: [1, 1] }, xp: 1, seedChance: 0.5 },
   rock:    { name: 'Камень',  hp: 2, action: 'mine', drops: { stone: [2, 4] }, xp: 2, oreChance: 0.1, ore: [1, 1] },
   boulder: { name: 'Валун',   hp: 5, action: 'mine', drops: { stone: [6, 9] }, xp: 5, oreChance: 1, ore: [1, 3], w: 2, h: 2 },
   house:   { name: 'Дом',     static: true, w: 2, h: 2 },
   well:    { name: 'Колодец', static: true },
+  // росток, посаженный игроком: o.tree — во что вырастет, o.born — когда посажен (мс)
+  sapling: { name: 'Росток',  hp: 1, action: 'chop', drops: {}, xp: 0 },
 };
+for (const f of Object.values(FLORA)) {
+  OBJECTS[f.key] = { name: f.name, hp: f.hp, action: 'chop', drops: { wood: f.wood }, xp: f.xp, stump: f.kind === 'tree', flora: f.key, bush: f.kind === 'bush' };
+}
 
 // Стоимость энергии за удар/действие
-export const ENERGY = { chop: 1, mine: 1, dig: 2, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1 };
+export const ENERGY = { chop: 1, mine: 1, dig: 2, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1, pick: 0, sow: 0 };
 export const ENERGY_REGEN_SEC = 120;
 
 export const HOUSE = [
@@ -120,6 +175,14 @@ for (const c of Object.values(CROPS)) ITEMS[seedId(c.key)] = {
   desc: `Посадите на пустую грядку. Растёт ${fmtMin(c.time)}, доступно с ${c.level} уровня.`,
 };
 for (const [k, r] of Object.entries(RESOURCES)) ITEMS[k] = { key: k, name: r.name, icon: k, tabs: ['res'], desc: 'Нужно для улучшения дома, колодца и новых участков.' };
+for (const g of Object.values(FLORA_GOODS)) ITEMS[g.key] = {
+  key: g.key, name: g.name, icon: g.key, sell: g.sell, food: g.food,
+  tabs: g.food ? ['food', 'plants'] : ['res'], desc: g.desc,
+};
+for (const f of Object.values(FLORA)) ITEMS[floraSeedId(f.key)] = {
+  key: floraSeedId(f.key), name: (f.kind === 'tree' ? 'Саженец: ' : 'Отросток: ') + f.name.toLowerCase(), icon: floraSeedId(f.key), badge: 'seed', tabs: ['plants'], floraOf: f.key,
+  desc: `Посадите на свободную траву. Вырастет ${f.name.toLowerCase()} за ${fmtMin(f.grow)} и будет давать плоды.`,
+};
 // Еда из магазина: её не выращивают и не продают, зато она даёт больше энергии
 export const SHOP_FOOD = {
   milk:  { name: 'Молоко',  food: 6,  price: 10, level: 1, desc: 'Свежее молоко из деревни.' },

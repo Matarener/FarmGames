@@ -2,7 +2,7 @@
 // Мир генерируется детерминированно из seed, в сохранение пишется только разница.
 
 import { mulberry32, hash2 } from '../engine/Sprite.js';
-import { OBJECTS } from './data.js';
+import { OBJECTS, FLORA_GROUPS, floraByGroup } from './data.js';
 import { toWorld } from '../engine/Iso.js';
 
 export const CHUNK = 10;
@@ -23,7 +23,7 @@ export function mapId(m) {
 
 // Текст файла карты: по строке на ряд клеток и на объект — удобно смотреть изменения в git
 export function mapText(m) {
-  return '{\n  "v": 1,\n  "n": ' + m.n + ',\n  "seed": ' + (m.seed >>> 0) + ',\n  "tiles": [\n' + m.tiles.map((r) => '    "' + r + '"').join(',\n') + '\n  ],\n' +
+  return '{\n  "v": 2,\n  "n": ' + m.n + ',\n  "seed": ' + (m.seed >>> 0) + ',\n  "tiles": [\n' + m.tiles.map((r) => '    "' + r + '"').join(',\n') + '\n  ],\n' +
     '  "objects": [\n' + m.objects.map((o) => '    ' + JSON.stringify(o)).join(',\n') + '\n  ],\n' +
     '  "well": ' + JSON.stringify(m.well) + ',\n  "player": ' + JSON.stringify(m.player) + '\n}\n';
 }
@@ -62,7 +62,9 @@ export class World {
         if (t === T.SOIL) this.startBeds.push(i);
       }
     }
-    for (const [type, x, y] of m.objects || []) if (OBJECTS[type] && type !== 'well') this.add(type, x, y);
+    const v1 = !(m.v >= 2);
+    // карта v1 знает только группы деревьев и кустов: вид — по номеру объекта, как раньше картинка
+    for (const [type, x, y] of m.objects || []) if ((OBJECTS[type] || FLORA_GROUPS[type]) && type !== 'well') this.add(v1 ? this.species(type) : type, x, y);
     this.genCount = this.objects.length;
     this.wellPos = m.well || [2 * CHUNK + 5, 2 * CHUNK + 4];
     this.well = this.add('well', this.wellPos[0], this.wellPos[1]);
@@ -79,10 +81,14 @@ export class World {
     for (const o of this.objects) {
       if (!o) continue;
       if (o === this.well || o.type === 'well') { well = [o.gx, o.gy]; continue; }
+      if (o.own || o.type === 'sapling') continue; // посаженное игроком — не часть карты
       objects.push([o.type === 'stump' ? (o.was || 'oak') : o.type, o.gx, o.gy]);
     }
-    return { v: 1, n: N, seed: this.seed, tiles, objects, well, player: this.playerStart.slice() };
+    return { v: 2, n: N, seed: this.seed, tiles, objects, well, player: this.playerStart.slice() };
   }
+
+  // группа деревьев/кустов (oak, oak2, bush, berry) → вид для следующего объекта
+  species(type) { return floraByGroup(type, this.objects.length); }
 
   idx(x, y) { return y * N + x; }
   inside(x, y) { return x >= 0 && y >= 0 && x < N && y < N; }
@@ -151,7 +157,7 @@ export class World {
 
     // гарантированные ресурсы внутри стартового участка
     const fixed = [['oak', 6, 2], ['oak2', 7, 3], ['pine', 8, 1], ['apple', 5, 1], ['rock', 6, 4], ['rock', 1, 4], ['bush', 4, 8], ['berry', 1, 8], ['oak', 2, 8], ['rock', 8, 4]];
-    for (const [t, lx, ly] of fixed) { const [x, y] = L(lx, ly); if (!reserved.has(y * N + x)) { this.add(t, x, y); res(x, y); } }
+    for (const [t, lx, ly] of fixed) { const [x, y] = L(lx, ly); if (!reserved.has(y * N + x)) { this.add(this.species(t), x, y); res(x, y); } }
 
     // лес и камни по краю стартового участка
     for (let ly = 0; ly < CHUNK; ly++) for (let lx = 0; lx < CHUNK; lx++) {
@@ -163,12 +169,12 @@ export class World {
       if (edge && front) {
         if (r < 0.14) this.add('pine', x, y);
         else if (r < 0.4) this.add('rock', x, y);
-        else if (r < 0.6) this.add(r < 0.5 ? 'bush' : 'berry', x, y);
+        else if (r < 0.6) this.add(this.species(r < 0.5 ? 'bush' : 'berry'), x, y);
       } else if (edge) {
-        if (r < 0.5) this.add(rnd() < 0.7 ? (rnd() < 0.5 ? 'oak' : 'oak2') : 'pine', x, y);
+        if (r < 0.5) this.add(this.species(rnd() < 0.7 ? (rnd() < 0.5 ? 'oak' : 'oak2') : 'pine'), x, y);
         else if (r < 0.68) this.add('rock', x, y);
-        else if (r < 0.76) this.add('bush', x, y);
-      } else if (r < 0.06) this.add('bush', x, y);
+        else if (r < 0.76) this.add(this.species('bush'), x, y);
+      } else if (r < 0.06) this.add(this.species('bush'), x, y);
     }
 
     // --- Остальные участки ---
@@ -190,9 +196,9 @@ export class World {
       const forest = 0.14 + rnd() * 0.18; // у каждого участка своя густота
       for (let y = y0; y < y0 + CHUNK; y++) for (let x = x0; x < x0 + CHUNK; x++) {
         const r = rnd(), k = rnd();
-        if (r < forest) this.add(k < 0.4 ? 'oak' : k < 0.7 ? 'oak2' : k < 0.92 ? 'pine' : 'apple', x, y);
+        if (r < forest) this.add(this.species(k < 0.4 ? 'oak' : k < 0.7 ? 'oak2' : k < 0.92 ? 'pine' : 'apple'), x, y);
         else if (r < forest + 0.08) this.add('rock', x, y);
-        else if (r < forest + 0.13) this.add(k < 0.7 ? 'bush' : 'berry', x, y);
+        else if (r < forest + 0.13) this.add(this.species(k < 0.7 ? 'bush' : 'berry'), x, y);
       }
     }
     // Добавочные камни (баланс: камня не хватало на расширения). Отдельный поток случайных
