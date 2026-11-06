@@ -1,0 +1,17 @@
+// Спрайт с затемнением в вершинах (атрибут tint_v), а не в общей константе материала:
+// так спрайты с разным затемнением склеиваются движком в один вызов отрисовки
+uniform highp mat4 view_proj;
+
+attribute highp vec4 position;
+attribute mediump vec2 texcoord0;
+attribute mediump vec4 tint_v;
+
+varying mediump vec2 var_texcoord0;
+varying mediump vec4 var_tint;
+
+void main()
+{
+	gl_Position = view_proj * vec4(position.xyz, 1.0);
+	var_texcoord0 = texcoord0;
+	var_tint = vec4(tint_v.xyz * tint_v.w, tint_v.w);
+}

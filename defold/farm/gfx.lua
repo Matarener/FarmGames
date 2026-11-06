@@ -16,6 +16,8 @@ function M.load()
 		return
 	end
 	-- первый запуск: на телефонах сразу «Средняя» (слабые видеокарты не тянут полную плотность пикселей)
+	local oki, si = pcall(sys.get_sys_info)
+	if oki and si and (si.system_name == 'Android' or si.system_name == 'iPhone OS') then M.quality = 'mid' end
 	if html5 then
 		local ok2, ua = pcall(html5.run, 'navigator.userAgent')
 		if ok2 and ua and (ua:find('Android') or ua:find('iPhone') or ua:find('iPad') or ua:find('Mobile')) then M.quality = 'mid' end
@@ -35,8 +37,13 @@ if(!window.__farmFit){window.__farmFit=fit;var g=function(){setTimeout(fit,0);se
 window.addEventListener('resize',g);window.addEventListener('orientationchange',g);}
 fit();setTimeout(fit,150);}catch(e){}})(%s)]]
 
+-- вне браузера (APK, ПК): мир рисуется в уменьшенную текстуру, интерфейс остаётся чётким
+local NATIVE = { high = 1, mid = 0.75, low = 0.5, min = 0.375 }
+function M.world_scale() return html5 and 1 or (NATIVE[M.quality] or 1) end
+
 function M.apply()
 	if html5 then pcall(html5.run, JS:format(M.ratio())) end
+	msg.post('@render:', 'scale', { k = M.world_scale() })
 	pcall(sys.set_update_frequency, M.fps == 30 and 30 or 0)
 end
 

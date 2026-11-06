@@ -184,6 +184,10 @@ components {
     z: -5.0
   }
 }
+components {
+  id: "blit"
+  component: "/render/blit.mesh"
+}
 embedded_components {
   id: "ground_f"
   type: "factory"

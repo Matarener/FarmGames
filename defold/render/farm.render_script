@@ -1,14 +1,42 @@
 -- Отрисовка: мир — ортокамера по сообщению "camera" от main.script (центр и пикселей на единицу),
 -- интерфейс — в пикселях окна (у gui отключена подгонка под размер проекта). Надписи над миром
 -- (+3, таблички участков, номера очереди) рисует интерфейс: так они всегда чёткие.
+-- Чёткость мира (сообщение "scale", k < 1): мир рисуется в уменьшенную текстуру и растягивается
+-- на экран полноэкранным прямоугольником (#blit, тег 'blit'); интерфейс — всегда в полном разрешении.
 local BG = vmath.vector4(0x3d / 255, 0x7a / 255, 0x35 / 255, 1)
 
 function init(self)
 	self.world_pred = render.predicate({ 'tile' })
 	self.text_pred = render.predicate({ 'text' })
 	self.gui_pred = render.predicate({ 'gui' })
+	self.blit_pred = render.predicate({ 'blit' })
 	self.cam = { x = 0, y = 0, k = 1 }
+	self.scale = 1
 	self.clear = { [graphics.BUFFER_TYPE_COLOR0_BIT] = BG, [graphics.BUFFER_TYPE_DEPTH_BIT] = 1, [graphics.BUFFER_TYPE_STENCIL_BIT] = 0 }
+	self.clear_c = { [graphics.BUFFER_TYPE_COLOR0_BIT] = BG }
+end
+
+local function target(self, rw, rh)
+	if self.rt and self.rt_w == rw and self.rt_h == rh then return self.rt end
+	if self.rt then render.delete_render_target(self.rt); self.rt = nil end
+	local params = { [graphics.BUFFER_TYPE_COLOR0_BIT] = {
+		format = graphics.TEXTURE_FORMAT_RGBA, width = rw, height = rh,
+		min_filter = graphics.TEXTURE_FILTER_LINEAR, mag_filter = graphics.TEXTURE_FILTER_LINEAR,
+		u_wrap = graphics.TEXTURE_WRAP_CLAMP_TO_EDGE, v_wrap = graphics.TEXTURE_WRAP_CLAMP_TO_EDGE } }
+	local ok, rt = pcall(render.render_target, 'world', params)
+	if not ok then ok, rt = pcall(render.render_target, params) end
+	if not ok or not rt then print('render target failed', rt); self.scale = 1; return nil end
+	self.rt, self.rt_w, self.rt_h = rt, rw, rh
+	return rt
+end
+
+local function draw_world(self, w, h)
+	local c = self.cam
+	local hw, hh = w / 2 / c.k, h / 2 / c.k
+	local proj = vmath.matrix4_orthographic(c.x - hw, c.x + hw, c.y - hh, c.y + hh, -10, 10)
+	render.set_view(vmath.matrix4())
+	render.set_projection(proj)
+	render.draw(self.world_pred, { frustum = proj })
 end
 
 function update(self)
@@ -26,14 +54,24 @@ function update(self)
 	render.set_blend_func(graphics.BLEND_FACTOR_ONE, graphics.BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
 
 	-- мир
-	local c = self.cam
-	local hw, hh = w / 2 / c.k, h / 2 / c.k
-	local proj = vmath.matrix4_orthographic(c.x - hw, c.x + hw, c.y - hh, c.y + hh, -10, 10)
-	local view = vmath.matrix4()
-	render.set_view(view)
-	render.set_projection(proj)
-	local frustum = proj * view
-	render.draw(self.world_pred, { frustum = frustum })
+	local rt = self.scale < 0.99 and target(self, math.max(1, math.floor(w * self.scale)), math.max(1, math.floor(h * self.scale))) or nil
+	if rt then
+		render.set_render_target(rt)
+		render.set_viewport(0, 0, self.rt_w, self.rt_h)
+		render.clear(self.clear_c)
+		draw_world(self, w, h) -- та же область мира, только меньше пикселей
+		render.set_render_target(render.RENDER_TARGET_DEFAULT)
+		render.set_viewport(0, 0, w, h)
+		render.disable_state(graphics.STATE_BLEND)
+		render.set_view(vmath.matrix4())
+		render.set_projection(vmath.matrix4())
+		render.enable_texture(0, rt, graphics.BUFFER_TYPE_COLOR0_BIT)
+		render.draw(self.blit_pred)
+		render.disable_texture(0)
+		render.enable_state(graphics.STATE_BLEND)
+	else
+		draw_world(self, w, h)
+	end
 
 	-- интерфейс
 	render.set_view(vmath.matrix4())
@@ -47,7 +85,10 @@ end
 function on_message(self, message_id, message)
 	if message_id == hash('camera') then
 		self.cam.x, self.cam.y, self.cam.k = message.x, message.y, message.k
+	elseif message_id == hash('scale') then
+		self.scale = math.max(0.25, math.min(1, message.k or 1))
 	elseif message_id == hash('clear_color') then
 		self.clear[graphics.BUFFER_TYPE_COLOR0_BIT] = message.color
+		self.clear_c[graphics.BUFFER_TYPE_COLOR0_BIT] = message.color
 	end
 end

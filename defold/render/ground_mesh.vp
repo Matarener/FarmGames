@@ -1,5 +1,5 @@
 // Запечённая земля участка: вершины в координатах мира, цвет вершины — затемнение закрытых участков
-uniform highp mat4 mtx_worldviewproj;
+uniform highp mat4 view_proj;
 
 attribute highp vec4 position;
 attribute mediump vec2 texcoord0;
@@ -12,5 +12,5 @@ void main()
 {
 	var_texcoord0 = texcoord0;
 	var_color = color;
-	gl_Position = mtx_worldviewproj * vec4(position.xyz, 1.0);
+	gl_Position = view_proj * vec4(position.xyz, 1.0);
 }

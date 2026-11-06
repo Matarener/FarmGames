@@ -34,6 +34,7 @@ local function hex(c)
 	return vmath.vector4(tonumber(r, 16) / 255, tonumber(g, 16) / 255, tonumber(b, 16) / 255, 1)
 end
 local HEX = {}
+local TINT_ATTR = true
 local function col(c) local v = HEX[c]; if not v then v = hex(c); HEX[c] = v end return v end
 
 function M.new(farm, f_ground, f_world, meshes)
@@ -86,7 +87,11 @@ function V:set_tint(e, r, g, b, a)
 		e.tr, e.tg, e.tb, e.ta = r, g, b, a
 		local t = self.tint
 		t.x, t.y, t.z, t.w = r, g, b, a
-		go.set(e.url, 'tint', t)
+		-- затемнение — атрибут вершин материала sprite_v (спрайты склеиваются в один вызов);
+		-- если движок его не принимает — обычный tint
+		if TINT_ATTR then
+			if not pcall(go.set, e.url, 'tint_v', t) then TINT_ATTR = false; pcall(go.set, e.url, 'tint', t) end
+		else pcall(go.set, e.url, 'tint', t) end
 	end
 end
 

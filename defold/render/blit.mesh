@@ -1,0 +1,5 @@
+material: "/render/blit.material"
+vertices: "/render/blit.buffer"
+primitive_type: PRIMITIVE_TRIANGLES
+position_stream: "position"
+normal_stream: "position"
