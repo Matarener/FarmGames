@@ -2,7 +2,7 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, xpToNext, houseNeedChunks } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SHOP, SHOP_TABS, xpToNext, houseNeedChunks } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
 import { fmtTime } from '../game/Farm.js';
 import { QUEST_END } from '../game/quests.js';
@@ -355,17 +355,106 @@ export class UI {
     });
   }
 
+  // ---------- Рынок: «Купить» и «Продать» ----------
   marketPanel(f) {
-    this.openPanel('market', 'Рынок', (body) => {
-      const list = Object.values(ITEMS).filter((it) => it.sell && Inv.count(f.st, it.key) > 0);
-      if (!list.length) { body.appendChild(h('div', 'pn-empty', 'Пока нечего продать. Соберите урожай с грядок.')); return; }
-      for (const c of list) {
-        const n = Inv.count(f.st, c.key);
-        const r = h('div', 'item mk-item', `${this.ic(c.icon, 'ic mid')}<div class="it-t"><b>${c.name}</b><span>${n} шт. · ${c.sell} ${this.ic('coin')} за шт.</span></div>`);
-        r.appendChild(this.sellRow(f, c, n));
-        body.appendChild(r);
+    const M = this.mk || (this.mk = { mode: 'sell', tab: 'seeds', sel: null });
+    this.openPanel('market', 'Рынок', (body, card) => {
+      const st = f.st;
+      const seg = h('div', 'mk-seg');
+      for (const [k, name] of [['buy', 'Купить'], ['sell', 'Продать']]) {
+        const b = h('button', M.mode === k ? 'on' : '', name);
+        b.onclick = () => { if (M.mode !== k) { M.mode = k; M.sel = null; this.sfx('tap'); this.refreshPanel(); } };
+        seg.appendChild(b);
       }
+      body.appendChild(seg);
+      if (M.mode === 'sell') this.marketSell(f, body, card, M);
+      else this.marketBuy(f, body, card, M);
     });
+  }
+
+  marketSell(f, body, card, M) {
+    const st = f.st;
+    const list = Inv.listItems(st, 'all', 'auto').filter((it) => it.sell);
+    if (!list.length) { body.appendChild(h('div', 'pn-empty', 'Пока нечего продать. Соберите урожай с грядок или поймайте рыбу.')); return; }
+    const g = h('div', 'mk-grid');
+    for (const it of list) {
+      const c = h('button', 'mk-cell' + (M.sel === it.key ? ' sel' : ''),
+        `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}<b>${fmtNum(Inv.count(st, it.key))}</b></i><span>${it.sell} ${this.ic('coin', 'ic-s')}</span>`);
+      c.onclick = () => { M.sel = M.sel === it.key ? null : it.key; this.sfx('tap'); this.refreshPanel(); };
+      g.appendChild(c);
+    }
+    body.appendChild(g);
+    const it = M.sel && ITEMS[M.sel], n = it ? Inv.count(st, it.key) : 0;
+    if (!it || !n || !it.sell) { M.sel = null; return; }
+    const box = this.mkCard(it, `${n} шт. · ${it.sell} ${this.ic('coin')} за шт.`, M);
+    box.appendChild(this.sellRow(f, it, n));
+    card.appendChild(box);
+  }
+
+  marketBuy(f, body, card, M) {
+    const st = f.st;
+    const tabs = h('div', 'inv-tabs');
+    for (const t of SHOP_TABS) {
+      const b = h('button', 'inv-tab' + (M.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
+      b.onclick = () => { if (M.tab !== t.key) { M.tab = t.key; M.sel = null; this.sfx('tap'); this.refreshPanel(); } };
+      tabs.appendChild(b);
+    }
+    body.appendChild(tabs);
+    const offers = SHOP.filter((o) => o.tab === M.tab);
+    if (!offers.length) { body.appendChild(h('div', 'pn-empty', 'Скоро здесь появятся товары.')); return; }
+    const g = h('div', 'mk-grid');
+    for (const o of offers) {
+      const it = ITEMS[o.item], locked = o.level > st.level, cur = o.cur === 'gems' ? 'gem' : 'coin';
+      const c = h('button', 'mk-cell' + (locked ? ' locked' : '') + (M.sel === o.item ? ' sel' : ''),
+        `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${locked ? this.ic('lock', 'mk-lock') : ''}${o.qty > 1 ? `<b>×${o.qty}</b>` : ''}</i>` +
+        `<span>${locked ? `с ${o.level} ур.` : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
+      c.onclick = () => { M.sel = M.sel === o.item ? null : o.item; this.sfx('tap'); this.refreshPanel(); };
+      g.appendChild(c);
+    }
+    body.appendChild(g);
+    const o = M.sel && offers.find((x) => x.item === M.sel);
+    if (!o) { M.sel = null; return; }
+    const it = ITEMS[o.item], have = Inv.count(st, it.key), pack = o.qty || 1;
+    const curKey = o.cur || 'coins', cur = curKey === 'gems' ? 'gem' : 'coin';
+    const per = pack > 1 ? `${o.price} ${this.ic(cur)} за ${pack} шт.` : `${o.price} ${this.ic(cur)} за шт.`;
+    const box = this.mkCard(it, `${per}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
+    if (o.level > st.level) box.appendChild(h('div', 'ii-note', `Откроется с ${o.level} уровня.`));
+    else {
+      const max = Math.min(99, Math.floor(st[curKey] / o.price));
+      const Q = this.buyQty || (this.buyQty = {});
+      const q = Q[o.item] = Math.max(1, Math.min(Math.max(1, max), Q[o.item] || 1));
+      const row = h('div', 'ii-sell');
+      if (max > 1) row.appendChild(this.stepper(q, max, (v) => { Q[o.item] = v; this.refreshPanel(); }));
+      const acts = h('div', 'ii-a');
+      const b = h('button', 'btn-s gold', `Купить ${q * pack} шт. · ${q * o.price} ${this.ic(cur)}`);
+      b.disabled = st[curKey] < q * o.price; b.onclick = () => f.buy(o, q);
+      acts.appendChild(b); row.appendChild(acts);
+      box.appendChild(row);
+    }
+    card.appendChild(box);
+  }
+
+  // карточка выбранного товара на рынке (снизу окна)
+  mkCard(it, facts, M) {
+    const box = h('div', 'inv-info ui-layer',
+      `<div class="ii-ic">${this.ic(it.icon, 'ic big')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}</div>` +
+      `<div class="ii-t"><b>${it.name}</b><span>${it.desc}</span><span class="ii-f">${facts}</span></div>`);
+    const x = h('button', 'ii-x', '✕'); x.onclick = () => { M.sel = null; this.refreshPanel(); };
+    box.appendChild(x);
+    return box;
+  }
+
+  // −10 −1 [N] +1 +10, значение от 1 до max
+  stepper(q, max, set) {
+    const step = h('div', 'ii-step');
+    for (const d of [-10, -1, 0, 1, 10]) {
+      if (!d) { step.appendChild(h('b', 'ii-q', String(q))); continue; }
+      const b = h('button', 'btn-s', d > 0 ? '+' + d : '−' + -d);
+      b.disabled = d < 0 ? q <= 1 : q >= max;
+      b.onclick = () => set(Math.max(1, Math.min(max, q + d)));
+      step.appendChild(b);
+    }
+    return step;
   }
 
   // ---------- Рюкзак: клетки с разделами ----------
@@ -428,17 +517,7 @@ export class UI {
     const Q = this.sellQty || (this.sellQty = {}); // выбранное количество — своё у каждого предмета
     const q = Q[it.key] = Math.max(1, Math.min(n, Q[it.key] || 1));
     const row = h('div', 'ii-sell');
-    if (n > 1) {
-      const step = h('div', 'ii-step');
-      for (const d of [-10, -1, 0, 1, 10]) {
-        if (!d) { step.appendChild(h('b', 'ii-q', String(q))); continue; }
-        const b = h('button', 'btn-s', d > 0 ? '+' + d : '−' + -d);
-        b.disabled = d < 0 ? q <= 1 : q >= n;
-        b.onclick = () => { Q[it.key] = q + d; this.refreshPanel(); };
-        step.appendChild(b);
-      }
-      row.appendChild(step);
-    }
+    if (n > 1) row.appendChild(this.stepper(q, n, (v) => { Q[it.key] = v; this.refreshPanel(); }));
     const acts = h('div', 'ii-a');
     const b1 = h('button', 'btn-s', `Продать ${q} · ${q * it.sell} ${this.ic('coin')}`); b1.onclick = () => f.sell(it.key, q);
     acts.appendChild(b1);

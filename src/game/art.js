@@ -803,6 +803,29 @@ export function makeIcons(crops, fish) {
     g.beginPath(); g.moveTo(-6, 8); g.lineTo(1, 8); g.stroke();
     g.fillStyle = '#e2392f'; blob(g, 7, 9, 3.4); g.restore();
   });
+  // магазинная еда
+  I.milk = iconURL((g) => {
+    g.strokeStyle = OUT; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(-6, -8); g.lineTo(6, -8); g.lineTo(9, -2); g.lineTo(9, 13); g.lineTo(-9, 13); g.lineTo(-9, -2); g.closePath();
+    g.fillStyle = '#f4f7fa'; g.fill(); g.stroke();
+    g.fillStyle = '#4f9bd0'; g.fillRect(-9, 2, 18, 6); g.strokeRect(-9, 2, 18, 6);
+    g.beginPath(); g.roundRect(-6, -14, 12, 6, 2); g.fillStyle = '#e2392f'; g.fill(); g.stroke();
+  });
+  I.bread = iconURL((g) => {
+    g.strokeStyle = OUT; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(-13, 9); g.quadraticCurveTo(-15, -9, 0, -10); g.quadraticCurveTo(15, -9, 13, 9); g.closePath();
+    g.fillStyle = '#d99b4a'; g.fill(); g.stroke();
+    g.strokeStyle = '#f4d08a'; g.lineWidth = 1.8;
+    for (const x of [-6, 0, 6]) { g.beginPath(); g.moveTo(x - 2, -4); g.lineTo(x + 2, 2); g.stroke(); }
+  });
+  I.pie = iconURL((g) => {
+    g.strokeStyle = OUT; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(-14, 6); g.quadraticCurveTo(0, -16, 14, 6); g.quadraticCurveTo(0, 12, -14, 6); g.closePath();
+    g.fillStyle = '#e6a85a'; g.fill(); g.stroke();
+    g.strokeStyle = '#a8662a'; g.lineWidth = 1.4;
+    for (let x = -8; x <= 8; x += 4) { g.beginPath(); g.moveTo(x, 4); g.lineTo(x * 0.5, -5); g.stroke(); }
+    g.fillStyle = '#fff1c4'; ell(g, -5, -3, 2.5, 1.5); g.fill();
+  });
   // инструменты рюкзака
   I.axe = iconURL((g) => {
     g.save(); g.rotate(-0.6);

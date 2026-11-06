@@ -69,3 +69,15 @@ export function listItems(st, tab, sort) {
   else out.sort((a, b) => a.order - b.order);
   return out;
 }
+
+// Покупка на рынке: offer — строка из SHOP, n — сколько покупок (по offer.qty штук). Всё или ничего.
+export function buyItem(st, offer, n) {
+  if (!offer || !(n > 0) || !ITEMS[offer.item]) return null;
+  if (offer.level && st.level < offer.level) return { locked: true };
+  const cur = offer.cur || 'coins', cost = offer.price * n;
+  if (st[cur] < cost) return { poor: cur };
+  const got = addItem(st, offer.item, n * (offer.qty || 1));
+  if (!got) return null;
+  st[cur] -= cost;
+  return { id: offer.item, n: got, cost, cur };
+}
