@@ -10,6 +10,7 @@ import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
+import * as Wild from './wild.js';
 import * as Flora from './flora.js';
 import { BAR_KIND, BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop } from './bars.js';
 import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC, FOG } from './data.js';
@@ -39,6 +40,7 @@ export class Farm {
     this.buildSprites();
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
       Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, waterTex: a.waterTex, decor: a.decor, objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, fog: a.fog && a.fog.clouds.length ? a.fog : null });
+      if (a.wildGrass && a.wildGrass.length) this.S.wildGrass = a.wildGrass;
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
       a.well.forEach((s, i) => { if (s) this.S.well[i] = s; });
       if (a.water.every(Boolean) || a.waterTex) { this.S.waterArt = a.waterTex ? null : a.water; this.S.water.clear(); }
@@ -76,6 +78,7 @@ export class Farm {
     S.rocks = [rock, rock];
     S.bush = art.bushSprite(false); S.berry = art.bushSprite(true);
     S.sprout = art.sproutSprite();
+    S.wildGrass = [0, 1, 2].map((v) => art.grassTuftSprite(v)); // дикая высокая трава (пока нет арта)
     S.flora = {}; // из арта: { вид: { bare — без плодов, young — молодое } }
     S.boulder = art.rockSprite(true);
     S.house = [null, 1, 2, 3, 4, 5].map((l) => l && art.houseSprite(l));
@@ -160,6 +163,7 @@ export class Farm {
     if (fd) return fd.kind === 'tree' ? S.trees[fd.group] : fd.group === 'berry' ? S.berry : S.bush;
     switch (o.type) {
       case 'stump': return S.stumps[o.id & 1];
+      case 'grass': return S.wildGrass[o.id % S.wildGrass.length];
       case 'bush': return S.bush;
       case 'berry': return S.berry;
       case 'rock': return S.rocks[o.id & 1];
@@ -193,7 +197,7 @@ export class Farm {
       // карту поменяли в редакторе: прогресс (монеты, уровень, участки, рюкзак) остаётся,
       // а деревья, камни, тропинки и постройки — как на новой карте
       const sameMap = (saved.map || null) === (w.mapId || null);
-      if (!sameMap) { delete this.st.paths; delete this.st.pos; delete this.st.movedBeds; delete this.st.fruit; delete this.st.plants; }
+      if (!sameMap) { delete this.st.paths; delete this.st.pos; delete this.st.movedBeds; delete this.st.fruit; delete this.st.plants; delete this.st.wild; }
       if (saved.objects && saved.v !== 2 && sameMap) w.importObjects(saved.objects);
       if (saved.chunks) for (const c of saved.chunks) w.unlocked[c] = 1;
       // грядки переносили: стартовые клетки — трава, все грядки берём из сохранения
@@ -237,6 +241,7 @@ export class Farm {
     });
     w.fixWell();
     this.restorePlants();
+    this.restoreWild();
     Flora.tidyFruit(this.st, Date.now());
     this.floraTick(Date.now());
     // старые сохранения: первое задание ещё не выполнено — стартовая морковка созревает сразу
@@ -245,6 +250,7 @@ export class Farm {
       if (b && b.crop === 'carrot') { b.p = CROPS.carrot.time; b.w = 2; }
     }
     this.player = new Player(w, makeGhostData(), px, py);
+    this.wildTick(Date.now(), true); // поросль за время отсутствия
     this.player.handlers = {
       canStart: (a) => this.canStart(a),
       perform: (a) => this.perform(a),
@@ -271,6 +277,62 @@ export class Farm {
       keep.push(p);
     }
     if (this.st.plants) this.st.plants = keep;
+  }
+
+  // Дикая поросль из сохранения → объекты на карте (место занято — пропадает)
+  restoreWild() {
+    const W = this.st.wild;
+    if (!W) return;
+    W.list = W.list.filter((e) => !!this.placeWild({ x: e[0], y: e[1], kind: e[2], born: e[3] }));
+  }
+
+  // Поставить дикую траву или куст (куст — ростком, если ещё не вырос)
+  placeWild(ev) {
+    const w = this.world, sp = ev.kind;
+    if (sp !== 'grass' && !(FLORA[sp] && FLORA[sp].kind === 'bush')) return null;
+    if (!w.isOpen(ev.x, ev.y)) return null;
+    const grown = sp !== 'grass' && Flora.plantStage(sp, ev.born, Date.now()) >= 2;
+    const o = w.add(sp === 'grass' ? 'grass' : grown ? sp : 'sapling', ev.x, ev.y);
+    if (!o) return null;
+    o.wild = 1;
+    if (sp !== 'grass') { o.tree = sp; o.born = ev.born; o.stage = grown ? 2 : 0; }
+    w.version++;
+    return o;
+  }
+
+  // Раз в секунду (и при входе): не пора ли вырасти новой траве или ростку
+  wildTick(now, quiet) {
+    const p = this.player;
+    const blocked = p ? (x, y) => Math.abs(x - p.tx) <= 1 && Math.abs(y - p.ty) <= 1 : null;
+    const out = Wild.wildTick(this.st, this.world, { now, rng: Math.random, blocked, reach: p && this.reachFn(), place: (ev) => !!this.placeWild(ev) });
+    if (!out.length) return;
+    if (!quiet) for (const ev of out) { toWorld(ev.x + 0.5, ev.y + 0.5, tmp); this.burst(tmp.x, tmp.y - 6, '#7ccf4f', 6, true); }
+    this.dirty = true;
+    this.syncBars(now);
+    this.save.schedule(() => this.serialize());
+  }
+
+  // Куда призрак может подойти: клетка рядом с проходимой, до которой есть путь от него.
+  // Считается лениво (только когда пора что-то вырастить) и заново после каждого появления.
+  reachFn() {
+    const w = this.world, p = this.player;
+    let seen = null, ver = -1;
+    const fill = () => {
+      seen = new Uint8Array(N * N); ver = w.version;
+      const q = [p.ty * N + p.tx]; seen[q[0]] = 1;
+      while (q.length) {
+        const i = q.pop(), x = i % N, y = (i / N) | 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx, ny = y + dy, j = ny * N + nx;
+          if (w.inside(nx, ny) && !seen[j] && w.walkable(nx, ny)) { seen[j] = 1; q.push(j); }
+        }
+      }
+    };
+    return (x, y) => {
+      if (!seen || ver !== w.version) fill();
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if ((dx || dy) && w.inside(nx, ny) && seen[ny * N + nx]) return true; }
+      return false;
+    };
   }
 
   // Раз в секунду: какие растения без плодов (другая картинка) и какие ростки подросли
@@ -785,6 +847,18 @@ export class Farm {
         this.changed();
         return false;
       }
+      case 'mow': {
+        const o = a.obj;
+        if (w.objects[o.id] !== o) return false;
+        const r = Wild.mowGrass(st, o.gx, o.gy, Math.random);
+        this.dropFx(o, r.items);
+        this.burst(o.wx, o.wy - 10, '#8fd35c', 10, true);
+        this.sfx('harvest');
+        if (r.xp) this.addXp(r.xp);
+        w.remove(o);
+        this.changed();
+        return false;
+      }
       case 'sow': {
         const i = w.idx(a.x, a.y);
         if (w.tiles[i] !== T.GRASS || w.occ[i] >= 0) return false;
@@ -1019,7 +1093,7 @@ export class Farm {
     this.grow(this._wall ? Math.min(Math.max(0, (now - this._wall) / 1000), 7 * 86400) : dt);
     this._wall = now;
     this._eT = (this._eT || 0) + dt;
-    if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.floraTick(now); this.ui.tick(this); }
+    if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.floraTick(now); this.wildTick(now); this.ui.tick(this); }
     this.player.update(dt);
     this.pourWater(dt);
     const OB = this.world.objects;

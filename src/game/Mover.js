@@ -83,7 +83,7 @@ export class Mover {
       }
       if (!MOVABLE[o.type]) {
         const def = OBJECTS[o.type] || {};
-        const how = def.action === 'mine' ? 'его можно только разбить киркой' : 'его можно только срубить';
+        const how = def.action === 'mine' ? 'его можно только разбить киркой' : def.action === 'mow' ? 'её можно только сорвать' : o.wild ? 'это дикое растение, его можно только срубить' : 'его можно только срубить';
         return { why: `${def.name || 'Этот объект'}: это не ваша постройка, ${how}` };
       }
       if (o.type === 'well' && !f.st.well) return { why: 'Колодец сломан: сначала почините его' };

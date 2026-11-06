@@ -60,6 +60,7 @@ export function chopFlora(st, o, now, rng) {
 export function forget(st, o) {
   if (st.fruit) delete st.fruit[cell(o)];
   if (st.plants) st.plants = st.plants.filter((p) => p[0] !== o.gx || p[1] !== o.gy);
+  if (st.wild) st.wild.list = st.wild.list.filter((e) => e[0] !== o.gx || e[1] !== o.gy); // дикая поросль
 }
 
 // ---------- Свои растения ----------

@@ -48,6 +48,8 @@ SHEETS = {
     'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_moss', -42)],
     'stumps2': [('stump_apple', -42), ('stump_sakura', -42), ('stump_blossom', -42), ('stump_autumn', -42)],
     'well': [('well_broken', 41), ('well_fixed', 42)],
+    # дикая высокая трава (WILD): 3 варианта, «пятачок» — ромб чуть меньше клетки
+    'grass_tall': [('grass_tall_0', -44), ('grass_tall_1', -48), ('grass_tall_2', -48)],
     'house1': [('house_1', -132)], 'house2': [('house_2', -132)], 'house3': [('house_3', -132)], 'house4': [('house_4', -132)], 'house5': [('house_5', -132)],
 }
 # Урожай: лист = 5 стадий слева направо, сверху вниз; в игре 4 стадии (третью пропускаем).
@@ -93,6 +95,7 @@ ICON_SHEETS = {
     'ui_flora2': ['blueberry', 'raspberry', 'rosehip', 'hydrangea', 'lavender', 'rose_petal'],
     # саженцы деревьев (иконки в рюкзаке)
     'ui_saplings1': ['sap_oak', 'sap_birch', 'sap_sakura', 'sap_cherry', 'sap_maple', 'sap_apple', 'sap_pine'],
+    'ui_hay': ['hay'],  # сено с дикой травы (свечение по краю срезано, контур тоньше)
     'ui_saplings2': ['sap_blueberry', 'sap_raspberry', 'sap_rosehip', 'sap_hydrangea', 'sap_lavender', 'sap_rose'],
 }
 ICON_PX = 128
