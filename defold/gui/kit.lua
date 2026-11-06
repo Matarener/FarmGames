@@ -111,7 +111,7 @@ function M.measure(n)
 	else
 		-- Defold 1.10+: метрики через ресурс шрифта
 		local font = gui.get_font_resource(gui.get_font(n))
-		local opts = nil
+		local opts = {}
 		if gui.get_line_break(n) then
 			opts = { width = gui.get_size(n).x, line_break = true,
 				leading = gui.get_leading(n), tracking = gui.get_tracking(n) }
