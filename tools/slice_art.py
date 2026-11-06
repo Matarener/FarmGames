@@ -28,11 +28,12 @@ SHEETS = {
     'trees_apple_bare': [('tree_apple_bare', 62)],
     'trees_cherry_bare': [('tree_blossom_bare', 62)],
     'trees_sakura_bare': [('tree_sakura_bare', 62)],
-    # отдельные правки кустов (точнее листа): у листа bushes_bare четыре из них — запасные
+    # отдельные правки кустов (точнее листа): у листа bushes_bare все, кроме лаванды, — запасные
     'bushes_blue_bare': [('bush_blue_bare', 40)], 'bushes_rasp_bare': [('bush_rasp_bare', 40)],
-    'bushes_pink_bare': [('bush_pink_bare', 40)], 'bushes_hydra_bare': [('bush_hydra_bare', 40)], 'bushes_lav_bare': [('bush_lav_bare_alt', 40)],  # лаванда с листа полнее
+    'bushes_pink_bare': [('bush_pink_bare', 40)], 'bushes_hydra_bare': [('bush_hydra_bare', 40)],
+    'bushes_rose_bare': [('bush_rose_bare', 40)], 'bushes_lav_bare': [('bush_lav_bare_alt', 40)],  # лаванда с листа полнее
     'bushes_bare': [('bush_blue_bare_alt', 40), ('bush_rasp_bare_alt', 40), ('bush_pink_bare_alt', 40),
-                    ('bush_hydra_bare_alt', 40), ('bush_lav_bare', 40), ('bush_rose_bare', 40)],
+                    ('bush_hydra_bare_alt', 40), ('bush_lav_bare', 40), ('bush_rose_bare_alt', 40)],
     # отрицательная ширина: «пятачок» — весь ромб объекта (ширина по краям картинки)
     'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_moss', -42)],
     'stumps2': [('stump_apple', -42), ('stump_sakura', -42), ('stump_blossom', -42), ('stump_autumn', -42)],
