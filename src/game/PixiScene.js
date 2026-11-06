@@ -119,6 +119,7 @@ export class PixiScene {
     app.stage.addChild(world);
     this.chunks = [];
     for (let c = 0; c < CHUNKS * CHUNKS; c++) { const cc = new PIXI.Container(); cc.tiles = []; /* одна сетка на кусок — отдельная группа рендера не нужна */ this.chunks.push(cc); world.addChild(cc); }
+    this.decorC = new PIXI.Container(); world.addChild(this.decorC); // кувшинки и листья на воде
     this.bedsC = new PIXI.Container({ sortableChildren: true, isRenderGroup: true }); world.addChild(this.bedsC);
     this.border = new PIXI.Graphics(); world.addChild(this.border);
     this.objC = new PIXI.Container({ sortableChildren: true }); world.addChild(this.objC);
@@ -160,6 +161,7 @@ export class PixiScene {
   syncGround() { const _t = performance.now(); try { this._syncGround(); } finally { this.f.perf.mark('syncGround', performance.now() - _t); } }
   _syncGround() {
     const f = this.f, w = f.world, S = f.S;
+    this.makeWaterTex();
     const BS = S.bed && S.bed[f.bedStyleName()];
     const per = this.chunks.map(() => []);
     for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
@@ -168,13 +170,19 @@ export class PixiScene {
       let s, bed = null;
       if (t === T.GRASS) s = S.grass[w.variant[i]];
       else if (t === T.PATH) s = S.path[(gx + gy) & 1];
-      else if (t === T.WATER) s = f.waterSprite(gx, gy);
-      else {
+      else if (t === T.WATER) {
+        const ws = f.waterSprite(gx, gy);
+        if (this.waterT) {
+          // вода — общей текстурой по координатам карты, поверх — берег (у клеток посреди пруда его нет)
+          per[w.chunkOf(gx, gy)].push(this.waterT, gx, gy);
+          s = ws.empty ? null : ws;
+        } else s = ws;
+      } else {
         const b = f.beds.get(i);
         const wet = b && b.crop && !f.cropInfo(b).needsWater && !f.cropInfo(b).ready ? 1 : 0;
         if (BS) { s = S.grass[w.variant[i]]; bed = BS[wet]; } else s = S.soil[wet];
       }
-      per[w.chunkOf(gx, gy)].push(s, cx, cy);
+      if (s) per[w.chunkOf(gx, gy)].push(s, cx, cy);
       // объёмная грядка — поверх земли, ближние поверх дальних
       let bs = this.bedSp && this.bedSp[i];
       if (bed) {
@@ -193,11 +201,22 @@ export class PixiScene {
     if (same) return;
     cc.list = list;
     const by = new Map(); // страница атласа → вершины
+    const WT = this.waterT;
     for (let j = 0; j < list.length; j += 3) {
-      const s = list[j], x0 = list[j + 1] - s.ax, y0 = list[j + 2] - s.ay;
+      const s = list[j];
       const t = this.groundAtlas.tex(s), fr = t.frame, p = t.page || t.source;
       let m = by.get(p); if (!m) by.set(p, m = { t, pos: [], uv: [] });
       const W = t.source.width, H = t.source.height;
+      if (s === WT) {
+        // клетка (gx, gy) воды: углы ромба — узлы сетки, текстура повторяется через WT.px × WT.py клеток
+        const gx = list[j + 1], gy = list[j + 2];
+        const cx = (gx - gy) * HW, cy = (gx + gy + 1) * HH;
+        const k = WT.cell, u0 = (fr.x + WT.m + (gx % WT.px) * k) / W, v0 = (fr.y + WT.m + (gy % WT.py) * k) / H, du = k / W, dv = k / H;
+        m.pos.push(cx, cy - HH, cx + HW, cy, cx, cy + HH, cx - HW, cy);
+        m.uv.push(u0, v0, u0 + du, v0, u0 + du, v0 + dv, u0, v0 + dv);
+        continue;
+      }
+      const x0 = list[j + 1] - s.ax, y0 = list[j + 2] - s.ay;
       const u0 = fr.x / W, v0 = fr.y / H, u1 = (fr.x + fr.width) / W, v1 = (fr.y + fr.height) / H, um = (u0 + u1) / 2, vm = (v0 + v1) / 2;
       m.pos.push(x0 + s.w / 2, y0, x0 + s.w, y0 + s.h / 2, x0 + s.w / 2, y0 + s.h, x0, y0 + s.h / 2);
       m.uv.push(um, v0, u1, vm, um, v1, u0, vm);
@@ -220,6 +239,46 @@ export class PixiScene {
         mesh = new PIXI.Mesh({ geometry, texture });
         meshes.set(p, mesh); cc.addChild(mesh);
       }
+    }
+    let k = 0;
+    for (const p of by.keys()) { const mesh = meshes.get(p); if (cc.getChildIndex(mesh) !== k) cc.setChildIndex(mesh, k); k++; }
+  }
+
+  // Текстура воды в атлас земли: с полями из противоположных краёв (бесшовный повтор без
+  // швов на стыках, в том числе на уменьшенных копиях — мипмапах)
+  makeWaterTex() {
+    const t = this.f.S.waterTex;
+    if (!t || this.waterT !== undefined) return;
+    const img = t.canvas, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, M = 16;
+    const c = document.createElement('canvas'); c.width = w + 2 * M; c.height = h + 2 * M;
+    const g = c.getContext('2d');
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) g.drawImage(img, M + dx * w, M + dy * h);
+    // 128 пикселей текстуры на клетку (как было в 2D): 768×512 → повтор через 6×4 клеток
+    const cell = 128;
+    this.waterT = { canvas: c, w: c.width, h: c.height, ax: 0, ay: 0, m: M, cell, px: Math.max(1, Math.round(w / cell)), py: Math.max(1, Math.round(h / cell)) };
+  }
+
+  // украшения пруда: стоят на месте, пересобираются только при открытии участка (затемнение)
+  syncDecor() {
+    const f = this.f, w = f.world, D = f.S.decor;
+    if (!this.decorSp) this.decorSp = [];
+    const list = (D && w.decor) || [];
+    for (let i = 0; i < list.length; i++) {
+      const d = list[i];
+      let s = D[d.type];
+      if (!s) continue;
+      let e = this.decorSp[i];
+      if (!e) {
+        e = this.decorSp[i] = new PIXI.Sprite();
+        toWorld(d.x, d.y, tmp); e.wx = tmp.x; e.wy = tmp.y;
+        const flat = d.type === 'lily' || d.type === 'leaves';
+        // мостик чуть «дальше» своей клетки: фермер на нём рисуется поверх
+        if (!flat) e.zIndex = Z(d.type === 'pier' ? d.x + d.y - 0.5 : d.x + d.y, tmp.y);
+        (flat ? this.decorC : this.objC).addChild(e);
+      }
+      if (!w.isOpen(d.gx, d.gy)) s = dimSprite(s);
+      this.put(e, s, e.wx, e.wy);
+      e.bw = s.w; e.bh = s.h; e.bax = s.ax; e.bay = s.ay;
     }
   }
 
@@ -287,8 +346,9 @@ export class PixiScene {
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.WATER) f.waterSprite(x, y);
     const S = f.S;
     const GROUND = ['grass', 'path', 'soil', 'water'];
+    this.makeWaterTex(); if (this.waterT) this.groundAtlas.tex(this.waterT);
     for (const k of GROUND) for (const v of (S[k] instanceof Map ? S[k].values() : S[k] || [])) this.groundAtlas.tex(v);
-    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k) && k !== 'waterArt') add(v, k !== 'bubble');
+    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k) && k !== 'waterArt' && k !== 'waterTex') add(v, k !== 'bubble');
     for (const o of w.objects || []) { if (!o) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
     if (S.stumpOf && S.objArt) for (const arr of Object.values(S.objArt)) for (const t of arr || []) for (const id of [0, 1, 3]) { const st = S.stumpOf(t, id); if (st) { this.atlas.tex(st); this.atlas.tex(dimSprite(st)); } }
     for (const im of Object.values(f.iconImg)) if (im.complete && im.naturalWidth) this.iconTex(im);
@@ -377,7 +437,7 @@ export class PixiScene {
     const K = this.keys, bsn = f.bedStyleName();
     if (K.gv !== f.groundV || K.wet !== wet || K.bs !== bsn) { K.gv = f.groundV; K.wet = wet; K.bs = bsn; this.syncGround(); }
     const uc = w.unlockedCount();
-    if (K.uc !== uc || K.house !== f.st.house) { K.uc = uc; K.house = f.st.house; this.syncFog(); this.syncSigns(); }
+    if (K.uc !== uc || K.house !== f.st.house || K.dec !== !!f.S.decor) { K.uc = uc; K.dec = !!f.S.decor; K.house = f.st.house; this.syncFog(); this.syncSigns(); this.syncDecor(); }
     if (this.keys.lock !== !!f.iconImg.lock) { this.keys.lock = !!f.iconImg.lock; this.syncSigns(); }
 
     // видимость кусков земли
@@ -386,6 +446,8 @@ export class PixiScene {
       const b = CB[c];
       this.chunks[c].visible = b.maxX + 40 > v.minX && b.minX - 40 < v.maxX && b.maxY + 40 > v.minY && b.minY - 40 < v.maxY;
     }
+    const DS = this.decorSp;
+    if (DS) for (let i = 0; i < DS.length; i++) { const e = DS[i]; if (!e) continue; const vis = r.visible(e.wx - e.bax, e.wy - e.bay, e.bw, e.bh); if (e.visible !== vis) e.visible = vis; }
     const SC = this.signsC.children;
     for (let i = 0; i < SC.length; i++) { const s = SC[i]; s.visible = r.visible(s.cx - 50, s.cy - 40, 100, 60); }
 

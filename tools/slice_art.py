@@ -42,7 +42,15 @@ CROP_UNIFORM = {'cabbage'}  # у кукурузы на 5-й стадии лиш�
 CROP_STAGES = [0, 1, 3, 4]
 CROP_W = 54
 
+# Листы-сетки: каждый предмет в своей ячейке (части предмета могут быть отдельными кусками,
+# например три кувшинки). (имя, ширина в мире, опора): base — центр основания растения,
+# center — середина картинки (плоское на воде), (fx, fy) — доли ширины/высоты.
+GRID_SHEETS = {
+    'pond_decor': (3, 2, [('pond_cattail', 40, 'base'), ('pond_lily', 56, 'center'), ('pond_rocks', 50, (0.5, 0.7)),
+                          ('pond_reeds', 46, 'base'), ('pond_pier', 70, (0.49, 0.59)), ('pond_leaves', 36, 'center')]),
+}
 BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), ('bed_dry_g', 66), ('bed_wet_g', 66)]}
+WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)
 TILE_SHEETS = [('tiles', ['tile_grass', 'tile_flowers', 'tile_soil', 'tile_sand']),
                ('tiles_water', ['water_0', 'water_lily', 'water_reed', 'water_spark']),
                ('tiles_path', ['tile_cobble', 'tile_planks', 'tile_sand2', 'tile_soil_wet'])]
@@ -240,6 +248,46 @@ def main():
             img = Image.fromarray(c).resize((round(W * DENSITY), round(H * DENSITY)), Image.LANCZOS)
             save(img, f'crop_{crop}_{st}', W, H, W / 2, H - W / 4 - 2, man)
             print(f'crop_{crop}_{st}  {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
+
+    for sheet, (cols, rows, items) in GRID_SHEETS.items():
+        if not os.path.exists(os.path.join(SRC, sheet + '.png')): continue
+        a = load(sheet)
+        ch, cw = a.shape[0] // rows, a.shape[1] // cols
+        for n, (name, wu, anchor) in enumerate(items):
+            r, c = divmod(n, cols)
+            cell = a[r * ch:(r + 1) * ch, c * cw:(c + 1) * cw]
+            m = cell[..., 3] > 0
+            # случайные крошки соседнего предмета ниже/выше пустой полосы — отбрасываем
+            rows = np.where(m.any(1))[0]
+            gaps = np.where(np.diff(rows) > 10)[0]
+            if len(gaps):
+                segs = np.split(rows, gaps + 1)
+                keep = max(segs, key=len)
+                m[:keep[0]] = False; m[keep[-1] + 1:] = False
+                cell = cell.copy(); cell[..., 3] *= m
+            ys, xs = np.where(m)
+            y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+            crop = cell[y0:y1, x0:x1].copy()
+            k = wu / (x1 - x0)
+            W, H = (x1 - x0) * k, (y1 - y0) * k
+            if anchor == 'base':
+                bw, bx, by = base_of(crop); ax, ay = bx * k, (by - bw / 4) * k
+            elif anchor == 'center': ax, ay = W / 2, H / 2
+            else: ax, ay = W * anchor[0], H * anchor[1]
+            img = Image.fromarray(crop).resize((round(W * DENSITY), round(H * DENSITY)), Image.LANCZOS)
+            save(img, name, W, H, ax, ay, man)
+            print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
+
+    # Текстура воды: бесшовная, вид сверху. Игра кладёт её на весь пруд по координатам карты
+    # (128 px на клетку). Делаем светлее и сочнее под общий стиль.
+    src = os.path.join(SRC, 'tex_water_src.png')
+    if os.path.exists(src):
+        t = np.array(Image.open(src).convert('RGB')).astype(np.float32)
+        t = np.clip(t * WATER_GAIN + np.array(WATER_LIFT), 0, 255).astype(np.uint8)
+        img = Image.fromarray(t)
+        img = img.resize((img.width // 2, img.height // 2), Image.LANCZOS)
+        save(img, 'tex_water', img.width, img.height, 0, 0, man)
+        print('tex_water', img.size)
 
     with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
         json.dump(man, f, indent=1)
