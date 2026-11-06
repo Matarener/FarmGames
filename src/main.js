@@ -29,6 +29,7 @@ async function main() {
   // WebGL (PixiJS), если есть; ?renderer=2d — старая отрисовка Canvas 2D для сравнения
   const want2d = new URLSearchParams(location.search).get('renderer') === '2d';
   const app = want2d ? null : await createPixiApp(canvas, perf, BG);
+  if (app) perf.keepScale = true;
   const renderer = app ? new GLRenderer(canvas, perf, app) : new Renderer(canvas, perf);
   const camera = new Camera();
   const ui = new UI(document.getElementById('app'));
@@ -98,6 +99,7 @@ async function main() {
   // ждём картинки (но не дольше 15 с: на плохой связи игра откроется с графикой из кода)
   await Promise.race([farm.artReady, new Promise((r) => setTimeout(r, 15000))]);
   if (farm.scene) { try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); } }
+  perf.restart();
   progress(1);
   setTimeout(() => { document.getElementById('loading').classList.add('hide'); if (!ui.panelOpen) audio.setTheme('farm'); }, 150);
   // начало истории: новое задание показываем сразу
@@ -113,7 +115,7 @@ async function main() {
     document.body.appendChild(fpsEl);
     const paint = () => {
       fpsEl.textContent = `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
-        ` · ${app ? 'WebGL' : '2D'} · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}`;
+        ` · ${app ? 'WebGL' : '2D'} · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}${perf.idle ? " · покой" : ""}`;
     };
     paint(); fpsTimer = setInterval(paint, 500);
   };

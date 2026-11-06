@@ -35,7 +35,8 @@ export class Game {
   _frame(t) {
     if (!this.running) return;
     this._raf = requestAnimationFrame(this._frame);
-    const fps = this.isIdle() ? Math.min(this.perf.idleFps, this.perf.targetFps) : this.perf.targetFps;
+    const idle = this.perf.idle = this.isIdle();
+    const fps = idle ? Math.min(this.perf.idleFps, this.perf.targetFps) : this.perf.targetFps;
     const elapsed = t - this.last;
     if (elapsed < 1000 / fps - 2) return;
     this.last = t;

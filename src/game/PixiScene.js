@@ -88,8 +88,8 @@ export class PixiScene {
     app.stage.addChild(world);
     this.base = new PIXI.Graphics(); world.addChild(this.base);
     this.chunks = [];
-    for (let c = 0; c < CHUNKS * CHUNKS; c++) { const cc = new PIXI.Container(); cc.tiles = []; this.chunks.push(cc); world.addChild(cc); }
-    this.bedsC = new PIXI.Container({ sortableChildren: true }); world.addChild(this.bedsC);
+    for (let c = 0; c < CHUNKS * CHUNKS; c++) { const cc = new PIXI.Container({ isRenderGroup: true }); cc.tiles = []; /* своя группа: неподвижная земля не пересобирается при движении камеры */ this.chunks.push(cc); world.addChild(cc); }
+    this.bedsC = new PIXI.Container({ sortableChildren: true, isRenderGroup: true }); world.addChild(this.bedsC);
     this.fog = new PIXI.Graphics(); world.addChild(this.fog);
     this.border = new PIXI.Graphics(); world.addChild(this.border);
     this.objC = new PIXI.Container({ sortableChildren: true }); world.addChild(this.objC);

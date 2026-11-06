@@ -24,6 +24,8 @@ export class Perf {
     this.idleFps = 20; // когда на экране ничего не происходит
     this.fps = 60;
     this.onScaleChange = null;
+    this.keepScale = false; // WebGL: разрешение не снижаем (мыло), при нехватке — только 30 FPS
+    this.idle = false;
 
     this._acc = 0; this._n = 0; this._slow = 0; this._warmup = 2;
     // время работы кадра (логика + отрисовка), мс: среднее и худшее за секунду
@@ -38,6 +40,9 @@ export class Perf {
     try { localStorage.setItem('farm.fps', v ? '1' : '0'); } catch { /* приватный режим */ }
     this.onShowFps && this.onShowFps(this._showFps);
   }
+
+  // после экрана загрузки меряем заново: загрузка картинок не должна снижать качество
+  restart() { this._slow = 0; this._warmup = 2; this._acc = 0; this._n = 0; }
 
   work(ms) { this._work += ms; if (ms > this._workMax) this._workMax = ms; }
 
@@ -56,7 +61,7 @@ export class Perf {
     if (avg > budget * 1.3) this._slow++; else this._slow = Math.max(0, this._slow - 1);
     if (this._slow >= 3) {
       this._slow = 0;
-      if (this.renderScale > 1) {
+      if (this.renderScale > 1 && !this.keepScale) {
         this.renderScale = Math.max(1, this.renderScale - 0.25);
         this.onScaleChange && this.onScaleChange();
       } else if (this.targetFps > 30) {
