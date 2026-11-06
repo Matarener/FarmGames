@@ -527,6 +527,16 @@ export class Farm {
     this.changed();
   }
 
+  buy(offer, n) {
+    const r = Inv.buyItem(this.st, offer, n);
+    if (!r) return;
+    if (r.locked) return this.toast(`Откроется с ${offer.level} уровня`, 'warn');
+    if (r.poor) return this.toast('Не хватает монет', 'warn');
+    this.quests.emit('buy', r.id, r.n);
+    this.sfx('coin');
+    this.changed();
+  }
+
   eat(key) {
     const r = Inv.eatItem(this.st, key, this.maxEnergy);
     if (!r) return;

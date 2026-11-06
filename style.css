@@ -226,13 +226,34 @@ button:disabled { cursor: default; }
 .ii-x { position: absolute; right: 8px; top: 8px; width: 30px; height: 30px; border-radius: 8px; background: rgba(0,0,0,.08); font-size: 14px; }
 .ii-a { display: flex; gap: 6px; width: 100%; flex-wrap: wrap; }
 .ii-a .btn-s { flex: 1; justify-content: center; }
-.mk-item { flex-wrap: wrap; }
 .ii-sell { width: 100%; display: flex; flex-direction: column; gap: 6px; }
 .ii-step { display: flex; align-items: center; gap: 6px; }
 .ii-step .btn-s { flex: 1; justify-content: center; padding: 0 4px; }
 .ii-q { min-width: 44px; text-align: center; font-size: 17px; }
 @media (min-width: 700px) and (min-height: 500px) { .inv-grid { grid-template-columns: repeat(7, 1fr); } }
 @media (max-height: 500px) and (orientation: landscape) { .inv-grid { grid-template-columns: repeat(8, 1fr); } .inv-info { padding: 6px 14px 8px; } }
+
+/* ---------- Рынок ---------- */
+.panel[data-kind="market"] .pn-card { max-height: 94%; }
+.mk-seg { display: flex; background: var(--paper-2); border-radius: 14px; padding: 3px; margin-bottom: 10px; }
+.mk-seg button { flex: 1; height: 40px; border-radius: 11px; font-size: 15px; color: #6b5442; }
+.mk-seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 0 rgba(61,43,31,.25); }
+.mk-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 4px; }
+.mk-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0; background: none; }
+.mk-cell i {
+  position: relative; width: 100%; aspect-ratio: 1; border-radius: 14px; background: var(--paper-2);
+  border: 2px solid rgba(61,43,31,.18); display: flex; align-items: center; justify-content: center;
+}
+.mk-cell i .ic { width: 66%; height: 66%; }
+.mk-cell i b { position: absolute; right: 5px; bottom: 3px; font-size: 13px; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+.mk-cell span { font-size: 12.5px; font-weight: 600; color: var(--ink); display: inline-flex; align-items: center; gap: 2px; }
+.mk-cell.sel i { border-color: var(--ink); background: #fff3c4; }
+.mk-cell.locked i .ic { filter: grayscale(1); opacity: .5; }
+.mk-cell.locked span { color: #8a6a50; font-weight: 500; }
+.mk-lock { position: absolute; right: 4px; top: 4px; width: 26%; height: 26%; }
+.ii-note { width: 100%; font-size: 13px; font-weight: 600; color: #8a6a50; }
+@media (min-width: 700px) and (min-height: 500px) { .mk-grid { grid-template-columns: repeat(6, 1fr); } }
+@media (max-height: 500px) and (orientation: landscape) { .mk-grid { grid-template-columns: repeat(7, 1fr); } }
 
 /* ---------- Уведомления ---------- */
 .toast {

@@ -123,3 +123,14 @@ for (const [k, r] of Object.entries(RESOURCES)) ITEMS[k] = { key: k, name: r.nam
 // порядок «по умолчанию»: как в таблице (инструменты, урожай, рыба, семена, ресурсы)
 let _ord = 0;
 for (const it of Object.values(ITEMS)) it.order = _ord++;
+
+// ---------------- Рынок: покупка ----------------
+export const SHOP_TABS = [
+  { key: 'food',  name: 'Еда',       icon: 'food' },
+  { key: 'seeds', name: 'Семена',    icon: 'seed' },
+  { key: 'res',   name: 'Ресурсы',   icon: 'wood' },
+  { key: 'build', name: 'Постройки', icon: 'build' },
+];
+// Товары: item — id из ITEMS, price — монеты за штуку, level — с какого уровня можно купить
+export const SHOP = [];
+for (const c of Object.values(CROPS)) SHOP.push({ tab: 'seeds', item: seedId(c.key), price: c.seed, level: c.level });
