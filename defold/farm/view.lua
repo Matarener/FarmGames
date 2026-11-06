@@ -4,6 +4,7 @@
 local iso = require('farm.iso')
 local W = require('farm.world')
 local META = require('farm.art_meta')
+local SHEET = require('farm.ground_sheet')
 
 local N, CHUNK, CHUNKS, T = W.N, W.CHUNK, W.CHUNKS, W.T
 local M = {}
@@ -35,8 +36,10 @@ end
 local HEX = {}
 local function col(c) local v = HEX[c]; if not v then v = hex(c); HEX[c] = v end return v end
 
-function M.new(farm, f_ground, f_world)
-	local self = setmetatable({ f = farm, fg = f_ground, fw = f_world }, V)
+function M.new(farm, f_ground, f_world, meshes)
+	local self = setmetatable({ f = farm, fg = f_ground, fw = f_world, meshes = meshes }, V)
+	self.gbase = {}    -- i → { картинка основы, зеркало } — рисуется сеткой участка
+	self.mesh_dirty = {}
 	self.ground = {}   -- i → { base, over, bed, key... }
 	self.objs = {}     -- id → { id, name, tint... }
 	self.crops = {}    -- i клетки → { id, name }
@@ -166,11 +169,18 @@ function V:sync_tile(gx, gy)
 		if b and b.crop then local _, ready, needs = f:crop_flags(b); wet = not needs and not ready end
 		bed = wet and 'bed_wet' or 'bed_dry'
 	end
-	local k = self:chunk_shade(w:chunk_of(gx, gy))
+	local ch = w:chunk_of(gx, gy)
+	local k = self:chunk_shade(ch)
 	local g = self.ground[i]
 	if not g then g = {}; self.ground[i] = g end
-	if not g.base then g.base = self:spawn(self.fg, base, cx, cy, Z_GROUND, bsx) else self:set_anim(g.base, base, bsx) end
-	self:set_tint(g.base, k, k, k, 1)
+	if self.meshes then
+		-- основа клетки — в сетке участка (одна на 100 клеток вместо 100 спрайтов)
+		local gb = self.gbase[i]
+		if not gb or gb[1] ~= base or gb[2] ~= bsx or gb[3] ~= k then self.gbase[i] = { base, bsx, k }; self.mesh_dirty[ch] = true end
+	else
+		if not g.base then g.base = self:spawn(self.fg, base, cx, cy, Z_GROUND, bsx) else self:set_anim(g.base, base, bsx) end
+		self:set_tint(g.base, k, k, k, 1)
+	end
 	if over then
 		if not g.over then g.over = self:spawn(self.fg, over, cx, cy, Z_SHORE) else self:set_anim(g.over, over) end
 		self:set_tint(g.over, k, k, k, 1)
@@ -181,8 +191,58 @@ function V:sync_tile(gx, gy)
 	elseif g.bed then self:delete(g.bed); g.bed = nil end
 end
 
+local H_POS, H_UV, H_COL = hash('position'), hash('texcoord0'), hash('color')
+local VERTS = CHUNK * CHUNK * 6
+
+-- вершины сетки участка c: по два треугольника на клетку, картинка — с листа ground_sheet
+function V:build_mesh(c)
+	local url = self.meshes[c]
+	if not url then return end
+	local buf = buffer.create(VERTS, {
+		{ name = H_POS, type = buffer.VALUE_TYPE_FLOAT32, count = 3 },
+		{ name = H_UV, type = buffer.VALUE_TYPE_FLOAT32, count = 2 },
+		{ name = H_COL, type = buffer.VALUE_TYPE_FLOAT32, count = 4 },
+	})
+	local P, U, C = buffer.get_stream(buf, H_POS), buffer.get_stream(buf, H_UV), buffer.get_stream(buf, H_COL)
+	local x0c, y0c = (c % CHUNKS) * CHUNK, math.floor(c / CHUNKS) * CHUNK
+	local p, u, q = 1, 1, 1
+	local minx, maxx, miny, maxy = math.huge, -math.huge, math.huge, -math.huge
+	local grass = SHEET.tile_grass
+	for gy = y0c, y0c + CHUNK - 1 do
+		for gx = x0c, x0c + CHUNK - 1 do
+			local gb = self.gbase[gy * N + gx]
+			local cell = gb and SHEET[gb[1]] or grass
+			local k = gb and gb[3] or 1
+			local x, y = (gx - gy) * 32, -(gx + gy + 1) * 16
+			local xl, xr, yt, yb = x - 33, x + 33, y + 16.5, y - 16.5
+			local ul, ur, vt, vb = cell[1], cell[3], cell[2], cell[4]
+			if gb and gb[2] < 0 then ul, ur = ur, ul end
+			-- (лево-верх, лево-низ, право-верх) и (право-верх, лево-низ, право-низ)
+			P[p], P[p + 1], P[p + 2] = xl, yt, 0; P[p + 3], P[p + 4], P[p + 5] = xl, yb, 0; P[p + 6], P[p + 7], P[p + 8] = xr, yt, 0
+			P[p + 9], P[p + 10], P[p + 11] = xr, yt, 0; P[p + 12], P[p + 13], P[p + 14] = xl, yb, 0; P[p + 15], P[p + 16], P[p + 17] = xr, yb, 0
+			p = p + 18
+			U[u], U[u + 1], U[u + 2], U[u + 3], U[u + 4], U[u + 5] = ul, vt, ul, vb, ur, vt
+			U[u + 6], U[u + 7], U[u + 8], U[u + 9], U[u + 10], U[u + 11] = ur, vt, ul, vb, ur, vb
+			u = u + 12
+			for _ = 1, 6 do C[q], C[q + 1], C[q + 2], C[q + 3] = k, k, k, 1; q = q + 4 end
+			if xl < minx then minx = xl end
+			if xr > maxx then maxx = xr end
+			if yb < miny then miny = yb end
+			if yt > maxy then maxy = yt end
+		end
+	end
+	pcall(buffer.set_metadata, buf, hash('AABB'), { minx, miny, -1, maxx, maxy, 1 }, buffer.VALUE_TYPE_FLOAT32)
+	resource.set_buffer(go.get(url, 'vertices'), buf)
+end
+
+function V:flush_meshes()
+	for c in pairs(self.mesh_dirty) do self:build_mesh(c) end
+	self.mesh_dirty = {}
+end
+
 function V:sync_ground()
 	for gy = 0, N - 1 do for gx = 0, N - 1 do self:sync_tile(gx, gy) end end
+	if self.meshes then self:flush_meshes() end
 end
 
 -- ---------- украшения пруда ----------

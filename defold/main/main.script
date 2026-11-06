@@ -65,7 +65,10 @@ function init(self)
 	elseif not saved then
 		app.ui:toast('Добро пожаловать на ферму! Нажмите на дерево или камень, чтобы добыть ресурсы.')
 	end
-	app.view = view_mod.new(f, msg.url('#ground_f'), msg.url('#world_f'))
+	-- сетки земли участков (#gm0..#gm24): основа клеток рисуется ими, а не спрайтами
+	local meshes = {}
+	for c = 0, W.CHUNKS * W.CHUNKS - 1 do meshes[c] = msg.url('#gm' .. c) end
+	app.view = view_mod.new(f, msg.url('#ground_f'), msg.url('#world_f'), meshes)
 	app.view:build()
 	self.touch = nil      -- первый палец/мышь: { x, y, t, moved }
 	self.pinch = nil

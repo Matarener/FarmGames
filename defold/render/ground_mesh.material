@@ -1,0 +1,17 @@
+name: "ground_mesh"
+tags: "tile"
+vertex_program: "/render/ground_mesh.vp"
+fragment_program: "/render/ground_mesh.fp"
+vertex_space: VERTEX_SPACE_LOCAL
+vertex_constants {
+  name: "mtx_worldviewproj"
+  type: CONSTANT_TYPE_WORLDVIEWPROJ
+}
+samplers {
+  name: "texture_sampler"
+  wrap_u: WRAP_MODE_CLAMP_TO_EDGE
+  wrap_v: WRAP_MODE_CLAMP_TO_EDGE
+  filter_min: FILTER_MODE_MIN_LINEAR_MIPMAP_LINEAR
+  filter_mag: FILTER_MODE_MAG_LINEAR
+  max_anisotropy: 0.0
+}

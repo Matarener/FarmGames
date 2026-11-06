@@ -1,0 +1,6 @@
+material: "/render/ground_mesh.material"
+vertices: "/main/gm/c7.buffer"
+textures: "/assets/ground_sheet.png"
+primitive_type: PRIMITIVE_TRIANGLES
+position_stream: "position"
+normal_stream: "position"
