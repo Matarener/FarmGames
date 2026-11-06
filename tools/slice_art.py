@@ -15,6 +15,7 @@ SRC = os.path.join(ROOT, 'assets', 'source')
 OUT = os.path.join(ROOT, 'assets', 'art')
 DENSITY = 4  # пикселей на мировую единицу
 TILE_W, TILE_H = 64, 32
+YOUNG_K = 0.65  # молодое растение ниже взрослого во столько раз
 
 # Лист → объекты по порядку (сверху вниз, слева направо) и ширина «пятачка» под объектом
 # в мировых единицах (по ней считается масштаб).
@@ -34,6 +35,10 @@ SHEETS = {
     'bushes_rose_bare': [('bush_rose_bare', 40)], 'bushes_lav_bare': [('bush_lav_bare', 40)],
     'bushes_bare': [('bush_blue_bare_alt', 40), ('bush_rasp_bare_alt', 40), ('bush_pink_bare_alt', 40),
                     ('bush_hydra_bare_alt', 40), ('bush_lav_bare_alt', 40), ('bush_rose_bare_alt', 40)],
+    # молодые растения (стадия 2 из 3): высота — YOUNG_K от взрослого (YOUNG ниже)
+    'young_oak': [('tree_oak_young', 62)], 'young_birch': [('tree_birch_young', 60)],
+    'young_sakura': [('tree_sakura_young', 62)], 'young_cherry': [('tree_blossom_young', 62)],
+    'young_maple': [('tree_autumn_young', 62)], 'young_apple': [('tree_apple_young', 62)],
     # ростки посаженных игроком растений (стадия 0): под деревья и под кусты
     'sprouts': [('sprout_tree', -30), ('sprout_bush', -32)],
     # отрицательная ширина: «пятачок» — весь ромб объекта (ширина по краям картинки)
@@ -211,13 +216,15 @@ def main(only=None):
                 bw, bx, by = base_of(crop)
                 # у деревьев «пятачок» травы — ромб, его самая широкая строка и есть центр
                 # (как у пней, иначе пень встаёт выше дерева)
-                if sheet.startswith('trees'): by += bw / 4
+                if sheet.startswith('trees') or sheet.startswith('young_'): by += bw / 4
                 # у колодца самая широкая строка — середина круглой кладки; опора — от низа кладки
                 # под центром (иначе колодец «съезжает» на клетку перед собой)
                 if sheet == 'well':
                     mm = crop[..., 3] > 128; c = int(bx)
                     by = np.where(mm[:, max(0, c - 3):c + 3].any(1))[0].max()
             k = base_w / bw  # мир/пиксель
+            if name.endswith('_young') and name[:-6] in man:  # по высоте взрослого
+                k = YOUNG_K * man[name[:-6]]['h'] / (y1 - y0)
             W, H = (x1 - x0) * k, (y1 - y0) * k
             img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
             # опора — центр ромба основания (низ минус четверть ширины)
@@ -229,7 +236,8 @@ def main(only=None):
     if only:
         with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
             json.dump(man, f, indent=1)
-        icons([n for n in only if n in ICON_SHEETS])
+        ic = [n for n in only if n in ICON_SHEETS]
+        if ic: icons(ic)
         return
     for sheet, items in BED_SHEETS.items():
         if not os.path.exists(os.path.join(SRC, sheet + '.png')): continue

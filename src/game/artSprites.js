@@ -101,7 +101,8 @@ export async function loadArt(onProgress) {
   for (const type of Object.keys(OBJ)) {
     const s = obj[type] && obj[type][0];
     if (!s || !/^(tree|bush)_/.test(s.name)) continue;
-    flora[type] = { bare: s, young: scaled(s, 0.6) };
+    // молодое: картинка художника (<имя>_young), иначе уменьшенная копия взрослого
+    flora[type] = { bare: s, young: A[s.name + '_young'] || scaled(s, 0.6) };
     // file:// не даёт читать пиксели — тогда без перекраски и своих иконок
     // картинка художника «без плодов» (<имя>_bare), иначе — временная перекраска
     if (A[s.name + '_bare']) flora[type].bare = A[s.name + '_bare'];
