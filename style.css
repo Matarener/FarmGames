@@ -376,3 +376,11 @@ body.moving .toast { bottom: calc(var(--safe-b) + 112px); }
 .gfx-cap { font-weight: 700; color: #3d2b1f; margin-right: 4px; }
 .gfx-btn { opacity: .55; }
 .gfx-btn.on { opacity: 1; outline: 2px solid #3d2b1f; }
+
+.bench-btn { margin-top: 10px; }
+.newgame { margin-top: 6px; }
+.ng-btn { background: linear-gradient(#f08a6a, #c9452b); }
+.ng-q { font-size: 13.5px; font-weight: 700; color: #8a2e1c; margin: 4px 0 8px; }
+.ng-row { display: flex; gap: 8px; }
+.ng-row .btn-s { flex: 1; justify-content: center; min-height: 42px; font-size: 13.5px; }
+.ng-yes { background: linear-gradient(#f08a6a, #c9452b); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }

@@ -120,7 +120,16 @@ async function main() {
       farm.scene.render();
       if (i % 10 === 9) { try { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); } catch { /* */ } progress(0.85 + 0.15 * (i + 1) / N); await nextFrame(); }
     }
-    cam.zoom = z0; cam.x = x0; cam.y = y0; farm.scene.render();
+    cam.zoom = z0; cam.x = x0; cam.y = y0;
+    // и по факту: если на «Высокой» кадр не укладывается в 60 FPS — тоже «Средняя»
+    if (perf.gfx === 'auto' && perf.renderScale > 1.5) {
+      const t = performance.now();
+      for (let i = 0; i < 10; i++) { cam.x = x0 + i * 3; farm.scene.render(); }
+      try { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); } catch { /* */ }
+      if ((performance.now() - t) / 10 > 15) perf.setGfx('mid');
+      cam.x = x0;
+    }
+    farm.scene.render();
     await new Promise((r) => setTimeout(r, 300)); // время на сборку мусора
   }
   progress(1);

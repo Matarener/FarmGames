@@ -306,7 +306,7 @@ export class UI {
         body.appendChild(row);
       }
       if (f.scene) {
-        const bt = h('button', 'btn-link', 'Тест видеокарты (≈15 с)');
+        const bt = h('button', 'btn-link bench-btn', 'Тест видеокарты (≈15 с)');
         const out = h('pre', 'bench-out', '');
         bt.onclick = async () => {
           bt.disabled = true; out.textContent = 'Идёт тест, не трогай экран…';
@@ -315,9 +315,20 @@ export class UI {
         };
         body.appendChild(bt); body.appendChild(out);
       }
-      const reset = h('button', 'btn-link', 'Начать заново');
-      reset.onclick = () => { if (confirm('Удалить сохранение и начать новую ферму?')) { f.save.reset(); location.reload(); } };
-      body.appendChild(reset);
+      // новая игра — отдельная заметная кнопка; подтверждение прямо на месте
+      body.appendChild(h('div', 'pn-sub', 'Игра'));
+      const ng = h('div', 'newgame');
+      const ask = () => {
+        ng.innerHTML = '';
+        ng.appendChild(h('div', 'ng-q', 'Начать новую игру? Вся ферма, вещи и прогресс будут удалены безвозвратно.'));
+        const row = h('div', 'ng-row');
+        const no = h('button', 'btn-s', 'Отмена'), yes = h('button', 'btn-s ng-yes', 'Да, начать заново');
+        no.onclick = idle; yes.onclick = () => { f.save.reset(); location.reload(); };
+        row.appendChild(no); row.appendChild(yes); ng.appendChild(row);
+      };
+      const idle = () => { ng.innerHTML = ''; const b = h('button', 'btn-main ng-btn', 'Новая игра'); b.onclick = ask; ng.appendChild(b); };
+      idle();
+      body.appendChild(ng);
     });
   }
 

@@ -611,6 +611,14 @@ export async function createPixiApp(canvas, perf, bg) {
       powerPreference: 'high-performance', hello: false,
     });
     app.ticker && app.ticker.stop();
+    // первый запуск на слабой видеокарте — сразу «Средняя» графика (игрок может сменить в настройках)
+    if (perf.gfx === 'auto' && (window.devicePixelRatio || 1) > 1.5) {
+      try {
+        const gl = app.renderer.gl, ext = gl.getExtension('WEBGL_debug_renderer_info');
+        const name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+        if (/PowerVR|Mali-(4|T[0-9]|G(31|51|52|57|68))|Adreno \(TM\) (3|4|50|51|60)\d/i.test(name)) perf.setGfx('mid');
+      } catch { /* нет данных о видеокарте */ }
+    }
     return app;
   } catch (e) {
     console.warn('WebGL', e);
