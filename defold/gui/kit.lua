@@ -42,8 +42,8 @@ function M.box(parent, x, y, w, h, color, style)
 	gui.set_texture(n, 'gui')
 	if style == 'pill' then
 		gui.play_flipbook(n, 'ui_pill')
-		local r = math.min(32, h * d / 2)
-		gui.set_slice9(n, vmath.vector4(r, r, r, r))
+		-- полные углы текстуры (радиус 32); при низком узле Defold сжимает их сам
+		gui.set_slice9(n, vmath.vector4(32, 32, 32, 32))
 	elseif style == 'round' then
 		gui.play_flipbook(n, 'ui_round')
 		gui.set_slice9(n, vmath.vector4(16, 16, 16, 16))
@@ -111,7 +111,12 @@ function M.measure(n)
 	else
 		-- Defold 1.10+: метрики через ресурс шрифта
 		local font = gui.get_font_resource(gui.get_font(n))
-		m = resource.get_text_metrics(font, gui.get_text(n))
+		local opts = nil
+		if gui.get_line_break(n) then
+			opts = { width = gui.get_size(n).x, line_break = true,
+				leading = gui.get_leading(n), tracking = gui.get_tracking(n) }
+		end
+		m = resource.get_text_metrics(font, gui.get_text(n), opts)
 	end
 	local s = gui.get_scale(n)
 	return m.width * s.x / app.dpi, m.height * s.y / app.dpi

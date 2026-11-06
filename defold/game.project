@@ -11,8 +11,8 @@ render = /render/farm.renderc
 game_binding = /input/game.input_bindingc
 
 [display]
-width = 540
-height = 960
+width = 450
+height = 800
 high_dpi = 1
 vsync = 1
 update_frequency = 0

@@ -142,7 +142,7 @@ local function quest_card(self)
 		text(n, done and 'Забрать награду!' or q.task, 34, 5, 11.5, { wrap = 100 })
 		text(n, Q:progress() .. '/' .. q.goal.n, 160, 5, 11, { pivot = gui.PIVOT_NE })
 		box(n, 34, 32, 120, 6, c('#3d2b1f', 0.18), 'pill')
-		box(n, 34, 32, math.max(0.1, 120 * Q:progress() / q.goal.n), 6, K.GREEN, 'pill')
+		if Q:progress() > 0 then box(n, 34, 32, math.max(6, 120 * Q:progress() / q.goal.n), 6, K.GREEN, 'pill') end
 		hit(self, 'quest', 8, y, 168, 46, function() self:open_quest() end)
 		y = y + 50
 	end
@@ -326,7 +326,7 @@ local function open_panel(self, kind, title, build)
 	end
 	function api.bar(k)
 		box(content, 0, cy, body_w, 9, c('#3d2b1f', 0.18), 'pill')
-		box(content, 0, cy, math.max(0.1, body_w * k), 9, K.GREEN, 'pill')
+		if k > 0 then box(content, 0, cy, math.max(9, body_w * k), 9, K.GREEN, 'pill') end
 		cy = cy + 16
 	end
 	function api.space(n) cy = cy + n end
