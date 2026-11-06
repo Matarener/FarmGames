@@ -13,8 +13,24 @@ export const T = { GRASS: 0, SOIL: 1, WATER: 2, PATH: 3 };
 
 const tmp = { x: 0, y: 0 };
 
+// Короткий отпечаток карты: сохранение помнит, на какой карте оно сделано
+export function mapId(m) {
+  const s = JSON.stringify([m.tiles, m.objects, m.well, m.seed || 0]);
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36);
+}
+
+// Текст файла карты: по строке на ряд клеток и на объект — удобно смотреть изменения в git
+export function mapText(m) {
+  return '{\n  "v": 1,\n  "n": ' + m.n + ',\n  "seed": ' + (m.seed >>> 0) + ',\n  "tiles": [\n' + m.tiles.map((r) => '    "' + r + '"').join(',\n') + '\n  ],\n' +
+    '  "objects": [\n' + m.objects.map((o) => '    ' + JSON.stringify(o)).join(',\n') + '\n  ],\n' +
+    '  "well": ' + JSON.stringify(m.well) + ',\n  "player": ' + JSON.stringify(m.player) + '\n}\n';
+}
+
 export class World {
-  constructor(seed) {
+  // map — карта из редактора (assets/map.json); без неё мир генерируется из seed
+  constructor(seed, map) {
     this.seed = seed >>> 0;
     this.tiles = new Uint8Array(N * N);
     this.variant = new Uint8Array(N * N);
@@ -23,7 +39,49 @@ export class World {
     this.unlocked = new Uint8Array(CHUNKS * CHUNKS);
     this.unlocked[START_CHUNK] = 1;
     this.version = 0;    // растёт при изменении объектов (для пересортировки)
-    this.generate();
+    if (map) this.loadMap(map); else this.generate();
+  }
+
+  // ---------- Карта из редактора ----------
+  // Формат: { v: 1, n: 50, tiles: [50 строк по 50 цифр T], objects: [[тип, x, y], ...], well: [x, y], player: [x, y] }
+  // Грядки — клетки T.SOIL (стартовые), колодец — отдельно (он всегда после genCount, как в генерации).
+  loadMap(m) {
+    this.mapId = mapId(m);
+    if (m.seed) this.seed = m.seed >>> 0; // у карты свой seed: трава и декор прудов у всех одинаковые
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const h = hash2(x + this.seed % 1000, y);
+      this.variant[y * N + x] = h < 0.55 ? 0 : h < 0.8 ? 1 : h < 0.9 ? 3 : 2;
+    }
+    const rows = m.tiles || [];
+    this.startBeds = [];
+    for (let y = 0; y < N; y++) {
+      const r = rows[y] || '';
+      for (let x = 0; x < N; x++) {
+        const t = +r[x] || 0, i = y * N + x;
+        this.tiles[i] = t <= 3 ? t : 0;
+        if (t === T.SOIL) this.startBeds.push(i);
+      }
+    }
+    for (const [type, x, y] of m.objects || []) if (OBJECTS[type] && type !== 'well') this.add(type, x, y);
+    this.genCount = this.objects.length;
+    this.wellPos = m.well || [2 * CHUNK + 5, 2 * CHUNK + 4];
+    this.well = this.add('well', this.wellPos[0], this.wellPos[1]);
+    this.playerStart = m.player || [2 * CHUNK + 4, 2 * CHUNK + 6];
+    this.genDecor();
+  }
+
+  // Текущий мир → карта для редактора (пни сохраняются как то дерево, из которого выросли)
+  toMap() {
+    const tiles = [];
+    for (let y = 0; y < N; y++) { let r = ''; for (let x = 0; x < N; x++) r += this.tiles[y * N + x]; tiles.push(r); }
+    const objects = [];
+    let well = null;
+    for (const o of this.objects) {
+      if (!o) continue;
+      if (o === this.well || o.type === 'well') { well = [o.gx, o.gy]; continue; }
+      objects.push([o.type === 'stump' ? (o.was || 'oak') : o.type, o.gx, o.gy]);
+    }
+    return { v: 1, n: N, seed: this.seed, tiles, objects, well, player: this.playerStart.slice() };
   }
 
   idx(x, y) { return y * N + x; }

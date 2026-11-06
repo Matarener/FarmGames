@@ -1,0 +1,37 @@
+/* Редактор карты (только локально, см. src/editor/MapEditor.js) */
+body.editor-mode .ui-layer, body.editor-mode #panel, body.editor-mode #popup { display: none !important; }
+body.editor-mode { user-select: none; }
+
+.ed-root {
+  position: absolute; left: 8px; top: 8px; bottom: 8px; width: 236px; z-index: 50;
+  display: flex; flex-direction: column; gap: 8px; padding: 10px;
+  background: rgba(255, 246, 227, .96); border: 2px solid var(--ink); border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .3); overflow: hidden; font-size: 13px;
+}
+.ed-head { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
+.ed-tools { flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; align-content: start; }
+.ed-group { grid-column: 1 / -1; font-size: 11px; text-transform: uppercase; opacity: .6; margin-top: 4px; }
+.ed-tool { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 2px; border-radius: 8px; border: 2px solid transparent; background: rgba(0,0,0,.04); font-size: 11px; line-height: 1.1; text-align: center; }
+.ed-tool img { width: 44px; height: 44px; object-fit: contain; }
+.ed-tool.on { border-color: var(--ink); background: #ffe48a; }
+.ed-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ed-cap { font-size: 12px; opacity: .7; margin-right: 2px; }
+.ed-btn { padding: 5px 8px; border-radius: 8px; border: 2px solid var(--ink); background: #fff; font-size: 12px; }
+.ed-btn.on { background: #ffe48a; }
+.ed-btn.gold { background: linear-gradient(#ffe48a, #f2b51d); }
+.ed-acts .ed-btn { flex: none; font-size: 15px; padding: 4px 10px; }
+.ed-acts .ed-btn.gold, .ed-acts .ed-btn:last-child { flex: 1; font-size: 13px; }
+.ed-more summary { cursor: pointer; font-size: 12px; }
+.ed-col { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.ed-status { min-height: 32px; font-size: 12px; padding: 4px 6px; border-radius: 6px; background: rgba(95,176,58,.18); }
+.ed-status.bad { background: rgba(220,80,60,.2); color: #8a2a1a; }
+.ed-help { font-size: 10.5px; opacity: .6; }
+
+/* узкий экран (телефон): панель снизу, инструменты — в одну прокручиваемую строку */
+@media (max-width: 640px) {
+  .ed-root { left: 4px; right: 4px; top: auto; bottom: 4px; width: auto; max-height: 46vh; gap: 5px; padding: 6px; }
+  .ed-tools { display: flex; overflow-x: auto; overflow-y: hidden; flex: none; }
+  .ed-group { display: none; }
+  .ed-tool { flex: none; width: 64px; }
+  .ed-help { display: none; }
+}

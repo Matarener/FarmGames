@@ -13,7 +13,22 @@ import { createPixiApp, GLRenderer, PixiScene } from './game/PixiScene.js';
 import { UI } from './ui/UI.js';
 import { Audio } from './engine/Audio.js';
 
+// Редактор карты — инструмент разработчика: только при локальном запуске (tools/editor.cmd → /editor).
+// В сборку для игроков (dist, GitHub Pages) его код не попадает: при сборке window.FARM_EDITOR = false.
+const EDITOR = !!window.FARM_EDITOR;
+
+// Карта из редактора (assets/map.json). Нет файла — мир генерируется случайно, как раньше.
+async function loadMap() {
+  const v = typeof __MAP_V__ !== 'undefined' ? __MAP_V__ : null;
+  if (v === '') return null; // в сборке карты нет — не делаем лишний запрос
+  try {
+    const r = await fetch('assets/map.json' + (v ? '?v=' + v : ''), { cache: 'no-cache' });
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+
 async function main() {
+  const mapP = loadMap();
   const tg = new TelegramBridge();
   tg.init();
   // звук (настройки в окне «Настройки»)
@@ -62,7 +77,7 @@ async function main() {
     input.updateRect();
     camera.setViewport(renderer.cssW, renderer.cssH);
     const big = Math.min(renderer.cssW, renderer.cssH) > 600;
-    camera.minZoom = big ? 0.6 : 0.5;
+    camera.minZoom = EDITOR ? 0.2 : big ? 0.6 : 0.5; // в редакторе можно отдалиться на всю карту
     camera.maxZoom = 2.6;
     // телефон повернули: подбираем масштаб под новую форму экрана
     const land = renderer.cssW > renderer.cssH;
@@ -86,9 +101,17 @@ async function main() {
   resize();
   camera.zoom = fitZoom();
 
-  const saved = await save.load();
-  farm.init(saved);
-  if (saved && farm.awaySec > 60) ui.toast(`С возвращением! Вас не было ${Math.round(farm.awaySec / 60)} мин, растения подросли.`);
+  let map = await mapP;
+  let editorMod = null;
+  if (EDITOR) {
+    editorMod = await import('./editor/MapEditor.js');
+    map = editorMod.startMap(map);
+    save.disabled = true; // редактор не трогает сохранение игры
+  }
+  const saved = EDITOR ? null : await save.load();
+  farm.init(saved, map);
+  if (EDITOR) { /* без приветствий */ }
+  else if (saved && farm.awaySec > 60) ui.toast(`С возвращением! Вас не было ${Math.round(farm.awaySec / 60)} мин, растения подросли.`);
   else if (!saved) ui.toast('Добро пожаловать на ферму! Нажмите на дерево или камень, чтобы добыть ресурсы.');
 
   const game = new Game(perf);
@@ -137,6 +160,7 @@ async function main() {
   perf.restart();
   await new Promise((r) => setTimeout(r, 450)); // дать полосе доехать до конца
   document.getElementById('loading').classList.add('hide'); if (!ui.panelOpen) audio.setTheme('farm');
+  if (EDITOR) { new editorMod.MapEditor(farm, { input, map }).start(); return; }
   // начало истории: новое задание показываем сразу
   if (farm.quests.current && !farm.quests.st.seen) setTimeout(() => ui.questPanel(farm), 700);
   // Счётчик FPS и времени кадра: включается в настройках (или ?debug в адресе)

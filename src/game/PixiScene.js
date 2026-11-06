@@ -282,6 +282,13 @@ export class PixiScene {
     }
   }
 
+  // декор пруда заново (редактор поменял воду)
+  resetDecor() {
+    if (this.decorSp) for (const e of this.decorSp) if (e) e.destroy();
+    this.decorSp = [];
+    this.syncDecor();
+  }
+
   syncFog() { const _t = performance.now(); try { this._syncFog(); } finally { this.f.perf.mark('syncFog', performance.now() - _t); } }
   _syncFog() {
     const w = this.f.world;
@@ -496,7 +503,7 @@ export class PixiScene {
     };
     // Обходим только объекты кусков рядом с экраном (на слабом процессоре обход всей карты — главная цена кадра).
     // Полный обход — когда объекты появились/исчезли/двигаются и изредка для надёжности.
-    const full = !this.buckets || this._obN !== OB.length || f.mover.active || ++this._obTick >= 90;
+    const full = !this.buckets || this._obN !== OB.length || f.mover.active || f.editor || ++this._obTick >= 90;
     if (full) {
       this._obN = OB.length; this._obTick = 0;
       const B = this.buckets = this.chunks.map(() => []);
@@ -551,6 +558,7 @@ export class PixiScene {
     };
     if (f.hover && w.inside(f.hover.x, f.hover.y)) outline(f.hover.x, f.hover.y, 0xffffff, 0.75, 1.8);
     if (f.tapFx) outline(f.tapFx.x, f.tapFx.y, 0xfffac8, Math.min(1, f.tapFx.t * 2.4), 2.5);
+    if (f.editor) f.editor.overlay(g, outline);
 
     this.syncQueue();
     this.syncMover(outline);

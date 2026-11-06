@@ -146,9 +146,10 @@ export class Farm {
 
   // ---------------- Состояние ----------------
 
-  init(saved) {
+  // map — карта из редактора (assets/map.json) или null (случайная генерация из seed)
+  init(saved, map) {
     const seed = saved && saved.seed ? saved.seed : (Math.random() * 2 ** 31) | 0;
-    this.world = new World(seed);
+    this.world = new World(seed, map || null);
     const w = this.world;
     this.beds = new Map();
     this.st = {
@@ -162,7 +163,11 @@ export class Farm {
     // поэтому из них берём только прогресс, а деревья и камни генерируются заново
     if (saved && (saved.v === 1 || saved.v === 2 || saved.v === 3)) {
       Object.assign(this.st, saved.st);
-      if (saved.objects && saved.v !== 2) w.importObjects(saved.objects);
+      // карту поменяли в редакторе: прогресс (монеты, уровень, участки, рюкзак) остаётся,
+      // а деревья, камни, тропинки и постройки — как на новой карте
+      const sameMap = (saved.map || null) === (w.mapId || null);
+      if (!sameMap) { delete this.st.paths; delete this.st.pos; delete this.st.movedBeds; }
+      if (saved.objects && saved.v !== 2 && sameMap) w.importObjects(saved.objects);
       if (saved.chunks) for (const c of saved.chunks) w.unlocked[c] = 1;
       // грядки переносили: стартовые клетки — трава, все грядки берём из сохранения
       if (this.st.movedBeds) for (const i of w.startBeds) w.tiles[i] = T.GRASS;
@@ -172,9 +177,11 @@ export class Farm {
         for (const i of this.st.paths) if (w.tiles[i] === T.GRASS && w.occ[i] < 0) w.tiles[i] = T.PATH;
       }
       for (const [i, crop, p, wt] of saved.beds || []) {
+        if (!sameMap && w.tiles[i] !== T.SOIL && (w.tiles[i] !== T.GRASS || w.occ[i] >= 0)) continue; // на новой карте здесь вода/дерево
         w.tiles[i] = T.SOIL;
         this.bedAt(i).crop = crop || null; this.bedAt(i).p = p; this.bedAt(i).w = wt;
       }
+      if (!sameMap) for (const i of w.startBeds) this.bedAt(i); // грядки новой карты
       if (saved.player && w.walkable(saved.player[0], saved.player[1])) [px, py] = saved.player;
       // рост и энергия за время отсутствия
       const away = Math.max(0, (Date.now() - (saved.t || Date.now())) / 1000);
@@ -184,7 +191,7 @@ export class Farm {
       for (const i of w.startBeds) this.bedAt(i);
       // одна грядка уже посажена — сразу видно, как всё работает
       // и уже созрела: первое задание — собрать её
-      const b = this.bedAt(w.startBeds[0]); b.crop = 'carrot'; b.p = CROPS.carrot.time; b.w = 2;
+      if (w.startBeds.length) { const b = this.bedAt(w.startBeds[0]); b.crop = 'carrot'; b.p = CROPS.carrot.time; b.w = 2; }
       this.st.can = 2;
     }
     // стартовые грядки: если игрок их не переносил — на месте всегда (как раньше)
@@ -227,7 +234,7 @@ export class Farm {
     const chunks = [];
     this.world.unlocked.forEach((u, i) => u && chunks.push(i));
     return {
-      v: 3, seed: this.world.seed, st: this.st, objects: this.world.exportObjects(), chunks, beds,
+      v: 3, seed: this.world.seed, map: this.world.mapId || undefined, st: this.st, objects: this.world.exportObjects(), chunks, beds,
       player: [this.player.tx, this.player.ty],
     };
   }

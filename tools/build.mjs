@@ -22,15 +22,27 @@ const ART = join(ROOT, 'assets', 'art');
 const ASSET_V = hash(Buffer.concat(readdirSync(ART).sort().map((f) => readFileSync(join(ART, f)))));
 cpSync(ART, join(DIST, 'assets', 'art'), { recursive: true });
 
+// Карта уровня (редактор карты пишет assets/map.json): копия в dist и версия по содержимому
+let MAP_V = '';
+try { const m = readFileSync(join(ROOT, 'assets', 'map.json')); MAP_V = hash(m); writeFileSync(join(DIST, 'assets', 'map.json'), m); } catch { /* карты нет — случайная генерация */ }
+
 // JS
 const js = await build({
   // manifest и список иконок вшиваем в код: так dist/index.html открывается и без сервера (file://)
   define: {
     __ASSET_V__: JSON.stringify(ASSET_V),
+    __MAP_V__: JSON.stringify(MAP_V),
+    // редактор карты — только для локального запуска, в сборку для игроков не попадает
+    'window.FARM_EDITOR': 'false',
     __ART_MANIFEST__: readFileSync(join(ART, 'manifest.json'), 'utf8'),
     __ART_ICONS__: readFileSync(join(ART, 'icons.json'), 'utf8'),
   },
   entryPoints: [join(ROOT, 'src', 'main.js')],
+  // код редактора карты в сборку для игроков не попадает вовсе (вместо него — пустой модуль)
+  plugins: [{ name: 'no-editor', setup(b) {
+    b.onResolve({ filter: /editor\/MapEditor\.js$/ }, () => ({ path: 'no-editor', namespace: 'no-editor' }));
+    b.onLoad({ filter: /.*/, namespace: 'no-editor' }, () => ({ contents: 'export {};', loader: 'js' }));
+  } }],
   bundle: true, minify: true, format: 'iife', target: ['es2020', 'safari14'],
   write: false, legalComments: 'none',
 });
