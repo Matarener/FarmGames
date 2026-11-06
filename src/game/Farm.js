@@ -11,9 +11,11 @@ import { Quests } from './quests.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
 import * as Flora from './flora.js';
+import { BAR_KIND, BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop } from './bars.js';
 import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC, FOG } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
+
 // вид объёмной грядки: 'plain' — без каймы, 'grass' — с травяной каймой
 export let BED_STYLE = 'plain';
 export function setBedStyle(v) { BED_STYLE = v; }
@@ -276,6 +278,34 @@ export class Farm {
       }
     }
     if (changed) { w.version++; this.dirty = true; }
+    this.syncBars(now);
+  }
+
+  // Полоски времени роста: над поливаемыми грядками, ростками и растениями, у которых отрастают плоды.
+  // Считаются раз в секунду (и сразу после действия), рисуют их сцены. this.bars — подряд по 4 числа:
+  // x, y (мир), доля готовности 0..1, вид (BAR_KIND). Пустые/готовые — без полоски.
+  syncBars(now = Date.now()) {
+    const B = this.bars || (this.bars = []), st = this.st;
+    B.length = 0;
+    for (const b of this.beds.values()) {
+      if (!b.crop) continue;
+      const fl = this.cropFlags(b);
+      if (fl & 12) continue; // созрело или ждёт полива — там уже значок
+      B.push(b.wx, b.wy - 26, b.p / CROPS[b.crop].time, BAR_KIND.crop);
+    }
+    for (const o of this.world.objects) {
+      if (!o || !this.world.isOpen(o.gx, o.gy)) continue;
+      let k = 0, kind = -1;
+      if (o.type === 'sapling' && FLORA[o.tree] && o.born) {
+        k = 1 - Flora.growLeft(o.tree, o.born, now) / FLORA[o.tree].grow; kind = BAR_KIND.grow;
+      } else if (o.bare && FLORA[o.type]) {
+        k = 1 - Flora.fruitLeft(st, o, now) / FLORA[o.type].regrow; kind = BAR_KIND.fruit;
+      }
+      if (kind < 0) continue;
+      const s = this.objSprite(o);
+      B.push(o.wx, o.wy - barTop(s), Math.max(0, Math.min(1, k)), kind);
+    }
+    this.barsV = (this.barsV || 0) + 1;
   }
 
   serialize() {
@@ -289,7 +319,7 @@ export class Farm {
     };
   }
 
-  changed() { this.quests.check(); this.ui.update(this); this.save.schedule(() => this.serialize()); }
+  changed() { this.syncBars(); this.quests.check(); this.ui.update(this); this.save.schedule(() => this.serialize()); }
 
   bedAt(i) {
     let b = this.beds.get(i);
@@ -1175,6 +1205,18 @@ export class Farm {
       const info = this.cropInfo(b);
       const s = info.ready ? S.bubble.ready : info.needsWater ? S.bubble.water : null;
       if (s) ctx.drawImage(s.canvas, b.wx - s.ax, b.wy - 26 - s.ay + bob, s.w, s.h);
+    }
+
+    // полоски времени роста
+    const BR = this.bars;
+    if (BR && BR.length && this.cam.zoom >= BAR_MIN_ZOOM) {
+      for (let i = 0; i < BR.length; i += 4) {
+        const x = BR[i] - BAR_W / 2, y = BR[i + 1] - BAR_H / 2;
+        if (!r.visible(x - 1, y - 1, BAR_W + 2, BAR_H + 2)) continue;
+        ctx.fillStyle = 'rgba(30,24,16,0.6)'; ctx.fillRect(x - 1, y - 1, BAR_W + 2, BAR_H + 2);
+        ctx.fillStyle = '#' + BAR_COLORS[BR[i + 3]].toString(16).padStart(6, '0');
+        ctx.fillRect(x, y, Math.max(1, BAR_W * BR[i + 2]), BAR_H);
+      }
     }
 
     this.drawQueue(ctx);
