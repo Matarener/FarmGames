@@ -202,14 +202,24 @@ export class PixiScene {
       m.pos.push(x0 + s.w / 2, y0, x0 + s.w, y0 + s.h / 2, x0 + s.w / 2, y0 + s.h, x0, y0 + s.h / 2);
       m.uv.push(um, v0, u1, vm, um, v1, u0, vm);
     }
-    for (const ch of cc.removeChildren()) ch.destroy();
-    for (const m of by.values()) {
+    // сетки переиспользуем (новые данные в те же буферы) — иначе видеопамять копится с каждой правкой земли
+    const meshes = cc.meshes || (cc.meshes = new Map());
+    for (const [p, mesh] of meshes) if (!by.has(p)) mesh.visible = false;
+    for (const [p, m] of by) {
       const n = m.pos.length / 8, idx = new Uint16Array(n * 6);
       for (let q = 0; q < n; q++) { const a = q * 4, o = q * 6; idx[o] = a; idx[o + 1] = a + 1; idx[o + 2] = a + 2; idx[o + 3] = a; idx[o + 4] = a + 2; idx[o + 5] = a + 3; }
-      const geometry = new PIXI.MeshGeometry({ positions: new Float32Array(m.pos), uvs: new Float32Array(m.uv), indices: idx });
-      const page = m.t.page;
-      const texture = page ? (page.full || (page.full = new PIXI.Texture({ source: page.source }))) : m.t;
-      cc.addChild(new PIXI.Mesh({ geometry, texture }));
+      let mesh = meshes.get(p);
+      if (mesh) {
+        const g = mesh.geometry;
+        g.positions = new Float32Array(m.pos); g.uvs = new Float32Array(m.uv); g.indices = idx;
+        mesh.visible = true;
+      } else {
+        const geometry = new PIXI.MeshGeometry({ positions: new Float32Array(m.pos), uvs: new Float32Array(m.uv), indices: idx });
+        const page = m.t.page;
+        const texture = page ? (page.full || (page.full = new PIXI.Texture({ source: page.source }))) : m.t;
+        mesh = new PIXI.Mesh({ geometry, texture });
+        meshes.set(p, mesh); cc.addChild(mesh);
+      }
     }
   }
 
