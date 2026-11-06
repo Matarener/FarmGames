@@ -6,6 +6,7 @@ local farm_mod = require('farm.farm')
 local view_mod = require('farm.view')
 local save_mod = require('farm.save')
 local iso = require('farm.iso')
+local autotest = require('farm.autotest')
 
 local function now_ms() return socket.gettime() * 1000 end
 
@@ -38,11 +39,12 @@ function init(self)
 		if event == window.WINDOW_EVENT_RESIZED then layout(self) end
 		if event == window.WINDOW_EVENT_FOCUS_LOST and app.save then app.save:flush() end
 	end)
+	app.autotest = autotest.enabled()
 	app.save = save_mod.new()
 	local f = farm_mod.new({ ui = app.ui, now = now_ms, cam = app.cam, save = app.save, low = false,
 		audio = function(name) if app.sfx then app.sfx(name) end end })
 	app.farm = f
-	local saved = app.save:load()
+	local saved = (not app.autotest) and app.save:load() or nil
 	f:init(saved)
 	if saved and (f.away_sec or 0) > 60 then
 		app.ui:toast('С возвращением! Вас не было ' .. math.floor(f.away_sec / 60 + 0.5) .. ' мин, растения подросли.')
@@ -55,6 +57,7 @@ function init(self)
 	self.pinch = nil
 	self.keys = {}
 	self.vx, self.vy = 0, 0
+	if app.autotest then self.test = autotest.new(self, on_input) end
 end
 
 local function points(action)
@@ -63,6 +66,12 @@ end
 
 function update(self, dt)
 	dt = math.min(dt, 0.1)
+	if self.test then
+		local q = app.test_map_q
+		app.test_map_q = {}
+		for _, ev in ipairs(q) do autotest.guard('map input', on_input, self, ev[1], ev[2]) end
+		self.test:update(dt)
+	end
 	local cam, f = app.cam, app.farm
 	-- клавиатура (ПК): WASD / стрелки
 	local kx = (self.keys.right and 1 or 0) - (self.keys.left and 1 or 0)

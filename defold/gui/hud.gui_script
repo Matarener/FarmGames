@@ -472,7 +472,7 @@ function H.open_settings(self)
 			a.button('Да, начать заново', function()
 				self.ask_new = false
 				app.save:reset()
-				msg.post('@system:', 'reboot')
+				if app.autotest then print('AUTOTEST', 'skip reboot') else msg.post('@system:', 'reboot') end
 			end, false, true)
 		else
 			a.button('Новая игра', function() self.ask_new = true; open_panel(self, 'settings', 'Настройки', self.panel_build) end)
@@ -685,6 +685,7 @@ end
 function update(self, dt)
 	if not self.focus then msg.post('.', 'acquire_input_focus'); self.focus = true end
 	if not app.farm or not app.cam then return end
+	app.gui_state = app.gui_state or function() return self end
 	if self.W ~= app.W or self.H ~= app.H or self.dpi ~= app.dpi then
 		self.W, self.H, self.dpi = app.W, app.H, app.dpi
 		local kind = self.panel_kind
@@ -716,6 +717,17 @@ function update(self, dt)
 		if self.intro_t > 0.7 then self.intro = true; H.open_quest(self) end
 	elseif not self.intro then self.intro = true end
 	overlays(self)
+	-- автотест: синтетические нажатия сначала интерфейсу, необработанные — карте
+	if app.test_gui_q and #app.test_gui_q > 0 then
+		local tq = app.test_gui_q
+		app.test_gui_q = {}
+		local guard = require('farm.autotest').guard
+		for _, ev in ipairs(tq) do
+			local used = false
+			guard('gui input', function() used = on_input(self, ev[1], ev[2]) end)
+			if not used then app.test_map_q[#app.test_map_q + 1] = ev end
+		end
+	end
 end
 
 -- нажатие в точках экрана → обработчик сверху вниз по слоям

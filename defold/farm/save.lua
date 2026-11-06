@@ -4,7 +4,10 @@ local M = {}
 local S = {}
 S.__index = S
 
-local function path() return sys.get_save_file('ghostfarm', 'save_v1') end
+local function path()
+	local test = sys.get_config_int('farm.autotest', 0) == 1
+	return sys.get_save_file('ghostfarm', test and 'save_test' or 'save_v1')
+end
 
 function M.new() return setmetatable({ pending = nil, timer = nil }, S) end
 
