@@ -46,6 +46,11 @@ export class Farm {
       for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
       // иконки художника уже загружены (loadArt ждёт их); иконки саженцев — data: URL, грузятся мгновенно
       for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
+      // пузыри над грядками из арта: квадрат 24×24 единицы, опора — низ хвостика
+      for (const k of ['ready', 'water']) {
+        const im = this.iconImg['bubble_' + k];
+        if (im) this.S.bubble[k] = { canvas: im, w: 24, h: 24, ax: 12, ay: 24, name: 'bubble_' + k };
+      }
       const fl = Object.entries(a.floraIcons).map(([k, url]) => new Promise((res) => {
         const im = new Image();
         im.onload = () => { this.icons[k] = url; this.iconImg[k] = im; res(); };

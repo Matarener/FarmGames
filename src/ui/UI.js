@@ -38,7 +38,6 @@ export class UI {
     $('#btn-center').onclick = () => { farm.player.worldPos(this._p = this._p || {}); farm.cam.centerOn(this._p.x, this._p.y - 20); };
     $('#energy-pill').onclick = () => this.bagPanel(farm);
     $('#quest-card').onclick = () => this.questPanel(farm);
-    $('#btn-settings').onclick = () => this.settingsPanel(farm);
     $('#btn-more').onclick = () => this.toggleMore();
     $('#mb-done').onclick = () => farm.mover.exit();
     $('#mb-cancel').onclick = () => farm.mover.cancel();
@@ -222,6 +221,7 @@ export class UI {
     return [
       { label: 'Переставить', icon: 'move', open: () => f.mover.enter() },
       { label: 'Задания', icon: 'note', open: () => this.questPanel(f) },
+      { label: 'Настройки', icon: 'gear', open: () => this.settingsPanel(f) },
       { label: 'Животные', icon: 'paw', soon: true },
       { label: 'Мастерская', icon: 'build', soon: true },
       { label: 'Декор', icon: 'decor', soon: true },

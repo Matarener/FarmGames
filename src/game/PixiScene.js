@@ -8,9 +8,12 @@ import { dimSprite } from '../engine/Sprite.js';
 import { N, CHUNK, CHUNKS, T, FOG_W } from './World.js';
 import { HOUSE, FOG } from './data.js';
 import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM } from './bars.js';
+
 import { hash2 } from '../engine/Sprite.js';
 
 const tmp = { x: 0, y: 0 };
+// кружки с номерами очереди: радиус в мировых единицах и плотность картинки (пикселей на единицу)
+const QBADGE_R = 6.5, QBADGE_RES = 12;
 const ATLAS = 2048, PAD = 6;
 const Z = (depth, wy) => depth * 1e4 + wy * 0.1; // порядок как в 2D: глубина, затем y
 
@@ -719,29 +722,49 @@ export class PixiScene {
     }
   }
 
-  // номера в очереди дел
+  // номера в очереди дел: готовые картинки высокого разрешения с мип-картами,
+  // чтобы кружок и цифра были гладкими и при сильном приближении, и при отдалении
+  queueTex(n, cur) {
+    const key = n + (cur ? 'c' : '');
+    this._qTex = this._qTex || {};
+    if (this._qTex[key]) return this._qTex[key];
+    const S = QBADGE_RES, R = QBADGE_R, pad = 1.5, size = Math.ceil((R + pad) * 2 * S);
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d'), m = size / 2;
+    g.scale(S, S);
+    const o = m / S;
+    g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.arc(o, o + 0.9, R, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#3d2b1f'; g.beginPath(); g.arc(o, o, R, 0, Math.PI * 2); g.fill();
+    const gr = g.createLinearGradient(0, o - R, 0, o + R);
+    if (cur) { gr.addColorStop(0, '#fff1a1'); gr.addColorStop(1, '#f5c531'); } else { gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#efe3c8'); }
+    g.fillStyle = gr; g.beginPath(); g.arc(o, o, R - 1.3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#3d2b1f'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const t = String(n);
+    g.font = `800 ${t.length > 1 ? 6.6 : 8}px system-ui, sans-serif`;
+    g.fillText(t, o, o + 0.5);
+    const source = new PIXI.CanvasSource({ resource: c, autoGenerateMipmaps: true, scaleMode: 'linear', mipmapFilter: 'linear', alphaMode: 'premultiply-alpha-on-upload' });
+    return (this._qTex[key] = new PIXI.Texture({ source }));
+  }
+
   syncQueue() {
     const f = this.f, p = f.player;
     const list = p.current && p.current.kind !== 'walk' ? [p.current, ...p.queue] : p.queue;
     const C = this.queueC;
     while (C.children.length < list.length) {
-      const n = C.children.length;
-      const box = new PIXI.Container();
-      box.g = new PIXI.Graphics(); box.addChild(box.g);
-      const tx = new PIXI.BitmapText({ text: String(n + 1), style: { fontFamily: 'farm-dark', fontSize: 8 } });
-      tx.anchor.set(0.5); tx.y = 0.3; box.addChild(tx);
-      C.addChild(box);
+      const sp = new PIXI.Sprite(); sp.anchor.set(0.5); sp.scale.set(1 / QBADGE_RES);
+      C.addChild(sp);
     }
-    C.children.forEach((box, i) => {
+    C.children.forEach((sp, i) => {
       const a = list[i];
-      box.visible = !!a;
+      sp.visible = !!a;
       if (!a) return;
       let x, y;
       if (a.obj) { const s = f.objSprite(a.obj); x = a.obj.wx; y = a.obj.wy - Math.min(s.ay * 0.7, 60) - 6; }
       else { toWorld(a.x + 0.5, a.y + 0.5, tmp); x = tmp.x; y = tmp.y - 8; }
-      box.position.set(x, y);
+      sp.position.set(x, y);
       const cur = i === 0 && a === p.current;
-      if (box.cur !== cur) { box.cur = cur; box.g.clear().circle(0, 0, 6).fill({ color: 0x3d2b1f, alpha: 0.9 }).circle(0, 0, 4.8).fill(cur ? 0xffe066 : 0xffffff); }
+      const tx = this.queueTex(i + 1, cur);
+      if (sp.texture !== tx) sp.texture = tx;
     });
   }
 
