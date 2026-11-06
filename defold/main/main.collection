@@ -3,4 +3,8 @@ instances {
   id: "game"
   prototype: "/main/game.go"
 }
+instances {
+  id: "ui"
+  prototype: "/main/ui.go"
+}
 scale_along_z: 0

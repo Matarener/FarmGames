@@ -3,10 +3,6 @@ components {
   component: "/main/main.script"
 }
 components {
-  id: "hud"
-  component: "/gui/hud.gui"
-}
-components {
   id: "map"
   component: "/map/farm.tilemap"
   position {
