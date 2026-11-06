@@ -36,7 +36,7 @@ export class Farm {
     this.groundV = 0; // растёт, когда меняются клетки земли
     this.buildSprites();
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
-      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, waterTex: a.waterTex, decor: a.decor, objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora });
+      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, waterTex: a.waterTex, decor: a.decor, objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts });
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
       a.well.forEach((s, i) => { if (s) this.S.well[i] = s; });
       if (a.water.every(Boolean) || a.waterTex) { this.S.waterArt = a.waterTex ? null : a.water; this.S.water.clear(); }
@@ -135,8 +135,8 @@ export class Farm {
     }
     if (o.type === 'sapling') {
       // свой росток: o.stage считает floraTick
-      const fl = S.flora[o.tree];
-      return o.stage >= 1 && fl ? fl.young : S.sprout;
+      const fl = S.flora[o.tree], fd = FLORA[o.tree], sp = S.sprouts && fd && S.sprouts[fd.kind];
+      return o.stage >= 1 && fl ? fl.young : sp || S.sprout;
     }
     if (o.bare && S.flora[o.type]) return S.flora[o.type].bare; // плоды собраны
     const v = S.objArt && S.objArt[o.type];

@@ -114,6 +114,7 @@ export async function loadArt(onProgress) {
   }
   return {
     obj, crops, icons, flora, floraIcons,
+    sprouts: { tree: A.sprout_tree || null, bush: A.sprout_bush || null },
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {
       const k = tree && tree.name && tree.name.replace('tree_', '');

@@ -34,6 +34,8 @@ SHEETS = {
     'bushes_rose_bare': [('bush_rose_bare', 40)], 'bushes_lav_bare': [('bush_lav_bare', 40)],
     'bushes_bare': [('bush_blue_bare_alt', 40), ('bush_rasp_bare_alt', 40), ('bush_pink_bare_alt', 40),
                     ('bush_hydra_bare_alt', 40), ('bush_lav_bare_alt', 40), ('bush_rose_bare_alt', 40)],
+    # ростки посаженных игроком растений (стадия 0): под деревья и под кусты
+    'sprouts': [('sprout_tree', -30), ('sprout_bush', -32)],
     # отрицательная ширина: «пятачок» — весь ромб объекта (ширина по краям картинки)
     'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_moss', -42)],
     'stumps2': [('stump_apple', -42), ('stump_sakura', -42), ('stump_blossom', -42), ('stump_autumn', -42)],
