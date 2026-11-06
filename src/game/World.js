@@ -89,7 +89,7 @@ export class World {
     for (const o of this.objects) {
       if (!o) continue;
       if (o === this.well || o.type === 'well') { well = [o.gx, o.gy]; continue; }
-      if (o.own || o.type === 'sapling') continue; // посаженное игроком — не часть карты
+      if (o.own || o.wild || o.type === 'sapling' || o.type === 'grass') continue; // посаженное игроком — не часть карты
       objects.push([o.type === 'stump' ? (o.was || 'oak') : o.type, o.gx, o.gy]);
     }
     const fog = this.fogTrees.map((t) => [t.type, t.gx, t.gy]);

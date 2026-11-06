@@ -85,6 +85,7 @@ export const FLORA_GOODS = {
   hydrangea:    { name: 'Гортензия',       sell: 4, look: 'flower', color: '#6f8fe8', desc: 'Пышные цветы гортензии.' },
   lavender:     { name: 'Лаванда',         sell: 4, look: 'spike',  color: '#9b6fd6', desc: 'Душистые веточки лаванды.' },
   rose_petal:   { name: 'Лепестки розы',   sell: 5, look: 'petals', color: '#e8406a', desc: 'Ароматные лепестки розы.' },
+  hay:          { name: 'Сено',            sell: 1, look: 'spike',  color: '#d9b44a', desc: 'Скошенная дикая трава. Пригодится для животных.' },
 };
 for (const [k, v] of Object.entries(FLORA_GOODS)) v.key = k;
 export const floraSeedId = (sp) => 'sap_' + sp;
@@ -101,16 +102,33 @@ export const OBJECTS = {
   well:    { name: 'Колодец', static: true },
   // росток, посаженный игроком: o.tree — во что вырастет, o.born — когда посажен (мс)
   sapling: { name: 'Росток',  hp: 1, action: 'chop', drops: {}, xp: 0 },
+  // дикая высокая трава (WILD.grass): срывается руками за один раз
+  grass:   { name: 'Высокая трава', hp: 1, action: 'mow', drops: {}, xp: 0 },
 };
 for (const f of Object.values(FLORA)) {
   OBJECTS[f.key] = { name: f.name, hp: f.hp, action: 'chop', drops: { wood: f.wood }, xp: f.xp, stump: f.kind === 'tree', flora: f.key, bush: f.kind === 'bush' };
 }
 
+// ---------------- Дикая поросль ----------------
+// Сама появляется на свободной траве открытых участков (не на тропинках, грядках, воде, постройках,
+// не рядом с призраком). Раз в every секунд — одна попытка с шансом chance; за время отсутствия
+// попытки досчитываются при входе (не больше catchUp). Предел у каждого вида — perChunk на
+// открытый участок, но не больше max: за день без игрока ферма не зарастает целиком.
+// w — вес вида при выборе. Кусты появляются ростками и растут, как свои (FLORA.grow).
+// Деревья здесь не появляются: у них своя генерация возле тумана.
+export const WILD = {
+  every: 900, chance: 0.7, catchUp: 96,
+  grass: { w: 6, perChunk: 2, max: 20 },
+  bush:  { w: 3, perChunk: 1, max: 10 },
+  // что даёт трава: сено и иногда семена культуры, доступной по уровню
+  mow: { hay: [1, 2], seed: 0.12, xp: 0 },
+};
+
 // Туман вокруг карты: ширина полосы (клеток), густота леса под туманом
 export const FOG = { width: 4, forest: [0.6, 0.55, 0.45, 0], color: 0xe4ecee };
 
 // Стоимость энергии за удар/действие
-export const ENERGY = { chop: 1, mine: 1, dig: 2, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1, pick: 1, sow: 0 };
+export const ENERGY = { chop: 1, mine: 1, dig: 2, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1, pick: 1, sow: 0, mow: 0 };
 export const ENERGY_REGEN_SEC = 120;
 
 export const HOUSE = [

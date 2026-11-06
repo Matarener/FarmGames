@@ -9,7 +9,7 @@ import { N } from './World.js';
 const TOOL_ANIM = {
   chop: ['swing', 'axe'], mine: ['swing', 'pickaxe'], dig: ['swing', 'hoe'],
   water: ['water', 'can'], fish: ['fish', 'rod'], fill: ['pick', 'can'], plant: ['pick', 'seedbag'], harvest: ['pick', null],
-  pick: ['pick', null], sow: ['pick', 'seedbag'],
+  pick: ['pick', null], sow: ['pick', 'seedbag'], mow: ['pick', null],
 };
 const MAX_QUEUE = 6;
 const tmp = { x: 0, y: 0 };

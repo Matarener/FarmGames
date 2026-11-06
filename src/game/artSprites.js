@@ -130,8 +130,10 @@ export async function loadArt(onProgress) {
   // облака тумана (tools/slice_fog.py): fog_clouds_*, fog_strips_*, fog_wisps_*
   const fog = { clouds: [], strips: [], wisps: [] };
   for (const name of Object.keys(A).sort()) { const m = /^fog_(clouds|strips|wisps)_\d+$/.exec(name); if (m) fog[m[1]].push(A[name]); }
+  // дикая высокая трава: grass_tall_0, grass_tall_1, ... (когда художник нарисует)
+  const wildGrass = Object.keys(A).filter((n) => /^grass_tall_\d+$/.test(n)).sort().map((n) => A[n]);
   return {
-    fog, obj, crops, icons, flora, floraIcons, failed,
+    wildGrass, fog, obj, crops, icons, flora, floraIcons, failed,
     sprouts: { tree: A.sprout_tree || null, bush: A.sprout_bush || null },
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {

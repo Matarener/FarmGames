@@ -701,6 +701,23 @@ function goodsIcon(it) {
   };
 }
 
+// Дикая высокая трава (v — вариант 0..2) — пока нет арта
+export function grassTuftSprite(v) {
+  const rnd = mulberry32(911 + v * 77);
+  return makeSprite(46, 40, 23, 30, (g) => {
+    shadow(g, 15, 5, 0.18);
+    const cols = [['#4f9a33', '#6cbd45'], ['#5aa83a', '#7fcf55'], ['#468f2e', '#66b640']];
+    const blades = 13 + v * 2;
+    for (let i = 0; i < blades; i++) {
+      const x = (rnd() - 0.5) * 24, h = 14 + rnd() * 14 + (Math.abs(x) < 6 ? 6 : 0), bend = (rnd() - 0.5) * 12 + x * 0.35;
+      const [dark, light] = cols[(rnd() * 3) | 0];
+      g.fillStyle = OUT; g.beginPath(); g.moveTo(x - 2.6, 1); g.quadraticCurveTo(x + bend * 0.4, -h * 0.5, x + bend, -h - 1); g.quadraticCurveTo(x + bend * 0.4 + 1, -h * 0.5, x + 2.6, 1); g.closePath(); g.fill();
+      g.fillStyle = i % 3 ? light : dark; g.beginPath(); g.moveTo(x - 1.7, 0.5); g.quadraticCurveTo(x + bend * 0.4, -h * 0.5, x + bend, -h); g.quadraticCurveTo(x + bend * 0.4 + 0.6, -h * 0.5, x + 1.7, 0.5); g.closePath(); g.fill();
+    }
+    if (v === 2) for (const [x, y] of [[-7, -20], [6, -24]]) { g.fillStyle = OUT; blob(g, x, y, 2.6); g.fillStyle = '#f5e27a'; blob(g, x, y, 1.9); }
+  });
+}
+
 // Росток, посаженный игроком (стадия 0), — пока нет арта
 export function sproutSprite() {
   return makeSprite(30, 26, 15, 18, (g) => {
