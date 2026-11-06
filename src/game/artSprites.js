@@ -103,7 +103,9 @@ export async function loadArt(onProgress) {
     if (!s || !/^(tree|bush)_/.test(s.name)) continue;
     flora[type] = { bare: s, young: scaled(s, 0.6) };
     // file:// не даёт читать пиксели — тогда без перекраски и своих иконок
-    try { if (BARE[type]) flora[type].bare = bare(s, BARE[type]); floraIcons['sap_' + type] = iconOf(s); } catch (e) { /* */ }
+    // картинка художника «без плодов» (<имя>_bare), иначе — временная перекраска
+    if (A[s.name + '_bare']) flora[type].bare = A[s.name + '_bare'];
+    try { if (BARE[type] && !A[s.name + '_bare']) flora[type].bare = bare(s, BARE[type]); floraIcons['sap_' + type] = iconOf(s); } catch (e) { /* */ }
   }
   const crops = {};
   for (const name of Object.keys(A)) {

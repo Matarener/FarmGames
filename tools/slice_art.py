@@ -24,6 +24,12 @@ SHEETS = {
     'rocks':  [('rock_big', 118), ('rock_mid', 54), ('rock_small', 40), ('rock_moss', 116)],
     'bushes': [('bush_blue', 40), ('bush_rasp', 40), ('bush_pink', 40),
                ('bush_hydra', 40), ('bush_lav', 40), ('bush_rose', 40)],
+    # без плодов (после сбора): те же деревья и кусты, правка исходной картинки
+    'trees_apple_bare': [('tree_apple_bare', 62)],
+    'trees_cherry_bare': [('tree_blossom_bare', 62)],
+    'trees_sakura_bare': [('tree_sakura_bare', 62)],
+    'bushes_bare': [('bush_blue_bare', 40), ('bush_rasp_bare', 40), ('bush_pink_bare', 40),
+                    ('bush_hydra_bare', 40), ('bush_lav_bare', 40), ('bush_rose_bare', 40)],
     # отрицательная ширина: «пятачок» — весь ромб объекта (ширина по краям картинки)
     'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_moss', -42)],
     'stumps2': [('stump_apple', -42), ('stump_sakura', -42), ('stump_blossom', -42), ('stump_autumn', -42)],
@@ -168,10 +174,14 @@ def save(img, name, w, h, ax, ay, man):
     man[name] = {'w': round(w, 2), 'h': round(h, 2), 'ax': round(ax, 2), 'ay': round(ay, 2)}
 
 
-def main():
+def main(only=None):
+    """only — нарезать только эти листы SHEETS и дописать их в существующий manifest.json"""
     os.makedirs(OUT, exist_ok=True)
     man = {}
+    if only:
+        with open(os.path.join(OUT, 'manifest.json')) as f: man = json.load(f)
     for sheet, items in SHEETS.items():
+        if only and sheet not in only: continue
         a = load(sheet)
         boxes, lab = components(a, len(items))
         for (y0, y1, x0, x1, i), (name, base_w) in zip(boxes, items):
@@ -201,6 +211,10 @@ def main():
 
     # Грядки: объёмный ромб (верх + бортик). Ширина — по краям картинки, центр ромба —
     # строка самой левой точки (левый угол верхней грани).
+    if only:
+        with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
+            json.dump(man, f, indent=1)
+        return
     for sheet, items in BED_SHEETS.items():
         if not os.path.exists(os.path.join(SRC, sheet + '.png')): continue
         a = load(sheet)
@@ -300,4 +314,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # python tools/slice_art.py [лист ...] — только эти листы деревьев/кустов, остальное не трогать
+    main(sys.argv[1:] or None)
