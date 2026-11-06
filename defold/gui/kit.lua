@@ -33,6 +33,27 @@ function M.group(parent, x, y)
 	return n
 end
 
+-- скругления: текстуры ui_c<r> — круг радиуса r px с полосой 2 px посередине, slice9 = r.
+-- Defold рисует углы slice9 в пикселях текстуры, поэтому радиус подбираем под размер узла.
+local RADII = { 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32 }
+local STYLE = setmetatable({}, { __mode = 'k' })
+local CUR = setmetatable({}, { __mode = 'k' }) -- текущий радиус узла, чтобы не дёргать flipbook каждый кадр
+local function corners(n, style, wpx, hpx)
+	local want = math.min(wpx, hpx) / 2
+	if style == 'round' then want = math.min(want, 6 * app.dpi) end
+	local r = 0
+	for _, v in ipairs(RADII) do if v <= want then r = v end end
+	if CUR[n] == r then return end
+	CUR[n] = r
+	if r > 0 then
+		gui.play_flipbook(n, 'ui_c' .. r)
+		gui.set_slice9(n, vmath.vector4(r, r, r, r))
+	else
+		gui.play_flipbook(n, 'ui_px')
+		gui.set_slice9(n, vmath.vector4(0, 0, 0, 0))
+	end
+end
+
 -- прямоугольник; style: 'round' (скругление), 'pill' (капсула), nil (прямой)
 function M.box(parent, x, y, w, h, color, style)
 	local d = app.dpi
@@ -40,13 +61,9 @@ function M.box(parent, x, y, w, h, color, style)
 	gui.set_pivot(n, gui.PIVOT_NW)
 	gui.set_size_mode(n, gui.SIZE_MODE_MANUAL)
 	gui.set_texture(n, 'gui')
-	if style == 'pill' then
-		gui.play_flipbook(n, 'ui_pill')
-		-- полные углы текстуры (радиус 32); при низком узле Defold сжимает их сам
-		gui.set_slice9(n, vmath.vector4(32, 32, 32, 32))
-	elseif style == 'round' then
-		gui.play_flipbook(n, 'ui_round')
-		gui.set_slice9(n, vmath.vector4(16, 16, 16, 16))
+	if style then
+		STYLE[n] = style
+		corners(n, style, w * d, h * d)
 	else
 		gui.play_flipbook(n, 'ui_px')
 	end
@@ -56,7 +73,13 @@ function M.box(parent, x, y, w, h, color, style)
 	return n
 end
 
--- рамка: внешний прямоугольник цвета обводки и внутренний поверх
+-- смена размера узла (в пикселях окна) с пересчётом скругления
+function M.set_size(n, v)
+	gui.set_size(n, v)
+	local st = STYLE[n]
+	if st then corners(n, st, v.x, v.y) end
+end
+
 function M.frame(parent, x, y, w, h, fill, line, lw, style)
 	lw = lw or 2
 	local o = M.box(parent, x, y, w, h, line or M.INK, style)

@@ -165,7 +165,7 @@ local function refresh_hud(self)
 	local pct = math.min(1, st.xp / data.xp_to_next(st.level))
 	if self.last.xp ~= pct then
 		self.last.xp = pct
-		gui.set_size(self.xpbar, vmath.vector3(math.max(1, K.px(80 * pct)), K.px(7), 0))
+		K.set_size(self.xpbar, vmath.vector3(math.max(1, K.px(80 * pct)), K.px(7), 0))
 	end
 	quest_card(self)
 end
@@ -570,7 +570,7 @@ local function overlays(self)
 			if e.icn ~= fl.icon then e.icn = fl.icon; gui.play_flipbook(e.ic, 'ic_' .. fl.icon) end
 			gui.set_enabled(e.ic, true)
 			gui.set_position(e.ic, vmath.vector3((tw + 1 * z) * d, -fs * 0.05 * d, 0))
-			gui.set_size(e.ic, vmath.vector3(12 * z * d, 12 * z * d, 0))
+			K.set_size(e.ic, vmath.vector3(12 * z * d, 12 * z * d, 0))
 			K.alpha(e.ic, a)
 		else gui.set_enabled(e.ic, false) end
 	end
@@ -602,11 +602,11 @@ local function overlays(self)
 				local bw = tw + 30 * z
 				gui.set_position(e.n, vmath.vector3((sx - bw / 2) * d, app.H - (sy - 11 * z) * d, 0))
 				gui.set_position(e.o, vmath.vector3(-2 * z * d, 2 * z * d, 0))
-				gui.set_size(e.o, vmath.vector3((bw + 4 * z) * d, 26 * z * d, 0))
-				gui.set_size(e.i, vmath.vector3(bw * d, 22 * z * d, 0))
+				K.set_size(e.o, vmath.vector3((bw + 4 * z) * d, 26 * z * d, 0))
+				K.set_size(e.i, vmath.vector3(bw * d, 22 * z * d, 0))
 				gui.set_color(e.i, blocked and c('#c9b48a') or c('#f6d37a'))
 				gui.set_position(e.ic, vmath.vector3(3 * z * d, -4 * z * d, 0))
-				gui.set_size(e.ic, vmath.vector3(14 * z * d, 14 * z * d, 0))
+				K.set_size(e.ic, vmath.vector3(14 * z * d, 14 * z * d, 0))
 				gui.set_position(e.t, vmath.vector3(22 * z * d, -5 * z * d, 0))
 			end
 		end
@@ -635,9 +635,9 @@ local function overlays(self)
 		end)
 		local s = z
 		gui.set_position(e.n, vmath.vector3((sx - 6 * s) * d, app.H - (sy - 6 * s) * d, 0))
-		gui.set_size(e.o, vmath.vector3(12 * s * d, 12 * s * d, 0))
+		K.set_size(e.o, vmath.vector3(12 * s * d, 12 * s * d, 0))
 		gui.set_position(e.i, vmath.vector3(1.2 * s * d, -1.2 * s * d, 0))
-		gui.set_size(e.i, vmath.vector3(9.6 * s * d, 9.6 * s * d, 0))
+		K.set_size(e.i, vmath.vector3(9.6 * s * d, 9.6 * s * d, 0))
 		gui.set_color(e.i, (i == 1 and a == p.current) and c('#ffe066') or K.WHITE)
 		gui.set_position(e.t, vmath.vector3(6 * s * d, -6 * s * d, 0))
 		gui.set_scale(e.t, vmath.vector3(8 * s * d / K.FONT_PX, 8 * s * d / K.FONT_PX, 1))
