@@ -471,12 +471,13 @@ export class Farm {
     // собирать касанием можно только плоды и ягоды (pick); кора, шишки, цветы — только рубкой
     const f = FLORA[o.type], left = f.pick ? Flora.fruitLeft(this.st, o, now) : 0, fruit = FLORA_GOODS[f.fruit];
     const ripe = f.pick && !left;
-    if (!ripe && !o.own) return this.queue({ kind: 'chop', obj: o });
+    // дикое без сбора рубится сразу; плодовое, пока плоды отрастают, — меню «Срубить» и время до урожая
+    if (!f.pick && !o.own) return this.queue({ kind: 'chop', obj: o });
     const items = [];
     if (ripe) items.push({ icon: f.fruit, label: `Собрать: ${fruit.name.toLowerCase()}`, sub: `⚡ ${ENERGY.pick}`, onClick: () => this.queue({ kind: 'pick', obj: o }) });
     items.push({ icon: 'wood', label: o.own ? 'Срубить своё' : 'Срубить', sub: `⚡ ${ENERGY.chop} за удар`, onClick: () => this.queue({ kind: 'chop', obj: o }) });
     this.ui.popup(sx, sy, {
-      title: (o.own ? 'Моё: ' : '') + f.name, text: left ? `${fruit.name} — через ${fmtTime(left)}` : !f.pick ? `${fruit.name}: только при рубке` : undefined, items,
+      title: (o.own ? 'Моё: ' : '') + f.name, text: left ? `Следующий урожай (${fruit.name.toLowerCase()}) через ${fmtTime(left)}` : !f.pick ? `${fruit.name}: только при рубке` : undefined, items,
     });
   }
 
