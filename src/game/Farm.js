@@ -44,12 +44,19 @@ export class Farm {
       if (a.water.every(Boolean) || a.waterTex) { this.S.waterArt = a.waterTex ? null : a.water; this.S.water.clear(); }
       this.groundV++;
       for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
-      for (const [k, url] of Object.entries({ ...a.floraIcons, ...a.icons })) {
-        const im = new Image(); im.src = url;
-        im.onload = () => { this.icons[k] = url; this.iconImg[k] = im; this.dirty = true; this.onIcons && this.onIcons(k); };
-      }
+      // иконки художника уже загружены (loadArt ждёт их); иконки саженцев — data: URL, грузятся мгновенно
+      for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
+      const fl = Object.entries(a.floraIcons).map(([k, url]) => new Promise((res) => {
+        const im = new Image();
+        im.onload = () => { this.icons[k] = url; this.iconImg[k] = im; res(); };
+        im.onerror = () => res();
+        im.src = url;
+      }));
       this.dirty = true;
-    }).catch((e) => console.warn('art', e));
+      return Promise.all(fl).then(() => { this.onIcons && this.onIcons(); });
+    });
+    // ошибку загрузки обрабатывает main.js (экран загрузки с кнопкой «Повторить»)
+    this.artReady.catch((e) => console.warn('art', e));
   }
 
   buildSprites() {

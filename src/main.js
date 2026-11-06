@@ -52,11 +52,11 @@ async function main() {
   { const fl = save.flush.bind(save); save.flush = () => { const t = performance.now(); fl(); perf.mark('сохранение', performance.now() - t); }; }
   const fill = document.getElementById('ld-fill'), ltext = document.getElementById('ld-text');
   // полоса двигается через transform (это анимирует видеокарта — плавно, даже пока JS занят), только вперёд
-  let shown = 0;
+  let shown = 0, slowNet = false;
   const progress = (k) => {
     if (k <= shown) return; shown = k;
     fill.style.transform = `scaleX(${k.toFixed(3)})`;
-    ltext.textContent = k < 1 ? `Загрузка… ${Math.round(k * 100)}%` : 'Готово!';
+    ltext.textContent = k < 1 ? `${slowNet ? 'Медленная сеть, догружаем' : 'Загрузка…'} ${Math.round(k * 100)}%` : 'Готово!';
   };
   const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   progress(0.05); await nextFrame();
@@ -125,9 +125,22 @@ async function main() {
   game.isIdle = () => farm.isIdle() && input.pointers.size === 0;
   game.onPause = () => save.flush();
   window.addEventListener('pagehide', () => save.flush());
-  // ждём картинки (но не дольше 15 с: на плохой связи игра откроется с графикой из кода).
+  // Ждём ВСЕ картинки художника, сколько бы это ни заняло: графику из кода игрок видеть не должен.
+  // Раньше через 15 с (или при одной оборвавшейся картинке) игра открывалась со старой графикой из кода.
+  // Если картинки так и не загрузились (нет сети) — экран загрузки с кнопкой «Повторить».
   // Игровой цикл пока не запускаем: за экраном загрузки кадры никому не нужны и только мешают загрузке.
-  await Promise.race([farm.artReady, new Promise((r) => setTimeout(r, 15000))]);
+  const slow = setTimeout(() => { slowNet = true; if (shown < 0.8) ltext.textContent = `Медленная сеть, догружаем ${Math.round(shown * 100)}%`; }, 12000);
+  try { await farm.artReady; } catch (e) {
+    clearTimeout(slow);
+    fill.parentElement.style.display = 'none';
+    ltext.textContent = 'Не удалось загрузить картинки. Проверьте интернет.';
+    const b = document.createElement('button');
+    b.className = 'ld-retry'; b.textContent = 'Повторить';
+    b.onclick = () => location.reload(); // загруженные картинки уже в кэше браузера — повтор быстрый
+    ltext.after(b);
+    return;
+  }
+  clearTimeout(slow);
   progress(0.85); await nextFrame(); // полоса успевает показаться до тяжёлого шага
   if (farm.scene) { try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); } }
   else farm.render();
