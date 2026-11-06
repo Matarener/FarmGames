@@ -41,9 +41,25 @@ export function loadImage(url) {
   return new Promise((res, rej) => {
     const img = new Image();
     img.onload = () => res(img);
-    img.onerror = rej;
+    img.onerror = () => rej(new Error('не загрузилась картинка ' + url));
     img.src = url;
   });
+}
+
+// Картинка с повторами: на мобильной связи (и в Telegram) отдельные запросы иногда обрываются.
+// Повтор идёт с меткой в адресе, чтобы не получить из кэша тот же оборванный ответ.
+export async function loadImageRetry(url, tries = 5) {
+  let err;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const img = await loadImage(i ? url + (url.includes('?') ? '&' : '?') + 'r=' + i : url);
+      // распаковать заранее, вне основного потока — иначе это случится рывком при первом рисовании
+      if (img.decode) await img.decode().catch(() => {});
+      return img;
+    } catch (e) { err = e; }
+    await new Promise((r) => setTimeout(r, 500 * 2 ** i)); // 0.5, 1, 2, 4 с
+  }
+  throw err;
 }
 
 // Детерминированный ГПСЧ

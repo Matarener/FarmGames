@@ -1,7 +1,7 @@
-// Спрайты художника (assets/art, нарезаны tools/slice_art.py). Загружаются после старта:
-// пока картинки грузятся, видна графика, нарисованная кодом.
+// Спрайты художника (assets/art, нарезаны tools/slice_art.py). Загружаются за экраном загрузки:
+// игра не открывается, пока не загружены все картинки (графика из кода игроку не показывается).
 
-import { loadImage, makeCanvas } from '../engine/Sprite.js';
+import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
@@ -79,21 +79,34 @@ export async function loadArt(onProgress) {
   // в сборке manifest вшит в код (работает и с file://), в разработке — читаем файл
   const man = typeof __ART_MANIFEST__ !== 'undefined' ? __ART_MANIFEST__ : await (await fetch(BASE + 'manifest.json?v=' + V)).json();
   const A = {};
+  const icList = typeof __ART_ICONS__ !== 'undefined' ? __ART_ICONS__ : await (await fetch(BASE + 'icons.json?v=' + V)).json();
   const list = Object.entries(man);
+  const total = list.length + icList.length;
   let done = 0;
-  await Promise.all(list.map(async ([name, m]) => {
-    const img = await loadImage(BASE + name + '.webp?v=' + V);
-    // распаковать картинку заранее, вне основного потока — иначе это случится рывком при первом рисовании
-    if (img.decode) await img.decode().catch(() => {});
-    onProgress && onProgress(++done / list.length);
-    A[name] = { canvas: img, w: m.w, h: m.h, ax: m.ax, ay: m.ay, name };
+  const tick = () => onProgress && onProgress(++done / total);
+  // Одна оборвавшаяся картинка раньше роняла всю загрузку (Promise.all) — и игра оставалась
+  // с графикой из кода. Теперь каждая грузится с повторами, а не загрузившиеся собираются в failed.
+  const failed = [];
+  const sprites = Promise.all(list.map(async ([name, m]) => {
+    try {
+      const img = await loadImageRetry(BASE + name + '.webp?v=' + V);
+      A[name] = { canvas: img, w: m.w, h: m.h, ax: m.ax, ay: m.ay, name };
+    } catch (e) { failed.push(name); }
+    tick();
   }));
-  // иконки интерфейса (ic_<имя>.webp); старые, нарисованные кодом, остаются запасными
+  // иконки интерфейса (ic_<имя>.webp) — тоже ждём, чтобы в интерфейсе не мелькали иконки из кода
   const icons = {};
-  try {
-    const list = typeof __ART_ICONS__ !== 'undefined' ? __ART_ICONS__ : await (await fetch(BASE + 'icons.json?v=' + V)).json();
-    for (const n of list) icons[n] = BASE + 'ic_' + n + '.webp?v=' + V;
-  } catch (e) { /* без иконок */ }
+  const iconsP = Promise.all(icList.map(async (n) => {
+    const url = BASE + 'ic_' + n + '.webp?v=' + V;
+    try { icons[n] = { url, img: await loadImageRetry(url) }; } catch (e) { failed.push('ic_' + n); }
+    tick();
+  }));
+  await Promise.all([sprites, iconsP]);
+  if (failed.length) {
+    const e = new Error('не загрузилось картинок: ' + failed.length);
+    e.failed = failed;
+    throw e;
+  }
   const obj = {};
   for (const [type, names] of Object.entries(OBJ)) obj[type] = names.map((n) => A[n]).filter(Boolean);
   // растения: без плодов, молодое; иконки саженцев
@@ -118,7 +131,7 @@ export async function loadArt(onProgress) {
   const fog = { clouds: [], strips: [], wisps: [] };
   for (const name of Object.keys(A).sort()) { const m = /^fog_(clouds|strips|wisps)_\d+$/.exec(name); if (m) fog[m[1]].push(A[name]); }
   return {
-    fog, obj, crops, icons, flora, floraIcons,
+    fog, obj, crops, icons, flora, floraIcons, failed,
     sprouts: { tree: A.sprout_tree || null, bush: A.sprout_bush || null },
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {
