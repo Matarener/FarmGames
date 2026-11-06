@@ -8,6 +8,7 @@ local save_mod = require('farm.save')
 local iso = require('farm.iso')
 local autotest = require('farm.autotest')
 
+local handle_input -- тело on_input; автотест зовёт его напрямую (Defold прячет on_input из глобальных)
 local function now_ms() return socket.gettime() * 1000 end
 
 local function layout(self)
@@ -57,7 +58,7 @@ function init(self)
 	self.pinch = nil
 	self.keys = {}
 	self.vx, self.vy = 0, 0
-	if app.autotest then self.test = autotest.new(self, on_input) end
+	if app.autotest then self.test = autotest.new(self) end
 end
 
 local function points(action)
@@ -69,7 +70,7 @@ function update(self, dt)
 	if self.test then
 		local q = app.test_map_q
 		app.test_map_q = {}
-		for _, ev in ipairs(q) do autotest.guard('map input', on_input, self, ev[1], ev[2]) end
+		for _, ev in ipairs(q) do autotest.guard('map input', handle_input, self, ev[1], ev[2]) end
 		self.test:update(dt)
 	end
 	local cam, f = app.cam, app.farm
@@ -89,7 +90,7 @@ local function tap(self, sx, sy)
 	f:on_tap(wx, wy, sx, sy, app.view:pick(wx, wy))
 end
 
-function on_input(self, action_id, action)
+handle_input = function(self, action_id, action)
 	local cam = app.cam
 	if action_id == hash('multitouch') then
 		local t = action.touch
@@ -174,3 +175,5 @@ end
 function final(self)
 	if app.save then app.save:flush() end
 end
+
+function on_input(self, action_id, action) return handle_input(self, action_id, action) end

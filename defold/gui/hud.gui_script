@@ -647,6 +647,7 @@ local function overlays(self)
 end
 
 -- ---------- команды от логики ----------
+local handle_input -- тело on_input; автотест зовёт его напрямую (Defold прячет on_input из глобальных)
 local CMD = {}
 function CMD.update(self) refresh_hud(self); if self.panel_kind and self.panel_kind ~= 'settings' then refresh_panel(self) end end
 function CMD.tick(self)
@@ -724,7 +725,7 @@ function update(self, dt)
 		local guard = require('farm.autotest').guard
 		for _, ev in ipairs(tq) do
 			local used = false
-			guard('gui input', function() used = on_input(self, ev[1], ev[2]) end)
+			guard('gui input', function() used = handle_input(self, ev[1], ev[2]) end)
 			if not used then app.test_map_q[#app.test_map_q + 1] = ev end
 		end
 	end
@@ -750,7 +751,7 @@ local function find_hit(self, x, y)
 	return best
 end
 
-function on_input(self, action_id, action)
+handle_input = function(self, action_id, action)
 	if not app.farm then return false end
 	if action_id == hash('touch') then
 		local x, y = action.screen_x / app.dpi, (app.H - action.screen_y) / app.dpi
@@ -792,3 +793,5 @@ function on_input(self, action_id, action)
 	end
 	return false
 end
+
+function on_input(self, action_id, action) return handle_input(self, action_id, action) end
