@@ -39,6 +39,8 @@ SHEETS = {
     'young_oak': [('tree_oak_young', 62)], 'young_birch': [('tree_birch_young', 60)],
     'young_sakura': [('tree_sakura_young', 62)], 'young_cherry': [('tree_blossom_young', 62)],
     'young_maple': [('tree_autumn_young', 62)], 'young_apple': [('tree_apple_young', 62)],
+    'youngb_blue': [('bush_blue_young', 40)], 'youngb_rasp': [('bush_rasp_young', 40)], 'youngb_pink': [('bush_pink_young', 40)],
+    'youngb_hydra': [('bush_hydra_young', 40)], 'youngb_lav': [('bush_lav_young', 40)], 'youngb_rose': [('bush_rose_young', 40)],
     # ростки посаженных игроком растений (стадия 0): под деревья и под кусты
     'sprouts': [('sprout_tree', -30), ('sprout_bush', -32)],
     # отрицательная ширина: «пятачок» — весь ромб объекта (ширина по краям картинки)
