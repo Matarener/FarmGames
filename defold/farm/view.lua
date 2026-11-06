@@ -56,9 +56,12 @@ end
 function V:spawn(fac, name, x, y, z, sx, sy)
 	local m = META[name]
 	local s = m and m[1] or 0.5
-	local id = factory.create(fac, vmath.vector3(x, -y, z), nil, nil, vmath.vector3(s * (sx or 1), s * (sy or 1), 1))
+	-- Defold не принимает отрицательный масштаб: зеркало — через hflip/vflip спрайта
+	local id = factory.create(fac, vmath.vector3(x, -y, z), nil, nil, vmath.vector3(s * math.abs(sx or 1), s * math.abs(sy or 1), 1))
 	local e = { id = id, url = msg.url(nil, id, 'sprite'), name = name, s = s, sx = sx or 1, sy = sy or 1 }
 	sprite.play_flipbook(e.url, h(name))
+	if (sx or 1) < 0 then sprite.set_hflip(e.url, true); e.hf = true end
+	if (sy or 1) < 0 then sprite.set_vflip(e.url, true); e.vf = true end
 	return e
 end
 
@@ -69,7 +72,9 @@ function V:set_anim(e, name, sx)
 		e.s = m and m[1] or 0.5
 		if e.name ~= name then sprite.play_flipbook(e.url, h(name)) end
 		e.name, e.sx = name, sx
-		go.set_scale(vmath.vector3(e.s * sx, e.s * e.sy, 1), e.id)
+		go.set_scale(vmath.vector3(e.s * math.abs(sx), e.s * math.abs(e.sy), 1), e.id)
+		local hf = sx < 0
+		if (e.hf or false) ~= hf then e.hf = hf; sprite.set_hflip(e.url, hf) end
 	end
 end
 
@@ -312,7 +317,10 @@ function V:sync_player()
 		v.x, v.y, v.z = e, -f, z0 + n * 1e-5
 		go.set_position(v, s.id)
 		go.set_rotation(vmath.quat_rotation_z(rot), s.id)
-		go.set_scale(vmath.vector3(sx * s.s, sy * s.s, 1), s.id)
+		go.set_scale(vmath.vector3(math.max(1e-4, sx * s.s), math.max(1e-4, math.abs(sy) * s.s), 1), s.id)
+		-- зеркальный призрак (det < 0): поворот + отражение по локальной Y = vflip вокруг центра спрайта
+		local vf = sy < 0
+		if (s.vf or false) ~= vf then s.vf = vf; sprite.set_vflip(s.url, vf) end
 		self:set_tint(s, 1, 1, 1, self.ghost_alpha or 1)
 	end)
 	for n = used + 1, #parts do
@@ -390,7 +398,7 @@ function V:sync_particles()
 		local a = math.max(0, 1 - q.t / q.life)
 		self:set_tint(e, c.x, c.y, c.z, a)
 		self:set_pos(e, q.x, q.y, Z_OVER + 0.5)
-		if e.ps ~= q.s then e.ps = q.s; go.set_scale(vmath.vector3(q.s / 8, q.s / 8, 1), e.id) end
+		if e.ps ~= q.s then e.ps = q.s; go.set_scale(vmath.vector3(math.max(0.01, q.s / 8), math.max(0.01, q.s / 8), 1), e.id) end
 	end
 	for i = #parts, #P + 1, -1 do self:give(parts[i]); parts[i] = nil end
 end
@@ -428,7 +436,7 @@ function V:sync_border()
 			local mx, my = x0 + ux * (d + e2) / 2, y0 + uy * (d + e2) / 2
 			self:set_pos(e, mx, my, Z_OVER - 0.3)
 			go.set_rotation(rot, e.id)
-			go.set_scale(vmath.vector3((e2 - d) / 16, 1.5 / 4, 1), e.id)
+			go.set_scale(vmath.vector3(math.max(0.01, (e2 - d) / 16), 1.5 / 4, 1), e.id)
 			self:set_tint(e, 1, 240 / 255, 190 / 255, 0.55)
 			self.dashes[#self.dashes + 1] = e
 			d = d + 11
@@ -461,7 +469,7 @@ function V:sync_fishing()
 		local len = math.sqrt(dx * dx + dy * dy)
 		self:set_pos(e, (ax + cx) / 2, (ay + cy) / 2, Z_OVER + 0.3)
 		go.set_rotation(vmath.quat_rotation_z(math.atan2(-dy, dx)), e.id)
-		go.set_scale(vmath.vector3(math.max(0.01, len) / 8, wdt / 8, 1), e.id)
+		go.set_scale(vmath.vector3(math.max(0.01, len) / 8, math.max(0.01, wdt / 8), 1), e.id)
 		e.ps = nil
 		self:set_tint(e, r, g, b, a)
 	end
@@ -472,7 +480,7 @@ function V:sync_fishing()
 		self:set_anim(e, 'circle')
 		self:set_pos(e, cx, cy, Z_OVER + 0.31 + used * 1e-4)
 		go.set_rotation(vmath.quat(), e.id)
-		go.set_scale(vmath.vector3(rad * 2 / 24, rad * 2 / 24, 1), e.id)
+		go.set_scale(vmath.vector3(math.max(0.01, rad / 12), math.max(0.01, rad / 12), 1), e.id)
 		e.ps = nil
 		self:set_tint(e, r, g, b, a)
 	end
