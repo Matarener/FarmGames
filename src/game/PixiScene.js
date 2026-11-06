@@ -313,6 +313,51 @@ export class PixiScene {
     if (cv) cv.addEventListener('webglcontextrestored', () => { try { f.save.flush(); } catch { /* */ } location.reload(); });
   }
 
+  // Тест на устройстве: сколько видеокарта тратит на кадр в разных режимах (с ожиданием конца
+  // отрисовки), чтобы понять, что именно её грузит.
+  async bench(onText) {
+    const f = this.f, R = this.app.renderer, gl = R.gl, cam = f.cam;
+    const px = new Uint8Array(4), sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const z0 = cam.zoom, x0 = cam.x, y0 = cam.y, res0 = R.resolution;
+    const lockedObjs = [];
+    const set = (o) => {
+      this.objC.visible = !o.noObj; this.over.visible = !o.noObj; this.bedsC.visible = !o.noObj;
+      for (const c of this.chunks) c.renderable = !o.noGround;
+      for (const e of this.objs.values()) if (!f.world.isOpen(e.o.gx, e.o.gy)) e.renderable = !o.noLocked;
+      if (R.resolution !== (o.res || res0)) { R.resolution = o.res || res0; R.resize(f.r.cssW, f.r.cssH); }
+    };
+    const modes = [
+      ['всё', {}], ['без объектов (деревья, дом…)', { noObj: true }], ['без земли', { noGround: true }],
+      ['без объектов на закрытых участках', { noLocked: true }],
+      ['разрешение x1.5', { res: 1.5 }], ['разрешение x1', { res: 1 }],
+    ];
+    const lines = [`экран ${Math.round(f.r.cssW * res0)}×${Math.round(f.r.cssH * res0)}, x${res0}, зум ${z0.toFixed(2)}`];
+    const wait = () => new Promise((r) => setTimeout(r, 30));
+    f.benching = true;
+    try {
+      for (const [name, o] of modes) {
+        set(o); sync();
+        const times = [];
+        for (let i = 0; i < 40; i++) {
+          cam.x = x0 + Math.sin(i / 6) * 40; cam.y = y0 + Math.cos(i / 6) * 20;
+          const t = performance.now(); this.render(); sync(); times.push(performance.now() - t);
+          if (i % 8 === 7) await wait();
+        }
+        times.sort((a, b) => a - b);
+        const med = times[times.length >> 1];
+        lines.push(`${name}: ${med.toFixed(1)} мс (${Math.round(1000 / med)} fps)`);
+        onText && onText(lines.join('\n') + '\n…');
+        await wait();
+      }
+    } finally {
+      set({}); cam.zoom = z0; cam.x = x0; cam.y = y0; f.benching = false;
+      for (const e of this.objs.values()) e.renderable = true;
+    }
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    if (info) lines.push('видеокарта: ' + gl.getParameter(info.UNMASKED_RENDERER_WEBGL));
+    return lines.join('\n');
+  }
+
   iconTex(img) { return this.atlas.tex({ canvas: img }); }
 
   // ---------- кадр ----------
@@ -535,6 +580,8 @@ export async function createPixiApp(canvas, perf, bg) {
     if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) return null;
     const app = new PIXI.Application();
     const rect = canvas.getBoundingClientRect();
+    // меньше текстур в пачке — проще шейдер на каждый пиксель (на телефонах это главная цена кадра)
+    PIXI.Batcher.defaultOptions.maxTextures = +new URLSearchParams(location.search).get('maxtex') || 4;
     await app.init({
       canvas, preference: 'webgl', background: bg, antialias: false, autoStart: false, sharedTicker: false,
       resolution: perf.renderScale, autoDensity: false, width: Math.max(1, rect.width), height: Math.max(1, rect.height),

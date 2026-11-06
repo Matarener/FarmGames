@@ -17,6 +17,10 @@ export class Perf {
     this.tier = tier;
     this.mobile = coarse;
     this.maxScale = tier === 'low' ? 1 : tier === 'mid' ? 1.5 : 2;
+    // выбор графики игроком: high — до x2, mid — x1.5, low — x1 (меньше пикселей — легче видеокарте)
+    try { this.gfx = localStorage.getItem('farm.gfx') || 'auto'; } catch { this.gfx = 'auto'; }
+    const cap = { high: 2, mid: 1.5, low: 1 }[this.gfx];
+    if (cap) this.maxScale = cap;
     this.renderScale = Math.min(dpr, this.maxScale);
     // Разрешение, в котором заранее рисуются спрайты (мир → пиксели).
     this.spriteScale = tier === 'low' ? 1.5 : tier === 'mid' ? 3 : 4;
@@ -35,6 +39,15 @@ export class Perf {
     this.onShowFps = null;
     // ловушка фризов: что происходило в самых долгих кадрах
     this.spikes = []; this._tags = {}; this._t0 = performance.now();
+  }
+
+  setGfx(v) {
+    this.gfx = v;
+    try { localStorage.setItem('farm.gfx', v); } catch { /* приватный режим */ }
+    const dpr = window.devicePixelRatio || 1;
+    const cap = { high: 2, mid: 1.5, low: 1 }[v] || (this.tier === 'low' ? 1 : this.tier === 'mid' ? 1.5 : 2);
+    this.maxScale = cap; this.renderScale = Math.min(dpr, cap);
+    this.onScaleChange && this.onScaleChange();
   }
 
   get showFps() { return this._showFps; }

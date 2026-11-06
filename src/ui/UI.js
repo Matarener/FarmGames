@@ -295,6 +295,26 @@ export class UI {
       toggle('Выключить весь звук', A.s.muted, (v) => { A.unlock(); A.set('muted', v); if (!v) A.play('tap'); });
       body.appendChild(h('div', 'pn-sub', 'Экран'));
       toggle('Показывать FPS и время кадра', f.perf.showFps, (v) => { f.perf.showFps = v; });
+      {
+        const row = h('div', 'gfx-row');
+        row.appendChild(h('span', 'gfx-cap', 'Графика'));
+        for (const [v, name] of [['high', 'Высокая'], ['mid', 'Средняя'], ['low', 'Низкая']]) {
+          const b = h('button', 'btn-s gfx-btn' + ((f.perf.gfx === v || (f.perf.gfx === 'auto' && v === ({ low: 'low', mid: 'mid' }[f.perf.tier] || 'high'))) ? ' on' : ''), name);
+          b.onclick = () => { f.perf.setGfx(v); row.querySelectorAll('.gfx-btn').forEach((x) => x.classList.toggle('on', x === b)); };
+          row.appendChild(b);
+        }
+        body.appendChild(row);
+      }
+      if (f.scene) {
+        const bt = h('button', 'btn-link', 'Тест видеокарты (≈15 с)');
+        const out = h('pre', 'bench-out', '');
+        bt.onclick = async () => {
+          bt.disabled = true; out.textContent = 'Идёт тест, не трогай экран…';
+          try { out.textContent = await f.scene.bench((t) => { out.textContent = t; }); } catch (e) { out.textContent = 'Ошибка: ' + e.message; }
+          bt.disabled = false;
+        };
+        body.appendChild(bt); body.appendChild(out);
+      }
       const reset = h('button', 'btn-link', 'Начать заново');
       reset.onclick = () => { if (confirm('Удалить сохранение и начать новую ферму?')) { f.save.reset(); location.reload(); } };
       body.appendChild(reset);

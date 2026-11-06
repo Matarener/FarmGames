@@ -369,3 +369,10 @@ body.moving .toast { bottom: calc(var(--safe-b) + 112px); }
   .fab img { width: 26px; height: 26px; }
   .more-menu { bottom: calc(var(--safe-b) + 62px); grid-template-columns: repeat(4, 1fr); width: min(400px, calc(100% - 16px)); }
 }
+
+.bench-out { white-space: pre-wrap; font: 12px/1.35 monospace; color: #3d2b1f; margin: 6px 0; user-select: text; }
+.bench-out:empty { display: none; }
+.gfx-row { display: flex; align-items: center; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+.gfx-cap { font-weight: 700; color: #3d2b1f; margin-right: 4px; }
+.gfx-btn { opacity: .55; }
+.gfx-btn.on { opacity: 1; outline: 2px solid #3d2b1f; }
