@@ -147,7 +147,7 @@ local function quest_card(self)
 		y = y + 50
 	end
 	local p = gui.get_position(self.chip)
-	p.y = app.H - K.px(y)
+	p.y = -K.px(y) -- чип — потомок слоя HUD: координата от его верхнего края, а не от низа окна
 	gui.set_position(self.chip, p)
 end
 
