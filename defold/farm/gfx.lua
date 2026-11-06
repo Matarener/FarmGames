@@ -13,6 +13,12 @@ function M.load()
 		if PR[t.quality] then M.quality = t.quality end
 		if t.fps == 30 or t.fps == 60 then M.fps = t.fps end
 		M.stats = t.stats == true
+		return
+	end
+	-- первый запуск: на телефонах сразу «Средняя» (слабые видеокарты не тянут полную плотность пикселей)
+	if html5 then
+		local ok2, ua = pcall(html5.run, 'navigator.userAgent')
+		if ok2 and ua and (ua:find('Android') or ua:find('iPhone') or ua:find('iPad') or ua:find('Mobile')) then M.quality = 'mid' end
 	end
 end
 
