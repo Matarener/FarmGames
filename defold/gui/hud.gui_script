@@ -50,7 +50,7 @@ local function update_toasts(self, dt)
 		if t.t > 2.6 then gui.delete_node(t.n); table.remove(self.toasts, i)
 		else
 			local p = gui.get_position(t.n)
-			p.y = app.H - K.px(y)
+			p.y = -K.px(y)
 			gui.set_position(t.n, p)
 			K.alpha(t.n, a)
 			y = y + t.h + 6
@@ -563,7 +563,7 @@ local function overlays(self)
 		local iw = fl.icon and 12 * z or 0
 		local sx, sy = cam:world_to_screen(fl.x, fl.y - k * 26)
 		local x = sx - (tw + iw) / 2
-		gui.set_position(e.n, vmath.vector3(x * d, app.H - (sy - fs * 0.6) * d, 0))
+		gui.set_position(e.n, vmath.vector3(x * d, -(sy - fs * 0.6) * d, 0))
 		K.alpha(e.t, a)
 		gui.set_outline(e.t, c('#28190f', 0.8 * a))
 		if fl.icon then
@@ -600,7 +600,7 @@ local function overlays(self)
 				gui.set_scale(e.t, vmath.vector3(fs * d / K.FONT_PX, fs * d / K.FONT_PX, 1))
 				local tw = K.measure(e.t)
 				local bw = tw + 30 * z
-				gui.set_position(e.n, vmath.vector3((sx - bw / 2) * d, app.H - (sy - 11 * z) * d, 0))
+				gui.set_position(e.n, vmath.vector3((sx - bw / 2) * d, -(sy - 11 * z) * d, 0))
 				gui.set_position(e.o, vmath.vector3(-2 * z * d, 2 * z * d, 0))
 				K.set_size(e.o, vmath.vector3((bw + 4 * z) * d, 26 * z * d, 0))
 				K.set_size(e.i, vmath.vector3(bw * d, 22 * z * d, 0))
@@ -634,7 +634,7 @@ local function overlays(self)
 			return { n = g, o = o, i = ii, t = t }
 		end)
 		local s = z
-		gui.set_position(e.n, vmath.vector3((sx - 6 * s) * d, app.H - (sy - 6 * s) * d, 0))
+		gui.set_position(e.n, vmath.vector3((sx - 6 * s) * d, -(sy - 6 * s) * d, 0))
 		K.set_size(e.o, vmath.vector3(12 * s * d, 12 * s * d, 0))
 		gui.set_position(e.i, vmath.vector3(1.2 * s * d, -1.2 * s * d, 0))
 		K.set_size(e.i, vmath.vector3(9.6 * s * d, 9.6 * s * d, 0))
@@ -707,7 +707,7 @@ function update(self, dt)
 		local l = self.levelups[i]
 		l.t = l.t + dt
 		local p = gui.get_position(l.n)
-		p.y = app.H - K.px(70)
+		p.y = -K.px(70)
 		gui.set_position(l.n, p)
 		if l.t > 2.8 then K.alpha(l.n, math.max(0, 1 - (l.t - 2.8) / 0.5)) end
 		if l.t > 3.3 then gui.delete_node(l.n); table.remove(self.levelups, i) end
