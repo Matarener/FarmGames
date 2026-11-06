@@ -5,8 +5,9 @@
 import * as PIXI from '../vendor/pixi.min.mjs';
 import { toWorld, HW, HH } from '../engine/Iso.js';
 import { dimSprite } from '../engine/Sprite.js';
-import { N, CHUNK, CHUNKS, T } from './World.js';
-import { HOUSE } from './data.js';
+import { N, CHUNK, CHUNKS, T, FOG_W } from './World.js';
+import { HOUSE, FOG } from './data.js';
+import { hash2 } from '../engine/Sprite.js';
 
 const tmp = { x: 0, y: 0 };
 const ATLAS = 2048, PAD = 6;
@@ -119,6 +120,9 @@ export class PixiScene {
     app.stage.addChild(world);
     this.chunks = [];
     for (let c = 0; c < CHUNKS * CHUNKS; c++) { const cc = new PIXI.Container(); cc.tiles = []; /* одна сетка на кусок — отдельная группа рендера не нужна */ this.chunks.push(cc); world.addChild(cc); }
+    // туман вокруг карты: одна сетка с плавной прозрачностью, над ней — лес (полупрозрачный, «в дымке»)
+    this.fogMesh = null; this.fogForest = new PIXI.Container(); this.fogForest.eventMode = 'none';
+    this.fogC = new PIXI.Container(); world.addChild(this.fogC); this.fogC.addChild(this.fogForest);
     this.decorC = new PIXI.Container(); world.addChild(this.decorC); // кувшинки и листья на воде
     this.bedsC = new PIXI.Container({ sortableChildren: true, isRenderGroup: true }); world.addChild(this.bedsC);
     this.border = new PIXI.Graphics(); world.addChild(this.border);
@@ -191,8 +195,17 @@ export class PixiScene {
         bs.visible = true; this.put(bs, bed, cx, cy);
       } else if (bs) bs.visible = false;
     }
+    // трава под туманом (за краем карты) — в сетку ближайшего куска: затемняется вместе с ним
+    const F = FOG_W, cl = (v) => Math.max(0, Math.min(CHUNKS - 1, Math.floor(v / CHUNK)));
+    for (let gy = -F; gy < N + F; gy++) for (let gx = -F; gx < N + F; gx++) {
+      if (gx >= 0 && gy >= 0 && gx < N && gy < N) { if (gy >= 0 && gy < N) gx = N - 1; continue; }
+      const h = hash2(gx + 977, gy + 311);
+      const s = S.grass[h < 0.6 ? 0 : h < 0.85 ? 1 : h < 0.93 ? 3 : 2];
+      per[cl(gy) * CHUNKS + cl(gx)].push(s, (gx - gy) * HW, (gx + gy + 1) * HH);
+    }
     for (let c = 0; c < per.length; c++) this.chunkMesh(this.chunks[c], per[c]);
     this.groundAtlas.flush();
+    if (!this.fogMesh) this.makeFog();
   }
 
   chunkMesh(cc, list) {
@@ -289,12 +302,67 @@ export class PixiScene {
     this.syncDecor();
   }
 
+  // Туман: кольца квадрата сетки (в клетках от края карты), прозрачность — из столбика-градиента
+  // в текстуре (v = непрозрачность). Внутренние кольца чуть «гуляют» — край тумана клубами.
+  makeFog() {
+    const c = document.createElement('canvas'); c.width = 2; c.height = 256;
+    const g = c.getContext('2d'), col = FOG.color;
+    const r = (col >> 16) & 255, gg = (col >> 8) & 255, b = col & 255;
+    for (let y = 0; y < 256; y++) { g.fillStyle = `rgba(${r},${gg},${b},${y / 255})`; g.fillRect(0, y, 2, 1); }
+    const texture = new PIXI.Texture({ source: new PIXI.CanvasSource({ resource: c, scaleMode: 'linear' }) });
+    const F = FOG_W, D = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, F, F + 1.5, 80];
+    const M = 64, L = 4 * M; // точек на сторону и на всё кольцо
+    const pos = new Float32Array(D.length * L * 2), uv = new Float32Array(D.length * L * 2);
+    for (let k = 0; k < D.length; k++) for (let i = 0; i < L; i++) {
+      const a = (2 * Math.PI * i) / L;
+      const jit = k > 0 && D[k] < F + 1 ? 0.32 * Math.sin(a * 23 + k * 1.7) + 0.18 * Math.sin(a * 41 + k * 0.6) : 0;
+      const d = Math.max(0.05 * (k > 0), D[k] + jit), side = (i / M) | 0, t = (i % M) / M, len = N + 2 * d;
+      let x, y;
+      if (side === 0) { x = -d + t * len; y = -d; } else if (side === 1) { x = N + d; y = -d + t * len; } else if (side === 2) { x = N + d - t * len; y = N + d; } else { x = -d; y = N + d - t * len; }
+      const o = (k * L + i) * 2;
+      pos[o] = (x - y) * HW; pos[o + 1] = (x + y) * HH;
+      uv[o] = 0.5; uv[o + 1] = (fogAlpha(D[k]) * 254 + 1) / 256;
+    }
+    const idx = new Uint16Array((D.length - 1) * L * 6);
+    let q = 0;
+    for (let k = 0; k < D.length - 1; k++) for (let i = 0; i < L; i++) {
+      const a = k * L + i, b2 = k * L + (i + 1) % L, c2 = a + L, d2 = b2 + L;
+      idx[q++] = a; idx[q++] = b2; idx[q++] = d2; idx[q++] = a; idx[q++] = d2; idx[q++] = c2;
+    }
+    this.fogMesh = new PIXI.Mesh({ geometry: new PIXI.MeshGeometry({ positions: pos, uvs: uv, indices: idx }), texture });
+    this.fogMesh.eventMode = 'none';
+    this.fogC.addChildAt(this.fogMesh, 0);
+  }
+
+  // лес под туманом: спрайты по глубине, у края почти чёткие, дальше тонут в дымке
+  syncFogForest() {
+    const f = this.f, w = f.world, FF = this.fogForest;
+    for (const ch of FF.removeChildren()) ch.destroy();
+    const list = w.fogTrees.slice().sort((a, b) => (a.gx + a.gy) - (b.gx + b.gy) || (a.gy - b.gy));
+    this.fogSp = [];
+    for (const t of list) {
+      const al = 1 - fogAlpha(t.d);
+      if (al < 0.05) continue;
+      const s = f.objSprite(t);
+      if (!s) continue;
+      const e = new PIXI.Sprite();
+      toWorld(t.gx + 0.5, t.gy + 0.5, tmp);
+      this.put(e, s, tmp.x, tmp.y);
+      e.alpha = al; e.wx = tmp.x; e.wy = tmp.y; e.bw = s.w; e.bh = s.h; e.bax = s.ax; e.bay = s.ay;
+      const cl = (v) => Math.max(0, Math.min(CHUNKS - 1, Math.floor(v / CHUNK)));
+      e.chunk = cl(t.gy) * CHUNKS + cl(t.gx);
+      FF.addChild(e); this.fogSp.push(e);
+    }
+    this.keys.fogTint = -1;
+  }
+
   syncFog() { const _t = performance.now(); try { this._syncFog(); } finally { this.f.perf.mark('syncFog', performance.now() - _t); } }
   _syncFog() {
     const w = this.f.world;
     // закрытые куски — затемнение цветом самого куска (без лишнего слоя поверх)
     const gray = (k) => { const v = Math.round(k * 255); return (v << 16) | (v << 8) | v; };
     for (let c = 0; c < CHUNKS * CHUNKS; c++) this.chunks[c].tint = w.unlocked[c] ? 0xffffff : gray(w.canUnlock(c) ? 0.66 : 0.5);
+    if (this.fogSp) for (const e of this.fogSp) e.tint = this.chunks[e.chunk].tint;
     // граница открытой земли: пунктир
     const b = this.border.clear();
     const dash = (ax, ay, bx, by) => {
@@ -450,12 +518,18 @@ export class PixiScene {
     const uc = w.unlockedCount();
     if (K.uc !== uc || K.house !== f.st.house || K.dec !== !!f.S.decor) { K.uc = uc; K.dec = !!f.S.decor; K.house = f.st.house; this.syncFog(); this.syncSigns(); this.syncDecor(); }
     if (this.keys.lock !== !!f.iconImg.lock) { this.keys.lock = !!f.iconImg.lock; this.syncSigns(); }
+    if (K.fogV !== w.fogV || K.fogArt !== !!f.S.objArt || K.fogW !== w) { K.fogV = w.fogV; K.fogArt = !!f.S.objArt; K.fogW = w; this.syncFogForest(); this.syncFog(); }
+    this.fogC.visible = !(f.editor && f.editor.hideFog);
+    const FS = this.fogSp;
+    if (FS && this.fogC.visible) for (let i = 0; i < FS.length; i++) { const e = FS[i]; const vis = r.visible(e.wx - e.bax, e.wy - e.bay, e.bw, e.bh); if (e.visible !== vis) e.visible = vis; }
 
     // видимость кусков земли
     const CB = this._cb || (this._cb = this.chunks.map((_, c) => w.chunkBounds(c))); // границы кусков не меняются
+    // у крайних кусков в сетке ещё и трава под туманом — запас шире
+    const GB = this._gb || (this._gb = CB.map((b, c) => { const cx = c % CHUNKS, cy = (c / CHUNKS) | 0, edge = !cx || !cy || cx === CHUNKS - 1 || cy === CHUNKS - 1, m = 40 + (edge ? FOG_W * 2 * HW : 0); return { minX: b.minX - m, maxX: b.maxX + m, minY: b.minY - m, maxY: b.maxY + m }; }));
     for (let c = 0; c < this.chunks.length; c++) {
-      const b = CB[c];
-      this.chunks[c].visible = b.maxX + 40 > v.minX && b.minX - 40 < v.maxX && b.maxY + 40 > v.minY && b.minY - 40 < v.maxY;
+      const b = GB[c];
+      this.chunks[c].visible = b.maxX > v.minX && b.minX < v.maxX && b.maxY > v.minY && b.minY < v.maxY;
     }
     const DS = this.decorSp;
     if (DS) for (let i = 0; i < DS.length; i++) { const e = DS[i]; if (!e) continue; const vis = r.visible(e.wx - e.bax, e.wy - e.bay, e.bw, e.bh); if (e.visible !== vis) e.visible = vis; }
@@ -744,4 +818,10 @@ export class GLRenderer {
     const v = this.view;
     return x < v.maxX && x + w > v.minX && y < v.maxY && y + h > v.minY;
   }
+}
+
+// Непрозрачность тумана в d клетках от края карты: 0 у края, плотный к концу полосы
+export function fogAlpha(d) {
+  const t = Math.max(0, Math.min(1, d / (FOG_W + 0.2)));
+  return t * t * (3 - 2 * t);
 }

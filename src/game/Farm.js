@@ -10,7 +10,8 @@ import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
-import { CROPS, FISH, FISH_CATCH, OBJECTS, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import { wildTick, exportWild, importWild, treeLeftSec } from './wild.js';
+import { CROPS, FISH, FISH_CATCH, OBJECTS, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC, TREE_GROW_SCALE, FOG } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 // вид объёмной грядки: 'plain' — без каймы, 'grass' — с травяной каймой
@@ -124,14 +125,20 @@ export class Farm {
   bedStyleName() { return BED_STYLE; }
 
   objSprite(o) {
-    const S = this.S;
+    const S = this.S, vi = o.v !== undefined ? o.v : o.id; // у диких деревьев вариант картинки свой (id меняется при загрузке)
+    if (o.type === 'sapling') {
+      // росток и саженец — уменьшенная картинка своего дерева
+      const tree = this._sapTmp || (this._sapTmp = { type: '', id: 0 });
+      tree.type = o.tree; tree.id = vi;
+      return grownSprite(this.objSprite(tree), TREE_GROW_SCALE[o.stage | 0] || 1);
+    }
     if (o.type === 'stump' && o.was && S.stumpOf) {
       // пень того дерева, которое срубили
-      const tree = S.objArt[o.was], st = tree && S.stumpOf(tree[o.id % tree.length], o.id);
+      const tree = S.objArt[o.was], st = tree && S.stumpOf(tree[vi % tree.length], vi);
       if (st) return st;
     }
     const v = S.objArt && S.objArt[o.type];
-    if (v && v.length) return v[o.id % v.length];
+    if (v && v.length) return v[vi % v.length];
     switch (o.type) {
       case 'oak': case 'oak2': case 'apple': case 'pine': return S.trees[o.type];
       case 'stump': return S.stumps[o.id & 1];
@@ -158,6 +165,7 @@ export class Farm {
       energy: START.energy, energyAt: Date.now(), can: 0, house: 1, well: 0,
       items: { [seedId('carrot')]: 4 },
       stats: { cleared: 0, harvested: 0 },
+      wild: { at: Date.now() },
     };
     let px = w.playerStart[0], py = w.playerStart[1];
     // v2 — сохранения версии с декором художника: там другой набор объектов,
@@ -211,6 +219,10 @@ export class Farm {
       // иначе объект остался снятым: колодец найдёт место сам (fixWell)
     });
     w.fixWell();
+    // дикие деревья у края тумана: сохранённые + выросшие, пока игры не было
+    importWild(w, this.st.wild && this.st.wild.list, Date.now());
+    if (this.st.wild) delete this.st.wild.list;
+    this.tickWild(px, py);
     // старые сохранения: первое задание ещё не выполнено — стартовая морковка созревает сразу
     if (saved && !this.st.stats.harvested && !(this.st.quest && this.st.quest.i > 0)) {
       const b = this.beds.get(w.startBeds[0]);
@@ -235,6 +247,7 @@ export class Farm {
     for (const b of this.beds.values()) if (this.world.tiles[b.i] === T.SOIL) beds.push([b.i, b.crop || '', Math.round(b.p), b.w]);
     const chunks = [];
     this.world.unlocked.forEach((u, i) => u && chunks.push(i));
+    if (this.st.wild) this.st.wild.list = exportWild(this.world);
     return {
       v: 3, seed: this.world.seed, map: this.world.mapId || undefined, st: this.st, objects: this.world.exportObjects(), chunks, beds,
       player: [this.player.tx, this.player.ty],
@@ -278,6 +291,23 @@ export class Farm {
       const limit = b.w >= 2 ? total : b.w >= 1 ? total * 2 / 3 : 0;
       if (b.p < limit) b.p = Math.min(limit, b.p + dt);
     }
+  }
+
+  // правила дикого леса (src/game/wild.js); px, py — где стоит фермер (там росток не появится)
+  tickWild(px, py) {
+    if (this.editor) return;
+    const p = this.player;
+    const fx = px !== undefined ? px : p.tx, fy = py !== undefined ? py : p.ty;
+    const ev = wildTick(this.st, this.world, {
+      now: Date.now(), rng: Math.random,
+      blocked: (x, y) => Math.abs(x - fx) <= 1 && Math.abs(y - fy) <= 1,
+    });
+    if (!ev.length) return;
+    if (this.r && this.r.view && p) for (const e of ev) {
+      const o = e.o;
+      if (this.r.visible(o.wx - 40, o.wy - 80, 80, 90)) this.burst(o.wx, o.wy - 10, e.type === 'grown' ? '#8fd35c' : '#c9f29a', e.type === 'grown' ? 10 : 6);
+    }
+    if (p) this.changed();
   }
 
   get maxEnergy() { return HOUSE[this.st.house].energy; }
@@ -373,6 +403,7 @@ export class Farm {
     if (!w.isOpen(o.gx, o.gy)) return this.expandPopup(w.chunkOf(o.gx, o.gy), sx, sy);
     if (o.type === 'house') return this.ui.housePanel(this);
     if (o.type === 'well') return this.wellPopup(o, sx, sy);
+    if (o.type === 'sapling') return this.saplingPopup(o, sx, sy);
     const def = OBJECTS[o.type];
     if (!def) return;
     if (def.action) this.queue({ kind: def.action, obj: o });
@@ -396,6 +427,14 @@ export class Farm {
     // одно действие (например, дорожка: только «идти») — выполняем сразу, без меню
     if (items.length === 1) { this.ui.closePopup(); return items[0].onClick(); }
     this.ui.popup(sx, sy, { items });
+  }
+
+  saplingPopup(o, sx, sy) {
+    const tree = OBJECTS[o.tree], left = treeLeftSec(o, Date.now());
+    this.ui.popup(sx, sy, {
+      title: (o.stage ? 'Саженец: ' : 'Росток: ') + tree.name.toLowerCase(), text: `Вырастет ${o.stage ? 'в дерево' : 'в саженец'} через ${fmtTime(left)}`,
+      items: [{ icon: 'axe', label: 'Выкопать', sub: `⚡ ${ENERGY.chop}`, onClick: () => this.queue({ kind: 'chop', obj: o }) }],
+    });
   }
 
   wellPopup(o, sx, sy) {
@@ -810,7 +849,7 @@ export class Farm {
       b.minX = Math.min(b.minX, cb.minX); b.maxX = Math.max(b.maxX, cb.maxX);
       b.minY = Math.min(b.minY, cb.minY); b.maxY = Math.max(b.maxY, cb.maxY);
     });
-    const m = 120;
+    const m = this.editor ? 320 : 120; // в редакторе видно и полосу тумана
     this.cam.bounds = { minX: b.minX - m, maxX: b.maxX + m, minY: b.minY - m, maxY: b.maxY + m };
     this.cam.clamp();
   }
@@ -825,6 +864,8 @@ export class Farm {
     this._wall = now;
     this._eT = (this._eT || 0) + dt;
     if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.ui.tick(this); }
+    this._wT = (this._wT || 0) + dt;
+    if (this._wT > 5) { this._wT = 0; this.tickWild(); }
     this.player.update(dt);
     this.pourWater(dt);
     const OB = this.world.objects;
@@ -910,6 +951,21 @@ export class Farm {
       toWorld(x0 + CHUNK, y0 + CHUNK, tmp); ctx.lineTo(tmp.x, tmp.y);
       toWorld(x0, y0 + CHUNK, tmp); ctx.lineTo(tmp.x, tmp.y);
       ctx.closePath(); ctx.fill();
+    }
+    // туман вокруг карты (в 2D — несколько колец, без леса)
+    const F = FOG.width, col = FOG.color, rgb = `${(col >> 16) & 255},${(col >> 8) & 255},${col & 255}`;
+    const sq = (d, back) => {
+      const P = [[-d, -d], [N + d, -d], [N + d, N + d], [-d, N + d]];
+      if (back) P.reverse();
+      toWorld(P[0][0], P[0][1], tmp); ctx.moveTo(tmp.x, tmp.y);
+      for (let k = 1; k < 4; k++) { toWorld(P[k][0], P[k][1], tmp); ctx.lineTo(tmp.x, tmp.y); }
+      ctx.closePath();
+    };
+    const D = [0, 1, 2, 3, F, 80];
+    for (let k = 0; k < D.length - 1; k++) {
+      const m = (D[k] + D[k + 1]) / 2, t = Math.min(1, m / F), a = k === D.length - 2 ? 1 : t * t * (3 - 2 * t);
+      ctx.fillStyle = `rgba(${rgb},${a.toFixed(3)})`;
+      ctx.beginPath(); sq(D[k], false); sq(D[k + 1], true); ctx.fill();
     }
     // граница открытой территории
     this.drawBorder(ctx);
@@ -1132,4 +1188,18 @@ export function fmtTime(sec) {
   if (sec < 3600) { const m = Math.floor(sec / 60), s = sec % 60; return s ? `${m} мин ${s} с` : `${m} мин`; }
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
   return m ? `${h} ч ${m} мин` : `${h} ч`;
+}
+
+// Уменьшенная копия спрайта (та же картинка — та же текстура в атласе, новых загрузок нет)
+function grownSprite(s, k) {
+  if (k === 1) return s;
+  const G = s.grown || (s.grown = new Map());
+  let g = G.get(k);
+  if (!g) {
+    g = { canvas: s.canvas, w: s.w * k, h: s.h * k, ax: s.ax * k, ay: s.ay * k };
+    const d = dimSprite(s); // затемнённая копия (закрытый участок) — тоже от готовой картинки
+    g.dim = { canvas: d.canvas, w: g.w, h: g.h, ax: g.ax, ay: g.ay };
+    G.set(k, g);
+  }
+  return g;
 }

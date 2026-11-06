@@ -8,7 +8,7 @@
 // Сохранение пишет assets/map.json прямо в папку проекта (через tools/serve.mjs). Игра берёт карту
 // из этого файла вместо случайной генерации. Несохранённая работа держится в черновике браузера.
 
-import { World, mapText, N, CHUNK, CHUNKS, T, START_CHUNK } from '../game/World.js';
+import { World, mapText, N, CHUNK, CHUNKS, T, START_CHUNK, FOG_TREES, FOG_W } from '../game/World.js';
 import { OBJECTS } from '../game/data.js';
 import { toGrid, toWorld } from '../engine/Iso.js';
 
@@ -31,6 +31,7 @@ const TOOLS = [
   { id: 'rock', name: 'Камень', obj: 'rock', brush: true },
   { id: 'boulder', name: 'Валун 2×2', obj: 'boulder' },
   { id: 'forest', name: 'Лес (случайно)', obj: 'forest', brush: true },
+  { id: 'fogforest', name: 'Лес в тумане', obj: 'fogforest', brush: true },
   { group: 'Постройки' },
   { id: 'house', name: 'Дом', obj: 'house', one: true },
   { id: 'well', name: 'Колодец', obj: 'well', one: true },
@@ -40,6 +41,7 @@ const TOOLS = [
   { id: 'move', name: 'Перенести', move: true },
 ];
 const FOREST = ['oak', 'oak', 'oak2', 'oak2', 'pine', 'pine', 'apple', 'bush', 'rock'];
+const FOG_FOREST = ['oak', 'oak', 'oak2', 'oak2', 'pine', 'pine', 'pine', 'apple', 'bush'];
 
 // Какую карту открыть: черновик (несохранённая работа) или файл
 export function startMap(fileMap) {
@@ -176,9 +178,35 @@ export class MapEditor {
     return out;
   }
 
+  // Полоса тумана за краем карты: там только лес-картинка (деревья, кусты), с дальних сторон
+  applyFog(gx, gy, drag) {
+    const t = this.tool, w = this.f.world;
+    const list = [];
+    const s = this.size, o = (s - 1) >> 1;
+    for (let y = gy - o; y < gy - o + s; y++) for (let x = gx - o; x < gx - o + s; x++) if (w.fogDepth(x, y) >= 1) list.push([x, y]);
+    let did = false;
+    for (const [x, y] of list) {
+      if (t.erase) { did = w.removeFogTree(x, y) || did; continue; }
+      let type = t.obj;
+      if (type === 'forest' || type === 'fogforest') {
+        if (this.size > 1 && Math.random() < 0.45) continue;
+        type = FOG_FOREST[(Math.random() * FOG_FOREST.length) | 0];
+      }
+      if (!FOG_TREES.includes(type)) { if (!drag) this.status('В тумане можно рисовать только деревья, кусты и ластик', true); return; }
+      if (!w.fogBack(x, y)) { if (!drag) this.status('Лес в тумане — только с дальних сторон карты (на ближних он закрывал бы край)', true); continue; }
+      did = !!w.addFogTree(type, x, y) || did;
+    }
+    if (did) { this._changed = true; this.status('Лес в тумане изменён'); }
+  }
+
   apply(gx, gy, drag) {
     const t = this.tool, f = this.f, w = f.world;
-    if (!w.inside(gx, gy)) { if (!drag) this.status('Это за краем карты', true); return; }
+    if (!w.inside(gx, gy)) {
+      if (w.fogDepth(gx, gy) <= FOG_W) return this.applyFog(gx, gy, drag);
+      if (!drag) this.status('Это за краем карты', true);
+      return;
+    }
+    if (t.obj === 'fogforest') { if (!drag) this.status('«Лес в тумане» рисуется за краем карты, в полосе тумана', true); return; }
     if (t.tile !== undefined) { for (const [x, y] of this.cells(gx, gy)) this.setTile(x, y, t.tile); return; }
     if (t.erase) { for (const [x, y] of this.cells(gx, gy)) this.erase(x, y); return; }
     if (t.player) return this.setPlayer(gx, gy);
@@ -414,6 +442,10 @@ export class MapEditor {
     if (this.sel) for (let y = this.sel.gy; y < this.sel.gy + this.sel.h; y++) for (let x = this.sel.gx; x < this.sel.gx + this.sel.w; x++) outline(x, y, 0xffe066, 0.6 + 0.4 * Math.sin(f.time * 6), 2.5);
     // кисть под курсором
     const h = f.hover;
+    if (h && w.fogDepth(h.x, h.y) >= 1 && w.fogDepth(h.x, h.y) <= FOG_W) {
+      const s = this.size, o = (s - 1) >> 1, t = this.tool;
+      for (let y = h.y - o; y < h.y - o + s; y++) for (let x = h.x - o; x < h.x - o + s; x++) if (w.fogDepth(x, y) >= 1) outline(x, y, t.erase ? 0xff6a50 : w.fogBack(x, y) ? 0xbfe6ff : 0x888888, 0.9, 2);
+    }
     if (h && w.inside(h.x, h.y)) {
       const t = this.tool;
       let list;
@@ -450,8 +482,8 @@ export class MapEditor {
       if (tool.tile === T.GRASS) s = S.grass[0];
       else if (tool.tile === T.PATH) s = S.path[0];
       else if (tool.tile === T.SOIL) s = S.bed ? S.bed.plain[0] : S.soil[0];
-      else if (tool.obj && tool.obj !== 'forest') s = f.objSprite({ type: tool.obj, id: 0 });
-      else if (tool.obj === 'forest') s = f.objSprite({ type: 'pine', id: 1 });
+      else if (tool.obj && tool.obj !== 'forest' && tool.obj !== 'fogforest') s = f.objSprite({ type: tool.obj, id: 0 });
+      else if (tool.obj === 'forest' || tool.obj === 'fogforest') s = f.objSprite({ type: 'pine', id: 1 });
     } catch { s = null; }
     const c = document.createElement('canvas'); c.width = c.height = 64;
     const g = c.getContext('2d');
@@ -477,6 +509,11 @@ export class MapEditor {
     hand.title = 'На телефоне: что делает палец — рисует или двигает карту';
     hand.onclick = () => { this.handMode = !this.handMode; hand.textContent = this.handMode ? 'Рука' : 'Кисть'; };
     head.appendChild(hand);
+    this.hideFog = false;
+    const fogB = el('button', 'ed-btn', 'Туман: виден');
+    fogB.title = 'Спрятать туман, чтобы лучше видеть лес под ним';
+    fogB.onclick = () => { this.hideFog = !this.hideFog; fogB.textContent = this.hideFog ? 'Туман: скрыт' : 'Туман: виден'; };
+    head.appendChild(fogB);
     root.appendChild(head);
 
     const tools = el('div', 'ed-tools');

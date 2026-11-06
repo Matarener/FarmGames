@@ -43,9 +43,26 @@ export const OBJECTS = {
   berry:   { name: 'Куст',    hp: 1, action: 'chop', drops: { wood: [1, 1] }, xp: 1, seedChance: 0.5 },
   rock:    { name: 'Камень',  hp: 2, action: 'mine', drops: { stone: [2, 4] }, xp: 2, oreChance: 0.1, ore: [1, 1] },
   boulder: { name: 'Валун',   hp: 5, action: 'mine', drops: { stone: [6, 9] }, xp: 5, oreChance: 1, ore: [1, 3], w: 2, h: 2 },
+  // росток дикого дерева у края тумана (src/game/wild.js); во что вырастет — o.tree
+  sapling: { name: 'Саженец', hp: 1, action: 'chop', drops: {}, xp: 1 },
   house:   { name: 'Дом',     static: true, w: 2, h: 2 },
   well:    { name: 'Колодец', static: true },
 };
+
+// Дикий лес у края тумана: новые деревья сами вырастают на свободной траве у края карты.
+// every — раз в сколько секунд появляется росток, cap — сколько ростков и саженцев может расти сразу,
+// band — в скольких клетках от тумана, stages — сколько секунд длится каждая стадия
+// (росток → саженец → дерево), trees — какие деревья вырастают и как часто.
+export const WILD = {
+  every: 1800, cap: 10, band: 2,
+  stages: [3600, 7200],
+  trees: { oak: 4, oak2: 3, pine: 3, apple: 1 },
+};
+// Размер спрайта дерева на каждой стадии роста (доля от взрослого)
+export const TREE_GROW_SCALE = [0.3, 0.58];
+
+// Туман вокруг карты: ширина полосы (клеток), густота леса под туманом
+export const FOG = { width: 4, forest: [0.6, 0.55, 0.45, 0], color: 0xe4ecee };
 
 // Стоимость энергии за удар/действие
 export const ENERGY = { chop: 1, mine: 1, dig: 2, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1 };
