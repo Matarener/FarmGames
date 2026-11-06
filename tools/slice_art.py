@@ -15,6 +15,7 @@ SRC = os.path.join(ROOT, 'assets', 'source')
 OUT = os.path.join(ROOT, 'assets', 'art')
 DENSITY = 4  # пикселей на мировую единицу
 TILE_W, TILE_H = 64, 32
+YOUNG_K = 0.65  # молодое растение ниже взрослого во столько раз
 
 # Лист → объекты по порядку (сверху вниз, слева направо) и ширина «пятачка» под объектом
 # в мировых единицах (по ней считается масштаб).
@@ -24,6 +25,25 @@ SHEETS = {
     'rocks':  [('rock_big', 118), ('rock_mid', 54), ('rock_small', 40), ('rock_moss', 116)],
     'bushes': [('bush_blue', 40), ('bush_rasp', 40), ('bush_pink', 40),
                ('bush_hydra', 40), ('bush_lav', 40), ('bush_rose', 40)],
+    # без плодов (после сбора): те же деревья и кусты, правка исходной картинки
+    'trees_apple_bare': [('tree_apple_bare', 62)],
+    'trees_cherry_bare': [('tree_blossom_bare', 62)],
+    'trees_sakura_bare': [('tree_sakura_bare', 62)],
+    # отдельные правки кустов (точнее листа): у листа bushes_bare все — запасные
+    'bushes_blue_bare': [('bush_blue_bare', 40)], 'bushes_rasp_bare': [('bush_rasp_bare', 40)],
+    'bushes_pink_bare': [('bush_pink_bare', 40)], 'bushes_hydra_bare': [('bush_hydra_bare', 40)],
+    'bushes_rose_bare': [('bush_rose_bare', 40)], 'bushes_lav_bare': [('bush_lav_bare', 40)],
+    'bushes_bare': [('bush_blue_bare_alt', 40), ('bush_rasp_bare_alt', 40), ('bush_pink_bare_alt', 40),
+                    ('bush_hydra_bare_alt', 40), ('bush_lav_bare_alt', 40), ('bush_rose_bare_alt', 40)],
+    # молодые растения (стадия 2 из 3): высота — YOUNG_K от взрослого (YOUNG ниже)
+    'young_oak': [('tree_oak_young', 62)], 'young_birch': [('tree_birch_young', 60)],
+    'young_sakura': [('tree_sakura_young', 62)], 'young_cherry': [('tree_blossom_young', 62)],
+    'young_maple': [('tree_autumn_young', 62)], 'young_apple': [('tree_apple_young', 62)],
+    'young_pine': [('tree_pine_young', 60)],
+    'youngb_blue': [('bush_blue_young', 40)], 'youngb_rasp': [('bush_rasp_young', 40)], 'youngb_pink': [('bush_pink_young', 40)],
+    'youngb_hydra': [('bush_hydra_young', 40)], 'youngb_lav': [('bush_lav_young', 40)], 'youngb_rose': [('bush_rose_young', 40)],
+    # ростки посаженных игроком растений (стадия 0): под деревья и под кусты
+    'sprouts': [('sprout_tree', -30), ('sprout_bush', -32)],
     # отрицательная ширина: «пятачок» — весь ромб объекта (ширина по краям картинки)
     'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_moss', -42)],
     'stumps2': [('stump_apple', -42), ('stump_sakura', -42), ('stump_blossom', -42), ('stump_autumn', -42)],
@@ -63,6 +83,12 @@ ICON_SHEETS = {
     'ui_crops': ['carrot', 'wheat', 'beet', 'cabbage', 'tomato', 'corn', 'sunflower', 'pumpkin', 'strawberry', 'cotton'],
     'ui_avatar': ['avatar'],
     'ui_fish': ['fish_carp', 'fish_perch', 'fish_gold', 'fish'],  # прозрачный фон
+    # плоды деревьев и кустов
+    'ui_flora1': ['acorn', 'birch_bark', 'sakura_petal', 'cherry', 'maple_leaf', 'apple', 'pinecone'],
+    'ui_flora2': ['blueberry', 'raspberry', 'rosehip', 'hydrangea', 'lavender', 'rose_petal'],
+    # саженцы деревьев (иконки в рюкзаке)
+    'ui_saplings1': ['sap_oak', 'sap_birch', 'sap_sakura', 'sap_cherry', 'sap_maple', 'sap_apple', 'sap_pine'],
+    'ui_saplings2': ['sap_blueberry', 'sap_raspberry', 'sap_rosehip', 'sap_hydrangea', 'sap_lavender', 'sap_rose'],
 }
 ICON_PX = 128
 
@@ -88,9 +114,12 @@ def cut_dark_bg(a):
     return np.isin(lab, np.where(sizes > 1500)[0] + 1)
 
 
-def icons():
+def icons(only=None):
     names = []
+    if only:
+        with open(os.path.join(OUT, 'icons.json')) as f: names = json.load(f)
     for sheet, items in ICON_SHEETS.items():
+        if only and sheet not in only: continue
         a = np.array(Image.open(os.path.join(SRC, sheet + '.png')).convert('RGBA'))
         if (a[..., 3] == 0).mean() > 0.2: a = load(sheet)  # уже прозрачный
         else: a[..., 3] = np.where(cut_dark_bg(a), 255, 0)
@@ -104,7 +133,7 @@ def icons():
             sq = Image.new('RGBA', (ICON_PX, ICON_PX))
             sq.paste(img, ((ICON_PX - img.width) // 2, (ICON_PX - img.height) // 2))
             sq.save(os.path.join(OUT, 'ic_' + name + '.webp'), 'WEBP', quality=90, method=6)
-            names.append(name)
+            if name not in names: names.append(name)
             print(f'ic_{name}')
     with open(os.path.join(OUT, 'icons.json'), 'w') as f:
         json.dump(names, f)
@@ -168,10 +197,14 @@ def save(img, name, w, h, ax, ay, man):
     man[name] = {'w': round(w, 2), 'h': round(h, 2), 'ax': round(ax, 2), 'ay': round(ay, 2)}
 
 
-def main():
+def main(only=None):
+    """only — нарезать только эти листы SHEETS и дописать их в существующий manifest.json"""
     os.makedirs(OUT, exist_ok=True)
     man = {}
+    if only:
+        with open(os.path.join(OUT, 'manifest.json')) as f: man = json.load(f)
     for sheet, items in SHEETS.items():
+        if only and sheet not in only: continue
         a = load(sheet)
         boxes, lab = components(a, len(items))
         for (y0, y1, x0, x1, i), (name, base_w) in zip(boxes, items):
@@ -186,13 +219,15 @@ def main():
                 bw, bx, by = base_of(crop)
                 # у деревьев «пятачок» травы — ромб, его самая широкая строка и есть центр
                 # (как у пней, иначе пень встаёт выше дерева)
-                if sheet.startswith('trees'): by += bw / 4
+                if sheet.startswith('trees') or sheet.startswith('young_'): by += bw / 4
                 # у колодца самая широкая строка — середина круглой кладки; опора — от низа кладки
                 # под центром (иначе колодец «съезжает» на клетку перед собой)
                 if sheet == 'well':
                     mm = crop[..., 3] > 128; c = int(bx)
                     by = np.where(mm[:, max(0, c - 3):c + 3].any(1))[0].max()
             k = base_w / bw  # мир/пиксель
+            if name.endswith('_young') and name[:-6] in man:  # по высоте взрослого
+                k = YOUNG_K * man[name[:-6]]['h'] / (y1 - y0)
             W, H = (x1 - x0) * k, (y1 - y0) * k
             img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
             # опора — центр ромба основания (низ минус четверть ширины)
@@ -201,6 +236,12 @@ def main():
 
     # Грядки: объёмный ромб (верх + бортик). Ширина — по краям картинки, центр ромба —
     # строка самой левой точки (левый угол верхней грани).
+    if only:
+        with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
+            json.dump(man, f, indent=1)
+        ic = [n for n in only if n in ICON_SHEETS]
+        if ic: icons(ic)
+        return
     for sheet, items in BED_SHEETS.items():
         if not os.path.exists(os.path.join(SRC, sheet + '.png')): continue
         a = load(sheet)
@@ -300,4 +341,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # python tools/slice_art.py [лист ...] — только эти листы деревьев/кустов, остальное не трогать
+    main(sys.argv[1:] or None)

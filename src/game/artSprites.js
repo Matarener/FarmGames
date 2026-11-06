@@ -7,18 +7,60 @@ import { loadImage, makeCanvas } from '../engine/Sprite.js';
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
 const BASE = 'assets/art/';
 
-// Какие картинки у каких объектов (вариант выбирается по id объекта)
+// Какие картинки у каких объектов (у камней и пней вариант выбирается по id объекта)
 const OBJ = {
-  oak: ['tree_oak', 'tree_birch'],
-  oak2: ['tree_sakura', 'tree_blossom', 'tree_autumn'],
-  apple: ['tree_apple'],
-  pine: ['tree_pine'],
+  oak: ['tree_oak'], birch: ['tree_birch'], sakura: ['tree_sakura'], cherry: ['tree_blossom'], maple: ['tree_autumn'],
+  apple: ['tree_apple'], pine: ['tree_pine'],
+  blueberry: ['bush_blue'], raspberry: ['bush_rasp'], rosehip: ['bush_pink'], hydrangea: ['bush_hydra'], lavender: ['bush_lav'], rose: ['bush_rose'],
   rock: ['rock_mid', 'rock_small'],
   boulder: ['rock_big', 'rock_moss'],
-  bush: ['bush_pink', 'bush_hydra', 'bush_lav', 'bush_rose'],
-  berry: ['bush_blue', 'bush_rasp'],
   stump: ['stump_oak', 'stump_birch', 'stump_pine', 'stump_moss'],
 };
+
+// Временная картинка «плоды собраны»: цвета плодов/цветов (диапазон оттенка) перекрашиваются в зелень листвы.
+// Когда художник нарисует варианты без плодов, они заменят это.
+// white — перекрашивать и белые лепестки
+const BARE = {
+  apple: { h: [[345, 15]] }, cherry: { h: [[300, 360], [0, 15]], white: true }, sakura: { h: [[300, 350]] }, blueberry: { h: [[215, 255]] },
+  raspberry: { h: [[330, 360], [0, 12]] }, rosehip: { h: [[300, 350]] }, hydrangea: { h: [[200, 250]] }, lavender: { h: [[255, 300]] }, rose: { h: [[320, 360], [0, 10]] },
+};
+function bare(s, { h: ranges, white: wh }) {
+  const c = makeCanvas(s.canvas.width, s.canvas.height), g = c.getContext('2d');
+  g.drawImage(s.canvas, 0, 0);
+  const im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 20) continue;
+    const r = d[i] / 255, gg = d[i + 1] / 255, b = d[i + 2] / 255;
+    const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), dl = mx - mn, sat = mx ? dl / mx : 0;
+    let h = 0;
+    if (dl) h = mx === r ? 60 * (((gg - b) / dl) % 6) : mx === gg ? 60 * ((b - r) / dl + 2) : 60 * ((r - gg) / dl + 4);
+    if (h < 0) h += 360;
+    // белые лепестки (у вишни) — по низкой насыщенности и яркости
+    const white = wh && sat < 0.22 && mx > 0.8;
+    if (!white && (sat < 0.35 || mx < 0.3 || !ranges.some(([a, z]) => a <= z ? h >= a && h <= z : h >= a || h <= z))) continue;
+    const L = Math.min(1, 0.25 + mx * 0.55); // зелень той же светлоты
+    d[i] = 70 * L; d[i + 1] = 170 * L; d[i + 2] = 55 * L;
+  }
+  g.putImageData(im, 0, 0);
+  return { canvas: c, w: s.w, h: s.h, ax: s.ax, ay: s.ay, name: s.name + '_bare' };
+}
+
+// Уменьшенная копия (молодое растение) — своя картинка, чтобы видеокарта не тянула большую
+function scaled(s, k) {
+  const c = makeCanvas(Math.max(1, Math.round(s.canvas.width * k)), Math.max(1, Math.round(s.canvas.height * k))), g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(s.canvas, 0, 0, c.width, c.height);
+  return { canvas: c, w: s.w * k, h: s.h * k, ax: s.ax * k, ay: s.ay * k, name: s.name + '_young' };
+}
+
+// Иконка саженца: само растение в квадрате 64×64
+function iconOf(s) {
+  const c = makeCanvas(64, 64), g = c.getContext('2d'), k = Math.min(60 / s.canvas.width, 60 / s.canvas.height);
+  const w = s.canvas.width * k, h = s.canvas.height * k;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(s.canvas, (64 - w) / 2, (64 - h) / 2, w, h);
+  return c.toDataURL();
+}
 
 function flipped(s) {
   const c = makeCanvas(s.canvas.width, s.canvas.height), g = c.getContext('2d');
@@ -54,13 +96,27 @@ export async function loadArt(onProgress) {
   } catch (e) { /* без иконок */ }
   const obj = {};
   for (const [type, names] of Object.entries(OBJ)) obj[type] = names.map((n) => A[n]).filter(Boolean);
+  // растения: без плодов, молодое; иконки саженцев
+  const flora = {}, floraIcons = {};
+  for (const type of Object.keys(OBJ)) {
+    const s = obj[type] && obj[type][0];
+    if (!s || !/^(tree|bush)_/.test(s.name)) continue;
+    // молодое: картинка художника (<имя>_young), иначе уменьшенная копия взрослого
+    flora[type] = { bare: s, young: A[s.name + '_young'] || scaled(s, 0.6) };
+    // file:// не даёт читать пиксели — тогда без перекраски и своих иконок
+    // картинка художника «без плодов» (<имя>_bare), иначе — временная перекраска
+    if (A[s.name + '_bare']) flora[type].bare = A[s.name + '_bare'];
+    try { if (BARE[type] && !A[s.name + '_bare']) flora[type].bare = bare(s, BARE[type]); floraIcons['sap_' + type] = floraIcons['own_' + type] = iconOf(s); } catch (e) { /* */ }
+  }
+  try { if (A.tile_sand) floraIcons.path = iconOf(A.tile_sand); } catch (e) { /* */ }
   const crops = {};
   for (const name of Object.keys(A)) {
     const m = /^crop_(\w+)_(\d)$/.exec(name);
     if (m) (crops[m[1]] = crops[m[1]] || [])[+m[2]] = A[name];
   }
   return {
-    obj, crops, icons,
+    obj, crops, icons, flora, floraIcons,
+    sprouts: { tree: A.sprout_tree || null, bush: A.sprout_bush || null },
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {
       const k = tree && tree.name && tree.name.replace('tree_', '');

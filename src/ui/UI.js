@@ -43,6 +43,7 @@ export class UI {
     $('#mb-done').onclick = () => farm.mover.exit();
     $('#mb-cancel').onclick = () => farm.mover.cancel();
     $('#mb-place').onclick = () => farm.mover.place();
+    $('#mb-store').onclick = () => farm.mover.store();
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && farm.mover.active) farm.mover.exit(); });
   }
 
@@ -259,6 +260,7 @@ export class UI {
     $('#mb-place').disabled = !st.canPlace;
     $('#mb-cancel').hidden = !st.selected;
     $('#mb-place').hidden = !st.selected;
+    $('#mb-store').hidden = !st.canStore;
   }
 
   moveBarShake() {
