@@ -120,6 +120,13 @@ for (const c of Object.values(CROPS)) ITEMS[seedId(c.key)] = {
   desc: `Посадите на пустую грядку. Растёт ${fmtMin(c.time)}, доступно с ${c.level} уровня.`,
 };
 for (const [k, r] of Object.entries(RESOURCES)) ITEMS[k] = { key: k, name: r.name, icon: k, tabs: ['res'], desc: 'Нужно для улучшения дома, колодца и новых участков.' };
+// Еда из магазина: её не выращивают и не продают, зато она даёт больше энергии
+export const SHOP_FOOD = {
+  milk:  { name: 'Молоко',  food: 6,  price: 10, level: 1, desc: 'Свежее молоко из деревни.' },
+  bread: { name: 'Хлеб',    food: 10, price: 18, level: 2, desc: 'Тёплый хлеб из пекарни.' },
+  pie:   { name: 'Пирожок', food: 18, price: 35, level: 4, desc: 'Пирожок с яблоками, очень сытный.' },
+};
+for (const [k, f] of Object.entries(SHOP_FOOD)) ITEMS[k] = { key: k, name: f.name, icon: k, food: f.food, tabs: ['food'], desc: f.desc + ' Восстанавливает энергию.' };
 // порядок «по умолчанию»: как в таблице (инструменты, урожай, рыба, семена, ресурсы)
 let _ord = 0;
 for (const it of Object.values(ITEMS)) it.order = _ord++;
@@ -131,6 +138,11 @@ export const SHOP_TABS = [
   { key: 'res',   name: 'Ресурсы',   icon: 'wood' },
   { key: 'build', name: 'Постройки', icon: 'build' },
 ];
-// Товары: item — id из ITEMS, price — монеты за штуку, level — с какого уровня можно купить
+// Товары: item — id из ITEMS, price — цена одной покупки, level — с какого уровня можно купить
 export const SHOP = [];
+// cur — валюта ('coins' или 'gems'), qty — сколько штук в одной покупке
+for (const [k, f] of Object.entries(SHOP_FOOD)) SHOP.push({ tab: 'food', item: k, price: f.price, level: f.level });
 for (const c of Object.values(CROPS)) SHOP.push({ tab: 'seeds', item: seedId(c.key), price: c.seed, level: c.level });
+SHOP.push({ tab: 'res', item: 'stone', price: 4 });
+SHOP.push({ tab: 'res', item: 'wood', price: 1, cur: 'gems', qty: 10 });
+SHOP.push({ tab: 'res', item: 'ore', price: 1, cur: 'gems', qty: 3 });

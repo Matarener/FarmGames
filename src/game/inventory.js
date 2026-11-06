@@ -70,14 +70,14 @@ export function listItems(st, tab, sort) {
   return out;
 }
 
-// Покупка на рынке: offer — строка из SHOP. Всё или ничего.
+// Покупка на рынке: offer — строка из SHOP, n — сколько покупок (по offer.qty штук). Всё или ничего.
 export function buyItem(st, offer, n) {
   if (!offer || !(n > 0) || !ITEMS[offer.item]) return null;
   if (offer.level && st.level < offer.level) return { locked: true };
-  const coins = offer.price * n;
-  if (st.coins < coins) return { poor: true };
-  const got = addItem(st, offer.item, n);
+  const cur = offer.cur || 'coins', cost = offer.price * n;
+  if (st[cur] < cost) return { poor: cur };
+  const got = addItem(st, offer.item, n * (offer.qty || 1));
   if (!got) return null;
-  st.coins -= offer.price * got;
-  return { id: offer.item, n: got, coins: offer.price * got };
+  st[cur] -= cost;
+  return { id: offer.item, n: got, cost, cur };
 }

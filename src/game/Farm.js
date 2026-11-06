@@ -531,7 +531,7 @@ export class Farm {
     const r = Inv.buyItem(this.st, offer, n);
     if (!r) return;
     if (r.locked) return this.toast(`Откроется с ${offer.level} уровня`, 'warn');
-    if (r.poor) return this.toast('Не хватает монет', 'warn');
+    if (r.poor) return this.toast(r.poor === 'gems' ? 'Не хватает кристаллов' : 'Не хватает монет', 'warn');
     this.quests.emit('buy', r.id, r.n);
     this.sfx('coin');
     this.changed();

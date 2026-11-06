@@ -404,28 +404,30 @@ export class UI {
     if (!offers.length) { body.appendChild(h('div', 'pn-empty', 'Скоро здесь появятся товары.')); return; }
     const g = h('div', 'mk-grid');
     for (const o of offers) {
-      const it = ITEMS[o.item], locked = o.level > st.level;
+      const it = ITEMS[o.item], locked = o.level > st.level, cur = o.cur === 'gems' ? 'gem' : 'coin';
       const c = h('button', 'mk-cell' + (locked ? ' locked' : '') + (M.sel === o.item ? ' sel' : ''),
-        `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${locked ? this.ic('lock', 'mk-lock') : ''}</i>` +
-        `<span>${locked ? `с ${o.level} ур.` : `${o.price} ${this.ic('coin', 'ic-s')}`}</span>`);
+        `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${locked ? this.ic('lock', 'mk-lock') : ''}${o.qty > 1 ? `<b>×${o.qty}</b>` : ''}</i>` +
+        `<span>${locked ? `с ${o.level} ур.` : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
       c.onclick = () => { M.sel = M.sel === o.item ? null : o.item; this.sfx('tap'); this.refreshPanel(); };
       g.appendChild(c);
     }
     body.appendChild(g);
     const o = M.sel && offers.find((x) => x.item === M.sel);
     if (!o) { M.sel = null; return; }
-    const it = ITEMS[o.item], have = Inv.count(st, it.key);
-    const box = this.mkCard(it, `${o.price} ${this.ic('coin')} за шт.${have ? ` · в рюкзаке ${have}` : ''}`, M);
+    const it = ITEMS[o.item], have = Inv.count(st, it.key), pack = o.qty || 1;
+    const curKey = o.cur || 'coins', cur = curKey === 'gems' ? 'gem' : 'coin';
+    const per = pack > 1 ? `${o.price} ${this.ic(cur)} за ${pack} шт.` : `${o.price} ${this.ic(cur)} за шт.`;
+    const box = this.mkCard(it, `${per}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
     if (o.level > st.level) box.appendChild(h('div', 'ii-note', `Откроется с ${o.level} уровня.`));
     else {
-      const max = Math.min(99, Math.floor(st.coins / o.price));
+      const max = Math.min(99, Math.floor(st[curKey] / o.price));
       const Q = this.buyQty || (this.buyQty = {});
       const q = Q[o.item] = Math.max(1, Math.min(Math.max(1, max), Q[o.item] || 1));
       const row = h('div', 'ii-sell');
       if (max > 1) row.appendChild(this.stepper(q, max, (v) => { Q[o.item] = v; this.refreshPanel(); }));
       const acts = h('div', 'ii-a');
-      const b = h('button', 'btn-s gold', `Купить ${q} · ${q * o.price} ${this.ic('coin')}`);
-      b.disabled = st.coins < q * o.price; b.onclick = () => f.buy(o, q);
+      const b = h('button', 'btn-s gold', `Купить ${q * pack} шт. · ${q * o.price} ${this.ic(cur)}`);
+      b.disabled = st[curKey] < q * o.price; b.onclick = () => f.buy(o, q);
       acts.appendChild(b); row.appendChild(acts);
       box.appendChild(row);
     }
