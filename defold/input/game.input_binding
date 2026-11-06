@@ -3,6 +3,10 @@ mouse_trigger {
   action: "touch"
 }
 mouse_trigger {
+  input: MOUSE_BUTTON_MIDDLE
+  action: "pan"
+}
+mouse_trigger {
   input: MOUSE_WHEEL_UP
   action: "wheel_up"
 }

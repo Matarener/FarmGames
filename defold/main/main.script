@@ -122,17 +122,21 @@ handle_input = function(self, action_id, action)
 		end
 		return
 	end
-	if action_id == hash('touch') then
+	if action_id == hash('touch') or action_id == hash('pan') then
+		-- pan — зажатое колёсико: только двигает карту, без нажатий
+		local mid = action_id == hash('pan')
+		if self.touch and (self.touch.mid or false) ~= mid then return end
+		if mid and action.pressed and app.ui_modal then return end
 		local sx, sy = points(action)
 		if action.pressed then
 			cam.vx, cam.vy = 0, 0
-			self.touch = { x = sx, y = sy, lx = sx, ly = sy, t = socket.gettime(), lt = socket.gettime(), moved = false }
+			self.touch = { x = sx, y = sy, lx = sx, ly = sy, t = socket.gettime(), lt = socket.gettime(), moved = false, mid = mid }
 			self.vx, self.vy = 0, 0
 		elseif self.touch and action.released then
 			local tc = self.touch
 			self.touch = nil
 			cam.dragging = false
-			if not tc.moved and socket.gettime() - tc.t < 0.6 then tap(self, tc.x, tc.y)
+			if not tc.moved and not tc.mid and socket.gettime() - tc.t < 0.6 then tap(self, tc.x, tc.y)
 			elseif tc.moved and not tc.pinched then
 				local stale = socket.gettime() - tc.lt > 0.08
 				cam:fling(stale and 0 or self.vx, stale and 0 or self.vy)

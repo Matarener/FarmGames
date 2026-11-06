@@ -76,9 +76,6 @@ local function build_hud(self)
 	text(L, 'уровень', 104, top + 8, 11, { color = c('#ffffff', 0.8) })
 	box(L, 66, top + 28, 80, 7, c('#000000', 0.35), 'pill')
 	self.xpbar = box(L, 66, top + 28, 0.1, 7, K.GREEN, 'pill')
-	-- настройки
-	icon(L, 'ui_gear', 158, top + 8, 30)
-	hit(self, 'hud', 154, top + 4, 38, 38, function() self:open_settings() end)
 	-- кошелёк справа
 	local px = VW - 8 - 92
 	self.pills = {}
@@ -109,6 +106,7 @@ local function build_hud(self)
 		icon(L, b[1] == 'more' and 'ui_more' or 'ic_' .. b[1], x + bw / 2 - 17, by + 6, 34)
 		local t = text(L, b[2], x + bw / 2, by + 43, 11, { pivot = gui.PIVOT_N })
 		hit(self, 'hud', x, by, bw, 62, b[3], nil, b[1])
+		if b[1] == 'more' then self.more_right = x + bw end
 	end
 	-- к фермеру
 	frame(L, VW - 8 - 50, by - 60, 50, 50, c('#f6e3b8'), INK, 2.5, 'pill')
@@ -488,11 +486,14 @@ function H.toggle_more(self)
 	local VW, VH = app.cam.view_w, app.cam.view_h
 	local items = {
 		{ 'Задания', 'ui_note', function() self:open_quest() end },
+		{ 'Настройки', 'ui_gear', function() self:open_settings() end },
 		{ 'Переставить', 'ic_house', nil },
 		{ 'Животные', 'ic_star', nil }, { 'Мастерская', 'ic_star', nil }, { 'Декор', 'ic_star', nil }, { 'Достижения', 'ic_star', nil },
 	}
 	local w, h = 190, #items * 40 + 12
-	local x, y = VW - w - 10, VH - 8 - 62 - h - 8
+	-- меню над кнопкой «Ещё» (на широком экране кнопки по центру, а не у края)
+	local x = math.max(8, math.min(VW - w - 8, (self.more_right or VW - 10) - w))
+	local y = VH - 8 - 62 - h - 8
 	local n = frame(self.l_popup, x, y, w, h, PAPER, INK, 2.5, 'round')
 	self.more = n
 	hit(self, 'more', x, y, w, h, function() end)
