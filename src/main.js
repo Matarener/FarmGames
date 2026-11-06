@@ -108,6 +108,21 @@ async function main() {
   progress(0.85); await nextFrame(); // полоса успевает показаться до тяжёлого шага
   if (farm.scene) { try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); } }
   else farm.render();
+  // Разгон: ~2 с кадров с движением камеры ещё за экраном загрузки — движок JS успевает
+  // оптимизировать горячий код, а сборка мусора после загрузки проходит здесь, а не в игре.
+  if (farm.scene) {
+    const cam = farm.cam, z0 = cam.zoom, x0 = cam.x, y0 = cam.y, gl = farm.scene.app.renderer.gl, px = new Uint8Array(4);
+    const N = 120;
+    for (let i = 0; i < N; i++) {
+      const a = i / N * Math.PI * 2;
+      cam.x = x0 + Math.cos(a) * 260; cam.y = y0 + Math.sin(a) * 160;
+      cam.zoom = z0 * (1 + 0.35 * Math.sin(a * 2));
+      farm.scene.render();
+      if (i % 10 === 9) { try { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); } catch { /* */ } progress(0.85 + 0.15 * (i + 1) / N); await nextFrame(); }
+    }
+    cam.zoom = z0; cam.x = x0; cam.y = y0; farm.scene.render();
+    await new Promise((r) => setTimeout(r, 300)); // время на сборку мусора
+  }
   progress(1);
   game.start();
   perf.restart();
