@@ -7,6 +7,7 @@ import { toWorld, HW, HH } from '../engine/Iso.js';
 import { dimSprite } from '../engine/Sprite.js';
 import { N, CHUNK, CHUNKS, T, FOG_W } from './World.js';
 import { HOUSE, FOG } from './data.js';
+import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM } from './bars.js';
 import { hash2 } from '../engine/Sprite.js';
 
 const tmp = { x: 0, y: 0 };
@@ -132,6 +133,7 @@ export class PixiScene {
     this.ghost2 = new PlayerView(this); this.ghost2.c.alpha = 0.4; this.over.addChild(this.ghost2.c);
     this.marks = new PIXI.Graphics(); this.over.addChild(this.marks);
     this.bubbles = new PIXI.Container(); this.over.addChild(this.bubbles);
+    this.barsG = new PIXI.Graphics(); this.over.addChild(this.barsG); this.barsKey = { v: -1, x0: 0, y0: 0, x1: 0, y1: 0 };
     this.queueC = new PIXI.Container(); this.over.addChild(this.queueC);
     this.signsC = new PIXI.Container(); this.over.addChild(this.signsC);
     this.moverC = new PIXI.Container(); this.over.addChild(this.moverC);
@@ -655,6 +657,8 @@ export class PixiScene {
     });
     this.crops.forEach((e) => { const b = e.b; if (f.beds.get(b.i) === b) return; e.destroy(); this.crops.delete(b); const bu = this.bub.get(b); if (bu) { bu.destroy(); this.bub.delete(b); } });
 
+    this.syncBars();
+
     // фермер
     this.player.sync(p);
     const pz = Z(pdepth, pwy); if (this.player.c.zIndex !== pz) this.player.c.zIndex = pz;
@@ -681,6 +685,38 @@ export class PixiScene {
     this.app.renderer.render(this.app.stage);
     this.calls = DST.calls; this.tris = DST.tris;
     const pm = performance.now() - tr; if (pm >= 3) P.mark('отрисовка', pm);
+  }
+
+  // Полоски времени роста — одна Graphics на всех. Пересобирается, когда Farm пересчитал полоски
+  // (раз в секунду) или камера ушла из собранной области; в кадре между этим — ничего не делается.
+  syncBars() {
+    const f = this.f, g = this.barsG, BR = f.bars, K = this.barsKey, v = f.r.view;
+    const show = !!(BR && BR.length) && f.cam.zoom >= BAR_MIN_ZOOM;
+    if (g.visible !== show) g.visible = show;
+    if (!show) return;
+    if (K.v === f.barsV && v.minX >= K.x0 && v.maxX <= K.x1 && v.minY >= K.y0 && v.maxY <= K.y1) return;
+    // область с запасом в полэкрана: при обычном движении камеры пересборка редкая
+    const mx = (v.maxX - v.minX) / 2, my = (v.maxY - v.minY) / 2;
+    K.v = f.barsV; K.x0 = v.minX - mx; K.x1 = v.maxX + mx; K.y0 = v.minY - my; K.y1 = v.maxY + my;
+    g.clear();
+    let n = 0;
+    for (let i = 0; i < BR.length; i += 4) {
+      const x = BR[i] - BAR_W / 2, y = BR[i + 1] - BAR_H / 2;
+      if (x + BAR_W < K.x0 || x > K.x1 || y + BAR_H < K.y0 || y > K.y1) continue;
+      g.rect(x - 1, y - 1, BAR_W + 2, BAR_H + 2); n++;
+    }
+    if (!n) return;
+    g.fill({ color: 0x1e1810, alpha: 0.6 });
+    for (let c = 0; c < BAR_COLORS.length; c++) {
+      let any = false;
+      for (let i = 0; i < BR.length; i += 4) {
+        if (BR[i + 3] !== c) continue;
+        const x = BR[i] - BAR_W / 2, y = BR[i + 1] - BAR_H / 2;
+        if (x + BAR_W < K.x0 || x > K.x1 || y + BAR_H < K.y0 || y > K.y1) continue;
+        g.rect(x, y, Math.max(1, BAR_W * BR[i + 2]), BAR_H); any = true;
+      }
+      if (any) g.fill(BAR_COLORS[c]);
+    }
   }
 
   // номера в очереди дел
