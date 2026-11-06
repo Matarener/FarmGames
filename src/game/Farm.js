@@ -286,10 +286,10 @@ export class Farm {
     W.list = W.list.filter((e) => !!this.placeWild({ x: e[0], y: e[1], kind: e[2], born: e[3] }));
   }
 
-  // Поставить дикую траву или куст (куст — ростком, если ещё не вырос)
+  // Поставить дикую траву, куст или дерево (растение — ростком, если ещё не выросло).
   placeWild(ev) {
     const w = this.world, sp = ev.kind;
-    if (sp !== 'grass' && !(FLORA[sp] && FLORA[sp].kind === 'bush')) return null;
+    if (sp !== 'grass' && !FLORA[sp]) return null;
     if (!w.isOpen(ev.x, ev.y)) return null;
     const grown = sp !== 'grass' && Flora.plantStage(sp, ev.born, Date.now()) >= 2;
     const o = w.add(sp === 'grass' ? 'grass' : grown ? sp : 'sapling', ev.x, ev.y);
@@ -300,11 +300,12 @@ export class Farm {
     return o;
   }
 
-  // Раз в секунду (и при входе): не пора ли вырасти новой траве или ростку
+  // Раз в секунду (и при входе): не пора ли вырасти новой траве, ростку куста или саженцу у тумана
   wildTick(now, quiet) {
     const p = this.player;
     const blocked = p ? (x, y) => Math.abs(x - p.tx) <= 1 && Math.abs(y - p.ty) <= 1 : null;
-    const out = Wild.wildTick(this.st, this.world, { now, rng: Math.random, blocked, reach: p && this.reachFn(), place: (ev) => !!this.placeWild(ev) });
+    const ctx = { now, rng: Math.random, blocked, reach: p && this.reachFn(), place: (ev) => !!this.placeWild(ev) };
+    const out = Wild.wildTick(this.st, this.world, ctx).concat(Wild.treeTick(this.st, this.world, ctx));
     if (!out.length) return;
     if (!quiet) for (const ev of out) { toWorld(ev.x + 0.5, ev.y + 0.5, tmp); this.burst(tmp.x, tmp.y - 6, '#7ccf4f', 6, true); }
     this.dirty = true;
