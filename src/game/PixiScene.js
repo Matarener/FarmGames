@@ -1,0 +1,494 @@
+// Отрисовка фермы через WebGL (PixiJS). Сцена «держится» в видеопамяти: земля, объекты и
+// растения — постоянные спрайты в атласах; каждый кадр меняется только то, что двигается
+// (камера, фермер, частицы). Логика игры, камера, ввод и скелетная анимация — свои; Pixi только рисует.
+// Если WebGL недоступен, Farm рисует по-старому через Canvas 2D.
+import * as PIXI from '../vendor/pixi.min.mjs';
+import { toWorld, HW, HH } from '../engine/Iso.js';
+import { dimSprite } from '../engine/Sprite.js';
+import { N, CHUNK, CHUNKS, T } from './World.js';
+import { HOUSE } from './data.js';
+
+const tmp = { x: 0, y: 0 };
+const ATLAS = 2048, PAD = 6;
+const Z = (depth, wy) => depth * 1e4 + wy * 0.1; // порядок как в 2D: глубина, затем y
+
+// ---------- атласы: все спрайты игры в нескольких больших текстурах ----------
+class Atlases {
+  constructor() { this.list = []; this.dirty = new Set(); this.map = new WeakMap(); }
+
+  page() {
+    const c = document.createElement('canvas'); c.width = c.height = ATLAS;
+    const g = c.getContext('2d');
+    const source = new PIXI.CanvasSource({ resource: c, autoGenerateMipmaps: true, scaleMode: 'linear', mipmapFilter: 'linear', alphaMode: 'premultiply-alpha-on-upload' });
+    const p = { c, g, source, x: PAD, y: PAD, rowH: 0 };
+    this.list.push(p);
+    return p;
+  }
+
+  // текстура для спрайта {canvas, w, h, ax, ay}
+  tex(s) {
+    let t = this.map.get(s.canvas);
+    if (t) return t;
+    const img = s.canvas, w = img.width, h = img.height;
+    if (w + 2 * PAD > ATLAS || h + 2 * PAD > ATLAS) {
+      t = new PIXI.Texture({ source: new PIXI.CanvasSource({ resource: img, autoGenerateMipmaps: true, scaleMode: 'linear' }) });
+      this.map.set(img, t); return t;
+    }
+    let p = this.list[this.list.length - 1] || this.page();
+    if (p.x + w + PAD > ATLAS) { p.x = PAD; p.y += p.rowH + PAD; p.rowH = 0; }
+    if (p.y + h + PAD > ATLAS) { p = this.page(); }
+    p.g.drawImage(img, p.x, p.y);
+    t = new PIXI.Texture({ source: p.source, frame: new PIXI.Rectangle(p.x, p.y, w, h) });
+    p.x += w + PAD; p.rowH = Math.max(p.rowH, h);
+    this.dirty.add(p);
+    this.map.set(img, t);
+    return t;
+  }
+
+  // новые спрайты попадают в видеопамять раз за кадр
+  flush() { for (const p of this.dirty) p.source.update(); this.dirty.clear(); }
+}
+
+// ---------- фермер: спрайты вложений скелета ----------
+class PlayerView {
+  constructor(scene) {
+    this.scene = scene;
+    this.c = new PIXI.Container();
+    this.shadow = new PIXI.Graphics().ellipse(0, 0, 9, 4).fill(0x14280a);
+    this.c.addChild(this.shadow);
+    this.parts = [];
+  }
+
+  sync(p) {
+    toWorld(p.x, p.y, tmp);
+    const f = p.sk.boneMap.float, lift = f ? Math.max(0, -f.ty) : 0, k = Math.max(0.55, 1.15 - lift * 0.035);
+    this.shadow.position.set(tmp.x, tmp.y); this.shadow.scale.set(k); this.shadow.alpha = 0.24 * k;
+    let n = 0;
+    p.sk.eachDraw(tmp.x, tmp.y, 1, p.flip, (s, a, b, c, d, e, f2) => {
+      let sp = this.parts[n];
+      if (!sp) { sp = this.parts[n] = new PIXI.Sprite(); this.c.addChild(sp); }
+      sp.visible = true;
+      const t = this.scene.atlas.tex(s);
+      if (sp.texture !== t) sp.texture = t;
+      // спрайт рисуется с (-ax,-ay) размером (w,h) в системе вложения
+      const kx = s.w / t.width, ky = s.h / t.height;
+      sp.anchor.set(s.ax / s.w, s.ay / s.h);
+      sp.setFromMatrix(new PIXI.Matrix(a * kx, b * kx, c * ky, d * ky, e, f2));
+      n++;
+    });
+    for (let i = n; i < this.parts.length; i++) this.parts[i].visible = false;
+  }
+}
+
+export class PixiScene {
+  constructor(farm, app) {
+    this.f = farm; this.app = app;
+    this.atlas = new Atlases();
+    const world = this.world = new PIXI.Container({ isRenderGroup: true });
+    app.stage.addChild(world);
+    this.base = new PIXI.Graphics(); world.addChild(this.base);
+    this.chunks = [];
+    for (let c = 0; c < CHUNKS * CHUNKS; c++) { const cc = new PIXI.Container(); cc.tiles = []; this.chunks.push(cc); world.addChild(cc); }
+    this.bedsC = new PIXI.Container({ sortableChildren: true }); world.addChild(this.bedsC);
+    this.fog = new PIXI.Graphics(); world.addChild(this.fog);
+    this.border = new PIXI.Graphics(); world.addChild(this.border);
+    this.objC = new PIXI.Container({ sortableChildren: true }); world.addChild(this.objC);
+    this.over = new PIXI.Container(); world.addChild(this.over);
+    this.border2 = new PIXI.Graphics(this.border.context); this.border2.alpha = 0.45; this.over.addChild(this.border2);
+    this.ghost2 = new PlayerView(this); this.ghost2.c.alpha = 0.4; this.over.addChild(this.ghost2.c);
+    this.marks = new PIXI.Graphics(); this.over.addChild(this.marks);
+    this.bubbles = new PIXI.Container(); this.over.addChild(this.bubbles);
+    this.queueC = new PIXI.Container(); this.over.addChild(this.queueC);
+    this.signsC = new PIXI.Container(); this.over.addChild(this.signsC);
+    this.moverC = new PIXI.Container(); this.over.addChild(this.moverC);
+    this.moverG = new PIXI.Graphics(); this.moverC.addChild(this.moverG);
+    this.moverHi = new PIXI.Sprite(); this.moverHi.blendMode = 'add'; this.moverC.addChild(this.moverHi);
+    this.moverGhost = new PIXI.Sprite(); this.moverGhost.alpha = 0.6; this.moverC.addChild(this.moverGhost);
+    this.fx = new PIXI.Graphics(); this.over.addChild(this.fx);
+    this.floatC = new PIXI.Container(); this.over.addChild(this.floatC);
+    this.player = new PlayerView(this); this.objC.addChild(this.player.c);
+    this.objs = new Map(); this.crops = new Map(); this.bub = new Map();
+    this.stamp = 0;
+    this.keys = {};
+    this.textRes = Math.max(2, (window.devicePixelRatio || 1)) * 2.6; // текст чёткий и при сильном приближении
+  }
+
+  // спрайт игры → Pixi-спрайт в точке (x, y) — опорной точке спрайта
+  put(sp, s, x, y) {
+    const t = this.atlas.tex(s);
+    if (sp.texture !== t) { sp.texture = t; sp.anchor.set(s.ax / s.w, s.ay / s.h); sp.scale.set(s.w / t.width, s.h / t.height); }
+    if (sp.x !== x || sp.y !== y) sp.position.set(x, y);
+  }
+
+  // ---------- земля ----------
+  syncGround() {
+    const f = this.f, w = f.world, S = f.S;
+    const BS = S.bed && S.bed[f.bedStyleName()];
+    for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
+      const i = gy * N + gx, t = w.tiles[i];
+      const cx = (gx - gy) * HW, cy = (gx + gy + 1) * HH;
+      const cc = this.chunks[w.chunkOf(gx, gy)];
+      const k = (gy % CHUNK) * CHUNK + (gx % CHUNK);
+      let sp = cc.tiles[k];
+      if (!sp) { sp = cc.tiles[k] = new PIXI.Sprite(); cc.addChild(sp); }
+      let s, bed = null;
+      if (t === T.GRASS) s = S.grass[w.variant[i]];
+      else if (t === T.PATH) s = S.path[(gx + gy) & 1];
+      else if (t === T.WATER) s = f.waterSprite(gx, gy);
+      else {
+        const b = f.beds.get(i);
+        const wet = b && b.crop && !f.cropInfo(b).needsWater && !f.cropInfo(b).ready ? 1 : 0;
+        if (BS) { s = S.grass[w.variant[i]]; bed = BS[wet]; } else s = S.soil[wet];
+      }
+      this.put(sp, s, cx, cy);
+      // объёмная грядка — поверх земли, ближние поверх дальних
+      let bs = this.bedSp && this.bedSp[i];
+      if (bed) {
+        if (!this.bedSp) this.bedSp = [];
+        if (!bs) { bs = this.bedSp[i] = new PIXI.Sprite(); this.bedsC.addChild(bs); bs.zIndex = cy; }
+        bs.visible = true; this.put(bs, bed, cx, cy);
+      } else if (bs) bs.visible = false;
+    }
+    // основа карты под тайлами (закрывает швы)
+    this.base.clear().poly([0, 0, N * HW, N * HH, 0, N * 2 * HH, -N * HW, N * HH]).fill(0x7cc44f);
+  }
+
+  syncFog() {
+    const w = this.f.world, g = this.fog.clear();
+    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
+      if (w.unlocked[c]) continue;
+      const x0 = (c % CHUNKS) * CHUNK, y0 = ((c / CHUNKS) | 0) * CHUNK, pts = [];
+      for (const [x, y] of [[x0, y0], [x0 + CHUNK, y0], [x0 + CHUNK, y0 + CHUNK], [x0, y0 + CHUNK]]) { toWorld(x, y, tmp); pts.push(tmp.x, tmp.y); }
+      g.poly(pts).fill(w.canUnlock(c) ? { color: 0x122c18, alpha: 0.34 } : { color: 0x0e2214, alpha: 0.5 });
+    }
+    // граница открытой земли: пунктир
+    const b = this.border.clear();
+    const dash = (ax, ay, bx, by) => {
+      toWorld(ax, ay, tmp); const x0 = tmp.x, y0 = tmp.y; toWorld(bx, by, tmp);
+      const dx = tmp.x - x0, dy = tmp.y - y0, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+      for (let d = 0; d < L; d += 11) { const e = Math.min(L, d + 6); b.moveTo(x0 + ux * d, y0 + uy * d).lineTo(x0 + ux * e, y0 + uy * e); }
+    };
+    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
+      if (!w.unlocked[c]) continue;
+      const cx = c % CHUNKS, cy = (c / CHUNKS) | 0, x0 = cx * CHUNK, y0 = cy * CHUNK;
+      const open = (dx, dy) => { const x = cx + dx, y = cy + dy; return x >= 0 && y >= 0 && x < CHUNKS && y < CHUNKS && w.unlocked[y * CHUNKS + x]; };
+      if (!open(0, -1)) dash(x0, y0, x0 + CHUNK, y0);
+      if (!open(1, 0)) dash(x0 + CHUNK, y0, x0 + CHUNK, y0 + CHUNK);
+      if (!open(0, 1)) dash(x0, y0 + CHUNK, x0 + CHUNK, y0 + CHUNK);
+      if (!open(-1, 0)) dash(x0, y0, x0, y0 + CHUNK);
+    }
+    b.stroke({ width: 1.5, color: 0xfff0be, alpha: 0.55 });
+  }
+
+  syncSigns() {
+    const f = this.f, w = f.world;
+    for (const ch of this.signsC.removeChildren()) ch.destroy({ children: true });
+    const blocked = w.unlockedCount() >= HOUSE[f.st.house].chunks;
+    const label = blocked ? 'Нужен дом выше' : 'Открыть участок';
+    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
+      if (!w.canUnlock(c)) continue;
+      const cx = c % CHUNKS, cy = (c / CHUNKS) | 0;
+      toWorld(cx * CHUNK + CHUNK / 2, cy * CHUNK + CHUNK / 2, tmp);
+      const box = new PIXI.Container(); box.position.set(tmp.x, tmp.y - 24);
+      const tx = new PIXI.Text({ text: label, style: { fontFamily: 'system-ui, sans-serif', fontSize: 9, fontWeight: '700', fill: 0x3d2b1f }, resolution: this.textRes });
+      const tw = tx.width, bw = tw + 30;
+      box.addChild(new PIXI.Graphics()
+        .roundRect(-bw / 2 - 2, -13, bw + 4, 26, 8).fill({ color: 0x3d2b1f, alpha: 0.92 })
+        .roundRect(-bw / 2, -11, bw, 22, 7).fill(blocked ? 0xc9b48a : 0xf6d37a));
+      tx.anchor.set(0.5); tx.position.set(8, 0.5); box.addChild(tx);
+      const lock = f.iconImg.lock;
+      if (lock && lock.complete && lock.naturalWidth) {
+        const ls = new PIXI.Sprite(this.iconTex(lock)); ls.width = 14; ls.height = 14; ls.position.set(-bw / 2 + 3, -7); box.addChild(ls);
+      }
+      box.cx = tmp.x; box.cy = tmp.y;
+      this.signsC.addChild(box);
+    }
+  }
+
+  // Прогрев на экране загрузки: все спрайты игры (и затемнённые копии для закрытых участков)
+  // сразу кладём в атласы и отправляем в видеопамять, чтобы в игре не было подгрузок.
+  warmup() {
+    const f = this.f, w = f.world, seen = new Set();
+    const add = (s, dim) => {
+      if (!s || seen.has(s)) return; seen.add(s);
+      if (s.canvas) { this.atlas.tex(s); if (dim) this.atlas.tex(dimSprite(s)); return; }
+      if (s instanceof Map) { for (const v of s.values()) add(v, dim); return; }
+      if (Array.isArray(s) || typeof s === 'object') for (const v of Object.values(s)) add(v, dim);
+    };
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.WATER) f.waterSprite(x, y);
+    const S = f.S;
+    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function') add(v, k !== 'bubble' && k !== 'water' && k !== 'waterArt');
+    for (const o of w.objects || []) { if (!o) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
+    for (const im of Object.values(f.iconImg)) if (im.complete && im.naturalWidth) this.iconTex(im);
+    this.atlas.flush();
+    const R = this.app.renderer;
+    for (const p of this.atlas.list) R.texture?.initSource?.(p.source);
+  }
+
+  iconTex(img) { return this.atlas.tex({ canvas: img }); }
+
+  // ---------- кадр ----------
+  render() {
+    const f = this.f, r = f.r, w = f.world, cam = f.cam, S = f.S, v = r.view;
+    r.begin(cam);
+    // камера: мир в CSS-пикселях, сдвиг — по целым пикселям экрана
+    const res = r.scale;
+    this.world.scale.set(cam.zoom);
+    this.world.position.set(Math.round((r.cssW / 2 - cam.x * cam.zoom) * res) / res, Math.round((r.cssH / 2 - cam.y * cam.zoom) * res) / res);
+
+    // постоянные части: пересобираются, только когда изменились
+    let wet = 0;
+    for (const b of f.beds.values()) if (b.crop) { const i = f.cropInfo(b); if (!i.needsWater && !i.ready) wet = (wet * 31 + b.i) % 1e9; }
+    const gk = `${f.groundV}|${wet}|${f.bedStyleName()}`;
+    if (this.keys.ground !== gk) { this.keys.ground = gk; this.syncGround(); }
+    const fk = `${w.unlockedCount()}|${f.st.house}`;
+    if (this.keys.fog !== fk) { this.keys.fog = fk; this.syncFog(); this.syncSigns(); }
+    if (this.keys.lock !== !!f.iconImg.lock) { this.keys.lock = !!f.iconImg.lock; this.syncSigns(); }
+
+    // видимость кусков земли
+    for (let c = 0; c < this.chunks.length; c++) {
+      const b = w.chunkBounds(c);
+      this.chunks[c].visible = b.maxX + 40 > v.minX && b.minX - 40 < v.maxX && b.maxY + 40 > v.minY && b.minY - 40 < v.maxY;
+    }
+    for (const s of this.signsC.children) s.visible = r.visible(s.cx - 50, s.cy - 40, 100, 60);
+
+    // фермер и что его не должно закрывать
+    const p = f.player;
+    toWorld(p.x, p.y, tmp);
+    const pdepth = p.x + p.y, pwy = tmp.y;
+    const F = f.focus; F.length = 0;
+    F.push({ x0: tmp.x - 11, y0: tmp.y - 50, x1: tmp.x + 11, y1: tmp.y, depth: pdepth, gx: -1, gy: -1 });
+    for (const t of [f.hover, f.tapFx]) {
+      if (!t || !w.inside(t.x, t.y)) continue;
+      toWorld(t.x + 0.5, t.y + 0.5, tmp);
+      F.push({ x0: tmp.x - HW + 6, y0: tmp.y - HH + 3, x1: tmp.x + HW - 6, y1: tmp.y + HH - 3, depth: t.x + t.y + 1, gx: t.x, gy: t.y });
+    }
+
+    // объекты
+    const stamp = ++this.stamp;
+    let playerHidden = false;
+    for (const o of w.objects) {
+      if (!o) continue;
+      let e = this.objs.get(o);
+      if (!e) { e = new PIXI.Sprite(); this.objs.set(o, e); this.objC.addChild(e); }
+      e.stamp = stamp;
+      let s = f.objSprite(o);
+      const vis = r.visible(o.wx - s.ax - 4, o.wy - s.ay, s.w + 8, s.h);
+      e.visible = vis;
+      if (!vis) { o.fade = 0; continue; }
+      if (!w.isOpen(o.gx, o.gy)) s = dimSprite(s);
+      const sh = o.shake > 0 ? Math.sin(f.time * 70) * 2.2 * (o.shake / 0.25) : 0;
+      const fade = f.occludes(o, s, F);
+      o.fade = (o.fade || 0) + (fade - (o.fade || 0)) * 0.3;
+      if (o.fade < 0.02) o.fade = 0;
+      if (fade && F[0].hit) playerHidden = true;
+      e.alpha = o.fade ? 1 - 0.62 * o.fade : 1;
+      this.put(e, s, o.wx + sh, o.wy);
+      const z = Z(o.depth, o.wy);
+      if (e.zIndex !== z) e.zIndex = z;
+    }
+    for (const [o, e] of this.objs) if (e.stamp !== stamp) { e.destroy(); this.objs.delete(o); }
+
+    // растения и значки над грядками
+    const bob = Math.sin(f.time * 4) * 1.5;
+    for (const b of f.beds.values()) {
+      let e = this.crops.get(b), bu = this.bub.get(b);
+      if (!b.crop) { if (e) e.visible = false; if (bu) bu.visible = false; continue; }
+      if (!e) { e = new PIXI.Sprite(); this.crops.set(b, e); this.objC.addChild(e); }
+      const info = f.cropInfo(b);
+      e.visible = r.visible(b.wx - 32, b.wy - 44, 64, 60);
+      if (e.visible) {
+        this.put(e, S.crops[b.crop][info.stage], b.wx, b.wy);
+        const z = Z(b.dr.depth, b.dr.wy); if (e.zIndex !== z) e.zIndex = z;
+      }
+      const bs = info.ready ? S.bubble.ready : info.needsWater ? S.bubble.water : null;
+      if (!bu) { bu = new PIXI.Sprite(); this.bub.set(b, bu); this.bubbles.addChild(bu); }
+      bu.visible = !!bs && e.visible;
+      if (bu.visible) this.put(bu, bs, b.wx, b.wy - 26 + bob);
+    }
+    for (const [b, e] of this.crops) if (!f.beds.has(b.i) || f.beds.get(b.i) !== b) { e.destroy(); this.crops.delete(b); const bu = this.bub.get(b); if (bu) { bu.destroy(); this.bub.delete(b); } }
+
+    // фермер
+    this.player.sync(p);
+    const pz = Z(pdepth, pwy); if (this.player.c.zIndex !== pz) this.player.c.zIndex = pz;
+    this.ghost2.c.visible = playerHidden;
+    if (playerHidden) this.ghost2.sync(p);
+
+    // рамки: клетка под курсором, тап
+    const g = this.marks.clear();
+    const outline = (x, y, color, alpha, lw) => {
+      toWorld(x + 0.5, y + 0.5, tmp);
+      g.poly([tmp.x, tmp.y - HH + 1, tmp.x + HW - 2, tmp.y, tmp.x, tmp.y + HH - 1, tmp.x - HW + 2, tmp.y]).stroke({ width: lw, color, alpha });
+    };
+    if (f.hover && w.inside(f.hover.x, f.hover.y)) outline(f.hover.x, f.hover.y, 0xffffff, 0.75, 1.8);
+    if (f.tapFx) outline(f.tapFx.x, f.tapFx.y, 0xfffac8, Math.min(1, f.tapFx.t * 2.4), 2.5);
+
+    this.syncQueue();
+    this.syncMover(outline);
+    this.syncFx();
+    this.syncFloaters();
+
+    this.atlas.flush();
+    this.app.renderer.render(this.app.stage);
+  }
+
+  // номера в очереди дел
+  syncQueue() {
+    const f = this.f, p = f.player;
+    const list = p.current && p.current.kind !== 'walk' ? [p.current, ...p.queue] : p.queue;
+    const C = this.queueC;
+    while (C.children.length < list.length) {
+      const n = C.children.length;
+      const box = new PIXI.Container();
+      box.g = new PIXI.Graphics(); box.addChild(box.g);
+      const tx = new PIXI.Text({ text: String(n + 1), style: { fontFamily: 'system-ui, sans-serif', fontSize: 8, fontWeight: '700', fill: 0x3d2b1f }, resolution: this.textRes });
+      tx.anchor.set(0.5); tx.y = 0.3; box.addChild(tx);
+      C.addChild(box);
+    }
+    C.children.forEach((box, i) => {
+      const a = list[i];
+      box.visible = !!a;
+      if (!a) return;
+      let x, y;
+      if (a.obj) { const s = f.objSprite(a.obj); x = a.obj.wx; y = a.obj.wy - Math.min(s.ay * 0.7, 60) - 6; }
+      else { toWorld(a.x + 0.5, a.y + 0.5, tmp); x = tmp.x; y = tmp.y - 8; }
+      box.position.set(x, y);
+      const cur = i === 0 && a === p.current;
+      if (box.cur !== cur) { box.cur = cur; box.g.clear().circle(0, 0, 6).fill({ color: 0x3d2b1f, alpha: 0.9 }).circle(0, 0, 4.8).fill(cur ? 0xffe066 : 0xffffff); }
+    });
+  }
+
+  syncMover(outline) {
+    const m = this.f.mover, f = this.f, g = this.moverG.clear();
+    this.moverC.visible = m.active;
+    if (!m.active) return;
+    const s = m.sel, t = m.to;
+    const pulse = 0.55 + 0.45 * Math.sin(f.time * 6);
+    this.moverHi.visible = !!(s && s.kind === 'obj');
+    if (this.moverHi.visible) { this.put(this.moverHi, f.objSprite(s.o), s.o.wx, s.o.wy); this.moverHi.alpha = 0.12 + 0.18 * pulse; }
+    if (s) {
+      for (let y = s.gy; y < s.gy + s.h; y++) for (let x = s.gx; x < s.gx + s.w; x++) {
+        toWorld(x + 0.5, y + 0.5, tmp);
+        g.poly([tmp.x, tmp.y - HH + 1, tmp.x + HW - 2, tmp.y, tmp.x, tmp.y + HH - 1, tmp.x - HW + 2, tmp.y]).stroke({ width: 2.5, color: 0xffe65a, alpha: pulse });
+      }
+    }
+    this.moverGhost.visible = !!(s && t);
+    if (s && t) {
+      for (let y = t.gy; y < t.gy + s.h; y++) for (let x = t.gx; x < t.gx + s.w; x++) {
+        toWorld(x + 0.5, y + 0.5, tmp);
+        g.poly([tmp.x, tmp.y - HH, tmp.x + HW, tmp.y, tmp.x, tmp.y + HH, tmp.x - HW, tmp.y]).fill({ color: t.ok ? 0x6edc5a : 0xeb4632, alpha: 0.38 });
+        g.poly([tmp.x, tmp.y - HH + 1, tmp.x + HW - 2, tmp.y, tmp.x, tmp.y + HH - 1, tmp.x - HW + 2, tmp.y]).stroke({ width: 2, color: t.ok ? 0x8ff06a : 0xff6a50 });
+      }
+      if (s.kind === 'obj') { toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp); this.put(this.moverGhost, f.objSprite(s.o), tmp.x, tmp.y); }
+      else {
+        const sp = s.kind === 'path' ? f.S.path[0] : f.S.bed ? f.S.bed.grass[0] : f.S.soil[0];
+        toWorld(t.gx + 0.5, t.gy + 0.5, tmp); this.put(this.moverGhost, sp, tmp.x, tmp.y);
+      }
+    }
+  }
+
+  // леска, частицы
+  syncFx() {
+    const f = this.f, g = this.fx.clear();
+    const fs = f.fishingState();
+    if (fs) {
+      const { x, y, bx, by, k, bite, yank } = fs;
+      g.moveTo(x, y).quadraticCurveTo((x + bx) / 2, Math.max(y, by) + 6, bx, by).stroke({ width: 0.5, color: 0xffffff, alpha: 0.85 });
+      if (k >= 1 && !yank) g.ellipse(bx, by + 1.5, 4 + bite * 3, 1.8 + bite * 1.2).stroke({ width: 0.6, color: 0xffffff, alpha: 0.45 });
+      g.circle(bx, by, 2.1).fill(0x3d2b1f);
+      g.moveTo(bx + 1.5, by + 0.4).arc(bx, by + 0.4, 1.5, 0, Math.PI).fill(0xffffff);
+      g.moveTo(bx - 1.5, by - 0.2).arc(bx, by - 0.2, 1.5, Math.PI, Math.PI * 2).fill(0xe2392f);
+    }
+    for (const q of f.particles) {
+      g.rect(q.x - q.s / 2, q.y - q.s / 2, q.s, q.s).fill({ color: q.c, alpha: Math.max(0, 1 - q.t / q.life) });
+    }
+  }
+
+  // всплывающие числа: «+3 дерево»
+  syncFloaters() {
+    const f = this.f, C = this.floatC;
+    while (C.children.length < f.floaters.length) {
+      const box = new PIXI.Container();
+      box.tx = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 11, fontWeight: '700', fill: 0xfffbe8, stroke: { color: 0x28190f, width: 3, alpha: 0.8 } }, resolution: this.textRes });
+      box.tx.anchor.set(0, 0.5); box.addChild(box.tx);
+      box.ic = new PIXI.Sprite(); box.ic.width = 12; box.ic.height = 12; box.addChild(box.ic);
+      C.addChild(box);
+    }
+    C.children.forEach((box, i) => {
+      const fl = f.floaters[i];
+      box.visible = !!fl;
+      if (!fl) return;
+      if (box.tx.text !== fl.text) box.tx.text = fl.text;
+      const img = fl.icon && f.iconImg[fl.icon];
+      const iconOk = img && img.complete && img.naturalWidth;
+      box.ic.visible = !!iconOk;
+      if (iconOk) { const t = this.iconTex(img); if (box.ic.texture !== t) { box.ic.texture = t; box.ic.width = 12; box.ic.height = 12; } }
+      const k = fl.t / 1.3, tw = box.tx.width, iw = iconOk ? 12 : 0;
+      box.alpha = k < 0.75 ? 1 : (1 - k) * 4;
+      box.position.set(fl.x - (tw + iw) / 2, fl.y - k * 26);
+      box.ic.position.set(tw + 1, -6);
+    });
+  }
+}
+
+// Запуск Pixi на канвасе игры. null — WebGL недоступен (останется Canvas 2D).
+export async function createPixiApp(canvas, perf, bg) {
+  try {
+    const probe = document.createElement('canvas');
+    if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) return null;
+    const app = new PIXI.Application();
+    const rect = canvas.getBoundingClientRect();
+    await app.init({
+      canvas, preference: 'webgl', background: bg, antialias: false, autoStart: false, sharedTicker: false,
+      resolution: perf.renderScale, autoDensity: false, width: Math.max(1, rect.width), height: Math.max(1, rect.height),
+      powerPreference: 'high-performance', hello: false,
+    });
+    app.ticker && app.ticker.stop();
+    return app;
+  } catch (e) {
+    console.warn('WebGL', e);
+    return null;
+  }
+}
+
+// Тот же интерфейс, что у Renderer (размер, матрица камеры, видимая область), но без 2D-контекста:
+// рисует PixiScene.
+export class GLRenderer {
+  constructor(canvas, perf, app) {
+    this.canvas = canvas; this.perf = perf; this.app = app; this.pixi = true;
+    this.ctx = null;
+    this.cssW = 1; this.cssH = 1; this.scale = 1;
+    this.va = 1; this.ve = 0; this.vf = 0;
+    this.view = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  }
+
+  resize() {
+    const rect = this.canvas.getBoundingClientRect();
+    this.cssW = Math.max(1, rect.width);
+    this.cssH = Math.max(1, rect.height);
+    this.scale = this.perf.renderScale;
+    const R = this.app.renderer;
+    if (R.resolution !== this.scale) R.resolution = this.scale;
+    R.resize(this.cssW, this.cssH);
+    this.canvas.style.width = ''; this.canvas.style.height = ''; // размер задаёт CSS
+  }
+
+  begin(cam) {
+    const s = this.scale * cam.zoom;
+    this.va = s;
+    this.ve = Math.round((this.cssW / 2 - cam.x * cam.zoom) * this.scale);
+    this.vf = Math.round((this.cssH / 2 - cam.y * cam.zoom) * this.scale);
+    const v = this.view;
+    v.minX = cam.x - this.cssW / 2 / cam.zoom;
+    v.maxX = cam.x + this.cssW / 2 / cam.zoom;
+    v.minY = cam.y - this.cssH / 2 / cam.zoom;
+    v.maxY = cam.y + this.cssH / 2 / cam.zoom;
+  }
+
+  resetView() {}
+
+  visible(x, y, w, h) {
+    const v = this.view;
+    return x < v.maxX && x + w > v.minX && y < v.maxY && y + h > v.minY;
+  }
+}

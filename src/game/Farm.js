@@ -15,7 +15,7 @@ const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 // вид объёмной грядки: 'plain' — без каймы, 'grass' — с травяной каймой
 export let BED_STYLE = 'plain';
 export function setBedStyle(v) { BED_STYLE = v; }
-const BG = '#3d7a35';
+export const BG = '#3d7a35';
 
 export class Farm {
   constructor({ renderer, camera, ui, tg, save, perf, audio }) {
@@ -85,6 +85,7 @@ export class Farm {
   }
 
   bedStyle(v) { setBedStyle(v); this.groundV++; this.dirty = true; }
+  bedStyleName() { return BED_STYLE; }
 
   objSprite(o) {
     const S = this.S;
@@ -681,9 +682,10 @@ export class Farm {
   // ---------------- Эффекты ----------------
 
   // Рыбалка: леска от кончика удочки к поплавку на клетке воды
-  drawFishing(ctx) {
+  // Поплавок и леска: точки для отрисовки (null — не рыбачим)
+  fishingState() {
     const p = this.player, an = p.anim, a = p.current;
-    if (p.state !== 'work' || !a || a.kind !== 'fish' || an.name !== 'fish' || an.time < 0.42 || an.time > 2.3) return;
+    if (p.state !== 'work' || !a || a.kind !== 'fish' || an.name !== 'fish' || an.time < 0.42 || an.time > 2.3) return null;
     const bn = p.sk.boneMap.foreF, ly = 3.4 + ROD_TIP;
     let x = bn.c * ly + bn.tx, y = bn.d * ly + bn.ty; if (p.flip) x = -x;
     p.worldPos(tmp); x += tmp.x; y += tmp.y;
@@ -695,6 +697,14 @@ export class Farm {
     const yank = t > 2.12 ? (t - 2.12) / 0.18 : 0; // подсечка: поплавок выдёргивается к удочке
     let bx = x + (tmp2.x - x) * k, by = y + (tmp2.y - y) * k - Math.sin(k * Math.PI) * 14 + (k >= 1 ? Math.sin(t * 7) * 0.7 + bite * 2.4 : 0);
     if (yank) { bx += (x - bx) * yank * 0.6; by += (y - 10 - by) * yank * 0.6; }
+    return { x, y, bx, by, k, bite, yank };
+  }
+
+  drawFishing(ctx) {
+    const fs = this.fishingState();
+    if (!fs) return;
+    const { x, y, k, bite, yank } = fs;
+    let { bx, by } = fs;
     ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 0.5;
     ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo((x + bx) / 2, Math.max(y, by) + 6, bx, by); ctx.stroke();
     if (k >= 1 && !yank) { // круги на воде
@@ -845,6 +855,7 @@ export class Farm {
   }
 
   render() {
+    if (this.scene) return this.scene.render(); // WebGL (PixiJS)
     const r = this.r, ctx = r.ctx, w = this.world, S = this.S;
     r.begin(this.cam, BG);
 

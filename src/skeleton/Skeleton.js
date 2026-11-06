@@ -93,6 +93,25 @@ export class Skeleton {
   }
 
   // Рисование. view = {va, ve, vf} — матрица камеры рендерера.
+  // Для WebGL-рендера: мировые матрицы вложений по порядку отрисовки, без холста.
+  // cb(sprite, a, b, c, d, e, f) — спрайт и матрица «спрайт → мир».
+  eachDraw(x, y, scale, flipX, cb) {
+    const ba = flipX ? -scale : scale, bd = scale;
+    for (let i = 0; i < this.drawOrder.length; i++) {
+      const slot = this.drawOrder[i];
+      const name = slot.name in this.override ? this.override[slot.name] : slot.attachment;
+      if (!name) continue;
+      const att = this.getAttachment(slot, name);
+      if (!att) continue;
+      prepAttachment(att);
+      const m = att._m, bn = slot.bone;
+      const wa = bn.a * m[0] + bn.c * m[1], wb = bn.b * m[0] + bn.d * m[1];
+      const wc = bn.a * m[2] + bn.c * m[3], wd = bn.b * m[2] + bn.d * m[3];
+      const we = bn.a * m[4] + bn.c * m[5] + bn.tx, wf = bn.b * m[4] + bn.d * m[5] + bn.ty;
+      cb(att.sprite, ba * wa, bd * wb, ba * wc, bd * wd, ba * we + x, bd * wf + y);
+    }
+  }
+
   draw(ctx, view, x, y, scale = 1, flipX = false) {
     const ba = (flipX ? -scale : scale) * view.va;
     const bd = scale * view.va;

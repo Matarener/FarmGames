@@ -8,7 +8,8 @@ import { Input } from './engine/Input.js';
 import { setSpriteScale } from './engine/Sprite.js';
 import { TelegramBridge } from './telegram/TelegramBridge.js';
 import { Save } from './game/Save.js';
-import { Farm } from './game/Farm.js';
+import { Farm, BG } from './game/Farm.js';
+import { createPixiApp, GLRenderer, PixiScene } from './game/PixiScene.js';
 import { UI } from './ui/UI.js';
 import { Audio } from './engine/Audio.js';
 
@@ -25,7 +26,10 @@ async function main() {
   setSpriteScale(perf.spriteScale);
 
   const canvas = document.getElementById('game');
-  const renderer = new Renderer(canvas, perf);
+  // WebGL (PixiJS), если есть; ?renderer=2d — старая отрисовка Canvas 2D для сравнения
+  const want2d = new URLSearchParams(location.search).get('renderer') === '2d';
+  const app = want2d ? null : await createPixiApp(canvas, perf, BG);
+  const renderer = app ? new GLRenderer(canvas, perf, app) : new Renderer(canvas, perf);
   const camera = new Camera();
   const ui = new UI(document.getElementById('app'));
   const save = new Save(tg);
@@ -33,6 +37,7 @@ async function main() {
   const progress = (k) => { fill.style.width = Math.round(k * 100) + '%'; ltext.textContent = k < 1 ? `Загрузка… ${Math.round(k * 100)}%` : 'Готово!'; };
   progress(0.05);
   const farm = new Farm({ renderer, camera, ui, tg, save, perf, audio });
+  if (app) farm.scene = new PixiScene(farm, app);
   farm.onArtProgress = (k) => progress(0.1 + k * 0.85);
   window.__farm = farm; // для тестов в браузере
   ui.bind(farm, farm.icons);
@@ -92,6 +97,7 @@ async function main() {
 
   // ждём картинки (но не дольше 15 с: на плохой связи игра откроется с графикой из кода)
   await Promise.race([farm.artReady, new Promise((r) => setTimeout(r, 15000))]);
+  if (farm.scene) { try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); } }
   progress(1);
   setTimeout(() => { document.getElementById('loading').classList.add('hide'); if (!ui.panelOpen) audio.setTheme('farm'); }, 150);
   // начало истории: новое задание показываем сразу
@@ -107,7 +113,7 @@ async function main() {
     document.body.appendChild(fpsEl);
     const paint = () => {
       fpsEl.textContent = `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
-        ` · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}`;
+        ` · ${app ? 'WebGL' : '2D'} · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}`;
     };
     paint(); fpsTimer = setInterval(paint, 500);
   };
