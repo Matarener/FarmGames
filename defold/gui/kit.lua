@@ -35,6 +35,11 @@ end
 
 -- скругления: текстуры ui_c<r> — круг радиуса r px с полосой 2 px посередине, slice9 = r.
 -- Defold рисует углы slice9 в пикселях текстуры, поэтому радиус подбираем под размер узла.
+-- ui_px (8×8) без slice9 растягивается целиком, и фильтрация размывает края большого прямоугольника
+-- (затемнение не доходило до краёв экрана); slice9 = 3 держит края чёткими, если узел не меньше 6 px
+local SLICE3, SLICE0 = vmath.vector4(3, 3, 3, 3), vmath.vector4(0, 0, 0, 0)
+function M.px_slice(wpx, hpx) return (wpx >= 6 and hpx >= 6) and SLICE3 or SLICE0 end
+
 local RADII = { 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32 }
 local STYLE = setmetatable({}, { __mode = 'k' })
 local CUR = setmetatable({}, { __mode = 'k' }) -- текущий радиус узла, чтобы не дёргать flipbook каждый кадр
@@ -50,7 +55,7 @@ local function corners(n, style, wpx, hpx)
 		gui.set_slice9(n, vmath.vector4(r, r, r, r))
 	else
 		gui.play_flipbook(n, 'ui_px')
-		gui.set_slice9(n, vmath.vector4(0, 0, 0, 0))
+		gui.set_slice9(n, M.px_slice(wpx, hpx))
 	end
 end
 
@@ -66,6 +71,7 @@ function M.box(parent, x, y, w, h, color, style)
 		corners(n, style, w * d, h * d)
 	else
 		gui.play_flipbook(n, 'ui_px')
+		gui.set_slice9(n, M.px_slice(w * d, h * d))
 	end
 	gui.set_size(n, vmath.vector3(w * d, h * d, 0))
 	gui.set_color(n, color or M.WHITE)
