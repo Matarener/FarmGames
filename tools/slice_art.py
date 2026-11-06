@@ -78,6 +78,8 @@ ICON_SHEETS = {
     # плоды деревьев и кустов
     'ui_flora1': ['acorn', 'birch_bark', 'sakura_petal', 'cherry', 'maple_leaf', 'apple', 'pinecone'],
     'ui_flora2': ['blueberry', 'raspberry', 'rosehip', 'hydrangea', 'lavender', 'rose_petal'],
+    # саженцы деревьев (иконки в рюкзаке)
+    'ui_saplings1': ['sap_oak', 'sap_birch', 'sap_sakura', 'sap_cherry', 'sap_maple', 'sap_apple', 'sap_pine'],
 }
 ICON_PX = 128
 
