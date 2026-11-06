@@ -9,6 +9,8 @@ local iso = require('farm.iso')
 local autotest = require('farm.autotest')
 local map_mod = require('farm.map')
 local W = require('farm.world')
+local gfx = require('farm.gfx')
+local prof = require('farm.prof')
 
 local handle_input -- тело on_input; автотест зовёт его напрямую (Defold прячет on_input из глобальных)
 local function now_ms() return socket.gettime() * 1000 end
@@ -36,6 +38,10 @@ end
 function init(self)
 	msg.post('.', 'acquire_input_focus')
 	math.randomseed(os.time())
+	gfx.load()
+	gfx.apply()
+	prof.set(gfx.stats)
+	app.gfx, app.prof = gfx, prof
 	app.cam = camera.new()
 	layout(self)
 	app.cam.zoom = fit_zoom()
@@ -73,6 +79,7 @@ local function points(action)
 end
 
 function update(self, dt)
+	prof.frame(dt, app.view)
 	dt = math.min(dt, 0.1)
 	if self.test then
 		local q = app.test_map_q
@@ -86,8 +93,12 @@ function update(self, dt)
 	local ky = (self.keys.down and 1 or 0) - (self.keys.up and 1 or 0)
 	if kx ~= 0 or ky ~= 0 then cam:pan_by(-kx * 600 * dt, -ky * 600 * dt) end
 	cam:update(dt)
+	local t0 = prof.now()
 	f:update(dt)
+	prof.add('logic', t0)
+	t0 = prof.now()
 	app.view:update(dt)
+	prof.add('view', t0)
 	msg.post('@render:', 'camera', { x = cam.x, y = -cam.y, k = cam.zoom * app.dpi })
 end
 

@@ -64,6 +64,7 @@ local function build_hud(self)
 	clear_hits(self, 'hud')
 	local L = group(self.l_hud_parent, 0, 0)
 	self.l_hud = L
+	self.stats_n = nil
 	local VW, VH = app.cam.view_w, app.cam.view_h
 	local top = 8
 	-- аватар
@@ -328,6 +329,19 @@ local function open_panel(self, kind, title, build)
 		cy = cy + 16
 	end
 	function api.space(n) cy = cy + n end
+	-- ряд кнопок-переключателей: opts = { {value, label}, ... }
+	function api.choice(opts, cur, fn)
+		local gap = 6
+		local bw = (body_w - gap * (#opts - 1)) / #opts
+		for i, o in ipairs(opts) do
+			local bx = (i - 1) * (bw + gap)
+			local on = o[1] == cur
+			local b = frame(content, bx, cy, bw, 38, on and c('#8fd35c') or c('#f8e7c0'), c('#3d2b1f', on and 1 or 0.5), 2, 'round')
+			text(b, o[2], bw / 2, 11, 12, { pivot = gui.PIVOT_N })
+			hits[#hits + 1] = { bx, cy, bw, 38, function() fn(o[1]) end }
+		end
+		cy = cy + 46
+	end
 	build(api)
 	local body_h = cy
 	local head = 46
@@ -475,6 +489,15 @@ function H.open_settings(self)
 		else
 			a.button('Новая игра', function() self.ask_new = true; open_panel(self, 'settings', 'Настройки', self.panel_build) end)
 		end
+		local gfx = app.gfx
+		local function again() open_panel(self, 'settings', 'Настройки', self.panel_build) end
+		a.sub('Графика')
+		a.text('Чёткость картинки. Чем ниже, тем быстрее на слабых телефонах.', 11)
+		a.choice(gfx.LEVELS, gfx.quality, function(v) gfx.set('quality', v); again() end)
+		a.text('Частота кадров', 12)
+		a.choice({ { 60, '60 в секунду' }, { 30, '30 (экономнее)' } }, gfx.fps, function(v) gfx.set('fps', v); again() end)
+		a.text('Счётчик кадров и профайлер', 12)
+		a.choice({ { true, 'Показывать' }, { false, 'Скрыть' } }, gfx.stats, function(v) gfx.set('stats', v); app.prof.set(v); again() end)
 		a.sub('О версии')
 		a.text('Версия на Defold (перенос с JS). Звук и Telegram — в следующих шагах.', 12)
 	end)
@@ -647,6 +670,34 @@ local function overlays(self)
 	pool_trim(self, 'q', n)
 end
 
+-- ---------- счётчик кадров / профайлер (слева над нижними кнопками) ----------
+local function stats(self)
+	local P = app.prof
+	local txt = (P and P.on) and P.text or ''
+	if txt == '' then
+		if self.stats_n then gui.set_enabled(self.stats_n.g, false) end
+		return
+	end
+	if not self.stats_n then
+		local g = group(self.l_hud, 0, 0)
+		local bg = box(g, 0, 0, 10, 10, c('#1c140e', 0.72), 'round')
+		local t = text(g, '', 6, 4, 10, { color = K.WHITE, wrap = 300 })
+		self.stats_n = { g = g, bg = bg, t = t, txt = nil }
+	end
+	local e = self.stats_n
+	gui.set_enabled(e.g, true)
+	if e.txt ~= txt then
+		e.txt = txt
+		gui.set_text(e.t, txt)
+		local tw, th = K.measure(e.t)
+		local d = app.dpi
+		local h = th + 8
+		local y = app.cam.view_h - 8 - 62 - 8 - 58 - h
+		gui.set_position(e.g, vmath.vector3(8 * d, -y * d, 0))
+		K.set_size(e.bg, vmath.vector3((tw + 12) * d, h * d, 0))
+	end
+end
+
 -- ---------- команды от логики ----------
 local handle_input -- тело on_input; автотест зовёт его напрямую (Defold прячет on_input из глобальных)
 local CMD = {}
@@ -687,6 +738,7 @@ end
 function update(self, dt)
 	if not self.focus then msg.post('.', 'acquire_input_focus'); self.focus = true end
 	if not app.farm or not app.cam then return end
+	local t_hud = app.prof and app.prof.now() or 0
 	app.gui_state = app.gui_state or function() return self end
 	if self.W ~= app.W or self.H ~= app.H or self.dpi ~= app.dpi then
 		self.W, self.H, self.dpi = app.W, app.H, app.dpi
@@ -694,7 +746,8 @@ function update(self, dt)
 		layers(self)
 		self.panel_kind = nil
 		if kind == 'bag' then H.open_bag(self) elseif kind == 'market' then H.open_market(self)
-		elseif kind == 'house' then H.open_house(self) elseif kind == 'quest' then H.open_quest(self) end
+		elseif kind == 'house' then H.open_house(self) elseif kind == 'quest' then H.open_quest(self)
+		elseif kind == 'settings' then H.open_settings(self) end
 	end
 	local q = app.queue
 	app.queue = {}
@@ -719,7 +772,9 @@ function update(self, dt)
 		if self.intro_t > 0.7 then self.intro = true; H.open_quest(self) end
 	elseif not self.intro then self.intro = true end
 	overlays(self)
+	stats(self)
 	app.ui_modal = self.panel ~= nil
+	if app.prof then app.prof.add('hud', t_hud) end
 	-- автотест: синтетические нажатия сначала интерфейсу, необработанные — карте
 	if app.test_gui_q and #app.test_gui_q > 0 then
 		local tq = app.test_gui_q

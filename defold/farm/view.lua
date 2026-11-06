@@ -510,6 +510,70 @@ function V:sync_fishing()
 	end
 end
 
+
+-- ---------- отсечение: спрайты далеко за краем экрана выключены ----------
+-- Движок тогда не обновляет и не сортирует их каждый кадр (на карте ~3500 спрайтов).
+-- Карта поделена на квадраты 5×5 клеток; квадрат виден, если его рамка (с запасом на высокие деревья) на экране.
+local CELL = 5
+local CELLS = N / CELL
+local function cell_of(gx, gy) return math.floor(gy / CELL) * CELLS + math.floor(gx / CELL) end
+
+function V:cull_index()
+	local w = self.f.world
+	local L = {}
+	for c = 0, CELLS * CELLS - 1 do L[c] = {} end
+	local function add(c, e) if e then local l = L[c]; l[#l + 1] = e end end
+	for i, g in pairs(self.ground) do
+		local c = cell_of(i % N, math.floor(i / N))
+		add(c, g.base); add(c, g.over); add(c, g.bed)
+	end
+	for _, e in pairs(self.objs) do add(cell_of(e.o.gx, e.o.gy), e) end
+	for k, e in pairs(self.decor) do local d = w.decor[k]; if d then add(cell_of(d.gx, d.gy), e) end end
+	self.cents = L
+	self.cvis = {}
+	local all = 0
+	for c = 0, CELLS * CELLS - 1 do all = all + #L[c] end
+	self.n_all = all
+	self.cull_dirty = false
+	if not self.cb then
+		self.cb = {}
+		for c = 0, CELLS * CELLS - 1 do
+			local x0, y0 = (c % CELLS) * CELL, math.floor(c / CELLS) * CELL
+			local x1, y1 = x0 + CELL, y0 + CELL
+			self.cb[c] = { (x0 - y1) * 32, (x1 - y0) * 32, (x0 + y0) * 16, (x1 + y1) * 16 }
+		end
+	end
+end
+
+local function show(e, on)
+	if (e.off == true) == on then
+		e.off = not on
+		msg.post(e.url, on and 'enable' or 'disable')
+	end
+end
+
+function V:cull()
+	local cam = self.f.cam
+	if not cam then return end
+	if self.cull_dirty or not self.cents then self:cull_index() end
+	local hw, hh = cam.view_w / 2 / cam.zoom, cam.view_h / 2 / cam.zoom
+	-- запас: высокие деревья и дом торчат вверх над своей клеткой, кроны — в стороны
+	local x0, x1, y0, y1 = cam.x - hw - 90, cam.x + hw + 90, cam.y - hh - 40, cam.y + hh + 260
+	local on = 0
+	local cb, cv, ce = self.cb, self.cvis, self.cents
+	for c = 0, CELLS * CELLS - 1 do
+		local b = cb[c]
+		local vis = not (b[2] < x0 or b[1] > x1 or b[4] < y0 or b[3] > y1)
+		local l = ce[c]
+		if cv[c] ~= vis then
+			cv[c] = vis
+			for i = 1, #l do show(l[i], vis) end
+		end
+		if vis then on = on + #l end
+	end
+	self.n_on = on
+end
+
 -- ---------- всё вместе ----------
 function V:build()
 	self:sync_ground()
@@ -518,6 +582,8 @@ function V:build()
 	self:sync_border()
 	self.ground_v = self.f.ground_v
 	self.unl = self.f.world:unlocked_count()
+	self.cull_dirty = true
+	self:cull()
 end
 
 function V:update(dt)
@@ -528,11 +594,14 @@ function V:update(dt)
 		self:sync_ground(); self:sync_decor(); self:sync_border()
 		self.ground_v = f.ground_v
 		self.obj_v = nil
+		self.cull_dirty = true
 	elseif self.ground_v ~= f.ground_v then
 		self.ground_v = f.ground_v
 		self:sync_ground()
+		self.cull_dirty = true
 	end
-	if self.obj_v ~= w.version or self.house_lv ~= f.st.house or self.well_st ~= f.st.well then self:sync_objects() end
+	if self.obj_v ~= w.version or self.house_lv ~= f.st.house or self.well_st ~= f.st.well then self:sync_objects(); self.cull_dirty = true end
+	self:cull()
 	-- дрожь от удара
 	for id, e in pairs(self.objs) do
 		local o = e.o
