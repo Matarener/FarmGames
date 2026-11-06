@@ -3,6 +3,7 @@
 // параметрами, звуков и картинок здесь нет — эффекты делает Farm по возвращённым событиям.
 //
 // st.fruit  = { "x,y": когда созреют плоды (мс) } — нет записи: плоды висят.
+//            Только у видов с pick (плоды и ягоды); у остальных добыча — только при рубке.
 // st.plants = [[x, y, вид, когда посажено (мс)], ...] — растения, посаженные игроком.
 
 import { FLORA, OBJECTS, floraSeedId, floraOwnId } from './data.js';
@@ -17,13 +18,14 @@ export function floraOf(o) {
   return d && d.flora ? FLORA[d.flora] : null;
 }
 
-// Сколько секунд до плодов (0 — уже висят)
+// Сколько секунд до плодов (0 — уже висят или вид без сбора)
 export function fruitLeft(st, o, now) {
   const t = st.fruit && st.fruit[cell(o)];
   return t && t > now ? Math.ceil((t - now) / 1000) : 0;
 }
 
-export function hasFruit(st, o, now) { return !!floraOf(o) && !fruitLeft(st, o, now); }
+// Висят ли плоды, которые можно собрать касанием (только у видов с pick)
+export function hasFruit(st, o, now) { const f = floraOf(o); return !!(f && f.pick) && !fruitLeft(st, o, now); }
 
 function give(st, out, id, n) {
   const got = addItem(st, id, n);
@@ -31,23 +33,24 @@ function give(st, out, id, n) {
   return got;
 }
 
-// Собрать плоды касанием. → { items: [{id, n}], xp } или null (плодов нет / склад полон)
+// Собрать плоды касанием (саженцы так не добываются). → { items: [{id, n}], xp } или null
+// (вид без сбора / плодов нет / склад полон)
 export function pickFruit(st, o, now, rng) {
   const f = floraOf(o);
-  if (!f || fruitLeft(st, o, now)) return null;
+  if (!hasFruit(st, o, now)) return null;
   const items = [];
   if (!give(st, items, f.fruit, roll(rng, f.n))) return null;
-  if (rng() < f.seedPick) give(st, items, floraSeedId(f.key), 1);
   (st.fruit || (st.fruit = {}))[cell(o)] = now + f.regrow * 1000;
   return { items, xp: 1 };
 }
 
-// Добыча при рубке дерева или куста: дерево, плоды (если висели) и, с шансом, семя этого вида.
+// Добыча при рубке дерева или куста: дерево, добыча вида (у плодовых — если плоды висели)
+// и, с шансом seedChop, саженец этого вида.
 export function chopFlora(st, o, now, rng) {
   const f = floraOf(o), items = [];
   if (!f) return { items };
   give(st, items, 'wood', roll(rng, f.wood));
-  if (!fruitLeft(st, o, now)) give(st, items, f.fruit, roll(rng, f.n));
+  if (!f.pick || !fruitLeft(st, o, now)) give(st, items, f.fruit, roll(rng, f.n));
   if (rng() < f.seedChop) give(st, items, floraSeedId(f.key), 1);
   forget(st, o);
   return { items };
@@ -77,8 +80,8 @@ export function sow(st, species, x, y, now) {
   if (!FLORA[species] || !n) return null;
   if (n === 1) delete st.items[id]; else st.items[id] = n - 1;
   (st.plants || (st.plants = [])).push([x, y, species, now]);
-  // только что выросшее растение — без плодов: они появятся через regrow после взросления
-  (st.fruit || (st.fruit = {}))[x + ',' + y] = now + (FLORA[species].grow + FLORA[species].regrow) * 1000;
+  // только что выросшее плодовое растение — без плодов: они появятся через regrow после взросления
+  if (FLORA[species].pick) (st.fruit || (st.fruit = {}))[x + ',' + y] = now + (FLORA[species].grow + FLORA[species].regrow) * 1000;
   return { species };
 }
 
@@ -93,7 +96,7 @@ export function storeOwn(st, o, now, rng) {
   } else {
     const f = floraOf(o);
     if (!f || !give(st, items, floraOwnId(f.key), 1)) return null;
-    if (!fruitLeft(st, o, now)) give(st, items, f.fruit, roll(rng, f.n));
+    if (hasFruit(st, o, now)) give(st, items, f.fruit, roll(rng, f.n));
   }
   forget(st, o);
   return { items };
@@ -113,7 +116,7 @@ export function sowGrown(st, species, x, y, now) {
   if (!f || !n) return null;
   if (n === 1) delete st.items[id]; else st.items[id] = n - 1;
   (st.plants || (st.plants = [])).push([x, y, species, now - f.grow * 1000]);
-  (st.fruit || (st.fruit = {}))[x + ',' + y] = now + f.regrow * 1000;
+  if (f.pick) (st.fruit || (st.fruit = {}))[x + ',' + y] = now + f.regrow * 1000;
   return { species };
 }
 

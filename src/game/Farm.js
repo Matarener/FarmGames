@@ -271,7 +271,7 @@ export class Farm {
         else if (o.stage !== stage) { o.stage = stage; changed = true; }
       }
       if (FLORA[o.type]) {
-        const bare = Flora.fruitLeft(st, o, now) > 0;
+        const bare = !!FLORA[o.type].pick && Flora.fruitLeft(st, o, now) > 0;
         if (o.bare !== bare) { o.bare = bare; changed = true; }
       }
     }
@@ -438,13 +438,15 @@ export class Farm {
         ...(o.own ? { text: `Вырастет через ${fmtTime(Flora.growLeft(o.tree, o.born, now))}. Убрать в рюкзак: «Ещё» → «Переставить»` } : {}),
       });
     }
-    const f = FLORA[o.type], left = Flora.fruitLeft(this.st, o, now), fruit = FLORA_GOODS[f.fruit];
-    if (left && !o.own) return this.queue({ kind: 'chop', obj: o });
+    // собирать касанием можно только плоды и ягоды (pick); кора, шишки, цветы — только рубкой
+    const f = FLORA[o.type], left = f.pick ? Flora.fruitLeft(this.st, o, now) : 0, fruit = FLORA_GOODS[f.fruit];
+    const ripe = f.pick && !left;
+    if (!ripe && !o.own) return this.queue({ kind: 'chop', obj: o });
     const items = [];
-    if (!left) items.push({ icon: f.fruit, label: `Собрать: ${fruit.name.toLowerCase()}`, onClick: () => this.queue({ kind: 'pick', obj: o }) });
+    if (ripe) items.push({ icon: f.fruit, label: `Собрать: ${fruit.name.toLowerCase()}`, sub: `⚡ ${ENERGY.pick}`, onClick: () => this.queue({ kind: 'pick', obj: o }) });
     items.push({ icon: 'wood', label: o.own ? 'Срубить своё' : 'Срубить', sub: `⚡ ${ENERGY.chop} за удар`, onClick: () => this.queue({ kind: 'chop', obj: o }) });
     this.ui.popup(sx, sy, {
-      title: (o.own ? 'Моё: ' : '') + f.name, text: left ? `${fruit.name} — через ${fmtTime(left)}` : undefined, items,
+      title: (o.own ? 'Моё: ' : '') + f.name, text: left ? `${fruit.name} — через ${fmtTime(left)}` : !f.pick ? `${fruit.name}: только при рубке` : undefined, items,
     });
   }
 
@@ -455,7 +457,7 @@ export class Farm {
     if (!(grown ? Flora.sowGrown : Flora.sow)(st, species, x, y, now)) return null;
     const o = w.add(grown ? species : 'sapling', x, y);
     o.own = 1; o.tree = species; o.born = st.plants[st.plants.length - 1][3]; o.stage = grown ? 2 : 0;
-    if (grown) { o.bare = true; w.version++; }
+    if (grown && FLORA[species].pick) { o.bare = true; w.version++; }
     return o;
   }
 
@@ -730,6 +732,7 @@ export class Farm {
         if (w.objects[o.id] !== o) return false;
         const r = Flora.pickFruit(st, o, now, Math.random);
         if (!r) { this.toast('Склад полон', 'warn'); return false; }
+        this.spend(ENERGY.pick);
         this.dropFx(o, r.items);
         o.bare = true; w.version++;
         this.burst(o.wx, o.wy - 30, FLORA_GOODS[FLORA[o.type].fruit].color, 8, true);
