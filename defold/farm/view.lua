@@ -615,6 +615,9 @@ end
 function V:cull()
 	local cam = self.f.cam
 	if not cam then return end
+	local key = cam.x .. ',' .. cam.y .. ',' .. cam.zoom .. ',' .. cam.view_w .. ',' .. cam.view_h
+	if not self.cull_dirty and self.cents and self.cull_key == key then return end
+	self.cull_key = key
 	if self.cull_dirty or not self.cents then self:cull_index() end
 	local hw, hh = cam.view_w / 2 / cam.zoom, cam.view_h / 2 / cam.zoom
 	-- запас: высокие деревья и дом торчат вверх над своей клеткой, кроны — в стороны
@@ -663,12 +666,16 @@ function V:update(dt)
 	if self.obj_v ~= w.version or self.house_lv ~= f.st.house or self.well_st ~= f.st.well then self:sync_objects(); self.cull_dirty = true end
 	self:cull()
 	-- дрожь от удара
-	for id, e in pairs(self.objs) do
-		local o = e.o
-		if o.shake > 0 or e.shaking then
+	self.shook = self.shook or {}
+	for id, o in pairs(f.shaking) do self.shook[id] = true end
+	for id in pairs(self.shook) do
+		local e = self.objs[id]
+		if not e then self.shook[id] = nil
+		else
+			local o = e.o
 			local sh = o.shake > 0 and math.sin(f.time * 70) * 2.2 * (o.shake / 0.25) or 0
-			e.shaking = o.shake > 0
 			self:set_pos(e, o.wx + sh, o.wy, zd(o.depth, o.wy))
+			if o.shake <= 0 then self.shook[id] = nil end
 		end
 	end
 	self:sync_crops(f.time)

@@ -83,6 +83,11 @@ end
 
 function update(self, dt)
 	prof.frame(dt, app.view)
+	if prof.on and (self.res_w ~= app.W or self.res_h ~= app.H or self.res_q ~= gfx.quality) then
+		self.res_w, self.res_h, self.res_q = app.W, app.H, gfx.quality
+		local L = { high = 'Высокая', mid = 'Средняя', low = 'Низкая', min = 'Миним.' }
+		prof.extra_line = 'Холст ' .. app.W .. '×' .. app.H .. ' пикс., чёткость ' .. (L[gfx.quality] or gfx.quality)
+	end
 	dt = math.min(dt, 0.1)
 	if self.test then
 		local q = app.test_map_q

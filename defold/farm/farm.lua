@@ -31,6 +31,7 @@ function M.new(opts)
 	self.low = opts.low -- слабое устройство: меньше частиц
 	self.map = opts.map -- нарисованная карта (farm/map.lua) или nil — тогда мир генерируется
 	self.particles, self.floaters = {}, {}
+	self.shaking = {} -- id → объект, который сейчас дрожит от удара
 	self.hover, self.tap_fx = nil, nil
 	self.time = 0
 	self.quests = quests.new(self)
@@ -502,7 +503,7 @@ function Farm:perform(a)
 	if k == 'chop' or k == 'mine' then
 		local o = a.obj
 		if w.objects[o.id] ~= o or not self:spend(1) then return false end
-		o.hp = o.hp - 1; o.shake = 0.25
+		o.hp = o.hp - 1; o.shake = 0.25; self.shaking[o.id] = o
 		if o.hp > 0 then self:sfx(k == 'chop' and 'chop' or 'mine') end
 		local hy = (o.type == 'stump' or o.type == 'rock' or o.type == 'bush' or o.type == 'berry') and 8 or (o.type == 'boulder' and 20 or 26)
 		self:burst(o.wx, o.wy - hy, k == 'chop' and '#b07a45' or '#b8bec3', 6)
@@ -710,10 +711,10 @@ function Farm:update(dt)
 	if self._eT > 1 then self._eT = 0; self:tick_energy(); self.ui:tick(self) end
 	self.player:update(dt)
 	self:pour_water(dt)
-	local OB = self.world.objects
-	for id = 0, self.world.nobj - 1 do
-		local o = OB[id]
-		if o and o.shake > 0 then o.shake = math.max(0, o.shake - dt) end
+	-- дрожь только у тех, кого ударили (раньше каждый кадр перебирались все ~900 объектов)
+	for id, o in pairs(self.shaking) do
+		o.shake = math.max(0, o.shake - dt)
+		if o.shake <= 0 then self.shaking[id] = nil end
 	end
 	local Pt = self.particles
 	for i = #Pt, 1, -1 do

@@ -602,7 +602,12 @@ local function overlays(self)
 	-- таблички «Открыть участок»
 	local w = f.world
 	local blocked = w:unlocked_count() >= data.HOUSE[f.st.house].chunks
-	n = 0
+	-- таблички пересчитываются, только когда сдвинулась камера или поменялись участки
+	local skey = cam.x .. ',' .. cam.y .. ',' .. z .. ',' .. cam.view_w .. ',' .. cam.view_h .. ',' .. w:unlocked_count() .. ',' .. tostring(blocked) .. ',' .. d
+	local signs = self.sign_key ~= skey
+	self.sign_key = skey
+	n = signs and 0 or (self.sign_n or 0)
+	if signs then
 	for ch = 0, W.CHUNKS * W.CHUNKS - 1 do
 		if w:can_unlock(ch) then
 			local cx, cy = ch % W.CHUNKS, math.floor(ch / W.CHUNKS)
@@ -621,8 +626,13 @@ local function overlays(self)
 				local label = blocked and 'Нужен дом выше' or 'Открыть участок'
 				if e.text ~= label then e.text = label; gui.set_text(e.t, label) end
 				local fs = 9 * z
-				gui.set_scale(e.t, vmath.vector3(fs * d / K.FONT_PX, fs * d / K.FONT_PX, 1))
-				local tw = K.measure(e.t)
+				if e.fs ~= fs then
+					e.fs = fs
+					gui.set_scale(e.t, vmath.vector3(fs * d / K.FONT_PX, fs * d / K.FONT_PX, 1))
+					e.tw = nil
+				end
+				if not e.tw or e.tw_text ~= label then e.tw = K.measure(e.t); e.tw_text = label end
+				local tw = e.tw
 				local bw = tw + 30 * z
 				gui.set_position(e.n, vmath.vector3((sx - bw / 2) * d, -(sy - 11 * z) * d, 0))
 				gui.set_position(e.o, vmath.vector3(-2 * z * d, 2 * z * d, 0))
@@ -636,6 +646,8 @@ local function overlays(self)
 		end
 	end
 	pool_trim(self, 'sign', n)
+	self.sign_n = n
+	end
 	-- номера очереди дел
 	local p = f.player
 	local list = {}
@@ -732,6 +744,7 @@ local function layers(self)
 	end
 	self.l_hud = nil; self.popup = nil; self.more = nil; self.panel = nil; self.q_card = nil
 	self.toasts, self.levelups, self.pools, self.hits = {}, {}, {}, {}
+	self.sign_key, self.sign_n = nil, 0
 	build_hud(self)
 end
 
