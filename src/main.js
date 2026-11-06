@@ -152,7 +152,7 @@ async function main() {
       const now = (performance.now() - perf._t0) / 1000;
       const sp = perf.spikes.map((x) => `${x.ms.toFixed(0)} мс ${Math.round(now - x.at)} с назад: ${x.tags}`).join('\n');
       fpsEl.textContent = `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
-        ` · ${app ? 'WebGL' : '2D'} · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}${perf.idle ? " · покой" : ""}` + (sp ? `\nфризы:\n${sp}` : '');
+        ` · ${app ? 'WebGL' : '2D'} · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}${perf.idle ? " · покой" : ""}` + (farm.scene ? `\nвызовов отрисовки ${farm.scene.calls} · треугольников ${Math.round(farm.scene.tris)} · холст ${canvas.width}×${canvas.height}` : '') + (sp ? `\nфризы:\n${sp}` : '');
     };
     paint(); fpsTimer = setInterval(paint, 500);
   };

@@ -411,7 +411,7 @@ export class PixiScene {
         }
         runs.sort((a, b) => a - b);
         const med = (runs[1] + runs[2]) / 2;
-        lines.push(`${name}: ${med.toFixed(1)} мс (${Math.round(1000 / med)} fps)`);
+        lines.push(`${name}: ${med.toFixed(1)} мс (${Math.round(1000 / med)} fps), вызовов ${this.calls}`);
         onText && onText(lines.join('\n') + '\n…');
         await wait();
       }
@@ -558,8 +558,9 @@ export class PixiScene {
     this.syncFloaters();
 
     const P = this.f.perf; this.atlas.flush(P);
-    const tr = performance.now();
+    const tr = performance.now(), DST = this.app.drawStats; DST.calls = 0; DST.tris = 0;
     this.app.renderer.render(this.app.stage);
+    this.calls = DST.calls; this.tris = DST.tris;
     const pm = performance.now() - tr; if (pm >= 3) P.mark('отрисовка', pm);
   }
 
@@ -677,6 +678,9 @@ export async function createPixiApp(canvas, perf, bg) {
       powerPreference: 'high-performance', hello: false,
     });
     app.ticker && app.ticker.stop();
+    // счётчик вызовов отрисовки (для профайлинга: показывается в счётчике FPS и в тесте видеокарты)
+    { const gl = app.renderer.gl, st = app.drawStats = { calls: 0, tris: 0 };
+      for (const n of ['drawElements', 'drawArrays']) { const o = gl[n].bind(gl); gl[n] = (mode, count, ...a) => { st.calls++; st.tris += count / 3; return o(mode, count, ...a); }; } }
     // первый запуск на слабой видеокарте — сразу «Средняя» графика (игрок может сменить в настройках)
     if (perf.gfx === 'auto' && (window.devicePixelRatio || 1) > 1.5) {
       try {
