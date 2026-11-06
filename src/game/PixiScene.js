@@ -118,7 +118,7 @@ export class PixiScene {
     const world = this.world = new PIXI.Container({ isRenderGroup: true });
     app.stage.addChild(world);
     this.chunks = [];
-    for (let c = 0; c < CHUNKS * CHUNKS; c++) { const cc = new PIXI.Container({ isRenderGroup: true }); cc.tiles = []; /* своя группа: неподвижная земля не пересобирается при движении камеры */ this.chunks.push(cc); world.addChild(cc); }
+    for (let c = 0; c < CHUNKS * CHUNKS; c++) { const cc = new PIXI.Container(); cc.tiles = []; /* одна сетка на кусок — отдельная группа рендера не нужна */ this.chunks.push(cc); world.addChild(cc); }
     this.bedsC = new PIXI.Container({ sortableChildren: true, isRenderGroup: true }); world.addChild(this.bedsC);
     this.border = new PIXI.Graphics(); world.addChild(this.border);
     this.objC = new PIXI.Container({ sortableChildren: true }); world.addChild(this.objC);
@@ -137,7 +137,7 @@ export class PixiScene {
     this.floatC = new PIXI.Container(); this.over.addChild(this.floatC);
     this.player = new PlayerView(this); this.objC.addChild(this.player.c);
     this.objs = new Map(); this.crops = new Map(); this.bub = new Map();
-    this.stamp = 0;
+    this.stamp = 0; this._obTick = 0;
     this.keys = {};
     this.textRes = Math.max(2, (window.devicePixelRatio || 1)) * 2.6; // текст чёткий и при сильном приближении
     // Надписи — растровые шрифты: буквы рисуются один раз в атлас, новая надпись ничего не грузит в видеокарту
@@ -406,28 +406,49 @@ export class PixiScene {
     const stamp = ++this.stamp;
     let playerHidden = false;
     const OB = w.objects;
-    for (let oi = 0; oi < OB.length; oi++) {
-      const o = OB[oi];
-      if (!o) continue;
+    const one = (o) => {
       let e = this.objs.get(o);
       if (!e) { e = new PIXI.Sprite(); e.o = o; this.objs.set(o, e); this.objC.addChild(e); }
       e.stamp = stamp;
       let s = f.objSprite(o);
       const vis = r.visible(o.wx - s.ax - 4, o.wy - s.ay, s.w + 8, s.h);
-      e.visible = vis;
-      if (!vis) { o.fade = 0; continue; }
+      if (e.visible !== vis) e.visible = vis;
+      if (!vis) { o.fade = 0; return; }
       if (!w.isOpen(o.gx, o.gy)) s = dimSprite(s);
       const sh = o.shake > 0 ? Math.sin(f.time * 70) * 2.2 * (o.shake / 0.25) : 0;
       const fade = f.occludes(o, s, F);
       o.fade = (o.fade || 0) + (fade - (o.fade || 0)) * 0.3;
       if (o.fade < 0.02) o.fade = 0;
       if (fade && F[0].hit) playerHidden = true;
-      e.alpha = o.fade ? 1 - 0.62 * o.fade : 1;
+      const al = o.fade ? 1 - 0.62 * o.fade : 1;
+      if (e.alpha !== al) e.alpha = al;
       this.put(e, s, o.wx + sh, o.wy);
       const z = Z(o.depth, o.wy);
       if (e.zIndex !== z) e.zIndex = z;
+    };
+    // Обходим только объекты кусков рядом с экраном (на слабом процессоре обход всей карты — главная цена кадра).
+    // Полный обход — когда объекты появились/исчезли/двигаются и изредка для надёжности.
+    const full = !this.buckets || this._obN !== OB.length || f.mover.active || ++this._obTick >= 90;
+    if (full) {
+      this._obN = OB.length; this._obTick = 0;
+      const B = this.buckets = this.chunks.map(() => []);
+      for (let oi = 0; oi < OB.length; oi++) { const o = OB[oi]; if (o) { B[w.chunkOf(o.gx, o.gy)].push(o); one(o); } }
+      this.objs.forEach((e) => { if (e.stamp !== stamp) { e.destroy(); this.objs.delete(e.o); } });
+      this._cvis = this.chunks.map(() => true);
+    } else {
+      const B = this.buckets, CV = this._cvis;
+      for (let c = 0; c < B.length; c++) {
+        const cb = CB[c]; // у высоких деревьев верхушка заходит в соседний кусок — запас вверх и в стороны
+        const near = cb.maxX + 120 > v.minX && cb.minX - 120 < v.maxX && cb.maxY + 40 > v.minY && cb.minY - 300 < v.maxY;
+        const L = B[c];
+        if (near) {
+          for (let i = 0; i < L.length; i++) { const o = L[i]; if (OB[o.id] === o) one(o); else this._obTick = 1e9; }
+        } else if (CV[c]) {
+          for (let i = 0; i < L.length; i++) { const e = this.objs.get(L[i]); if (e) e.visible = false; L[i].fade = 0; }
+        }
+        CV[c] = near;
+      }
     }
-    this.objs.forEach((e) => { if (e.stamp !== stamp) { e.destroy(); this.objs.delete(e.o); } });
 
     // растения и значки над грядками
     const bob = Math.sin(f.time * 4) * 1.5;
