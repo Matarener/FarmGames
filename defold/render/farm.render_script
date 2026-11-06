@@ -1,0 +1,53 @@
+-- Отрисовка: мир — ортокамера по сообщению "camera" от main.script (центр и пикселей на единицу),
+-- интерфейс — в пикселях окна (у gui отключена подгонка под размер проекта). Надписи над миром
+-- (+3, таблички участков, номера очереди) рисует интерфейс: так они всегда чёткие.
+local BG = vmath.vector4(0x3d / 255, 0x7a / 255, 0x35 / 255, 1)
+
+function init(self)
+	self.world_pred = render.predicate({ 'tile' })
+	self.text_pred = render.predicate({ 'text' })
+	self.gui_pred = render.predicate({ 'gui' })
+	self.cam = { x = 0, y = 0, k = 1 }
+	self.clear = { [graphics.BUFFER_TYPE_COLOR0_BIT] = BG, [graphics.BUFFER_TYPE_DEPTH_BIT] = 1, [graphics.BUFFER_TYPE_STENCIL_BIT] = 0 }
+end
+
+function update(self)
+	local w, h = render.get_window_width(), render.get_window_height()
+	if w == 0 or h == 0 then return end
+	render.set_depth_mask(true)
+	render.set_stencil_mask(0xff)
+	render.clear(self.clear)
+	render.set_viewport(0, 0, w, h)
+	render.set_depth_mask(false)
+	render.disable_state(graphics.STATE_DEPTH_TEST)
+	render.disable_state(graphics.STATE_STENCIL_TEST)
+	render.disable_state(graphics.STATE_CULL_FACE)
+	render.enable_state(graphics.STATE_BLEND)
+	render.set_blend_func(graphics.BLEND_FACTOR_ONE, graphics.BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
+
+	-- мир
+	local c = self.cam
+	local hw, hh = w / 2 / c.k, h / 2 / c.k
+	local proj = vmath.matrix4_orthographic(c.x - hw, c.x + hw, c.y - hh, c.y + hh, -10, 10)
+	local view = vmath.matrix4()
+	render.set_view(view)
+	render.set_projection(proj)
+	local frustum = proj * view
+	render.draw(self.world_pred, { frustum = frustum })
+
+	-- интерфейс
+	render.set_view(vmath.matrix4())
+	render.set_projection(vmath.matrix4_orthographic(0, w, 0, h, -1, 1))
+	render.enable_state(graphics.STATE_STENCIL_TEST)
+	render.draw(self.gui_pred)
+	render.draw(self.text_pred)
+	render.disable_state(graphics.STATE_STENCIL_TEST)
+end
+
+function on_message(self, message_id, message)
+	if message_id == hash('camera') then
+		self.cam.x, self.cam.y, self.cam.k = message.x, message.y, message.k
+	elseif message_id == hash('clear_color') then
+		self.clear[graphics.BUFFER_TYPE_COLOR0_BIT] = message.color
+	end
+end

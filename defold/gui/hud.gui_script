@@ -1,0 +1,782 @@
+-- Интерфейс фермы (перенос src/ui/UI.js): верхняя панель, задание, нижние кнопки, всплывающее
+-- меню у точки на карте, окна (рюкзак, рынок, дом, задания, настройки), уведомления и надписи
+-- над миром (+3 дерево, таблички участков, номера очереди).
+-- Логика фермы шлёт сюда команды через app.queue (см. farm/app.lua).
+local app = require('farm.app')
+local K = require('gui.kit')
+local data = require('farm.data')
+local util = require('farm.util')
+local quests = require('farm.quests')
+local iso = require('farm.iso')
+local W = require('farm.world')
+local META = require('farm.art_meta')
+
+local box, frame, text, icon, rich, group = K.box, K.frame, K.text, K.icon, K.rich, K.group
+local c, INK, PAPER = K.c, K.INK, K.PAPER
+local DARK = c('#3d2b1f', 0.72)
+local fmt_num, fmt_time, fmt_clock = util.fmt_num, util.fmt_time, util.fmt_clock
+
+-- ---------- нажатия ----------
+-- зоны нажатий по слоям: { x0, y0, x1, y1, fn, layer }
+local function hit(self, layer, x, y, w, h, fn, scroll, tag)
+	self.hits[#self.hits + 1] = { x, y, x + w, y + h, fn, layer, scroll, tag }
+end
+local function clear_hits(self, layer)
+	for i = #self.hits, 1, -1 do if self.hits[i][6] == layer then table.remove(self.hits, i) end end
+end
+
+local function sfx(name) if app.farm then app.farm:sfx(name) end end
+
+-- ---------- уведомления ----------
+local function toast(self, msg, kind)
+	local col = kind == 'warn' and c('#fde2d8') or kind == 'good' and c('#e6f7d2') or PAPER
+	local wmax = math.min(340, app.cam.view_w - 24)
+	local tmp = text(nil, msg, 0, 0, 13, { wrap = wmax - 24 })
+	local tw, th = K.measure(tmp)
+	gui.delete_node(tmp)
+	local w, h = math.min(wmax, tw + 24), th + 16
+	local n = frame(self.l_toast, (app.cam.view_w - w) / 2, 0, w, h, col, c('#3d2b1f', 0.6), 2, 'round')
+	text(n, msg, 12, 8, 13, { wrap = wmax - 24 })
+	table.insert(self.toasts, { n = n, t = 0, h = h })
+	while #self.toasts > 3 do gui.delete_node(table.remove(self.toasts, 1).n) end
+end
+
+local function update_toasts(self, dt)
+	local y = 120
+	for i = #self.toasts, 1, -1 do
+		local t = self.toasts[i]
+		t.t = t.t + dt
+		local a = t.t < 2.2 and 1 or math.max(0, 1 - (t.t - 2.2) / 0.4)
+		if t.t > 2.6 then gui.delete_node(t.n); table.remove(self.toasts, i)
+		else
+			local p = gui.get_position(t.n)
+			p.y = app.H - K.px(y)
+			gui.set_position(t.n, p)
+			K.alpha(t.n, a)
+			y = y + t.h + 6
+		end
+	end
+end
+
+-- ---------- верхняя панель ----------
+local function build_hud(self)
+	if self.l_hud then gui.delete_node(self.l_hud) end
+	clear_hits(self, 'hud')
+	local L = group(self.l_hud_parent, 0, 0)
+	self.l_hud = L
+	local VW, VH = app.cam.view_w, app.cam.view_h
+	local top = 8
+	-- аватар
+	frame(L, 8, top, 46, 46, c('#ffd98a'), INK, 2.5, 'round')
+	icon(L, 'ic_avatar', 10, top + 2, 42)
+	-- уровень и опыт
+	box(L, 60, top + 2, 92, 40, DARK, 'round')
+	icon(L, 'ic_star', 66, top + 6, 18)
+	self.t_level = text(L, '1', 87, top + 5, 16, { color = K.WHITE })
+	text(L, 'уровень', 104, top + 8, 11, { color = c('#ffffff', 0.8) })
+	box(L, 66, top + 28, 80, 7, c('#000000', 0.35), 'pill')
+	self.xpbar = box(L, 66, top + 28, 0.1, 7, K.GREEN, 'pill')
+	-- настройки
+	icon(L, 'ui_gear', 158, top + 8, 30)
+	hit(self, 'hud', 154, top + 4, 38, 38, function() self:open_settings() end)
+	-- кошелёк справа
+	local px = VW - 8 - 92
+	self.pills = {}
+	for i, k in ipairs({ 'coin', 'gem', 'energy' }) do
+		local y = top + (i - 1) * 32
+		box(L, px, y, 92, 28, DARK, 'pill')
+		icon(L, 'ic_' .. k, px + 4, y + 3, 22)
+		self.pills[k] = text(L, '0', px + 29, y + 6, 14, { color = K.WHITE })
+	end
+	self.t_energy_t = text(L, '', px + 62, top + 64 + 9, 10, { color = c('#ffffff', 0.75) })
+	hit(self, 'hud', px, top + 64, 92, 28, function() self:open_bag() end)
+	-- задание и лейка
+	self.quest_y = top + 64
+	self.q_card = nil
+	self.chip = frame(L, 8, top + 64, 64, 26, c('#fff6e3', 0.88), c('#3d2b1f', 0.55), 2, 'pill')
+	icon(self.chip, 'ic_water', 2, 1, 20)
+	self.t_can = text(self.chip, '0', 26, 4, 13)
+	-- нижние кнопки
+	local names = { { 'bag', 'Рюкзак', function() self:open_bag() end }, { 'market', 'Рынок', function() self:open_market() end },
+		{ 'house', 'Дом', function() self:open_house() end }, { 'more', 'Ещё', function() self:toggle_more() end } }
+	local bw = math.min(92, (VW - 16 - 8 * 3) / 4)
+	local total = bw * 4 + 8 * 3
+	local x0 = (VW - total) / 2
+	local by = VH - 8 - 62
+	for i, b in ipairs(names) do
+		local x = x0 + (i - 1) * (bw + 8)
+		frame(L, x, by, bw, 62, c('#f6e3b8'), INK, 2.5, 'round')
+		icon(L, b[1] == 'more' and 'ui_more' or 'ic_' .. b[1], x + bw / 2 - 17, by + 6, 34)
+		local t = text(L, b[2], x + bw / 2, by + 43, 11, { pivot = gui.PIVOT_N })
+		hit(self, 'hud', x, by, bw, 62, b[3], nil, b[1])
+	end
+	-- к фермеру
+	frame(L, VW - 8 - 50, by - 60, 50, 50, c('#f6e3b8'), INK, 2.5, 'pill')
+	icon(L, 'ic_center', VW - 8 - 50 + 8, by - 52, 34)
+	hit(self, 'hud', VW - 58, by - 60, 50, 50, function()
+		local x, y = app.farm.player:world_pos()
+		app.cam:center_on(x, y - 20)
+	end)
+	self.last = {}
+end
+
+local function set_text(self, key, node, val)
+	if self.last[key] ~= val then self.last[key] = val; gui.set_text(node, val) end
+end
+
+local function quest_card(self)
+	local f = app.farm
+	local Q = f.quests
+	local q = Q:current()
+	local key = q and (Q:st().i .. ':' .. Q:progress() .. ':' .. tostring(Q:done())) or 'end'
+	if self.last.quest == key then return end
+	self.last.quest = key
+	if self.q_card then gui.delete_node(self.q_card); self.q_card = nil end
+	clear_hits(self, 'quest')
+	local y = self.quest_y
+	if q then
+		local done = Q:done()
+		local n = frame(self.l_hud, 8, y, 168, 46, done and c('#ffd75a') or c('#fff6e3', 0.94), c('#3d2b1f', 0.6), 2, 'round')
+		self.q_card = n
+		icon(n, q.who == 'note' and 'ui_note' or 'ic_star', 4, 8, 26)
+		text(n, done and 'Забрать награду!' or q.task, 34, 5, 11.5, { wrap = 100 })
+		text(n, Q:progress() .. '/' .. q.goal.n, 160, 5, 11, { pivot = gui.PIVOT_NE })
+		box(n, 34, 32, 120, 6, c('#3d2b1f', 0.18), 'pill')
+		box(n, 34, 32, math.max(0.1, 120 * Q:progress() / q.goal.n), 6, K.GREEN, 'pill')
+		hit(self, 'quest', 8, y, 168, 46, function() self:open_quest() end)
+		y = y + 50
+	end
+	local p = gui.get_position(self.chip)
+	p.y = app.H - K.px(y)
+	gui.set_position(self.chip, p)
+end
+
+local function refresh_hud(self)
+	local f = app.farm
+	if not f or not f.st then return end
+	local st = f.st
+	set_text(self, 'lv', self.t_level, tostring(st.level))
+	set_text(self, 'coins', self.pills.coin, fmt_num(st.coins))
+	set_text(self, 'gems', self.pills.gem, fmt_num(st.gems))
+	set_text(self, 'energy', self.pills.energy, st.energy .. '/' .. f:max_energy())
+	set_text(self, 'can', self.t_can, st.can .. '/' .. f:can_max())
+	local full = st.energy >= f:max_energy()
+	set_text(self, 'et', self.t_energy_t, full and '' or fmt_clock(f:energy_left_sec()))
+	local pct = math.min(1, st.xp / data.xp_to_next(st.level))
+	if self.last.xp ~= pct then
+		self.last.xp = pct
+		gui.set_size(self.xpbar, vmath.vector3(math.max(1, K.px(80 * pct)), K.px(7), 0))
+	end
+	quest_card(self)
+end
+
+-- ---------- всплывающее меню у точки ----------
+local function close_popup(self)
+	if self.popup then gui.delete_node(self.popup); self.popup = nil end
+	clear_hits(self, 'popup')
+	self.popup_spec = nil
+	if self.more then gui.delete_node(self.more); self.more = nil; clear_hits(self, 'more') end
+end
+
+local function cost_parts(cost, f)
+	local parts = {}
+	for _, k in ipairs(data.COST_ORDER) do
+		local v = cost[k]
+		if v then
+			local have = f:have(k)
+			parts[#parts + 1] = { icon = k == 'coins' and 'coin' or k == 'gems' and 'gem' or k }
+			parts[#parts + 1] = (have < v and (fmt_num(have) .. '/') or '') .. fmt_num(v) .. '  '
+		end
+	end
+	return parts
+end
+
+local function popup(self, sx, sy, spec)
+	close_popup(self)
+	self.popup_spec = spec
+	local f = app.farm
+	local items = spec.items or {}
+	local w = spec.wide and 260 or 210
+	local VW, VH = app.cam.view_w, app.cam.view_h
+	w = math.min(w, VW - 20)
+	-- высота: заголовок, текст, цена, кнопки
+	local h = 8
+	local tmp
+	if spec.title then h = h + 22 end
+	local th = 0
+	if spec.text then
+		tmp = text(nil, spec.text, 0, 0, 12, { wrap = w - 20 }); local _, hh = K.measure(tmp); gui.delete_node(tmp)
+		th = hh; h = h + th + 6
+	end
+	if spec.cost then h = h + 24 end
+	h = h + #items * 40 + 4
+	local x = math.min(VW - w - 10, math.max(10, sx - w / 2))
+	local y = sy - h - 18
+	if y < 70 then y = math.min(VH - h - 90, sy + 22) end
+	y = math.max(10, y)
+	local n = frame(self.l_popup, x, y, w, h, PAPER, INK, 2.5, 'round')
+	self.popup = n
+	hit(self, 'popup', x, y, w, h, function() end) -- нажатие по самому меню не уходит на карту
+	local cy = 8
+	if spec.title then text(n, spec.title, 12, cy, 14); cy = cy + 22 end
+	if spec.text then text(n, spec.text, 10, cy, 12, { wrap = w - 20, color = c('#5a4636') }); cy = cy + th + 6 end
+	if spec.cost then rich(n, cost_parts(spec.cost, f), 10, cy + 2, 13); cy = cy + 24 end
+	for _, it in ipairs(items) do
+		local dis = it.disabled
+		local b = frame(n, 6, cy, w - 16, 36, dis and c('#e9dcc0') or c('#f8e7c0'), c('#3d2b1f', dis and 0.3 or 0.8), 2, 'round')
+		local a = dis and 0.45 or 1
+		local ic = icon(b, 'ic_' .. it.icon, 6, 6, 22); K.alpha(ic, a)
+		local lt = text(b, it.label, 34, 9, 13); K.alpha(lt, a)
+		if it.sub then
+			local sw = K.rich_width(it.sub, 11)
+			rich(b, it.sub, w - 26 - sw, 11, 11, { color = c('#3d2b1f', dis and 0.45 or 0.75) })
+		end
+		if not dis then
+			hit(self, 'popup', x + 6, y + cy, w - 16, 36, function() close_popup(self); it.on_click() end)
+		end
+		cy = cy + 40
+	end
+	sfx('pop')
+end
+
+-- ---------- окна ----------
+local function close_panel(self)
+	if self.panel then gui.delete_node(self.panel); self.panel = nil; sfx('close') end
+	clear_hits(self, 'panel'); clear_hits(self, 'pbody')
+	self.panel_kind = nil
+end
+
+-- Окно: build(add) получает функции разметки тела; тело прокручивается пальцем
+local function open_panel(self, kind, title, build)
+	local keep_scroll = self.panel_kind == kind and self.scroll or 0
+	if self.panel then gui.delete_node(self.panel); self.panel = nil end
+	clear_hits(self, 'panel'); clear_hits(self, 'pbody')
+	close_popup(self)
+	if not self.panel_kind then sfx('open') end
+	self.panel_kind, self.panel_title, self.panel_build = kind, title, build
+	local VW, VH = app.cam.view_w, app.cam.view_h
+	local root = box(self.l_panel, 0, 0, VW, VH, c('#1c140e', 0.5))
+	self.panel = root
+	hit(self, 'panel', 0, 0, VW, VH, function() close_panel(self) end)
+	local w = math.min(380, VW - 20)
+	local hmax = VH - 120
+	local x = (VW - w) / 2
+	-- сначала тело в невидимом контейнере, чтобы узнать высоту
+	local body_w = w - 28
+	local content = group(nil, 0, 0)
+	local cy = 0
+	local hits = {}
+	local api = {}
+	function api.sub(s) cy = cy + 6; text(content, s, 0, cy, 12, { color = c('#8a5a35') }); cy = cy + 20 end
+	function api.text(s, size) local t = text(content, s, 0, cy, size or 13, { wrap = body_w }); local _, th = K.measure(t); cy = cy + th + 8 end
+	function api.rich(parts, size) rich(content, parts, 0, cy, size or 13); cy = cy + (size or 13) + 12 end
+	function api.button(label, fn, disabled, gold)
+		local b = frame(content, 0, cy, body_w, 44, disabled and c('#e3d6bb') or (gold and c('#ffd75a') or c('#8fd35c')), c('#3d2b1f', disabled and 0.35 or 1), 2.5, 'round')
+		local t = text(b, label, body_w / 2, 13, 15, { pivot = gui.PIVOT_N, color = c('#3d2b1f', disabled and 0.5 or 1) })
+		if not disabled then hits[#hits + 1] = { 0, cy, body_w, 44, fn } end
+		cy = cy + 52
+	end
+	-- строка товара: значок, название, подпись, кнопки справа { {label, fn, disabled, gold} }
+	function api.item(ic, name, sub, buttons)
+		local r = frame(content, 0, cy, body_w, 52, c('#fffaf0'), c('#3d2b1f', 0.25), 2, 'round')
+		icon(r, 'ic_' .. ic, 8, 10, 32)
+		text(r, name, 48, 8, 13)
+		if sub then rich(r, sub, 48, 28, 11, { color = c('#3d2b1f', 0.7) }) end
+		local bx = body_w - 6
+		for i = #buttons, 1, -1 do
+			local b = buttons[i]
+			local bw = math.max(64, K.rich_width(b[1], 12) + 16)
+			bx = bx - bw
+			local bn = frame(r, bx, 10, bw, 32, b[3] and c('#e3d6bb') or (b[4] and c('#ffd75a') or c('#f8e7c0')), c('#3d2b1f', b[3] and 0.3 or 0.8), 2, 'round')
+			rich(bn, b[1], 8, 8, 12, { color = c('#3d2b1f', b[3] and 0.45 or 1) })
+			if not b[3] then hits[#hits + 1] = { bx, cy + 10, bw, 32, b[2] } end
+			bx = bx - 6
+		end
+		cy = cy + 58
+	end
+	-- плитки: { {icon, value, caption}, ... } по 4 в ряд
+	function api.grid(cells)
+		local cw = (body_w - 18) / 4
+		for i, cl in ipairs(cells) do
+			local col, row = (i - 1) % 4, math.floor((i - 1) / 4)
+			local cx = col * (cw + 6)
+			local cell = frame(content, cx, cy + row * 82, cw, 76, c('#fffaf0'), c('#3d2b1f', 0.25), 2, 'round')
+			icon(cell, 'ic_' .. cl[1], cw / 2 - 16, 6, 32)
+			text(cell, cl[2], cw / 2, 40, 14, { pivot = gui.PIVOT_N })
+			text(cell, cl[3], cw / 2, 58, 10, { pivot = gui.PIVOT_N, color = c('#3d2b1f', 0.7) })
+		end
+		cy = cy + math.ceil(#cells / 4) * 82
+	end
+	function api.stat(label, a, b)
+		local r = box(content, 0, cy, body_w, 28, c('#fffaf0'), 'round')
+		text(r, label, 10, 6, 13)
+		local s = tostring(a) .. (b and ('  → ' .. b) or '')
+		text(r, s, body_w - 10, 6, 13, { pivot = gui.PIVOT_NE })
+		cy = cy + 32
+	end
+	function api.story(face, who, s, note)
+		icon(content, face, 0, 0 + cy, 56)
+		local tw = body_w - 66
+		local t = text(nil, s, 0, 0, 14, { wrap = tw - 20 })
+		local _, th = K.measure(t); gui.delete_node(t)
+		local bubble = frame(content, 66, cy, tw, th + 36, note and c('#fbf0d4') or K.WHITE, c('#3d2b1f', 0.25), 2, 'round')
+		text(bubble, who, 10, 6, 12, { color = c('#8a5a35') })
+		text(bubble, s, 10, 24, 14, { wrap = tw - 20 })
+		cy = cy + math.max(60, th + 40) + 8
+	end
+	function api.bar(k)
+		box(content, 0, cy, body_w, 9, c('#3d2b1f', 0.18), 'pill')
+		box(content, 0, cy, math.max(0.1, body_w * k), 9, K.GREEN, 'pill')
+		cy = cy + 16
+	end
+	function api.space(n) cy = cy + n end
+	build(api)
+	local body_h = cy
+	local head = 46
+	local h = math.min(hmax, head + body_h + 16)
+	local y = math.max(60, (VH - h) / 2)
+	local card = frame(root, x, y, w, h, PAPER, INK, 3, 'round')
+	hit(self, 'panel', x, y, w, h, function() end)
+	text(card, title, 14, 12, 18)
+	icon(card, 'ui_close', w - 40, 8, 30)
+	hit(self, 'panel', x + w - 46, y, 46, 46, function() close_panel(self) end)
+	-- тело с обрезкой и прокруткой
+	local view_h = h - head - 12
+	local clip = box(card, 12, head, body_w, view_h, K.WHITE)
+	gui.set_clipping_mode(clip, gui.CLIPPING_MODE_STENCIL)
+	gui.set_clipping_visible(clip, false)
+	gui.set_parent(content, clip)
+	self.scroll_max = math.max(0, body_h - view_h)
+	self.scroll = math.min(keep_scroll, self.scroll_max)
+	self.content = content
+	self.body_rect = { x + 12, y + head, body_w, view_h }
+	gui.set_position(content, vmath.vector3(0, K.px(self.scroll), 0))
+	for _, hb in ipairs(hits) do
+		hit(self, 'pbody', self.body_rect[1] + hb[1], self.body_rect[2] + hb[2], hb[3], hb[4], hb[5], true)
+	end
+end
+
+local function refresh_panel(self)
+	if self.panel_kind and self.panel_kind ~= 'settings' then open_panel(self, self.panel_kind, self.panel_title, self.panel_build) end
+end
+
+local function reward_parts(r)
+	local p = {}
+	if r.coins and r.coins > 0 then p[#p + 1] = r.coins .. ' '; p[#p + 1] = { icon = 'coin' }; p[#p + 1] = '  ' end
+	if r.gems and r.gems > 0 then p[#p + 1] = r.gems .. ' '; p[#p + 1] = { icon = 'gem' } end
+	return p
+end
+
+local H = {}
+function H.open_bag(self)
+	open_panel(self, 'bag', 'Рюкзак', function(a)
+		local f = app.farm
+		local st = f.st
+		a.sub('Ресурсы')
+		local cells = {}
+		for _, k in ipairs(data.RES_KEYS) do cells[#cells + 1] = { k, tostring(st.inv[k] or 0), data.RES_NAMES[k] } end
+		cells[#cells + 1] = { 'water', st.can .. '/' .. f:can_max(), 'Лейка' }
+		a.grid(cells)
+		local full = st.energy >= f:max_energy()
+		a.sub('Еда · энергия ' .. st.energy .. '/' .. f:max_energy() .. (full and '' or (', +1 через ' .. fmt_clock(f:energy_left_sec()))))
+		local any = false
+		for _, k in ipairs(data.GOODS_KEYS) do
+			local g = data.GOODS[k]
+			if g.food > 0 and (st.crops[k] or 0) > 0 then
+				any = true
+				a.item(k, g.name .. ' × ' .. st.crops[k], { '+' .. g.food .. ' ', { icon = 'energy' } }, { { 'Съесть', function() f:eat(k) end, full } })
+			end
+		end
+		if not any then a.text('Урожай можно съесть, чтобы восстановить энергию.', 12) end
+		local seeds = {}
+		for _, k in ipairs(data.CROP_KEYS) do if (st.seeds[k] or 0) > 0 then seeds[#seeds + 1] = { k, tostring(st.seeds[k]), data.CROPS[k].name } end end
+		if #seeds > 0 then a.sub('Семена'); a.grid(seeds) end
+	end)
+end
+
+function H.open_market(self)
+	open_panel(self, 'market', 'Рынок', function(a)
+		local f = app.farm
+		local any = false
+		for _, k in ipairs(data.GOODS_KEYS) do
+			local g = data.GOODS[k]
+			local n = f.st.crops[k] or 0
+			if n > 0 then
+				any = true
+				a.item(k, g.name, { n .. ' шт. · ' .. g.sell .. ' ', { icon = 'coin' }, ' за шт.' }, {
+					{ 'Продать 1', function() f:sell(k, 1) end },
+					{ { 'Все: ' .. n * g.sell .. ' ', { icon = 'coin' } }, function() f:sell(k, n) end, false, true },
+				})
+			end
+		end
+		if not any then a.text('Пока нечего продать. Соберите урожай с грядок.') end
+	end)
+end
+
+function H.open_house(self)
+	open_panel(self, 'house', 'Дом фермера', function(a)
+		local f = app.farm
+		local lvl = f.st.house
+		local cur, nxt = data.HOUSE[lvl], data.HOUSE[lvl + 1]
+		a.text(lvl .. ' уровень. Главное здание: от него зависят энергия, лейка и размер фермы.', 13)
+		a.stat('Энергия', cur.energy, nxt and nxt.energy)
+		a.stat('Лейка, поливов', cur.can, nxt and nxt.can)
+		a.stat('Участков земли', cur.chunks, nxt and nxt.chunks)
+		if nxt then
+			a.sub('Улучшение')
+			a.rich(cost_parts(nxt.cost, f), 13)
+			local need, have = data.house_need_chunks(lvl), f.world:unlocked_count()
+			if have < need then a.text('Сначала откройте новый участок земли (участков: ' .. have .. ' из ' .. need .. ').', 12) end
+			a.button('Улучшить до ' .. (lvl + 1) .. ' уровня', function() if f:upgrade_house() then refresh_panel(self) end end,
+				not f:can_pay(nxt.cost) or have < need, true)
+		else a.text('Дом улучшен до максимума!') end
+	end)
+end
+
+function H.open_quest(self)
+	open_panel(self, 'quest', 'Задания', function(a)
+		local f = app.farm
+		local Q = f.quests
+		local q = Q:current() or quests.QUEST_END
+		if Q:current() then Q:st().seen = true end
+		local note = q.who == 'note'
+		a.story(note and 'ui_note' or 'ic_avatar', note and 'Записка бабушки Марфы' or 'Призрачок', q.text, note)
+		if not Q:current() then return end
+		local n, done = Q:progress(), Q:done()
+		a.sub(q.title)
+		a.text(q.task .. '   ' .. n .. '/' .. q.goal.n, 14)
+		a.bar(n / q.goal.n)
+		local rp = reward_parts(q.reward)
+		table.insert(rp, 1, 'Награда: ')
+		a.rich(rp, 13)
+		a.button(done and 'Забрать награду' or 'Понятно', function()
+			if not done then return close_panel(self) end
+			local r = q.reward
+			if Q:claim() then
+				local s = '+'
+				if r.coins then s = s .. r.coins .. ' монет ' end
+				if r.gems then s = s .. r.gems .. ' крист.' end
+				toast(self, s, 'good')
+				refresh_panel(self)
+			end
+		end, false, done)
+	end)
+end
+
+function H.open_settings(self)
+	open_panel(self, 'settings', 'Настройки', function(a)
+		a.sub('Игра')
+		if self.ask_new then
+			a.text('Начать новую игру? Вся ферма, вещи и прогресс будут удалены безвозвратно.', 13)
+			a.button('Отмена', function() self.ask_new = false; open_panel(self, 'settings', 'Настройки', self.panel_build) end)
+			a.button('Да, начать заново', function()
+				self.ask_new = false
+				app.save:reset()
+				msg.post('@system:', 'reboot')
+			end, false, true)
+		else
+			a.button('Новая игра', function() self.ask_new = true; open_panel(self, 'settings', 'Настройки', self.panel_build) end)
+		end
+		a.sub('О версии')
+		a.text('Версия на Defold (перенос с JS). Звук и Telegram — в следующих шагах.', 12)
+	end)
+end
+
+function H.toggle_more(self)
+	if self.more then close_popup(self); return end
+	close_popup(self)
+	local VW, VH = app.cam.view_w, app.cam.view_h
+	local items = {
+		{ 'Задания', 'ui_note', function() self:open_quest() end },
+		{ 'Переставить', 'ic_house', nil },
+		{ 'Животные', 'ic_star', nil }, { 'Мастерская', 'ic_star', nil }, { 'Декор', 'ic_star', nil }, { 'Достижения', 'ic_star', nil },
+	}
+	local w, h = 190, #items * 40 + 12
+	local x, y = VW - w - 10, VH - 8 - 62 - h - 8
+	local n = frame(self.l_popup, x, y, w, h, PAPER, INK, 2.5, 'round')
+	self.more = n
+	hit(self, 'more', x, y, w, h, function() end)
+	for i, it in ipairs(items) do
+		local cy = 6 + (i - 1) * 40
+		local ic = icon(n, it[2], 8, cy + 4, 28)
+		local t = text(n, it[1], 44, cy + 10, 13)
+		if not it[3] then
+			K.alpha(ic, 0.5); K.alpha(t, 0.5)
+			text(n, 'скоро', w - 12, cy + 12, 10, { pivot = gui.PIVOT_NE, color = c('#8a5a35') })
+		end
+		hit(self, 'more', x, y + cy, w, 40, function()
+			if not it[3] then toast(self, '«' .. it[1] .. '» появится в следующих обновлениях'); return end
+			close_popup(self); it[3]()
+		end)
+	end
+	sfx('open')
+end
+
+-- ---------- новый уровень ----------
+local function level_up(self, level, opened, coins)
+	local VW = app.cam.view_w
+	local w = math.min(320, VW - 40)
+	local n = frame(self.l_toast, (VW - w) / 2, 0, w, 70, c('#fff1b0'), INK, 3, 'round')
+	icon(n, 'ic_star', 10, 10, 48)
+	text(n, tostring(level), 34, 26, 16, { pivot = gui.PIVOT_N })
+	text(n, 'Новый уровень!', 68, 10, 16)
+	local parts = { '+1 ', { icon = 'gem' }, ' +' .. coins .. ' ', { icon = 'coin' } }
+	if #opened > 0 then parts[#parts + 1] = '  Открыто: ' .. table.concat(opened, ', ') end
+	rich(n, parts, 68, 36, 12)
+	self.levelups[#self.levelups + 1] = { n = n, t = 0 }
+end
+
+-- ---------- надписи над миром ----------
+local function pool_get(self, key, i, make)
+	local P = self.pools[key]
+	if not P then P = {}; self.pools[key] = P end
+	local e = P[i]
+	if not e then e = make(); P[i] = e end
+	gui.set_enabled(e.n, true)
+	return e
+end
+local function pool_trim(self, key, n)
+	local P = self.pools[key]
+	if not P then return end
+	for i = n + 1, #P do gui.set_enabled(P[i].n, false) end
+end
+
+local function overlays(self)
+	local f, cam = app.farm, app.cam
+	local d, z = app.dpi, cam.zoom
+	-- всплывающие числа: «+3» со значком
+	local n = 0
+	for _, fl in ipairs(f.floaters) do
+		n = n + 1
+		local e = pool_get(self, 'fl', n, function()
+			local g = group(self.l_world, 0, 0)
+			local t = text(g, '', 0, 0, 11, { color = c('#fffbe8'), outline = c('#28190f', 0.8) })
+			local ic = icon(g, 'ic_wood', 0, 0, 12)
+			return { n = g, t = t, ic = ic }
+		end)
+		local k = fl.t / 1.3
+		local a = k < 0.75 and 1 or (1 - k) * 4
+		if e.text ~= fl.text then e.text = fl.text; gui.set_text(e.t, fl.text) end
+		local fs = 11 * z
+		gui.set_scale(e.t, vmath.vector3(fs * d / K.FONT_PX, fs * d / K.FONT_PX, 1))
+		local tw = K.measure(e.t)
+		local iw = fl.icon and 12 * z or 0
+		local sx, sy = cam:world_to_screen(fl.x, fl.y - k * 26)
+		local x = sx - (tw + iw) / 2
+		gui.set_position(e.n, vmath.vector3(x * d, app.H - (sy - fs * 0.6) * d, 0))
+		K.alpha(e.t, a)
+		gui.set_outline(e.t, c('#28190f', 0.8 * a))
+		if fl.icon then
+			if e.icn ~= fl.icon then e.icn = fl.icon; gui.play_flipbook(e.ic, 'ic_' .. fl.icon) end
+			gui.set_enabled(e.ic, true)
+			gui.set_position(e.ic, vmath.vector3((tw + 1 * z) * d, -fs * 0.05 * d, 0))
+			gui.set_size(e.ic, vmath.vector3(12 * z * d, 12 * z * d, 0))
+			K.alpha(e.ic, a)
+		else gui.set_enabled(e.ic, false) end
+	end
+	pool_trim(self, 'fl', n)
+	-- таблички «Открыть участок»
+	local w = f.world
+	local blocked = w:unlocked_count() >= data.HOUSE[f.st.house].chunks
+	n = 0
+	for ch = 0, W.CHUNKS * W.CHUNKS - 1 do
+		if w:can_unlock(ch) then
+			local cx, cy = ch % W.CHUNKS, math.floor(ch / W.CHUNKS)
+			local wx, wy = iso.to_world(cx * W.CHUNK + W.CHUNK / 2, cy * W.CHUNK + W.CHUNK / 2)
+			local sx, sy = cam:world_to_screen(wx, wy - 24)
+			if sx > -100 and sy > -60 and sx < cam.view_w + 100 and sy < cam.view_h + 60 then
+				n = n + 1
+				local e = pool_get(self, 'sign', n, function()
+					local g = group(self.l_world, 0, 0)
+					local o = box(g, 0, 0, 10, 10, c('#3d2b1f', 0.92), 'round')
+					local i = box(g, 0, 0, 10, 10, c('#f6d37a'), 'round')
+					local ic = icon(g, 'ic_lock', 0, 0, 14)
+					local t = text(g, '', 0, 0, 9)
+					return { n = g, o = o, i = i, ic = ic, t = t }
+				end)
+				local label = blocked and 'Нужен дом выше' or 'Открыть участок'
+				if e.text ~= label then e.text = label; gui.set_text(e.t, label) end
+				local fs = 9 * z
+				gui.set_scale(e.t, vmath.vector3(fs * d / K.FONT_PX, fs * d / K.FONT_PX, 1))
+				local tw = K.measure(e.t)
+				local bw = tw + 30 * z
+				gui.set_position(e.n, vmath.vector3((sx - bw / 2) * d, app.H - (sy - 11 * z) * d, 0))
+				gui.set_position(e.o, vmath.vector3(-2 * z * d, 2 * z * d, 0))
+				gui.set_size(e.o, vmath.vector3((bw + 4 * z) * d, 26 * z * d, 0))
+				gui.set_size(e.i, vmath.vector3(bw * d, 22 * z * d, 0))
+				gui.set_color(e.i, blocked and c('#c9b48a') or c('#f6d37a'))
+				gui.set_position(e.ic, vmath.vector3(3 * z * d, -4 * z * d, 0))
+				gui.set_size(e.ic, vmath.vector3(14 * z * d, 14 * z * d, 0))
+				gui.set_position(e.t, vmath.vector3(22 * z * d, -5 * z * d, 0))
+			end
+		end
+	end
+	pool_trim(self, 'sign', n)
+	-- номера очереди дел
+	local p = f.player
+	local list = {}
+	if p.current and p.current.kind ~= 'walk' then list[1] = p.current end
+	for _, q in ipairs(p.queue) do list[#list + 1] = q end
+	n = 0
+	for i, a in ipairs(list) do
+		local x, y
+		if a.obj then
+			local m = META[app.view:obj_sprite(a.obj)]
+			x, y = a.obj.wx, a.obj.wy - math.min((m and m[5] or 30) * 0.7, 60) - 6
+		else x, y = iso.to_world(a.x + 0.5, a.y + 0.5); y = y - 8 end
+		local sx, sy = cam:world_to_screen(x, y)
+		n = n + 1
+		local e = pool_get(self, 'q', n, function()
+			local g = group(self.l_world, 0, 0)
+			local o = box(g, 0, 0, 12, 12, c('#3d2b1f', 0.9), 'pill')
+			local ii = box(g, 1.2, 1.2, 9.6, 9.6, K.WHITE, 'pill')
+			local t = text(g, '', 6, 6, 8, { pivot = gui.PIVOT_CENTER })
+			return { n = g, o = o, i = ii, t = t }
+		end)
+		local s = z
+		gui.set_position(e.n, vmath.vector3((sx - 6 * s) * d, app.H - (sy - 6 * s) * d, 0))
+		gui.set_size(e.o, vmath.vector3(12 * s * d, 12 * s * d, 0))
+		gui.set_position(e.i, vmath.vector3(1.2 * s * d, -1.2 * s * d, 0))
+		gui.set_size(e.i, vmath.vector3(9.6 * s * d, 9.6 * s * d, 0))
+		gui.set_color(e.i, (i == 1 and a == p.current) and c('#ffe066') or K.WHITE)
+		gui.set_position(e.t, vmath.vector3(6 * s * d, -6 * s * d, 0))
+		gui.set_scale(e.t, vmath.vector3(8 * s * d / K.FONT_PX, 8 * s * d / K.FONT_PX, 1))
+		if e.text ~= tostring(i) then e.text = tostring(i); gui.set_text(e.t, e.text) end
+	end
+	pool_trim(self, 'q', n)
+end
+
+-- ---------- команды от логики ----------
+local CMD = {}
+function CMD.update(self) refresh_hud(self); if self.panel_kind and self.panel_kind ~= 'settings' then refresh_panel(self) end end
+function CMD.tick(self)
+	refresh_hud(self)
+	if self.panel_kind == 'bag' then refresh_panel(self) end
+end
+function CMD.toast(self, msg, kind) toast(self, msg, kind) end
+function CMD.popup(self, sx, sy, spec) popup(self, sx, sy, spec) end
+function CMD.close_popup(self) close_popup(self) end
+function CMD.house_panel(self) H.open_house(self) end
+function CMD.quest_panel(self) H.open_quest(self) end
+function CMD.level_up(self, level, opened, coins) level_up(self, level, opened, coins) end
+function CMD.quest_done(self, q) toast(self, 'Задание выполнено: ' .. q.title, 'good'); self.last.quest = nil end
+
+-- ---------- жизненный цикл ----------
+function init(self)
+	self.hits = {}
+	self.toasts, self.levelups = {}, {}
+	self.pools = {}
+	self.last = {}
+	self.open_bag, self.open_market, self.open_house, self.open_quest, self.open_settings, self.toggle_more =
+		H.open_bag, H.open_market, H.open_house, H.open_quest, H.open_settings, H.toggle_more
+	self.focus = false
+end
+
+local function layers(self)
+	for _, k in ipairs({ 'l_world', 'l_hud_parent', 'l_popup', 'l_panel', 'l_toast' }) do
+		if self[k] then gui.delete_node(self[k]) end
+		self[k] = group(nil, 0, 0)
+	end
+	self.l_hud = nil; self.popup = nil; self.more = nil; self.panel = nil; self.q_card = nil
+	self.toasts, self.levelups, self.pools, self.hits = {}, {}, {}, {}
+	build_hud(self)
+end
+
+function update(self, dt)
+	if not self.focus then msg.post('.', 'acquire_input_focus'); self.focus = true end
+	if not app.farm or not app.cam then return end
+	if self.W ~= app.W or self.H ~= app.H or self.dpi ~= app.dpi then
+		self.W, self.H, self.dpi = app.W, app.H, app.dpi
+		local kind = self.panel_kind
+		layers(self)
+		self.panel_kind = nil
+		if kind == 'bag' then H.open_bag(self) elseif kind == 'market' then H.open_market(self)
+		elseif kind == 'house' then H.open_house(self) elseif kind == 'quest' then H.open_quest(self) end
+	end
+	local q = app.queue
+	app.queue = {}
+	for _, cmd in ipairs(q) do
+		local fn = CMD[cmd[1]]
+		if fn then fn(self, unpack(cmd[2], 1, cmd.n)) end
+	end
+	refresh_hud(self)
+	update_toasts(self, dt)
+	for i = #self.levelups, 1, -1 do
+		local l = self.levelups[i]
+		l.t = l.t + dt
+		local p = gui.get_position(l.n)
+		p.y = app.H - K.px(70)
+		gui.set_position(l.n, p)
+		if l.t > 2.8 then K.alpha(l.n, math.max(0, 1 - (l.t - 2.8) / 0.5)) end
+		if l.t > 3.3 then gui.delete_node(l.n); table.remove(self.levelups, i) end
+	end
+	-- начало истории: новое задание показываем сразу
+	if not self.intro and app.farm.quests:current() and not app.farm.quests:st().seen then
+		self.intro_t = (self.intro_t or 0) + dt
+		if self.intro_t > 0.7 then self.intro = true; H.open_quest(self) end
+	elseif not self.intro then self.intro = true end
+	overlays(self)
+end
+
+-- нажатие в точках экрана → обработчик сверху вниз по слоям
+local ORDER = { pbody = 1, panel = 2, more = 3, popup = 4, quest = 5, hud = 6 }
+local function find_hit(self, x, y)
+	local best, bo
+	for _, h in ipairs(self.hits) do
+		local hx, hy, ok = x, y, true
+		if h[7] then
+			local r = self.body_rect
+			ok = x >= r[1] and x <= r[1] + r[3] and y >= r[2] and y <= r[2] + r[4]
+			hy = y + (self.scroll or 0)
+		end
+		-- при равном слое побеждает добавленная позже (кнопка поверх своей подложки)
+		if ok and hx >= h[1] and hx <= h[3] and hy >= h[2] and hy <= h[4] then
+			local o = ORDER[h[6]] or 9
+			if not bo or o <= bo then best, bo = h, o end
+		end
+	end
+	return best
+end
+
+function on_input(self, action_id, action)
+	if not app.farm then return false end
+	if action_id == hash('touch') then
+		local x, y = action.screen_x / app.dpi, (app.H - action.screen_y) / app.dpi
+		if action.pressed then
+			local h = find_hit(self, x, y)
+			self.press = h and { h = h, x = x, y = y, sy = self.scroll or 0, moved = false } or nil
+			if not h and self.panel then self.press = { x = x, y = y } end
+			-- нажатие мимо меню «Ещё» закрывает его (нажатие уходит на карту)
+			if self.more and (not h or (h[6] ~= 'more' and h[8] ~= 'more')) then gui.delete_node(self.more); self.more = nil; clear_hits(self, 'more') end
+			return self.press ~= nil
+		end
+		local pr = self.press
+		if not pr then return false end
+		if action.released then
+			self.press = nil
+			if not pr.moved and pr.h then
+				sfx('tap')
+				pr.h[5]()
+			end
+			return true
+		end
+		-- прокрутка тела окна
+		if math.abs(y - pr.y) > 8 then pr.moved = true end
+		if self.panel and self.content and pr.moved then
+			self.scroll = math.max(0, math.min(self.scroll_max or 0, (pr.sy or 0) - (y - pr.y)))
+			gui.set_position(self.content, vmath.vector3(0, K.px(self.scroll), 0))
+		end
+		return true
+	end
+	if action_id == hash('multitouch') then return self.panel ~= nil or self.press ~= nil end
+	if (action_id == hash('wheel_up') or action_id == hash('wheel_down')) and self.panel then
+		self.scroll = math.max(0, math.min(self.scroll_max or 0, (self.scroll or 0) + (action_id == hash('wheel_up') and -40 or 40)))
+		if self.content then gui.set_position(self.content, vmath.vector3(0, K.px(self.scroll), 0)) end
+		return true
+	end
+	if action_id == hash('back') and action.pressed and (self.panel or self.popup) then
+		close_panel(self); close_popup(self)
+		return true
+	end
+	return false
+end

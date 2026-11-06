@@ -1,0 +1,167 @@
+-- Точка входа: собирает ферму (логика), камеру, отрисовку мира и ввод на карте.
+-- Интерфейс — gui/hud.gui_script (получает касания первым и забирает те, что попали в кнопки).
+local app = require('farm.app')
+local camera = require('farm.camera')
+local farm_mod = require('farm.farm')
+local view_mod = require('farm.view')
+local save_mod = require('farm.save')
+local iso = require('farm.iso')
+
+local function now_ms() return socket.gettime() * 1000 end
+
+local function layout(self)
+	local w, h = window.get_size()
+	if w == 0 or h == 0 then return end
+	app.W, app.H = w, h
+	-- «точка» интерфейса ≈ CSS-пиксель телефона: около 400 точек по короткой стороне
+	app.dpi = math.max(1, math.min(4, math.min(w, h) / 400))
+	local cam = app.cam
+	cam:set_viewport(w / app.dpi, h / app.dpi)
+	local big = math.min(w, h) / app.dpi > 600
+	cam.min_zoom = big and 0.6 or 0.5
+	cam.max_zoom = 2.6
+end
+
+local function fit_zoom()
+	local w, h = app.cam.view_w, app.cam.view_h
+	if w > h and h < 500 then return math.min(1.7, math.max(0.8, math.min(w / (64 * 10), h / (32 * 8)))) end
+	return math.min(1.7, math.max(0.8, math.min(w / (64 * 6.5), h / (32 * 13))))
+end
+
+function init(self)
+	msg.post('.', 'acquire_input_focus')
+	math.randomseed(os.time())
+	app.cam = camera.new()
+	layout(self)
+	app.cam.zoom = fit_zoom()
+	window.set_listener(function(_, event)
+		if event == window.WINDOW_EVENT_RESIZED then layout(self) end
+		if event == window.WINDOW_EVENT_FOCUS_LOST and app.save then app.save:flush() end
+	end)
+	app.save = save_mod.new()
+	local f = farm_mod.new({ ui = app.ui, now = now_ms, cam = app.cam, save = app.save, low = false,
+		audio = function(name) if app.sfx then app.sfx(name) end end })
+	app.farm = f
+	local saved = app.save:load()
+	f:init(saved)
+	if saved and (f.away_sec or 0) > 60 then
+		app.ui:toast('С возвращением! Вас не было ' .. math.floor(f.away_sec / 60 + 0.5) .. ' мин, растения подросли.')
+	elseif not saved then
+		app.ui:toast('Добро пожаловать на ферму! Нажмите на дерево или камень, чтобы добыть ресурсы.')
+	end
+	app.view = view_mod.new(f, msg.url('#ground_f'), msg.url('#world_f'))
+	app.view:build()
+	self.touch = nil      -- первый палец/мышь: { x, y, t, moved }
+	self.pinch = nil
+	self.keys = {}
+	self.vx, self.vy = 0, 0
+end
+
+local function points(action)
+	return action.screen_x / app.dpi, (app.H - action.screen_y) / app.dpi
+end
+
+function update(self, dt)
+	dt = math.min(dt, 0.1)
+	local cam, f = app.cam, app.farm
+	-- клавиатура (ПК): WASD / стрелки
+	local kx = (self.keys.right and 1 or 0) - (self.keys.left and 1 or 0)
+	local ky = (self.keys.down and 1 or 0) - (self.keys.up and 1 or 0)
+	if kx ~= 0 or ky ~= 0 then cam:pan_by(-kx * 600 * dt, -ky * 600 * dt) end
+	cam:update(dt)
+	f:update(dt)
+	app.view:update(dt)
+	msg.post('@render:', 'camera', { x = cam.x, y = -cam.y, k = cam.zoom * app.dpi })
+end
+
+local function tap(self, sx, sy)
+	local f = app.farm
+	local wx, wy = app.cam:screen_to_world(sx, sy)
+	f:on_tap(wx, wy, sx, sy, app.view:pick(wx, wy))
+end
+
+function on_input(self, action_id, action)
+	local cam = app.cam
+	if action_id == hash('multitouch') then
+		local t = action.touch
+		if #t >= 2 then
+			local a, b = t[1], t[2]
+			local ax, ay = a.screen_x / app.dpi, (app.H - a.screen_y) / app.dpi
+			local bx, by = b.screen_x / app.dpi, (app.H - b.screen_y) / app.dpi
+			local d = math.max(1, math.sqrt((ax - bx) ^ 2 + (ay - by) ^ 2))
+			local mx, my = (ax + bx) / 2, (ay + by) / 2
+			if self.pinch then
+				cam:zoom_at(d / self.pinch.d, mx, my)
+				cam:pan_by(mx - self.pinch.x, my - self.pinch.y)
+				app.ui:close_popup()
+			end
+			self.pinch = { d = d, x = mx, y = my }
+			if self.touch then self.touch.moved = true; self.touch.pinched = true end
+			cam.dragging = true
+			cam.vx, cam.vy = 0, 0
+		else
+			self.pinch = nil
+		end
+		return
+	end
+	if action_id == hash('touch') then
+		local sx, sy = points(action)
+		if action.pressed then
+			cam.vx, cam.vy = 0, 0
+			self.touch = { x = sx, y = sy, lx = sx, ly = sy, t = socket.gettime(), lt = socket.gettime(), moved = false }
+			self.vx, self.vy = 0, 0
+		elseif self.touch and action.released then
+			local tc = self.touch
+			self.touch = nil
+			cam.dragging = false
+			if not tc.moved and socket.gettime() - tc.t < 0.6 then tap(self, tc.x, tc.y)
+			elseif tc.moved and not tc.pinched then
+				local stale = socket.gettime() - tc.lt > 0.08
+				cam:fling(stale and 0 or self.vx, stale and 0 or self.vy)
+			end
+			self.pinch = nil
+		elseif self.touch then
+			local tc = self.touch
+			if self.pinch then tc.lx, tc.ly = sx, sy; return end
+			if not tc.moved and math.sqrt((sx - tc.x) ^ 2 + (sy - tc.y) ^ 2) > 9 then
+				tc.moved = true
+				cam.dragging = true
+				app.ui:close_popup()
+			end
+			if tc.moved then
+				local dx, dy = sx - tc.lx, sy - tc.ly
+				local now = socket.gettime()
+				local ddt = math.max(0.001, now - tc.lt)
+				tc.lt = now
+				self.vx = self.vx * 0.6 + dx / ddt * 0.4
+				self.vy = self.vy * 0.6 + dy / ddt * 0.4
+				cam:pan_by(dx, dy)
+			end
+			tc.lx, tc.ly = sx, sy
+		end
+		return
+	end
+	if action_id == nil then
+		-- наведение мышью (ПК)
+		if action.screen_x then
+			local sx, sy = points(action)
+			local wx, wy = cam:screen_to_world(sx, sy)
+			local gx, gy = iso.to_grid(wx, wy)
+			app.farm.hover = (not self.touch) and { x = math.floor(gx), y = math.floor(gy) } or nil
+		end
+		return
+	end
+	if action_id == hash('wheel_up') or action_id == hash('wheel_down') then
+		local sx, sy = points(action)
+		cam:zoom_at(action_id == hash('wheel_up') and 1.12 or 1 / 1.12, sx, sy)
+		app.ui:close_popup()
+		return
+	end
+	for _, k in ipairs({ 'up', 'down', 'left', 'right' }) do
+		if action_id == hash(k) then self.keys[k] = not action.released; return end
+	end
+end
+
+function final(self)
+	if app.save then app.save:flush() end
+end

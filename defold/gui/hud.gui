@@ -1,0 +1,22 @@
+script: "/gui/hud.gui_script"
+fonts {
+  name: "ui"
+  font: "/assets/fonts/ui.font"
+}
+textures {
+  name: "gui"
+  texture: "/assets/gui.atlas"
+}
+textures {
+  name: "world"
+  texture: "/assets/world.atlas"
+}
+background_color {
+  x: 0.0
+  y: 0.0
+  z: 0.0
+  w: 0.0
+}
+material: "/builtins/materials/gui.material"
+adjust_reference: ADJUST_REFERENCE_DISABLED
+max_nodes: 4096

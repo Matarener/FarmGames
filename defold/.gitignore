@@ -1,0 +1,4 @@
+/build
+/.internal
+/.defold-mcp-backups
+/tools/out

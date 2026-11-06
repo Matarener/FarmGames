@@ -1,0 +1,64 @@
+[project]
+title = Ферма маленького милого призрака
+version = 0.1.0
+dependencies =
+
+[bootstrap]
+main_collection = /main/main.collectionc
+render = /render/farm.renderc
+
+[input]
+game_binding = /input/game.input_bindingc
+
+[display]
+width = 720
+height = 1280
+high_dpi = 1
+vsync = 1
+update_frequency = 0
+
+[graphics]
+default_texture_min_filter = linear_mipmap_linear
+default_texture_mag_filter = linear
+texture_profiles = /farm.texture_profiles
+
+[script]
+shared_state = 1
+
+[collection]
+max_instances = 16384
+
+[sprite]
+max_count = 16384
+
+[label]
+max_count = 512
+
+[physics]
+type = 2D
+max_collision_object_count = 0
+
+[gui]
+max_count = 8
+
+[factory]
+max_count = 64
+
+[html5]
+scale_mode = stretch
+heap_size = 128
+show_fullscreen_button = 0
+show_made_with_defold = 0
+retry_time = 1
+retry_count = 10
+
+[android]
+package = com.matarener.ghostfarm
+minimum_sdk_version = 21
+target_sdk_version = 35
+
+[ios]
+bundle_identifier = com.matarener.ghostfarm
+
+[engine]
+fixed_update_frequency = 60
