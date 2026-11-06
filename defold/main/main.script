@@ -18,7 +18,10 @@ local function layout(self)
 	if w == 0 or h == 0 then return end
 	app.W, app.H = w, h
 	-- «точка» интерфейса ≈ CSS-пиксель телефона: около 400 точек по короткой стороне
-	app.dpi = math.max(1, math.min(4, math.min(w, h) / 400))
+	-- телефон (портрет): ~400 точек по короткой стороне; широкий экран (ПК, браузер): ~720 точек по высоте,
+	-- иначе на мониторе 1920×1080 интерфейс выходит огромным
+	local short = (w > h * 1.2) and (h / 720) or (math.min(w, h) / 400)
+	app.dpi = math.max(1, math.min(4, short))
 	local cam = app.cam
 	cam:set_viewport(w / app.dpi, h / app.dpi)
 	local big = math.min(w, h) / app.dpi > 600
@@ -99,6 +102,7 @@ end
 handle_input = function(self, action_id, action)
 	local cam = app.cam
 	if action_id == hash('multitouch') then
+		if app.ui_modal then self.pinch = nil; return end
 		local t = action.touch
 		if #t >= 2 then
 			local a, b = t[1], t[2]
@@ -167,6 +171,8 @@ handle_input = function(self, action_id, action)
 		end
 		return
 	end
+	-- пока открыто окно или меню, колёсико и щипок крутят только его, карта стоит
+	if (action_id == hash('wheel_up') or action_id == hash('wheel_down')) and app.ui_modal then return end
 	if action_id == hash('wheel_up') or action_id == hash('wheel_down') then
 		local sx, sy = points(action)
 		cam:zoom_at(action_id == hash('wheel_up') and 1.12 or 1 / 1.12, sx, sy)

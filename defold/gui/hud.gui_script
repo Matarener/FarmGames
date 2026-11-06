@@ -718,6 +718,7 @@ function update(self, dt)
 		if self.intro_t > 0.7 then self.intro = true; H.open_quest(self) end
 	elseif not self.intro then self.intro = true end
 	overlays(self)
+	app.ui_modal = self.panel ~= nil
 	-- автотест: синтетические нажатия сначала интерфейсу, необработанные — карте
 	if app.test_gui_q and #app.test_gui_q > 0 then
 		local tq = app.test_gui_q
