@@ -11,7 +11,7 @@ import { Quests } from './quests.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
 import * as Flora from './flora.js';
-import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC, FOG } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 // вид объёмной грядки: 'plain' — без каймы, 'grass' — с травяной каймой
@@ -36,7 +36,7 @@ export class Farm {
     this.groundV = 0; // растёт, когда меняются клетки земли
     this.buildSprites();
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
-      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, waterTex: a.waterTex, decor: a.decor, objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts });
+      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, waterTex: a.waterTex, decor: a.decor, objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, fog: a.fog && a.fog.clouds.length ? a.fog : null });
       a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
       a.well.forEach((s, i) => { if (s) this.S.well[i] = s; });
       if (a.water.every(Boolean) || a.waterTex) { this.S.waterArt = a.waterTex ? null : a.water; this.S.water.clear(); }
@@ -962,7 +962,7 @@ export class Farm {
       b.minX = Math.min(b.minX, cb.minX); b.maxX = Math.max(b.maxX, cb.maxX);
       b.minY = Math.min(b.minY, cb.minY); b.maxY = Math.max(b.maxY, cb.maxY);
     });
-    const m = 120;
+    const m = this.editor ? 320 : 120; // в редакторе видно и полосу тумана
     this.cam.bounds = { minX: b.minX - m, maxX: b.maxX + m, minY: b.minY - m, maxY: b.maxY + m };
     this.cam.clamp();
   }
@@ -1062,6 +1062,21 @@ export class Farm {
       toWorld(x0 + CHUNK, y0 + CHUNK, tmp); ctx.lineTo(tmp.x, tmp.y);
       toWorld(x0, y0 + CHUNK, tmp); ctx.lineTo(tmp.x, tmp.y);
       ctx.closePath(); ctx.fill();
+    }
+    // туман вокруг карты (в 2D — несколько колец, без леса)
+    const F = FOG.width, col = FOG.color, rgb = `${(col >> 16) & 255},${(col >> 8) & 255},${col & 255}`;
+    const sq = (d, back) => {
+      const P = [[-d, -d], [N + d, -d], [N + d, N + d], [-d, N + d]];
+      if (back) P.reverse();
+      toWorld(P[0][0], P[0][1], tmp); ctx.moveTo(tmp.x, tmp.y);
+      for (let k = 1; k < 4; k++) { toWorld(P[k][0], P[k][1], tmp); ctx.lineTo(tmp.x, tmp.y); }
+      ctx.closePath();
+    };
+    const D = [0, 1, 2, 3, F, 80];
+    for (let k = 0; k < D.length - 1; k++) {
+      const m = (D[k] + D[k + 1]) / 2, t = Math.min(1, m / F), a = k === D.length - 2 ? 1 : t * t * (3 - 2 * t);
+      ctx.fillStyle = `rgba(${rgb},${a.toFixed(3)})`;
+      ctx.beginPath(); sq(D[k], false); sq(D[k + 1], true); ctx.fill();
     }
     // граница открытой территории
     this.drawBorder(ctx);

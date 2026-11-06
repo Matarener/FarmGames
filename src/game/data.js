@@ -106,6 +106,9 @@ for (const f of Object.values(FLORA)) {
   OBJECTS[f.key] = { name: f.name, hp: f.hp, action: 'chop', drops: { wood: f.wood }, xp: f.xp, stump: f.kind === 'tree', flora: f.key, bush: f.kind === 'bush' };
 }
 
+// Туман вокруг карты: ширина полосы (клеток), густота леса под туманом
+export const FOG = { width: 4, forest: [0.6, 0.55, 0.45, 0], color: 0xe4ecee };
+
 // Стоимость энергии за удар/действие
 export const ENERGY = { chop: 1, mine: 1, dig: 2, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1, pick: 1, sow: 0 };
 export const ENERGY_REGEN_SEC = 120;

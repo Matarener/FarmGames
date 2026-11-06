@@ -2,7 +2,7 @@
 // Мир генерируется детерминированно из seed, в сохранение пишется только разница.
 
 import { mulberry32, hash2 } from '../engine/Sprite.js';
-import { OBJECTS, FLORA_GROUPS, floraByGroup } from './data.js';
+import { OBJECTS, FLORA, FLORA_GROUPS, floraByGroup, FOG } from './data.js';
 import { toWorld } from '../engine/Iso.js';
 
 export const CHUNK = 10;
@@ -10,6 +10,10 @@ export const CHUNKS = 5;
 export const N = CHUNK * CHUNKS;
 export const START_CHUNK = 2 * CHUNKS + 2; // центральный участок
 export const T = { GRASS: 0, SOIL: 1, WATER: 2, PATH: 3 };
+// Полоса тумана вокруг карты: её никогда не открыть, под туманом — лес (только картинка, не объекты)
+export const FOG_W = FOG.width;
+export const FOG_TREES = Object.keys(FLORA); // любые деревья и кусты (виды)
+const FOG_OLD = { oak2: 'sakura', bush: 'rosehip', berry: 'blueberry' }; // старые имена групп
 
 const tmp = { x: 0, y: 0 };
 
@@ -25,7 +29,8 @@ export function mapId(m) {
 export function mapText(m) {
   return '{\n  "v": 2,\n  "n": ' + m.n + ',\n  "seed": ' + (m.seed >>> 0) + ',\n  "tiles": [\n' + m.tiles.map((r) => '    "' + r + '"').join(',\n') + '\n  ],\n' +
     '  "objects": [\n' + m.objects.map((o) => '    ' + JSON.stringify(o)).join(',\n') + '\n  ],\n' +
-    '  "well": ' + JSON.stringify(m.well) + ',\n  "player": ' + JSON.stringify(m.player) + '\n}\n';
+    '  "well": ' + JSON.stringify(m.well) + ',\n  "player": ' + JSON.stringify(m.player) +
+    (m.fog ? ',\n  "fog": [\n' + m.fog.map((o) => '    ' + JSON.stringify(o)).join(',\n') + '\n  ]' : '') + '\n}\n';
 }
 
 export class World {
@@ -39,6 +44,8 @@ export class World {
     this.unlocked = new Uint8Array(CHUNKS * CHUNKS);
     this.unlocked[START_CHUNK] = 1;
     this.version = 0;    // растёт при изменении объектов (для пересортировки)
+    this.fogTrees = [];  // лес под туманом: { type, gx, gy, d, id }
+    this.fogV = 0;       // растёт при правке леса в тумане (редактор)
     if (map) this.loadMap(map); else this.generate();
   }
 
@@ -70,6 +77,7 @@ export class World {
     this.well = this.add('well', this.wellPos[0], this.wellPos[1]);
     this.playerStart = m.player || [2 * CHUNK + 4, 2 * CHUNK + 6];
     this.genDecor();
+    if (Array.isArray(m.fog)) { this.fogTrees = []; for (const [type, x, y] of m.fog) this.addFogTree(type, x, y); } else this.genFog();
   }
 
   // Текущий мир → карта для редактора (пни сохраняются как то дерево, из которого выросли)
@@ -84,7 +92,8 @@ export class World {
       if (o.own || o.type === 'sapling') continue; // посаженное игроком — не часть карты
       objects.push([o.type === 'stump' ? (o.was || 'oak') : o.type, o.gx, o.gy]);
     }
-    return { v: 2, n: N, seed: this.seed, tiles, objects, well, player: this.playerStart.slice() };
+    const fog = this.fogTrees.map((t) => [t.type, t.gx, t.gy]);
+    return { v: 2, n: N, seed: this.seed, tiles, objects, well, player: this.playerStart.slice(), fog };
   }
 
   // группа деревьев/кустов (oak, oak2, bush, berry) → вид для следующего объекта
@@ -213,6 +222,44 @@ export class World {
     this.wellPos = L(5, 4); // у тропинки к дому, на виду
     this.well = this.add('well', this.wellPos[0], this.wellPos[1]);
     this.genDecor();
+    this.genFog();
+  }
+
+  // ---------- Туман ----------
+  // Сколько клеток клетка за краем карты (0 — на карте)
+  fogDepth(x, y) { return Math.max(-x, -y, x - N + 1, y - N + 1, 0); }
+  // Лес под туманом — только с дальних сторон (сверху-слева и сверху-справа на экране):
+  // с ближних сторон кроны деревьев закрывали бы край карты.
+  fogBack(x, y) { return x < 0 || y < 0; }
+
+  addFogTree(type, x, y) {
+    type = FOG_OLD[type] || type;
+    const d = this.fogDepth(x, y);
+    if (!FOG_TREES.includes(type) || d < 1 || d > FOG_W || !this.fogBack(x, y)) return null;
+    if (this.fogTrees.some((t) => t.gx === x && t.gy === y)) return null;
+    const t = { type, gx: x, gy: y, d, id: (hash2(x * 31 + 7, y * 17 + 3) * 1e6) | 0 };
+    this.fogTrees.push(t);
+    this.fogV = (this.fogV || 0) + 1;
+    return t;
+  }
+
+  removeFogTree(x, y) {
+    const i = this.fogTrees.findIndex((t) => t.gx === x && t.gy === y);
+    if (i < 0) return false;
+    this.fogTrees.splice(i, 1); this.fogV = (this.fogV || 0) + 1;
+    return true;
+  }
+
+  // Лес под туманом по seed карты: у края гуще, дальше реже
+  genFog() {
+    const rnd = mulberry32(this.seed ^ 0x2c1b3c6d), F = FOG_W;
+    this.fogTrees = [];
+    for (let y = -F; y < N + F; y++) for (let x = -F; x < N + F; x++) {
+      const d = this.fogDepth(x, y);
+      if (d < 1 || !this.fogBack(x, y)) continue;
+      const r = rnd(), k = rnd();
+      if (r < (FOG.forest[d - 1] || 0)) this.addFogTree(k < 0.2 ? 'oak' : k < 0.3 ? 'birch' : k < 0.4 ? 'sakura' : k < 0.48 ? 'cherry' : k < 0.56 ? 'maple' : k < 0.86 ? 'pine' : k < 0.92 ? 'apple' : 'rosehip', x, y);
+    }
   }
 
   // Украшения пруда: не объекты (их нельзя рубить и двигать), всегда одинаковые для мира.

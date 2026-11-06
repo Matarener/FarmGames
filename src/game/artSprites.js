@@ -114,8 +114,11 @@ export async function loadArt(onProgress) {
     const m = /^crop_(\w+)_(\d)$/.exec(name);
     if (m) (crops[m[1]] = crops[m[1]] || [])[+m[2]] = A[name];
   }
+  // облака тумана (tools/slice_fog.py): fog_clouds_*, fog_strips_*, fog_wisps_*
+  const fog = { clouds: [], strips: [], wisps: [] };
+  for (const name of Object.keys(A).sort()) { const m = /^fog_(clouds|strips|wisps)_\d+$/.exec(name); if (m) fog[m[1]].push(A[name]); }
   return {
-    obj, crops, icons, flora, floraIcons,
+    fog, obj, crops, icons, flora, floraIcons,
     sprouts: { tree: A.sprout_tree || null, bush: A.sprout_bush || null },
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {
