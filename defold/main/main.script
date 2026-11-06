@@ -17,11 +17,9 @@ local function layout(self)
 	local w, h = window.get_size()
 	if w == 0 or h == 0 then return end
 	app.W, app.H = w, h
-	-- «точка» интерфейса ≈ CSS-пиксель телефона: около 400 точек по короткой стороне
-	-- телефон (портрет): ~400 точек по короткой стороне; широкий экран (ПК, браузер): ~720 точек по высоте,
-	-- иначе на мониторе 1920×1080 интерфейс выходит огромным
-	local short = (w > h * 1.2) and (h / 720) or (math.min(w, h) / 400)
-	app.dpi = math.max(1, math.min(4, short))
+	-- не меньше 400 точек по ширине и 720 по высоте: телефон в портрете как раньше (по ширине),
+	-- монитор, полэкрана браузера и телефон в альбомной ориентации — по высоте, чтобы окна влезали
+	app.dpi = math.max(1, math.min(4, w / 400, h / 720))
 	local cam = app.cam
 	cam:set_viewport(w / app.dpi, h / app.dpi)
 	local big = math.min(w, h) / app.dpi > 600
