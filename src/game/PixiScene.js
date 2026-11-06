@@ -12,6 +12,24 @@ const tmp = { x: 0, y: 0 };
 const ATLAS = 2048, PAD = 6;
 const Z = (depth, wy) => depth * 1e4 + wy * 0.1; // порядок как в 2D: глубина, затем y
 
+// прямоугольник непрозрачных пикселей картинки (с запасом в 1 px), null — если пусто
+let scratch = null;
+function opaqueBox(img, w, h) {
+  if (!scratch) scratch = document.createElement('canvas');
+  if (scratch.width < w || scratch.height < h) { scratch.width = Math.max(scratch.width, w); scratch.height = Math.max(scratch.height, h); }
+  const g = scratch.getContext('2d', { willReadFrequently: true });
+  g.clearRect(0, 0, w, h); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    const row = y * w * 4;
+    for (let x = 0; x < w; x++) if (d[row + x * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; }
+  }
+  if (x1 < 0) return null;
+  x0 = Math.max(0, x0 - 1); y0 = Math.max(0, y0 - 1); x1 = Math.min(w - 1, x1 + 1); y1 = Math.min(h - 1, y1 + 1);
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
 // ---------- атласы: все спрайты игры в нескольких больших текстурах ----------
 class Atlases {
   constructor() { this.list = []; this.dirty = new Set(); this.map = new WeakMap(); }
@@ -37,13 +55,21 @@ class Atlases {
       t = new PIXI.Texture({ source: new PIXI.CanvasSource({ resource: img, autoGenerateMipmaps: true, scaleMode: 'linear', mipmapFilter: 'linear', alphaMode: 'premultiply-alpha-on-upload' }) });
       this.map.set(img, t); return t;
     }
+    // пустые прозрачные поля обрезаем: видеокарта не тратит на них время, атлас меньше
+    const b = this.trim ? opaqueBox(img, w, h) : { x: 0, y: 0, w, h };
+    if (!b) { t = PIXI.Texture.EMPTY; this.map.set(img, t); return t; }
     let p = this.list[this.list.length - 1] || this.page();
-    if (p.x + w + PAD > ATLAS) { p.x = PAD; p.y += p.rowH + PAD; p.rowH = 0; }
-    if (p.y + h + PAD > ATLAS) { p = this.page(); }
-    p.g.drawImage(img, p.x, p.y);
-    t = new PIXI.Texture({ source: p.source, frame: new PIXI.Rectangle(p.x, p.y, w, h) });
+    if (p.x + b.w + PAD > ATLAS) { p.x = PAD; p.y += p.rowH + PAD; p.rowH = 0; }
+    if (p.y + b.h + PAD > ATLAS) { p = this.page(); }
+    p.g.drawImage(img, b.x, b.y, b.w, b.h, p.x, p.y, b.w, b.h);
+    const trimmed = b.w !== w || b.h !== h;
+    t = new PIXI.Texture({
+      source: p.source, frame: new PIXI.Rectangle(p.x, p.y, b.w, b.h),
+      orig: trimmed ? new PIXI.Rectangle(0, 0, w, h) : undefined,
+      trim: trimmed ? new PIXI.Rectangle(b.x, b.y, b.w, b.h) : undefined,
+    });
     t.page = p;
-    p.x += w + PAD; p.rowH = Math.max(p.rowH, h);
+    p.x += b.w + PAD; p.rowH = Math.max(p.rowH, b.h);
     this.dirty.add(p);
     this.map.set(img, t);
     return t;
@@ -87,7 +113,7 @@ class PlayerView {
 export class PixiScene {
   constructor(farm, app) {
     this.f = farm; this.app = app;
-    this.atlas = new Atlases();
+    this.atlas = new Atlases(); this.atlas.trim = true;
     this.groundAtlas = new Atlases(); // клетки земли — отдельно, для сеток по кускам
     const world = this.world = new PIXI.Container({ isRenderGroup: true });
     app.stage.addChild(world);
@@ -270,6 +296,11 @@ export class PixiScene {
     cam.zoom = z0; cam.x = x0; cam.y = y0;
     this.render();
     try { const gl = R.gl; gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4)); } catch { /* не важно */ }
+    // листы атласа уже в видеопамяти — их копии в обычной памяти (по 16 МБ) больше не нужны
+    for (const p of [...this.atlas.list, ...this.groundAtlas.list]) { p.c.width = p.c.height = 1; p.g = null; }
+    // если система отберёт у игры видеокарту (свернули надолго), проще всего перезапуститься
+    const cv = R.canvas || R.view?.canvas;
+    if (cv) cv.addEventListener('webglcontextrestored', () => { try { f.save.flush(); } catch { /* */ } location.reload(); });
   }
 
   iconTex(img) { return this.atlas.tex({ canvas: img }); }

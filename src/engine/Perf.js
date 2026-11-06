@@ -21,6 +21,7 @@ export class Perf {
     // Разрешение, в котором заранее рисуются спрайты (мир → пиксели).
     this.spriteScale = tier === 'low' ? 1.5 : tier === 'mid' ? 3 : 4;
     this.targetFps = tier === 'low' ? 30 : 60;
+    this.baseFps = this.targetFps;
     this.idleFps = 20; // когда на экране ничего не происходит
     this.fps = 60;
     this.onScaleChange = null;
@@ -68,22 +69,34 @@ export class Perf {
   // в бюджет, сначала уменьшаем разрешение, затем ограничиваем FPS до 30.
   sample(dt, budgetFps) {
     this._acc += dt; this._n++;
+    if (dt > 1.4 / this.targetFps) this._over = (this._over || 0) + 1; // кадр не уложился
     if (this._acc < 1) return;
-    const avg = this._acc / this._n;
+    const avg = this._acc / this._n, over = (this._over || 0) / this._n;
     this.fps = 1 / avg;
     this.frameMs = this._work / this._n; this.frameMax = this._workMax; this._work = 0; this._workMax = 0;
-    this._acc = 0; this._n = 0;
+    this._acc = 0; this._n = 0; this._over = 0;
     if (this._warmup > 0) { this._warmup--; return; }
     if (budgetFps < this.targetFps) return; // в режиме простоя не меряем
-    const budget = 1 / this.targetFps;
-    if (avg > budget * 1.3) this._slow++; else this._slow = Math.max(0, this._slow - 1);
+    // «медленная» секунда — когда не укладывается больше трети кадров (один фриз не считается)
+    const slow = over > 0.35;
+    if (this._probe > 0) { // пробуем снова 60 FPS
+      this._probeSlow = (this._probeSlow || 0) + (slow ? 1 : 0);
+      if (this._probeSlow >= 2) { this.targetFps = 30; this._probe = 0; this._lockSec = 0; this._probeIn = Math.min(120, this._probeIn * 2); }
+      else if (--this._probe === 0) { this._probeIn = 15; this._slow = 0; } // справились — остаёмся на 60
+      return;
+    }
+    if (this.targetFps === 30 && this.baseFps > 30) { // заперты на 30: время от времени пробуем 60
+      if (++this._lockSec >= this._probeIn) { this.targetFps = 60; this._probe = 3; this._probeSlow = 0; this._warmup = 1; }
+      return;
+    }
+    if (slow) this._slow++; else this._slow = Math.max(0, this._slow - 1);
     if (this._slow >= 3) {
       this._slow = 0;
       if (this.renderScale > 1 && !this.keepScale) {
         this.renderScale = Math.max(1, this.renderScale - 0.25);
         this.onScaleChange && this.onScaleChange();
       } else if (this.targetFps > 30) {
-        this.targetFps = 30;
+        this.targetFps = 30; this._lockSec = 0; this._probeIn = this._probeIn || 15;
       }
     }
   }
