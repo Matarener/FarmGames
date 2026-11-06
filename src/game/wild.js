@@ -8,11 +8,24 @@
 
 import { WILD, FLORA, CROPS, seedId } from './data.js';
 import { addItem } from './inventory.js';
-import { N, T } from './World.js';
+import { N, CHUNK, CHUNKS, T } from './World.js';
 
 const BUSHES = Object.values(FLORA).filter((f) => f.kind === 'bush').map((f) => f.key);
 
 export const groupOf = (kind) => kind === 'grass' ? 'grass' : 'bush';
+
+// Сколько клеток до края открытой земли: до закрытого участка или до тумана (края карты).
+// 1 — клетка у самого края.
+export function edgeDist(world, x, y) {
+  let d = Math.min(x, y, N - 1 - x, N - 1 - y) + 1;
+  const cx = (x / CHUNK) | 0, cy = (y / CHUNK) | 0, lx = x - cx * CHUNK, ly = y - cy * CHUNK;
+  const closed = (ax, ay) => ax >= 0 && ay >= 0 && ax < CHUNKS && ay < CHUNKS && !world.unlocked[ay * CHUNKS + ax];
+  if (closed(cx - 1, cy)) d = Math.min(d, lx + 1);
+  if (closed(cx + 1, cy)) d = Math.min(d, CHUNK - lx);
+  if (closed(cx, cy - 1)) d = Math.min(d, ly + 1);
+  if (closed(cx, cy + 1)) d = Math.min(d, CHUNK - ly);
+  return d;
+}
 
 // Свободная трава открытой земли: не тропинка, не грядка, не вода, не объект, не рядом с призраком
 export function freeCell(world, x, y, blocked) {
@@ -28,14 +41,17 @@ function caps(world) {
   return { grass: cap('grass'), bush: cap('bush') };
 }
 
-// reach(x, y) — можно ли подойти к клетке: трава и кусты появляются там, куда призрак дойдёт
-function pickCell(world, rng, blocked, reach) {
-  const cells = [];
+// reach(x, y) — можно ли подойти к клетке: появляется там, куда призрак дойдёт.
+// Кусты — только у края открытой земли (WILD.bush.band); если там подойти некуда — у края где угодно.
+function pickCell(world, group, rng, blocked, reach) {
+  let cells = [], far = [];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     if (!freeCell(world, x, y, blocked)) continue;
-    if (reach && !reach(x, y)) continue;
+    if (group === 'bush' && edgeDist(world, x, y) > WILD.bush.band) continue;
+    if (reach && !reach(x, y)) { if (group === 'bush') far.push(x, y); continue; }
     cells.push(x, y);
   }
+  if (!cells.length) cells = far;
   if (!cells.length) return null;
   const k = Math.floor(rng() * (cells.length / 2)) * 2;
   return [cells[k], cells[k + 1]];
@@ -50,7 +66,7 @@ function trySpawn(st, world, t, rng, blocked, reach) {
   if (!groups.length) return null;
   let r = rng() * groups.reduce((s, g) => s + WILD[g].w, 0), group = groups[0];
   for (const g of groups) { r -= WILD[g].w; if (r < 0) { group = g; break; } }
-  const at = pickCell(world, rng, blocked, reach);
+  const at = pickCell(world, group, rng, blocked, reach);
   if (!at) return null;
   const kind = group === 'grass' ? 'grass' : BUSHES[Math.floor(rng() * BUSHES.length)];
   const e = [at[0], at[1], kind, t];
