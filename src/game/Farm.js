@@ -219,6 +219,14 @@ export class Farm {
     return { c, total, ready, stage, needsWater, left: Math.max(0, total - b.p) };
   }
 
+  // то же, что cropInfo, без создания объекта (для каждого кадра): стадия | готово<<2 | нужен полив<<3
+  cropFlags(b) {
+    const total = CROPS[b.crop].time, ready = b.p >= total;
+    const stage = ready ? 3 : Math.min(2, Math.floor((b.p / total) * 3));
+    const needsWater = !ready && (b.w === 0 || (b.w === 1 && b.p >= total * 2 / 3));
+    return stage | (ready ? 4 : 0) | (needsWater ? 8 : 0);
+  }
+
   grow(dt) {
     for (const b of this.beds.values()) {
       if (!b.crop) continue;
@@ -773,7 +781,8 @@ export class Farm {
     if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.ui.tick(this); }
     this.player.update(dt);
     this.pourWater(dt);
-    for (const o of this.world.objects) if (o && o.shake > 0) o.shake = Math.max(0, o.shake - dt);
+    const OB = this.world.objects;
+    for (let i = 0; i < OB.length; i++) { const o = OB[i]; if (o && o.shake > 0) o.shake = Math.max(0, o.shake - dt); }
     const P = this.particles;
     for (let i = P.length - 1; i >= 0; i--) {
       const p = P[i];

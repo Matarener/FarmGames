@@ -229,7 +229,10 @@ button:disabled { cursor: default; }
 @keyframes ld-float { 50% { transform: translateY(-8px) scale(.98, 1.03); } }
 .ld-title { font-size: 24px; line-height: 1.15; text-align: center; max-width: 280px; font-weight: 800; letter-spacing: .5px; color: #fff6e3; text-shadow: 0 2px 0 #3d2b1f, 0 0 2px #3d2b1f; }
 .ld-bar { width: 100%; height: 14px; border-radius: 8px; background: rgba(61,43,31,.45); border: 2px solid #3d2b1f; overflow: hidden; }
-.ld-bar i { display: block; height: 100%; width: 0; background: linear-gradient(#ffd75a, #f2b51d); transition: width .2s; }
+.ld-bar i { display: block; height: 100%; width: 100%; transform: scaleX(0); transform-origin: 0 50%; will-change: transform; background: linear-gradient(#ffd75a, #f2b51d); transition: transform .8s ease-out; }
+.ld-bar { position: relative; }
+.ld-bar::after { content: ''; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: ld-shine 1.3s linear infinite; will-change: transform; }
+@keyframes ld-shine { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
 .ld-text { font-size: 14px; font-weight: 700; color: #fff6e3; text-shadow: 0 1px 0 #3d2b1f, 0 0 2px #3d2b1f; }
 .loading.hide { opacity: 0; pointer-events: none; }
 .debug { position: fixed; right: 8px; top: calc(var(--safe-t) + 118px); z-index: 60; background: rgba(0,0,0,.6); color: #0f0; font: 11px monospace; padding: 3px 6px; border-radius: 4px; pointer-events: none; white-space: pre-line; max-width: calc(100vw - 16px); }

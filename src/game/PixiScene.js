@@ -30,8 +30,11 @@ class Atlases {
     let t = this.map.get(s.canvas);
     if (t) return t;
     const img = s.canvas, w = img.width, h = img.height;
-    if (w + 2 * PAD > ATLAS || h + 2 * PAD > ATLAS) {
-      t = new PIXI.Texture({ source: new PIXI.CanvasSource({ resource: img, autoGenerateMipmaps: true, scaleMode: 'linear' }) });
+    // после прогрева страницы атласа больше не трогаем: дорисовка в лист 2048² заставила бы
+    // заново отправить в видеокарту весь лист с мипмапами (фриз). Новый спрайт — своя маленькая текстура.
+    if (this.sealed || w + 2 * PAD > ATLAS || h + 2 * PAD > ATLAS) {
+      if (this.sealed && this.perf) this.perf.mark('новый спрайт');
+      t = new PIXI.Texture({ source: new PIXI.CanvasSource({ resource: img, autoGenerateMipmaps: true, scaleMode: 'linear', mipmapFilter: 'linear', alphaMode: 'premultiply-alpha-on-upload' }) });
       this.map.set(img, t); return t;
     }
     let p = this.list[this.list.length - 1] || this.page();
@@ -111,6 +114,11 @@ export class PixiScene {
     this.stamp = 0;
     this.keys = {};
     this.textRes = Math.max(2, (window.devicePixelRatio || 1)) * 2.6; // текст чёткий и при сильном приближении
+    // Надписи — растровые шрифты: буквы рисуются один раз в атлас, новая надпись ничего не грузит в видеокарту
+    const chars = [['a', 'z'], ['A', 'Z'], ['0', '9'], ['а', 'я'], ['А', 'Я'], 'ёЁ +-−–—×·:;!?.,%()/«»"\'№'];
+    const font = { fontFamily: 'system-ui, sans-serif', fontWeight: '700' };
+    PIXI.BitmapFont.install({ name: 'farm-dark', style: { ...font, fontSize: 11, fill: 0x3d2b1f }, chars, resolution: this.textRes, padding: 2 });
+    PIXI.BitmapFont.install({ name: 'farm-float', style: { ...font, fontSize: 11, fill: 0xfffbe8, stroke: { color: 0x28190f, width: 3, alpha: 0.8 } }, chars, resolution: this.textRes, padding: 3 });
   }
 
   // спрайт игры → Pixi-спрайт в точке (x, y) — опорной точке спрайта
@@ -215,7 +223,7 @@ export class PixiScene {
       const cx = c % CHUNKS, cy = (c / CHUNKS) | 0;
       toWorld(cx * CHUNK + CHUNK / 2, cy * CHUNK + CHUNK / 2, tmp);
       const box = new PIXI.Container(); box.position.set(tmp.x, tmp.y - 24);
-      const tx = new PIXI.Text({ text: label, style: { fontFamily: 'system-ui, sans-serif', fontSize: 9, fontWeight: '700', fill: 0x3d2b1f }, resolution: this.textRes });
+      const tx = new PIXI.BitmapText({ text: label, style: { fontFamily: 'farm-dark', fontSize: 9 } });
       const tw = tx.width, bw = tw + 30;
       box.addChild(new PIXI.Graphics()
         .roundRect(-bw / 2 - 2, -13, bw + 4, 26, 8).fill({ color: 0x3d2b1f, alpha: 0.92 })
@@ -246,10 +254,22 @@ export class PixiScene {
     for (const k of GROUND) for (const v of (S[k] instanceof Map ? S[k].values() : S[k] || [])) this.groundAtlas.tex(v);
     for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k) && k !== 'waterArt') add(v, k !== 'bubble');
     for (const o of w.objects || []) { if (!o) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
+    if (S.stumpOf && S.objArt) for (const arr of Object.values(S.objArt)) for (const t of arr || []) for (const id of [0, 1, 3]) { const st = S.stumpOf(t, id); if (st) { this.atlas.tex(st); this.atlas.tex(dimSprite(st)); } }
     for (const im of Object.values(f.iconImg)) if (im.complete && im.naturalWidth) this.iconTex(im);
     this.atlas.flush(); this.groundAtlas.flush();
+    this.atlas.sealed = this.groundAtlas.sealed = true; this.atlas.perf = this.groundAtlas.perf = f.perf;
     const R = this.app.renderer;
     for (const p of [...this.atlas.list, ...this.groundAtlas.list]) R.texture?.initSource?.(p.source);
+    // первые кадры (сборка сцены, загрузка в видеокарту, сборка шейдеров для всех видов
+    // отрисовки: надписи, частицы, рамки) — ещё за экраном загрузки
+    const cam = f.cam, z0 = cam.zoom, x0 = cam.x, y0 = cam.y;
+    const p = f.player, tx = Math.floor(p.x), ty = Math.floor(p.y);
+    f.float(x0, y0, '+1 Дерево', 'wood'); f.burst(x0, y0, '#fff', 4, true); f.tapFx = { x: tx, y: ty, t: 0.35 };
+    for (const z of [cam.minZoom, 1, cam.maxZoom, z0]) { cam.zoom = z; this.render(); }
+    f.floaters.length = 0; f.particles.length = 0; f.tapFx = null;
+    cam.zoom = z0; cam.x = x0; cam.y = y0;
+    this.render();
+    try { const gl = R.gl; gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4)); } catch { /* не важно */ }
   }
 
   iconTex(img) { return this.atlas.tex({ canvas: img }); }
@@ -265,39 +285,46 @@ export class PixiScene {
 
     // постоянные части: пересобираются, только когда изменились
     let wet = 0;
-    for (const b of f.beds.values()) if (b.crop) { const i = f.cropInfo(b); if (!i.needsWater && !i.ready) wet = (wet * 31 + b.i) % 1e9; }
-    const gk = `${f.groundV}|${wet}|${f.bedStyleName()}`;
-    if (this.keys.ground !== gk) { this.keys.ground = gk; this.syncGround(); }
-    const fk = `${w.unlockedCount()}|${f.st.house}`;
-    if (this.keys.fog !== fk) { this.keys.fog = fk; this.syncFog(); this.syncSigns(); }
+    f.beds.forEach((b) => { if (b.crop && !(f.cropFlags(b) & 12)) wet = (wet * 31 + b.i) % 1e9; });
+    const K = this.keys, bsn = f.bedStyleName();
+    if (K.gv !== f.groundV || K.wet !== wet || K.bs !== bsn) { K.gv = f.groundV; K.wet = wet; K.bs = bsn; this.syncGround(); }
+    const uc = w.unlockedCount();
+    if (K.uc !== uc || K.house !== f.st.house) { K.uc = uc; K.house = f.st.house; this.syncFog(); this.syncSigns(); }
     if (this.keys.lock !== !!f.iconImg.lock) { this.keys.lock = !!f.iconImg.lock; this.syncSigns(); }
 
     // видимость кусков земли
+    const CB = this._cb || (this._cb = this.chunks.map((_, c) => w.chunkBounds(c))); // границы кусков не меняются
     for (let c = 0; c < this.chunks.length; c++) {
-      const b = w.chunkBounds(c);
+      const b = CB[c];
       this.chunks[c].visible = b.maxX + 40 > v.minX && b.minX - 40 < v.maxX && b.maxY + 40 > v.minY && b.minY - 40 < v.maxY;
     }
-    for (const s of this.signsC.children) s.visible = r.visible(s.cx - 50, s.cy - 40, 100, 60);
+    const SC = this.signsC.children;
+    for (let i = 0; i < SC.length; i++) { const s = SC[i]; s.visible = r.visible(s.cx - 50, s.cy - 40, 100, 60); }
 
     // фермер и что его не должно закрывать
     const p = f.player;
     toWorld(p.x, p.y, tmp);
     const pdepth = p.x + p.y, pwy = tmp.y;
     const F = f.focus; F.length = 0;
-    F.push({ x0: tmp.x - 11, y0: tmp.y - 50, x1: tmp.x + 11, y1: tmp.y, depth: pdepth, gx: -1, gy: -1 });
-    for (const t of [f.hover, f.tapFx]) {
+    const fo = this._fo || (this._fo = [{}, {}, {}]); // переиспользуем, чтобы не плодить мусор
+    const foc = (i, x0, y0, x1, y1, depth, gx, gy) => { const q = fo[i]; q.x0 = x0; q.y0 = y0; q.x1 = x1; q.y1 = y1; q.depth = depth; q.gx = gx; q.gy = gy; q.hit = false; F.push(q); };
+    foc(0, tmp.x - 11, tmp.y - 50, tmp.x + 11, tmp.y, pdepth, -1, -1);
+    for (let ti = 0; ti < 2; ti++) {
+      const t = ti ? f.tapFx : f.hover;
       if (!t || !w.inside(t.x, t.y)) continue;
       toWorld(t.x + 0.5, t.y + 0.5, tmp);
-      F.push({ x0: tmp.x - HW + 6, y0: tmp.y - HH + 3, x1: tmp.x + HW - 6, y1: tmp.y + HH - 3, depth: t.x + t.y + 1, gx: t.x, gy: t.y });
+      foc(F.length, tmp.x - HW + 6, tmp.y - HH + 3, tmp.x + HW - 6, tmp.y + HH - 3, t.x + t.y + 1, t.x, t.y);
     }
 
     // объекты
     const stamp = ++this.stamp;
     let playerHidden = false;
-    for (const o of w.objects) {
+    const OB = w.objects;
+    for (let oi = 0; oi < OB.length; oi++) {
+      const o = OB[oi];
       if (!o) continue;
       let e = this.objs.get(o);
-      if (!e) { e = new PIXI.Sprite(); this.objs.set(o, e); this.objC.addChild(e); }
+      if (!e) { e = new PIXI.Sprite(); e.o = o; this.objs.set(o, e); this.objC.addChild(e); }
       e.stamp = stamp;
       let s = f.objSprite(o);
       const vis = r.visible(o.wx - s.ax - 4, o.wy - s.ay, s.w + 8, s.h);
@@ -314,26 +341,26 @@ export class PixiScene {
       const z = Z(o.depth, o.wy);
       if (e.zIndex !== z) e.zIndex = z;
     }
-    for (const [o, e] of this.objs) if (e.stamp !== stamp) { e.destroy(); this.objs.delete(o); }
+    this.objs.forEach((e) => { if (e.stamp !== stamp) { e.destroy(); this.objs.delete(e.o); } });
 
     // растения и значки над грядками
     const bob = Math.sin(f.time * 4) * 1.5;
-    for (const b of f.beds.values()) {
+    f.beds.forEach((b) => {
       let e = this.crops.get(b), bu = this.bub.get(b);
-      if (!b.crop) { if (e) e.visible = false; if (bu) bu.visible = false; continue; }
-      if (!e) { e = new PIXI.Sprite(); this.crops.set(b, e); this.objC.addChild(e); }
-      const info = f.cropInfo(b);
+      if (!b.crop) { if (e) e.visible = false; if (bu) bu.visible = false; return; }
+      if (!e) { e = new PIXI.Sprite(); e.b = b; this.crops.set(b, e); this.objC.addChild(e); }
+      const fl = f.cropFlags(b);
       e.visible = r.visible(b.wx - 32, b.wy - 44, 64, 60);
       if (e.visible) {
-        this.put(e, S.crops[b.crop][info.stage], b.wx, b.wy);
+        this.put(e, S.crops[b.crop][fl & 3], b.wx, b.wy);
         const z = Z(b.dr.depth, b.dr.wy); if (e.zIndex !== z) e.zIndex = z;
       }
-      const bs = info.ready ? S.bubble.ready : info.needsWater ? S.bubble.water : null;
+      const bs = fl & 4 ? S.bubble.ready : fl & 8 ? S.bubble.water : null;
       if (!bu) { bu = new PIXI.Sprite(); this.bub.set(b, bu); this.bubbles.addChild(bu); }
       bu.visible = !!bs && e.visible;
       if (bu.visible) this.put(bu, bs, b.wx, b.wy - 26 + bob);
-    }
-    for (const [b, e] of this.crops) if (!f.beds.has(b.i) || f.beds.get(b.i) !== b) { e.destroy(); this.crops.delete(b); const bu = this.bub.get(b); if (bu) { bu.destroy(); this.bub.delete(b); } }
+    });
+    this.crops.forEach((e) => { const b = e.b; if (f.beds.get(b.i) === b) return; e.destroy(); this.crops.delete(b); const bu = this.bub.get(b); if (bu) { bu.destroy(); this.bub.delete(b); } });
 
     // фермер
     this.player.sync(p);
@@ -370,7 +397,7 @@ export class PixiScene {
       const n = C.children.length;
       const box = new PIXI.Container();
       box.g = new PIXI.Graphics(); box.addChild(box.g);
-      const tx = new PIXI.Text({ text: String(n + 1), style: { fontFamily: 'system-ui, sans-serif', fontSize: 8, fontWeight: '700', fill: 0x3d2b1f }, resolution: this.textRes });
+      const tx = new PIXI.BitmapText({ text: String(n + 1), style: { fontFamily: 'farm-dark', fontSize: 8 } });
       tx.anchor.set(0.5); tx.y = 0.3; box.addChild(tx);
       C.addChild(box);
     }
@@ -438,7 +465,7 @@ export class PixiScene {
     const f = this.f, C = this.floatC;
     while (C.children.length < f.floaters.length) {
       const box = new PIXI.Container();
-      box.tx = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 11, fontWeight: '700', fill: 0xfffbe8, stroke: { color: 0x28190f, width: 3, alpha: 0.8 } }, resolution: this.textRes });
+      box.tx = new PIXI.BitmapText({ text: '', style: { fontFamily: 'farm-float', fontSize: 11 } });
       box.tx.anchor.set(0, 0.5); box.addChild(box.tx);
       box.ic = new PIXI.Sprite(); box.ic.width = 12; box.ic.height = 12; box.addChild(box.ic);
       C.addChild(box);
@@ -447,7 +474,7 @@ export class PixiScene {
       const fl = f.floaters[i];
       box.visible = !!fl;
       if (!fl) return;
-      if (box.tx.text !== fl.text) { box.tx.text = fl.text; this.f.perf.mark('текст'); }
+      if (box.tx.text !== fl.text) box.tx.text = fl.text;
       const img = fl.icon && f.iconImg[fl.icon];
       const iconOk = img && img.complete && img.naturalWidth;
       box.ic.visible = !!iconOk;

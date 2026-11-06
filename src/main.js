@@ -36,11 +36,18 @@ async function main() {
   const save = new Save(tg);
   { const fl = save.flush.bind(save); save.flush = () => { const t = performance.now(); fl(); perf.mark('сохранение', performance.now() - t); }; }
   const fill = document.getElementById('ld-fill'), ltext = document.getElementById('ld-text');
-  const progress = (k) => { fill.style.width = Math.round(k * 100) + '%'; ltext.textContent = k < 1 ? `Загрузка… ${Math.round(k * 100)}%` : 'Готово!'; };
-  progress(0.05);
+  // полоса двигается через transform (это анимирует видеокарта — плавно, даже пока JS занят), только вперёд
+  let shown = 0;
+  const progress = (k) => {
+    if (k <= shown) return; shown = k;
+    fill.style.transform = `scaleX(${k.toFixed(3)})`;
+    ltext.textContent = k < 1 ? `Загрузка… ${Math.round(k * 100)}%` : 'Готово!';
+  };
+  const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  progress(0.05); await nextFrame();
   const farm = new Farm({ renderer, camera, ui, tg, save, perf, audio });
   if (app) farm.scene = new PixiScene(farm, app);
-  farm.onArtProgress = (k) => progress(0.1 + k * 0.85);
+  farm.onArtProgress = (k) => progress(0.08 + k * 0.72);
   window.__farm = farm; // для тестов в браузере
   ui.bind(farm, farm.icons);
 
@@ -95,14 +102,17 @@ async function main() {
   game.isIdle = () => farm.isIdle() && input.pointers.size === 0;
   game.onPause = () => save.flush();
   window.addEventListener('pagehide', () => save.flush());
-  game.start();
-
-  // ждём картинки (но не дольше 15 с: на плохой связи игра откроется с графикой из кода)
+  // ждём картинки (но не дольше 15 с: на плохой связи игра откроется с графикой из кода).
+  // Игровой цикл пока не запускаем: за экраном загрузки кадры никому не нужны и только мешают загрузке.
   await Promise.race([farm.artReady, new Promise((r) => setTimeout(r, 15000))]);
+  progress(0.85); await nextFrame(); // полоса успевает показаться до тяжёлого шага
   if (farm.scene) { try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); } }
-  perf.restart();
+  else farm.render();
   progress(1);
-  setTimeout(() => { document.getElementById('loading').classList.add('hide'); if (!ui.panelOpen) audio.setTheme('farm'); }, 150);
+  game.start();
+  perf.restart();
+  await new Promise((r) => setTimeout(r, 450)); // дать полосе доехать до конца
+  document.getElementById('loading').classList.add('hide'); if (!ui.panelOpen) audio.setTheme('farm');
   // начало истории: новое задание показываем сразу
   if (farm.quests.current && !farm.quests.st.seen) setTimeout(() => ui.questPanel(farm), 700);
   // Счётчик FPS и времени кадра: включается в настройках (или ?debug в адресе)
