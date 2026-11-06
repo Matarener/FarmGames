@@ -803,6 +803,29 @@ export function makeIcons(crops, fish) {
     g.beginPath(); g.moveTo(-6, 8); g.lineTo(1, 8); g.stroke();
     g.fillStyle = '#e2392f'; blob(g, 7, 9, 3.4); g.restore();
   });
+  // инструменты рюкзака
+  I.axe = iconURL((g) => {
+    g.save(); g.rotate(-0.6);
+    g.fillStyle = '#9a6538'; g.fillRect(-1.6, -12, 3.2, 26); g.strokeStyle = OUT; g.lineWidth = 1.3; g.strokeRect(-1.6, -12, 3.2, 26);
+    g.beginPath(); g.moveTo(1.6, -12); g.lineTo(10, -15); g.quadraticCurveTo(13, -7, 10, 1); g.lineTo(1.6, -2); g.closePath();
+    g.fillStyle = '#b9c0c5'; g.fill(); g.stroke();
+    g.fillStyle = '#e6eaed'; g.fillRect(8, -12, 2, 10);
+    g.restore();
+  });
+  I.pick = iconURL((g) => {
+    g.save(); g.rotate(0.5);
+    g.fillStyle = '#9a6538'; g.fillRect(-1.6, -10, 3.2, 24); g.strokeStyle = OUT; g.lineWidth = 1.3; g.strokeRect(-1.6, -10, 3.2, 24);
+    g.beginPath(); g.moveTo(-14, -4); g.quadraticCurveTo(0, -16, 14, -4); g.quadraticCurveTo(0, -11, -14, -4); g.closePath();
+    g.fillStyle = '#9aa1a7'; g.fill(); g.stroke();
+    g.restore();
+  });
+  I.can = iconURL((g) => {
+    g.strokeStyle = OUT; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(6, -2); g.lineTo(14, -10); g.lineTo(15, -7); g.lineTo(8, 4); g.closePath(); g.fillStyle = '#6fb3d9'; g.fill(); g.stroke();
+    g.beginPath(); g.roundRect(-11, -6, 18, 17, 4); g.fillStyle = '#4f9bd0'; g.fill(); g.stroke();
+    g.beginPath(); g.arc(-2, -6, 6, Math.PI, 0); g.lineWidth = 2.4; g.stroke();
+    g.fillStyle = '#a9d8f5'; g.fillRect(-8, -2, 3, 9);
+  });
   for (const crop of Object.values(crops)) I[crop.key] = iconURL(cropIcon(crop));
   for (const f of Object.values(fish || {})) I[f.key] = iconURL(fishIcon(f));
   I.fish = I.fish_carp;

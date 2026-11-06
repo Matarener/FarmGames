@@ -81,3 +81,45 @@ export function expansionCost(n) {
 export function houseNeedChunks(level) { return (HOUSE[level - 1] ? HOUSE[level - 1].chunks : 1) + 1; }
 
 export const GEM_SPEEDUP_SEC = 600; // 1 кристалл ускоряет на 10 минут (минимум 1)
+
+// ---------------- Инвентарь ----------------
+// Разделы рюкзака. Предмет может лежать сразу в нескольких (морковь — еда и растение).
+export const INV_TABS = [
+  { key: 'all',    name: 'Все',         icon: 'bag' },
+  { key: 'tools',  name: 'Инструменты', icon: 'axe' },
+  { key: 'build',  name: 'Постройки',   icon: 'build' },
+  { key: 'plants', name: 'Растения',    icon: 'seed' },
+  { key: 'food',   name: 'Еда',         icon: 'food' },
+  { key: 'res',    name: 'Ресурсы',     icon: 'wood' },
+];
+
+// Инструменты есть всегда, их не считают и не продают
+export const TOOLS = {
+  tool_axe:    { name: 'Топор',  icon: 'axe',  desc: 'Рубит деревья, кусты и пни. Удар стоит 1 энергию.' },
+  tool_pick:   { name: 'Кирка',  icon: 'pick', desc: 'Разбивает камни и валуны, иногда попадается руда.' },
+  tool_shovel: { name: 'Лопата', icon: 'dig',  desc: 'Вскапывает траву под новую грядку.' },
+  tool_can:    { name: 'Лейка',  icon: 'can',  desc: 'Поливает грядки. Набрать воду можно в пруду или у колодца.', can: true },
+  tool_rod:    { name: 'Удочка', icon: 'fish', desc: 'Ловит рыбу в пруду. Рыбу можно съесть или продать.' },
+};
+
+export const seedId = (crop) => 'seed_' + crop;
+const fmtMin = (s) => s < 3600 ? `${Math.round(s / 60)} мин.` : `${+(s / 3600).toFixed(1)} ч.`;
+
+// Единая таблица всех предметов: key, name, icon, tabs, desc, sell (цена продажи), food (энергия).
+// Собирается из таблиц выше, чтобы цены и названия жили в одном месте.
+export const ITEMS = {};
+for (const [k, t] of Object.entries(TOOLS)) ITEMS[k] = { ...t, key: k, tabs: ['tools'], tool: true };
+for (const c of Object.values(CROPS)) ITEMS[c.key] = {
+  key: c.key, name: c.name, icon: c.key, sell: c.sell, food: c.food,
+  tabs: c.food ? ['food', 'plants'] : ['plants'],
+  desc: c.food ? 'Урожай с грядки. Можно съесть или продать.' : 'Урожай с грядки. Несъедобно, но хорошо продаётся.',
+};
+for (const f of Object.values(FISH)) ITEMS[f.key] = { key: f.key, name: f.name, icon: f.key, sell: f.sell, food: f.food, tabs: ['food'], desc: 'Рыба из пруда. Можно съесть или продать.' };
+for (const c of Object.values(CROPS)) ITEMS[seedId(c.key)] = {
+  key: seedId(c.key), name: 'Семена: ' + c.name.toLowerCase(), icon: c.key, badge: 'seed', tabs: ['plants'], seedOf: c.key,
+  desc: `Посадите на пустую грядку. Растёт ${fmtMin(c.time)}, доступно с ${c.level} уровня.`,
+};
+for (const [k, r] of Object.entries(RESOURCES)) ITEMS[k] = { key: k, name: r.name, icon: k, tabs: ['res'], desc: 'Нужно для улучшения дома, колодца и новых участков.' };
+// порядок «по умолчанию»: как в таблице (инструменты, урожай, рыба, семена, ресурсы)
+let _ord = 0;
+for (const it of Object.values(ITEMS)) it.order = _ord++;
