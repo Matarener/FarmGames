@@ -36,7 +36,7 @@ export class World {
   walkable(x, y) {
     if (!this.isOpen(x, y)) return false;
     const i = y * N + x;
-    return this.tiles[i] !== T.WATER && this.occ[i] < 0;
+    return (this.tiles[i] !== T.WATER || (this.pier && this.pier.has(i))) && this.occ[i] < 0; // по мостику можно ходить
   }
 
   add(type, gx, gy) {
@@ -148,6 +148,48 @@ export class World {
     // Колодец бабушки — после счётчика: он не сохраняется в разнице и всегда на месте
     this.wellPos = L(5, 4); // у тропинки к дому, на виду
     this.well = this.add('well', this.wellPos[0], this.wellPos[1]);
+    this.genDecor();
+  }
+
+  // Украшения пруда: не объекты (их нельзя рубить и двигать), всегда одинаковые для мира.
+  // Камыш, рогоз и камни — у берега, кувшинки и листья — на воде, мостик — по одному на пруд.
+  genDecor() {
+    const rnd = mulberry32(this.seed ^ 0x7f4a7c15), W = T.WATER;
+    this.decor = []; this.pier = new Set();
+    const water = (x, y) => this.inside(x, y) && this.tiles[y * N + x] === W;
+    const seen = new Uint8Array(N * N);
+    const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (let i = 0; i < N * N; i++) {
+      if (this.tiles[i] !== W || seen[i]) continue;
+      // один пруд — связная вода
+      const pond = [], st = [i]; seen[i] = 1;
+      while (st.length) {
+        const j = st.pop(); pond.push(j);
+        const x = j % N, y = (j / N) | 0;
+        for (const [dx, dy] of D4) { const k = (y + dy) * N + x + dx; if (water(x + dx, y + dy) && !seen[k]) { seen[k] = 1; st.push(k); } }
+      }
+      const land = (j) => { const x = j % N, y = (j / N) | 0; return D4.filter(([dx, dy]) => this.inside(x + dx, y + dy) && !water(x + dx, y + dy)); };
+      const shore = pond.filter((j) => land(j).length);
+      const used = new Set();
+      const take = (list) => { const free = list.filter((j) => !used.has(j)); if (!free.length) return -1; const j = free[(rnd() * free.length) | 0]; used.add(j); return j; };
+      const put = (type, j, toLand) => {
+        if (j < 0) return;
+        const x = j % N, y = (j / N) | 0;
+        let ox = (rnd() - 0.5) * 0.2, oy = (rnd() - 0.5) * 0.2;
+        if (toLand) { const L = land(j); if (L.length) { const [dx, dy] = L[(rnd() * L.length) | 0]; ox += dx * 0.28; oy += dy * 0.28; } }
+        this.decor.push({ type, gx: x, gy: y, x: x + 0.5 + ox, y: y + 0.5 + oy });
+      };
+      // мостик: с берега, где можно встать (трава), смотрит в воду
+      const pierAt = take(shore.filter((j) => land(j).some(([dx, dy]) => { const x = j % N + dx, y = ((j / N) | 0) + dy; return this.tiles[y * N + x] === T.GRASS; })));
+      if (pierAt >= 0) { this.pier.add(pierAt); this.decor.push({ type: 'pier', gx: pierAt % N, gy: (pierAt / N) | 0, x: pierAt % N + 0.5, y: ((pierAt / N) | 0) + 0.5 }); }
+      put('cattail', take(shore), true);
+      if (pond.length > 6) put('cattail', take(shore), true);
+      put('reeds', take(shore), true);
+      if (rnd() < 0.7) put('rocks', take(shore), true);
+      put('lily', take(pond), false);
+      if (pond.length > 6) put('lily', take(pond), false);
+      if (rnd() < 0.6) put('leaves', take(pond), false);
+    }
   }
 
   // Снять объект с карты (клетки свободны) и поставить обратно — для загрузки сохранения
