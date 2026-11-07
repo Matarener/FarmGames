@@ -576,7 +576,7 @@ export class Farm {
       const f = FLORA[o.tree];
       return this.ui.popup(sx, sy, {
         title: `Росток: ${f.name.toLowerCase()}`, text: `Вырастет через ${fmtTime(Flora.growLeft(o.tree, o.born, now))}`,
-        items: o.own ? [] : [{ icon: 'dig', label: 'Выкопать', sub: `⚡ ${ENERGY.chop}`, onClick: () => this.queue({ kind: 'chop', obj: o }) }],
+        items: o.own ? [] : [{ icon: 'wood', label: 'Срубить', sub: `⚡ ${ENERGY.chop}`, onClick: () => this.queue({ kind: 'chop', obj: o }) }],
         ...(o.own ? { text: `Вырастет через ${fmtTime(Flora.growLeft(o.tree, o.born, now))}. Убрать в рюкзак: «Ещё» → «Переставить»` } : {}),
       });
     }
@@ -1074,12 +1074,11 @@ export class Farm {
   destroy(o) {
     const def = OBJECTS[o.type], st = this.st;
     if (o.type === 'sapling') {
-      // свой росток: выкопали — саженец вернулся в рюкзак
-      Flora.forget(st, o);
-      this.addItem(floraSeedId(o.tree), 1);
-      this.dropFx(o, [{ id: floraSeedId(o.tree), n: 1 }]);
-      this.burst(o.wx, o.wy - 4, '#8a5a30', 8);
-      this.sfx('dig');
+      // дикий росток срубили — 1 дерево; свой — саженец вернулся в рюкзак
+      const r = Flora.chopSapling(st, o, Math.random);
+      this.dropFx(o, r.items);
+      this.burst(o.wx, o.wy - 4, o.own ? '#8a5a30' : '#7a4b28', 8);
+      this.sfx(o.own ? 'dig' : 'break');
       this.world.remove(o);
       return;
     }
