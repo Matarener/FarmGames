@@ -34,6 +34,7 @@ export class Mover {
     this.sel = null; this.to = null;
     f.player.queue.length = 0; // очередь дел отменяется: объекты могут переехать
     f.ui.closePopup(); f.ui.closePanel();
+    f.stopPlanting(); // плашка посадки и плашка перестановки занимают одно место
     this.hint();
   }
 
