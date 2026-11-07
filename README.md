@@ -36,7 +36,7 @@ npm run build      # → dist/: один минифицированный бан
 npm run preview    # открыть собранную версию на http://localhost:8080
 ```
 
-Папка `dist/` лежит в репозитории. При каждом пуше в `main` GitHub Actions пересобирает её и публикует на GitHub Pages (`.github/workflows/pages.yml`). Адрес: https://matarener.github.io/FarmGames/
+Папка `dist/` в репозиторий не попадает: при каждом пуше в `main` GitHub Actions сам собирает игру и публикует её на GitHub Pages (`.github/workflows/pages.yml`). Адрес: https://matarener.github.io/FarmGames/
 
 ## Подключение к Telegram
 
