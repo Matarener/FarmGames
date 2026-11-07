@@ -1,21 +1,18 @@
 // Отрисовка фермы через WebGL (PixiJS). Сцена «держится» в видеопамяти: земля, объекты и
 // растения — постоянные спрайты в атласах; каждый кадр меняется только то, что двигается
 // (камера, фермер, частицы). Логика игры, камера, ввод и скелетная анимация — свои; Pixi только рисует.
-// Если WebGL недоступен, Farm рисует по-старому через Canvas 2D.
 import * as PIXI from '../vendor/pixi.min.mjs';
 import { toWorld, HW, HH } from '../engine/Iso.js';
-import { dimSprite } from '../engine/Sprite.js';
+import { dimSprite, hash2 } from '../engine/Sprite.js';
 import { N, CHUNK, CHUNKS, T, FOG_W } from './World.js';
 import { HOUSE, FOG } from './data.js';
 import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM } from './bars.js';
-
-import { hash2 } from '../engine/Sprite.js';
 
 const tmp = { x: 0, y: 0 };
 // кружки с номерами очереди: радиус в мировых единицах и плотность картинки (пикселей на единицу)
 const QBADGE_R = 6.5, QBADGE_RES = 12;
 const ATLAS = 2048, PAD = 6;
-const Z = (depth, wy) => depth * 1e4 + wy * 0.1; // порядок как в 2D: глубина, затем y
+const Z = (depth, wy) => depth * 1e4 + wy * 0.1; // порядок отрисовки: глубина клетки, затем y
 
 // прямоугольник непрозрачных пикселей картинки (с запасом в 1 px), null — если пусто
 let scratch = null;
@@ -271,7 +268,7 @@ export class PixiScene {
     const c = document.createElement('canvas'); c.width = w + 2 * M; c.height = h + 2 * M;
     const g = c.getContext('2d');
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) g.drawImage(img, M + dx * w, M + dy * h);
-    // 128 пикселей текстуры на клетку (как было в 2D): 768×512 → повтор через 6×4 клеток
+    // 128 пикселей текстуры на клетку: 768×512 → повтор через 6×4 клеток
     const cell = 128;
     this.waterT = { canvas: c, w: c.width, h: c.height, ax: 0, ay: 0, m: M, cell, px: Math.max(1, Math.round(w / cell)), py: Math.max(1, Math.round(h / cell)) };
   }
@@ -841,7 +838,7 @@ export class PixiScene {
   }
 }
 
-// Запуск Pixi на канвасе игры. null — WebGL недоступен (останется Canvas 2D).
+// Запуск Pixi на канвасе игры. null — WebGL недоступен (main.js покажет сообщение).
 export async function createPixiApp(canvas, perf, bg) {
   try {
     const probe = document.createElement('canvas');
@@ -871,48 +868,6 @@ export async function createPixiApp(canvas, perf, bg) {
   } catch (e) {
     console.warn('WebGL', e);
     return null;
-  }
-}
-
-// Тот же интерфейс, что у Renderer (размер, матрица камеры, видимая область), но без 2D-контекста:
-// рисует PixiScene.
-export class GLRenderer {
-  constructor(canvas, perf, app) {
-    this.canvas = canvas; this.perf = perf; this.app = app; this.pixi = true;
-    this.ctx = null;
-    this.cssW = 1; this.cssH = 1; this.scale = 1;
-    this.va = 1; this.ve = 0; this.vf = 0;
-    this.view = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  }
-
-  resize() {
-    const rect = this.canvas.getBoundingClientRect();
-    this.cssW = Math.max(1, rect.width);
-    this.cssH = Math.max(1, rect.height);
-    this.scale = this.perf.renderScale;
-    const R = this.app.renderer;
-    if (R.resolution !== this.scale) R.resolution = this.scale;
-    R.resize(this.cssW, this.cssH);
-    this.canvas.style.width = ''; this.canvas.style.height = ''; // размер задаёт CSS
-  }
-
-  begin(cam) {
-    const s = this.scale * cam.zoom;
-    this.va = s;
-    this.ve = Math.round((this.cssW / 2 - cam.x * cam.zoom) * this.scale);
-    this.vf = Math.round((this.cssH / 2 - cam.y * cam.zoom) * this.scale);
-    const v = this.view;
-    v.minX = cam.x - this.cssW / 2 / cam.zoom;
-    v.maxX = cam.x + this.cssW / 2 / cam.zoom;
-    v.minY = cam.y - this.cssH / 2 / cam.zoom;
-    v.maxY = cam.y + this.cssH / 2 / cam.zoom;
-  }
-
-  resetView() {}
-
-  visible(x, y, w, h) {
-    const v = this.view;
-    return x < v.maxX && x + w > v.minX && y < v.maxY && y + h > v.minY;
   }
 }
 

@@ -9,7 +9,7 @@ import { setSpriteScale } from './engine/Sprite.js';
 import { TelegramBridge } from './telegram/TelegramBridge.js';
 import { Save } from './game/Save.js';
 import { Farm, BG } from './game/Farm.js';
-import { createPixiApp, GLRenderer, PixiScene } from './game/PixiScene.js';
+import { createPixiApp, PixiScene } from './game/PixiScene.js';
 import { UI } from './ui/UI.js';
 import { Audio } from './engine/Audio.js';
 
@@ -41,11 +41,11 @@ async function main() {
   setSpriteScale(perf.spriteScale);
 
   const canvas = document.getElementById('game');
-  // WebGL (PixiJS), если есть; ?renderer=2d — старая отрисовка Canvas 2D для сравнения
-  const want2d = new URLSearchParams(location.search).get('renderer') === '2d';
-  const app = want2d ? null : await createPixiApp(canvas, perf, BG);
-  if (app) perf.keepScale = true;
-  const renderer = app ? new GLRenderer(canvas, perf, app) : new Renderer(canvas, perf);
+  // Рисует WebGL (PixiJS). Без WebGL играть нельзя: старая отрисовка Canvas 2D убрана
+  // (она осталась в ветке canvas2d), а WebGL есть во всех клиентах Telegram.
+  const app = await createPixiApp(canvas, perf, BG);
+  if (!app) { loadingError('Ваше устройство не поддерживает WebGL: без него игра не запустится. Попробуйте обновить Telegram или открыть игру на другом устройстве.'); return; }
+  const renderer = new Renderer(canvas, perf, app);
   const camera = new Camera();
   const ui = new UI(document.getElementById('app'));
   const save = new Save(tg);
@@ -61,7 +61,7 @@ async function main() {
   const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   progress(0.05); await nextFrame();
   const farm = new Farm({ renderer, camera, ui, tg, save, perf, audio });
-  if (app) farm.scene = new PixiScene(farm, app);
+  farm.scene = new PixiScene(farm, app);
   farm.onArtProgress = (k) => progress(0.08 + k * 0.72);
   window.__farm = farm; // для тестов в браузере
   ui.bind(farm, farm.icons);
@@ -132,8 +132,7 @@ async function main() {
   const slow = setTimeout(() => { slowNet = true; if (shown < 0.8) ltext.textContent = `Медленная сеть, догружаем ${Math.round(shown * 100)}%`; }, 12000);
   try { await farm.artReady; } catch (e) {
     clearTimeout(slow);
-    fill.parentElement.style.display = 'none';
-    ltext.textContent = 'Не удалось загрузить картинки. Проверьте интернет.';
+    loadingError('Не удалось загрузить картинки. Проверьте интернет.');
     const b = document.createElement('button');
     b.className = 'ld-retry'; b.textContent = 'Повторить';
     b.onclick = () => location.reload(); // загруженные картинки уже в кэше браузера — повтор быстрый
@@ -142,11 +141,10 @@ async function main() {
   }
   clearTimeout(slow);
   progress(0.85); await nextFrame(); // полоса успевает показаться до тяжёлого шага
-  if (farm.scene) { try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); } }
-  else farm.render();
+  try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); }
   // Разгон: ~2 с кадров с движением камеры ещё за экраном загрузки — движок JS успевает
   // оптимизировать горячий код, а сборка мусора после загрузки проходит здесь, а не в игре.
-  if (farm.scene) {
+  {
     const cam = farm.cam, z0 = cam.zoom, x0 = cam.x, y0 = cam.y, gl = farm.scene.app.renderer.gl, px = new Uint8Array(4);
     const N = 120;
     for (let i = 0; i < N; i++) {
@@ -189,7 +187,7 @@ async function main() {
       const now = (performance.now() - perf._t0) / 1000;
       const sp = perf.spikes.map((x) => `${x.ms.toFixed(0)} мс ${Math.round(now - x.at)} с назад: ${x.tags}`).join('\n');
       fpsEl.textContent = `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
-        ` · ${app ? 'WebGL' : '2D'} · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}${perf.idle ? " · покой" : ""}` + (farm.scene ? `\nвызовов отрисовки ${farm.scene.calls} · треугольников ${Math.round(farm.scene.tris)} · холст ${canvas.width}×${canvas.height}` : '') + (sp ? `\nфризы:\n${sp}` : '');
+        ` · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}${perf.idle ? " · покой" : ""}` + `\nвызовов отрисовки ${farm.scene.calls} · треугольников ${Math.round(farm.scene.tris)} · холст ${canvas.width}×${canvas.height}` + (sp ? `\nфризы:\n${sp}` : '');
     };
     paint(); fpsTimer = setInterval(paint, 500);
   };
@@ -198,8 +196,14 @@ async function main() {
   window.__farm = farm;
 }
 
+// Экран загрузки остаётся, вместо полосы — текст ошибки
+function loadingError(text) {
+  const bar = document.querySelector('#loading .ld-bar'), t = document.getElementById('ld-text');
+  if (bar) bar.style.display = 'none';
+  if (t) t.textContent = text;
+}
+
 main().catch((e) => {
   console.error(e);
-  const l = document.getElementById('loading');
-  if (l) l.textContent = 'Ошибка загрузки: ' + e.message;
+  loadingError('Ошибка загрузки: ' + e.message);
 });

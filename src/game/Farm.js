@@ -1,8 +1,8 @@
 // Сцена фермы: состояние игрока, взаимодействия, рост растений, отрисовка мира.
 
-import { toWorld, toGrid, HW, HH } from '../engine/Iso.js';
-import { dimSprite, hash2, makeCanvas } from '../engine/Sprite.js';
-import { World, N, CHUNK, CHUNKS, T, START_CHUNK } from './World.js';
+import { toWorld, toGrid } from '../engine/Iso.js';
+import { hash2, makeCanvas } from '../engine/Sprite.js';
+import { World, N, CHUNK, CHUNKS, T } from './World.js';
 import { Player } from './Player.js';
 import { makeGhostData, ROD_TIP } from './ghost.js';
 import * as art from './art.js';
@@ -12,8 +12,8 @@ import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
 import * as Wild from './wild.js';
 import * as Flora from './flora.js';
-import { BAR_KIND, BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop } from './bars.js';
-import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC, FOG } from './data.js';
+import { BAR_KIND, barTop } from './bars.js';
+import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 
@@ -103,22 +103,6 @@ export class Farm {
     const d = x.getImageData(0, 0, 1, 1).data;
     this._gcOf = g0; this._gc = `rgb(${d[0]},${d[1]},${d[2]})`;
     return this._gc;
-  }
-
-  // Текстура воды по координатам карты: одна картинка на весь пруд, без повторов по клеткам
-  waterFill(ctx, gx, gy) {
-    const t = this.S.waterTex;
-    if (!this._wpat) {
-      const p = ctx.createPattern(t.canvas, 'repeat');
-      if (!p || !p.setTransform) { this.S.waterTex = null; this.S.water.clear(); return; }
-      p.setTransform(new DOMMatrix().scale(1 / 128));
-      this._wpat = p;
-    }
-    ctx.save();
-    ctx.transform(HW, HH, -HW, HH, 0, 0); // клетка сетки → ромб на карте
-    ctx.fillStyle = this._wpat;
-    ctx.fillRect(gx - 0.02, gy - 0.02, 1.04, 1.04);
-    ctx.restore();
   }
 
   waterSprite(x, y) {
@@ -1024,22 +1008,6 @@ export class Farm {
     return { x, y, bx, by, k, bite, yank };
   }
 
-  drawFishing(ctx) {
-    const fs = this.fishingState();
-    if (!fs) return;
-    const { x, y, k, bite, yank } = fs;
-    let { bx, by } = fs;
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 0.5;
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo((x + bx) / 2, Math.max(y, by) + 6, bx, by); ctx.stroke();
-    if (k >= 1 && !yank) { // круги на воде
-      ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 0.6;
-      ctx.beginPath(); ctx.ellipse(bx, by + 1.5, 4 + bite * 3, 1.8 + bite * 1.2, 0, 0, Math.PI * 2); ctx.stroke();
-    }
-    ctx.fillStyle = '#3d2b1f'; ctx.beginPath(); ctx.arc(bx, by, 2.1, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bx, by + 0.4, 1.5, 0, Math.PI); ctx.fill();
-    ctx.fillStyle = '#e2392f'; ctx.beginPath(); ctx.arc(bx, by - 0.2, 1.5, Math.PI, 0); ctx.fill();
-  }
-
   // Полив: пока лейка наклонена, из носика падают капли
   pourWater(dt) {
     const p = this.player, an = p.anim;
@@ -1116,227 +1084,7 @@ export class Farm {
 
   // ---------------- Отрисовка ----------------
 
-  drawGround(ctx) {
-    const r = this.r, w = this.world, v = r.view;
-    // видимый диапазон клеток
-    let gx0 = Infinity, gx1 = -Infinity, gy0 = Infinity, gy1 = -Infinity;
-    for (const [x, y] of [[v.minX, v.minY], [v.maxX, v.minY], [v.minX, v.maxY], [v.maxX, v.maxY]]) {
-      toGrid(x, y, tmp);
-      gx0 = Math.min(gx0, tmp.x); gx1 = Math.max(gx1, tmp.x); gy0 = Math.min(gy0, tmp.y); gy1 = Math.max(gy1, tmp.y);
-    }
-    gx0 = Math.max(0, Math.floor(gx0) - 1); gy0 = Math.max(0, Math.floor(gy0) - 1);
-    gx1 = Math.min(N - 1, Math.ceil(gx1) + 1); gy1 = Math.min(N - 1, Math.ceil(gy1) + 1);
-
-    // основа карты (закрывает швы между тайлами)
-    ctx.fillStyle = '#7cc44f';
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(N * HW, N * HH); ctx.lineTo(0, N * 2 * HH); ctx.lineTo(-N * HW, N * HH); ctx.closePath(); ctx.fill();
-
-    // земля
-    const S = this.S, raised = [];
-    for (let gy = gy0; gy <= gy1; gy++) {
-      for (let gx = gx0; gx <= gx1; gx++) {
-        const cx = (gx - gy) * HW, cy = (gx + gy + 1) * HH;
-        if (cx + HW < v.minX || cx - HW > v.maxX || cy + HH < v.minY || cy - HH > v.maxY) continue;
-        const i = gy * N + gx, t = w.tiles[i];
-        let s;
-        if (t === T.GRASS) s = S.grass[w.variant[i]];
-        else if (t === T.PATH) s = S.path[(gx + gy) & 1];
-        else if (t === T.WATER) { if (S.waterTex) this.waterFill(ctx, gx, gy); s = this.waterSprite(gx, gy); }
-        else {
-          const b = this.beds.get(i);
-          const wet = b && b.crop && !this.cropInfo(b).needsWater && !this.cropInfo(b).ready;
-          if (S.bed) {
-            // объёмная грядка выше земли: сначала трава под ней, сама грядка — вторым проходом
-            raised.push([cx, cy, wet ? 1 : 0]);
-            s = S.grass[w.variant[i]];
-          } else s = S.soil[wet ? 1 : 0];
-        }
-        ctx.drawImage(s.canvas, cx - s.ax, cy - s.ay, s.w, s.h);
-      }
-    }
-    // ближние грядки ложатся поверх дальних
-    if (raised.length) {
-      const BS = S.bed[BED_STYLE];
-      raised.sort((a, b) => a[1] - b[1]);
-      for (const [x, y, wet] of raised) { const s = BS[wet]; ctx.drawImage(s.canvas, x - s.ax, y - s.ay, s.w, s.h); }
-    }
-    // украшения пруда (в 2D — вместе с землёй)
-    if (S.decor && w.decor) for (const d of w.decor) {
-      const s = S.decor[d.type]; if (!s) continue;
-      toWorld(d.x, d.y, tmp);
-      if (r.visible(tmp.x - s.ax, tmp.y - s.ay, s.w, s.h)) ctx.drawImage(s.canvas, tmp.x - s.ax, tmp.y - s.ay, s.w, s.h);
-    }
-
-    // туман над закрытыми участками
-    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
-      if (w.unlocked[c]) continue;
-      const cb = w.chunkBounds(c);
-      if (!r.visible(cb.minX, cb.minY, cb.maxX - cb.minX, cb.maxY - cb.minY)) continue;
-      const x0 = (c % CHUNKS) * CHUNK, y0 = ((c / CHUNKS) | 0) * CHUNK;
-      ctx.fillStyle = w.canUnlock(c) ? 'rgba(18,44,24,0.34)' : 'rgba(14,34,20,0.5)';
-      ctx.beginPath();
-      toWorld(x0, y0, tmp); ctx.moveTo(tmp.x, tmp.y);
-      toWorld(x0 + CHUNK, y0, tmp); ctx.lineTo(tmp.x, tmp.y);
-      toWorld(x0 + CHUNK, y0 + CHUNK, tmp); ctx.lineTo(tmp.x, tmp.y);
-      toWorld(x0, y0 + CHUNK, tmp); ctx.lineTo(tmp.x, tmp.y);
-      ctx.closePath(); ctx.fill();
-    }
-    // туман вокруг карты (в 2D — несколько колец, без леса)
-    const F = FOG.width, col = FOG.color, rgb = `${(col >> 16) & 255},${(col >> 8) & 255},${col & 255}`;
-    const sq = (d, back) => {
-      const P = [[-d, -d], [N + d, -d], [N + d, N + d], [-d, N + d]];
-      if (back) P.reverse();
-      toWorld(P[0][0], P[0][1], tmp); ctx.moveTo(tmp.x, tmp.y);
-      for (let k = 1; k < 4; k++) { toWorld(P[k][0], P[k][1], tmp); ctx.lineTo(tmp.x, tmp.y); }
-      ctx.closePath();
-    };
-    const D = [0, 1, 2, 3, F, 80];
-    for (let k = 0; k < D.length - 1; k++) {
-      const m = (D[k] + D[k + 1]) / 2, t = Math.min(1, m / F), a = k === D.length - 2 ? 1 : t * t * (3 - 2 * t);
-      ctx.fillStyle = `rgba(${rgb},${a.toFixed(3)})`;
-      ctx.beginPath(); sq(D[k], false); sq(D[k + 1], true); ctx.fill();
-    }
-    // граница открытой территории
-    this.drawBorder(ctx);
-  }
-
-  render() {
-    if (this.scene) return this.scene.render(); // WebGL (PixiJS)
-    const r = this.r, ctx = r.ctx, w = this.world, S = this.S;
-    r.begin(this.cam, BG);
-
-    // Земля, туман и граница меняются редко: рисуем их в отдельный холст и, пока камера
-    // и клетки те же, только копируем его (на слабых телефонах это половина кадра).
-    let wet = 0;
-    for (const b of this.beds.values()) if (b.crop) { const i = this.cropInfo(b); if (!i.needsWater && !i.ready) wet = (wet * 31 + b.i) % 1e9; }
-    const key = `${this.cam.x.toFixed(2)}|${this.cam.y.toFixed(2)}|${this.cam.zoom.toFixed(4)}|${r.canvas.width}x${r.canvas.height}|${this.groundV}|${w.unlockedCount()}|${wet}`;
-    let gc = this._ground;
-    if (!gc || gc.width !== r.canvas.width || gc.height !== r.canvas.height) {
-      gc = this._ground = makeCanvas(r.canvas.width, r.canvas.height); this._groundKey = '';
-    }
-    if (key !== this._groundKey) {
-      this._groundKey = key;
-      const g = gc.getContext('2d');
-      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = ctx.imageSmoothingQuality;
-      g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = BG; g.fillRect(0, 0, gc.width, gc.height);
-      g.setTransform(r.va, 0, 0, r.va, r.ve, r.vf);
-      this.drawGround(g);
-    }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(gc, 0, 0);
-    r.resetView();
-
-    // объекты + растения + персонаж, по глубине
-    const L = this.drawList; L.length = 0;
-    for (const o of w.objects) {
-      if (!o) continue;
-      const s = this.objSprite(o);
-      if (!r.visible(o.wx - s.ax - 4, o.wy - s.ay, s.w + 8, s.h)) continue;
-      o.kind = 'o';
-      L.push(o);
-    }
-    for (const b of this.beds.values()) {
-      if (!b.crop || !r.visible(b.wx - 32, b.wy - 44, 64, 60)) continue;
-      L.push(b.dr);
-    }
-    const p = this.player;
-    toWorld(p.x, p.y, tmp);
-    this._pd = this._pd || { kind: 'p' };
-    this._pd.depth = p.x + p.y; this._pd.wy = tmp.y;
-    L.push(this._pd);
-    L.sort((a, b) => a.depth - b.depth || a.wy - b.wy);
-
-    // Что нельзя закрывать: фермер, клетка под курсором, клетка последнего тапа.
-    // Высокие объекты перед ними становятся полупрозрачными.
-    const F = this.focus; F.length = 0;
-    F.push({ x0: tmp.x - 11, y0: tmp.y - 50, x1: tmp.x + 11, y1: tmp.y, depth: p.x + p.y, gx: -1, gy: -1 });
-    for (const t of [this.hover, this.tapFx]) {
-      if (!t || !w.inside(t.x, t.y)) continue;
-      toWorld(t.x + 0.5, t.y + 0.5, tmp);
-      F.push({ x0: tmp.x - HW + 6, y0: tmp.y - HH + 3, x1: tmp.x + HW - 6, y1: tmp.y + HH - 3, depth: t.x + t.y + 1, gx: t.x, gy: t.y });
-    }
-    let playerHidden = false;
-
-    for (const d of L) {
-      if (d.kind === 'o') {
-        let s = this.objSprite(d);
-        if (!w.isOpen(d.gx, d.gy)) s = dimSprite(s);
-        const sh = d.shake > 0 ? Math.sin(this.time * 70) * 2.2 * (d.shake / 0.25) : 0;
-        const fade = this.occludes(d, s, F);
-        d.fade = (d.fade || 0) + (fade - (d.fade || 0)) * 0.3;
-        if (d.fade < 0.02) d.fade = 0;
-        if (fade && F[0].hit) playerHidden = true;
-        if (d.fade) ctx.globalAlpha = 1 - 0.62 * d.fade;
-        ctx.drawImage(s.canvas, d.wx - s.ax + sh, d.wy - s.ay, s.w, s.h);
-        ctx.globalAlpha = 1;
-      } else if (d.kind === 'c') {
-        const b = d.bed, info = this.cropInfo(b);
-        const s = S.crops[b.crop][info.stage];
-        ctx.drawImage(s.canvas, b.wx - s.ax, b.wy - s.ay, s.w, s.h);
-      } else {
-        p.draw(r);
-      }
-    }
-
-    // фермер за объектом: полупрозрачная копия поверх
-    if (playerHidden) { ctx.globalAlpha = 0.4; p.draw(r); ctx.globalAlpha = 1; }
-
-    // рамки поверх объектов: граница участка (бледно), клетка под курсором, тап
-    ctx.globalAlpha = 0.45; this.drawBorder(ctx); ctx.globalAlpha = 1;
-    if (this.hover && w.inside(this.hover.x, this.hover.y)) this.tileOutline(ctx, this.hover.x, this.hover.y, 'rgba(255,255,255,0.75)', 1.8);
-    if (this.tapFx) this.tileOutline(ctx, this.tapFx.x, this.tapFx.y, `rgba(255,250,200,${Math.min(1, this.tapFx.t * 2.4)})`, 2.5);
-
-    // значки над грядками
-    const bob = Math.sin(this.time * 4) * 1.5;
-    for (const b of this.beds.values()) {
-      if (!b.crop || !r.visible(b.wx - 12, b.wy - 70, 24, 40)) continue;
-      const info = this.cropInfo(b);
-      const s = info.ready ? S.bubble.ready : info.needsWater ? S.bubble.water : null;
-      if (s) ctx.drawImage(s.canvas, b.wx - s.ax, b.wy - 26 - s.ay + bob, s.w, s.h);
-    }
-
-    // полоски времени роста
-    const BR = this.bars;
-    if (BR && BR.length && this.cam.zoom >= BAR_MIN_ZOOM) {
-      for (let i = 0; i < BR.length; i += 4) {
-        const x = BR[i] - BAR_W / 2, y = BR[i + 1] - BAR_H / 2;
-        if (!r.visible(x - 1, y - 1, BAR_W + 2, BAR_H + 2)) continue;
-        ctx.fillStyle = 'rgba(30,24,16,0.6)'; ctx.fillRect(x - 1, y - 1, BAR_W + 2, BAR_H + 2);
-        ctx.fillStyle = '#' + BAR_COLORS[BR[i + 3]].toString(16).padStart(6, '0');
-        ctx.fillRect(x, y, Math.max(1, BAR_W * BR[i + 2]), BAR_H);
-      }
-    }
-
-    this.drawQueue(ctx);
-    this.drawSigns(ctx);
-    this.mover.draw(ctx);
-
-    this.drawFishing(ctx);
-
-    // частицы
-    for (const q of this.particles) {
-      ctx.globalAlpha = Math.max(0, 1 - q.t / q.life);
-      ctx.fillStyle = q.c;
-      ctx.fillRect(q.x - q.s / 2, q.y - q.s / 2, q.s, q.s);
-    }
-    ctx.globalAlpha = 1;
-
-    // всплывающие числа
-    ctx.font = '700 11px system-ui, sans-serif';
-    ctx.textBaseline = 'middle';
-    for (const f of this.floaters) {
-      const k = f.t / 1.3;
-      ctx.globalAlpha = k < 0.75 ? 1 : (1 - k) * 4;
-      const y = f.y - k * 26;
-      const tw = ctx.measureText(f.text).width;
-      const iw = f.icon ? 12 : 0;
-      const x = f.x - (tw + iw) / 2;
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(40,25,15,0.8)';
-      ctx.strokeText(f.text, x, y); ctx.fillStyle = '#fffbe8'; ctx.fillText(f.text, x, y);
-      if (f.icon && this.iconImg[f.icon]) ctx.drawImage(this.iconImg[f.icon], x + tw + 1, y - 6, 12, 12);
-    }
-    ctx.globalAlpha = 1;
-  }
+  render() { this.scene.render(); }
 
   // Закрывает ли объект что-то из списка F (фермер, выделенная клетка): объект
   // должен стоять ближе к камере и пересекаться по картинке. Низкие объекты не трогаем.
@@ -1352,74 +1100,6 @@ export class Farm {
       f.hit = true; r = 1;
     }
     return r;
-  }
-
-  tileOutline(ctx, x, y, color, lw) {
-    toWorld(x + 0.5, y + 0.5, tmp);
-    ctx.strokeStyle = color; ctx.lineWidth = lw;
-    ctx.beginPath();
-    ctx.moveTo(tmp.x, tmp.y - HH + 1); ctx.lineTo(tmp.x + HW - 2, tmp.y); ctx.lineTo(tmp.x, tmp.y + HH - 1); ctx.lineTo(tmp.x - HW + 2, tmp.y);
-    ctx.closePath(); ctx.stroke();
-  }
-
-  drawBorder(ctx) {
-    const w = this.world;
-    ctx.strokeStyle = 'rgba(255,240,190,0.55)'; ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 5]);
-    ctx.beginPath();
-    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
-      if (!w.unlocked[c]) continue;
-      const cx = c % CHUNKS, cy = (c / CHUNKS) | 0, x0 = cx * CHUNK, y0 = cy * CHUNK;
-      const open = (dx, dy) => { const x = cx + dx, y = cy + dy; return x >= 0 && y >= 0 && x < CHUNKS && y < CHUNKS && w.unlocked[y * CHUNKS + x]; };
-      const seg = (ax, ay, bx, by) => { toWorld(ax, ay, tmp); ctx.moveTo(tmp.x, tmp.y); toWorld(bx, by, tmp); ctx.lineTo(tmp.x, tmp.y); };
-      if (!open(0, -1)) seg(x0, y0, x0 + CHUNK, y0);
-      if (!open(1, 0)) seg(x0 + CHUNK, y0, x0 + CHUNK, y0 + CHUNK);
-      if (!open(0, 1)) seg(x0, y0 + CHUNK, x0 + CHUNK, y0 + CHUNK);
-      if (!open(-1, 0)) seg(x0, y0, x0, y0 + CHUNK);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  drawQueue(ctx) {
-    const p = this.player;
-    const list = p.current && p.current.kind !== 'walk' ? [p.current, ...p.queue] : p.queue;
-    ctx.font = '700 8px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    list.forEach((a, i) => {
-      let x, y;
-      if (a.obj) { const s = this.objSprite(a.obj); x = a.obj.wx; y = a.obj.wy - Math.min(s.ay * 0.7, 60) - 6; }
-      else { toWorld(a.x + 0.5, a.y + 0.5, tmp); x = tmp.x; y = tmp.y - 8; }
-      ctx.fillStyle = 'rgba(61,43,31,0.9)'; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = i === 0 && a === p.current ? '#ffe066' : '#ffffff';
-      ctx.beginPath(); ctx.arc(x, y, 4.8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#3d2b1f'; ctx.fillText(String(i + 1), x, y + 0.3);
-    });
-    ctx.textAlign = 'left';
-  }
-
-  drawSigns(ctx) {
-    const w = this.world, r = this.r;
-    const n = w.unlockedCount();
-    const blocked = n >= HOUSE[this.st.house].chunks;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
-      if (!w.canUnlock(c)) continue;
-      const cx = c % CHUNKS, cy = (c / CHUNKS) | 0;
-      toWorld(cx * CHUNK + CHUNK / 2, cy * CHUNK + CHUNK / 2, tmp);
-      if (!r.visible(tmp.x - 50, tmp.y - 40, 100, 60)) continue;
-      const x = tmp.x, y = tmp.y - 24;
-      const label = blocked ? 'Нужен дом выше' : 'Открыть участок';
-      ctx.font = '700 9px system-ui, sans-serif';
-      const tw = ctx.measureText(label).width, bw = tw + 30;
-      ctx.fillStyle = 'rgba(61,43,31,0.92)';
-      ctx.beginPath(); ctx.roundRect(x - bw / 2 - 2, y - 13, bw + 4, 26, 8); ctx.fill();
-      ctx.fillStyle = blocked ? '#c9b48a' : '#f6d37a';
-      ctx.beginPath(); ctx.roundRect(x - bw / 2, y - 11, bw, 22, 7); ctx.fill();
-      ctx.fillStyle = '#3d2b1f';
-      ctx.fillText(label, x + 8, y + 0.5);
-      if (this.iconImg.lock) ctx.drawImage(this.iconImg.lock, x - bw / 2 + 3, y - 7, 14, 14);
-    }
-    ctx.textAlign = 'left';
   }
 }
 
