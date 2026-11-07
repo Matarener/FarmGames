@@ -6,7 +6,6 @@ export class Perf {
     const cores = navigator.hardwareConcurrency || 4;
     const mem = navigator.deviceMemory || 4;
     const dpr = window.devicePixelRatio || 1;
-    const coarse = matchMedia('(pointer: coarse)').matches;
 
     let tier = 'high';
     if (cores <= 4 || mem <= 3) tier = 'mid';
@@ -15,7 +14,6 @@ export class Perf {
     if (q === 'low' || q === 'mid' || q === 'high') tier = q;
 
     this.tier = tier;
-    this.mobile = coarse;
     this.maxScale = tier === 'low' ? 1 : tier === 'mid' ? 1.5 : 2;
     // выбор графики игроком: high — до x2, mid — x1.5, low — x1 (меньше пикселей — легче видеокарте)
     try { this.gfx = localStorage.getItem('farm.gfx') || 'auto'; } catch { this.gfx = 'auto'; }

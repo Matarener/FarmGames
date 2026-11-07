@@ -109,7 +109,7 @@ export class World {
   walkable(x, y) {
     if (!this.isOpen(x, y)) return false;
     const i = y * N + x;
-    return (this.tiles[i] !== T.WATER || (this.pier && this.pier.has(i))) && this.occ[i] < 0; // по мостику можно ходить
+    return this.tiles[i] !== T.WATER && this.occ[i] < 0;
   }
 
   add(type, gx, gy) {
@@ -263,10 +263,10 @@ export class World {
   }
 
   // Украшения пруда: не объекты (их нельзя рубить и двигать), всегда одинаковые для мира.
-  // Камыш, рогоз и камни — у берега, кувшинки и листья — на воде, мостик — по одному на пруд.
+  // Камыш, рогоз и камни — у берега, кувшинки и листья — на воде.
   genDecor() {
     const rnd = mulberry32(this.seed ^ 0x7f4a7c15), W = T.WATER;
-    this.decor = []; this.pier = new Set();
+    this.decor = [];
     const water = (x, y) => this.inside(x, y) && this.tiles[y * N + x] === W;
     const seen = new Uint8Array(N * N);
     const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];

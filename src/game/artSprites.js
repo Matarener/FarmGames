@@ -93,7 +93,7 @@ export async function loadArt(onProgress) {
   // дикая высокая трава: grass_tall_0, grass_tall_1, ...
   const wildGrass = Object.keys(A).filter((n) => /^grass_tall_\d+$/.test(n)).sort().map((n) => A[n]);
   return {
-    wildGrass, fog, obj, crops, icons, flora, floraIcons, failed,
+    wildGrass, fog, obj, crops, icons, flora, floraIcons,
     sprouts: { tree: A.sprout_tree, bush: A.sprout_bush }, // ростки посаженных растений
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {

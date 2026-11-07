@@ -7,10 +7,9 @@ export class Camera {
     this.bounds = null; // {minX,maxX,minY,maxY}
     this.vx = 0; this.vy = 0;
     this.dragging = false;
-    this.moved = true; // флаг «нужно перерисовать»
   }
 
-  setViewport(w, h) { this.viewW = w; this.viewH = h; this.clamp(); this.moved = true; }
+  setViewport(w, h) { this.viewW = w; this.viewH = h; this.clamp(); }
 
   screenToWorld(sx, sy, out) {
     out.x = (sx - this.viewW / 2) / this.zoom + this.x;
@@ -28,7 +27,6 @@ export class Camera {
     this.x -= dx / this.zoom;
     this.y -= dy / this.zoom;
     this.clamp();
-    this.moved = true;
   }
 
   zoomAt(factor, sx, sy) {
@@ -40,12 +38,11 @@ export class Camera {
     this.x = bx - (sx - this.viewW / 2) / z;
     this.y = by - (sy - this.viewH / 2) / z;
     this.clamp();
-    this.moved = true;
   }
 
   fling(vx, vy) { this.vx = vx; this.vy = vy; }
 
-  centerOn(wx, wy) { this.x = wx; this.y = wy; this.clamp(); this.moved = true; }
+  centerOn(wx, wy) { this.x = wx; this.y = wy; this.clamp(); }
 
   clamp() {
     const b = this.bounds;

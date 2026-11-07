@@ -4,7 +4,6 @@
 
 import { HOUSE, ITEMS, INV_TABS, SHOP, SHOP_TABS, xpToNext, houseNeedChunks } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
-import { fmtTime } from '../game/Farm.js';
 import { QUEST_END } from '../game/quests.js';
 import { MUSIC } from '../engine/Audio.js';
 
@@ -364,7 +363,6 @@ export class UI {
   marketPanel(f) {
     const M = this.mk || (this.mk = { mode: 'sell', tab: 'seeds', sel: null });
     this.openPanel('market', 'Рынок', (body, card) => {
-      const st = f.st;
       const seg = h('div', 'mk-seg');
       for (const [k, name] of [['buy', 'Купить'], ['sell', 'Продать']]) {
         const b = h('button', M.mode === k ? 'on' : '', name);
@@ -557,4 +555,3 @@ export class UI {
 
 function fmtNum(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
 function fmtClock(s) { s = Math.max(0, s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
-export { fmtTime };

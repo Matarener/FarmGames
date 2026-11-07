@@ -35,7 +35,6 @@ export class Mover {
     f.player.queue.length = 0; // очередь дел отменяется: объекты могут переехать
     f.ui.closePopup(); f.ui.closePanel();
     this.hint();
-    f.dirty = true;
   }
 
   exit() {
@@ -43,7 +42,6 @@ export class Mover {
     this.active = false;
     this.sel = null; this.to = null;
     this.f.ui.moveBar(null);
-    this.f.dirty = true;
   }
 
   hint(msg, bad) {
@@ -193,13 +191,11 @@ export class Mover {
     this.to = { gx: tx, gy: ty, ok: c.ok, why: c.why };
     this.hint();
     if (!c.ok) { this.f.sfx('error'); this.f.ui.moveBarShake(); }
-    this.f.dirty = true;
   }
 
   cancel() {
     this.sel = null; this.to = null;
     this.hint();
-    this.f.dirty = true;
   }
 
   place() {
@@ -235,7 +231,6 @@ export class Mover {
     f.sfx('dig');
     this.sel = null; this.to = null;
     this.hint('Готово! Выберите, что ещё передвинуть');
-    f.dirty = true;
     f.changed();
     return true;
   }
@@ -275,7 +270,6 @@ export class Mover {
     f.sfx('dig');
     this.sel = null; this.to = null;
     this.hint(`${s.name}: в рюкзаке. Поставить обратно — нажмите на пустую траву`);
-    f.dirty = true;
     f.changed();
     return true;
   }
@@ -322,7 +316,6 @@ export class Mover {
     }
     f.sfx('dig');
     this.hint(`${it.name}: поставлено`);
-    f.dirty = true;
     f.changed();
     return true;
   }

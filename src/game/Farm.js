@@ -13,7 +13,7 @@ import * as Inv from './inventory.js';
 import * as Wild from './wild.js';
 import * as Flora from './flora.js';
 import { BAR_KIND, barTop } from './bars.js';
-import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 
@@ -30,7 +30,6 @@ export class Farm {
     this.focus = [];
     this.tapFx = null;
     this.time = 0;
-    this.dirty = true;
     this.quests = new Quests(this);
     this.mover = new Mover(this);
     this.groundV = 0; // растёт, когда меняются клетки земли
@@ -255,7 +254,6 @@ export class Farm {
     const out = Wild.wildTick(this.st, this.world, ctx).concat(Wild.treeTick(this.st, this.world, ctx));
     if (!out.length) return;
     if (!quiet) for (const ev of out) { toWorld(ev.x + 0.5, ev.y + 0.5, tmp); this.burst(tmp.x, tmp.y - 6, '#7ccf4f', 6, true); }
-    this.dirty = true;
     this.syncBars(now);
     this.save.schedule(() => this.serialize());
   }
@@ -299,7 +297,7 @@ export class Farm {
         if (o.bare !== bare) { o.bare = bare; changed = true; }
       }
     }
-    if (changed) { w.version++; this.dirty = true; }
+    if (changed) w.version++;
     this.syncBars(now);
   }
 
@@ -382,7 +380,6 @@ export class Farm {
 
   get maxEnergy() { return HOUSE[this.st.house].energy; }
   get canMax() { return HOUSE[this.st.house].can; }
-  get storage() { return STORAGE; }
 
   tickEnergy() {
     const st = this.st, now = Date.now(), period = ENERGY_REGEN_SEC * 1000;
@@ -571,7 +568,6 @@ export class Farm {
     this.sfx('unlock');
     this.addXp(5);
     this.player.celebrate();
-    this.dirty = true;
     this.changed();
     return true;
   }

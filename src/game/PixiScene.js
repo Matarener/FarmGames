@@ -285,8 +285,7 @@ export class PixiScene {
         e = this.decorSp[i] = new PIXI.Sprite();
         toWorld(d.x, d.y, tmp); e.wx = tmp.x; e.wy = tmp.y;
         const flat = d.type === 'lily' || d.type === 'leaves';
-        // мостик чуть «дальше» своей клетки: фермер на нём рисуется поверх
-        if (!flat) e.zIndex = Z(d.type === 'pier' ? d.x + d.y - 0.5 : d.x + d.y, tmp.y);
+        if (!flat) e.zIndex = Z(d.x + d.y, tmp.y);
         (flat ? this.decorC : this.objC).addChild(e);
       }
       if (!w.isOpen(d.gx, d.gy)) s = dimSprite(s);

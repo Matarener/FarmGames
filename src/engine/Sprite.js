@@ -3,7 +3,6 @@
 
 let SCALE = 2;
 export function setSpriteScale(s) { SCALE = s; }
-export function getSpriteScale() { return SCALE; }
 
 export function makeCanvas(w, h) {
   const c = document.createElement('canvas');

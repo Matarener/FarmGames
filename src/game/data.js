@@ -23,9 +23,6 @@ export const FISH = {
 for (const [k, v] of Object.entries(FISH)) v.key = k;
 export const FISH_CATCH = 0.75; // шанс, что рыба не сорвётся
 
-// Всё, что лежит в рюкзаке как еда/товар
-export const GOODS = { ...CROPS, ...FISH };
-
 export const RESOURCES = {
   wood: { name: 'Дерево' },
   stone: { name: 'Камень' },
