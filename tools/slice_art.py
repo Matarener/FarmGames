@@ -29,12 +29,9 @@ SHEETS = {
     'trees_apple_bare': [('tree_apple_bare', 62)],
     'trees_cherry_bare': [('tree_blossom_bare', 62)],
     'trees_sakura_bare': [('tree_sakura_bare', 62)],
-    # отдельные правки кустов (точнее листа): у листа bushes_bare все — запасные
     'bushes_blue_bare': [('bush_blue_bare', 40)], 'bushes_rasp_bare': [('bush_rasp_bare', 40)],
     'bushes_pink_bare': [('bush_pink_bare', 40)], 'bushes_hydra_bare': [('bush_hydra_bare', 40)],
     'bushes_rose_bare': [('bush_rose_bare', 40)], 'bushes_lav_bare': [('bush_lav_bare', 40)],
-    'bushes_bare': [('bush_blue_bare_alt', 40), ('bush_rasp_bare_alt', 40), ('bush_pink_bare_alt', 40),
-                    ('bush_hydra_bare_alt', 40), ('bush_lav_bare_alt', 40), ('bush_rose_bare_alt', 40)],
     # молодые растения (стадия 2 из 3): высота — YOUNG_K от взрослого (YOUNG ниже)
     'young_oak': [('tree_oak_young', 62)], 'young_birch': [('tree_birch_young', 60)],
     'young_sakura': [('tree_sakura_young', 62)], 'young_cherry': [('tree_blossom_young', 62)],
@@ -64,18 +61,21 @@ CROP_UNIFORM = {'cabbage'}  # у кукурузы на 5-й стадии лиш�
 CROP_STAGES = [0, 1, 3, 4]
 CROP_W = 54
 
+# None в списке листа — предмет нарисован, но игре не нужен: его место учитывается, картинка не сохраняется.
+
 # Листы-сетки: каждый предмет в своей ячейке (части предмета могут быть отдельными кусками,
 # например три кувшинки). (имя, ширина в мире, опора): base — центр основания растения,
 # center — середина картинки (плоское на воде), (fx, fy) — доли ширины/высоты.
 GRID_SHEETS = {
+    # пятая ячейка — мостик (мостики убраны из игры)
     'pond_decor': (3, 2, [('pond_cattail', 40, 'base'), ('pond_lily', 56, 'center'), ('pond_rocks', 50, (0.5, 0.7)),
-                          ('pond_reeds', 46, 'base'), ('pond_pier', 77, (0.5, 0.494)), ('pond_leaves', 36, 'center')]),
+                          ('pond_reeds', 46, 'base'), None, ('pond_leaves', 36, 'center')]),
 }
-BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), ('bed_dry_g', 66), ('bed_wet_g', 66)]}
+# грядки: сухая и политая; вторая пара — с травяной каймой (не используется)
+BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), None, None]}
 WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)
-TILE_SHEETS = [('tiles', ['tile_grass', 'tile_flowers', 'tile_soil', 'tile_sand']),
-               ('tiles_water', ['water_0', 'water_lily', 'water_reed', 'water_spark']),
-               ('tiles_path', ['tile_cobble', 'tile_planks', 'tile_sand2', 'tile_soil_wet'])]
+# третья плитка листа — голая земля (грядки рисуются объёмными, плитка не нужна)
+TILE_SHEETS = [('tiles', ['tile_grass', 'tile_flowers', None, 'tile_sand'])]
 
 
 # Иконки интерфейса: листы на тёмном фоне со свечением (не прозрачные) — фон срезаем по контуру.
@@ -254,7 +254,9 @@ def main(only=None):
         if not os.path.exists(os.path.join(SRC, sheet + '.png')): continue
         a = load(sheet)
         boxes, lab = components(a, len(items))
-        for (y0, y1, x0, x1, i), (name, tw) in zip(boxes, items):
+        for (y0, y1, x0, x1, i), item in zip(boxes, items):
+            if item is None: continue
+            name, tw = item
             crop = a[y0:y1, x0:x1].copy()
             crop[lab[y0:y1, x0:x1] != i, 3] = 0
             m = crop[..., 3] > 128
@@ -275,6 +277,7 @@ def main(only=None):
         yy, xx = np.mgrid[0:TH, 0:TW]
         diamond = (np.abs(xx + 0.5 - TW / 2) / (TW / 2) + np.abs(yy + 0.5 - TH / 2) / (TH / 2)) <= 1.0
         for (y0, y1, x0, x1, i), name in zip(boxes, names):
+            if name is None: continue
             inset = 0.045
             w, h = x1 - x0, y1 - y0
             crop = a[y0 + int(h * inset):y1 - int(h * inset), x0 + int(w * inset):x1 - int(w * inset)]
@@ -307,15 +310,17 @@ def main(only=None):
         if not os.path.exists(os.path.join(SRC, sheet + '.png')): continue
         a = load(sheet)
         ch, cw = a.shape[0] // rows, a.shape[1] // cols
-        for n, (name, wu, anchor) in enumerate(items):
+        for n, item in enumerate(items):
+            if item is None: continue
+            name, wu, anchor = item
             r, c = divmod(n, cols)
             cell = a[r * ch:(r + 1) * ch, c * cw:(c + 1) * cw]
             m = cell[..., 3] > 0
             # случайные крошки соседнего предмета ниже/выше пустой полосы — отбрасываем
-            rows = np.where(m.any(1))[0]
-            gaps = np.where(np.diff(rows) > 10)[0]
+            filled = np.where(m.any(1))[0]  # строки ячейки, где что-то нарисовано
+            gaps = np.where(np.diff(filled) > 10)[0]
             if len(gaps):
-                segs = np.split(rows, gaps + 1)
+                segs = np.split(filled, gaps + 1)
                 keep = max(segs, key=len)
                 m[:keep[0]] = False; m[keep[-1] + 1:] = False
                 cell = cell.copy(); cell[..., 3] *= m
