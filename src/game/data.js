@@ -157,6 +157,10 @@ export const HOUSE = [
 export const STORAGE = 999999;
 
 export const START = { coins: 50, gems: 5, energy: 30 };
+
+// Режим тестера (devRules.js): сколько монет/кристаллов можно поставить и предметов выдать за раз,
+// и сколько нажатий по строке версии в «Настройках» его включают
+export const DEV_LIMITS = { wallet: 999999999, item: 99999, quick: [1, 10, 100, 1000], unlockTaps: 7 };
 // Починка бабушкиного колодца: после него воду можно набирать у грядок
 export const WELL_COST = { wood: 5, stone: 4, coins: 15 };
 

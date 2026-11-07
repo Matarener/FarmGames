@@ -666,3 +666,11 @@ body.digging .fab-dig { background: linear-gradient(#ffe48a, #f2b51d); }
 .ng-yes { background: linear-gradient(#f08a6a, #c9452b); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
 @media (max-width: 380px) { .inv-tab { font-size: 12px; gap: 3px; padding: 0 4px; } .inv-tab .ic { width: 15px; height: 15px; } }
 @media (max-width: 350px) { .qt-tab { font-size: 9.5px; } .qt-tab .ic { width: 18px; height: 18px; } }
+
+/* Режим тестера (Настройки → нажатия по версии) */
+.set-ver { margin-top: 14px; padding: 8px 0 2px; text-align: center; font-size: 11.5px; color: #a0806a; user-select: none; -webkit-user-select: none; cursor: default; }
+.dev-row { display: grid; grid-template-columns: auto 1fr 120px auto; align-items: center; gap: 8px; padding: 6px 0; font-size: 14px; }
+.dev-row .ic { width: 22px; height: 22px; object-fit: contain; }
+.dev-num { min-width: 0; width: 100%; height: 38px; padding: 0 8px; border-radius: 10px; border: 2px solid rgba(61,43,31,.5); background: #fff; font: inherit; font-size: 14px; color: var(--ink); }
+.dev-acts .dev-num { flex: 0 0 96px; }
+.inv-cell.dev-none { opacity: .55; }

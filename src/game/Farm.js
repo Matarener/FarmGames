@@ -41,10 +41,13 @@ export class Farm {
     this.quests = new Quests(this);
     this.gifts = new Gifts(this);
     this.wheel = new Wheel(this);
-    // Проверка заданий (только с ?debug в адресе): сдвиг часов заданий и событие (окно «Настройки»)
-    this.devOn = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+    // Режим тестера (окно «Настройки»): монеты, кристаллы, предметы, энергия и проверка заданий —
+    // сдвиг часов заданий и событие. Включается ?debug в адресе или нажатиями по строке версии.
+    this.urlDebug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+    let tester = false;
+    try { tester = localStorage.getItem('farm.tester') === '1'; } catch { /* приватный режим */ }
     this.dev = {};
-    if (this.devOn) { try { this.dev = JSON.parse(localStorage.getItem('farm.dev')) || {}; } catch { this.dev = {}; } }
+    this.setTester(tester, true);
     this.mover = new Mover(this);
     this.groundV = 0; // растёт, когда меняются клетки земли
     // Спрайты и иконки — из картинок художника. Пока они грузятся, игра не запущена (экран загрузки),
@@ -392,6 +395,24 @@ export class Farm {
     try { if (this.hintAsk) localStorage.setItem('farm.hintQ', this.hintAsk); else localStorage.removeItem('farm.hintQ'); } catch { /* приватный режим */ }
     if (on && id && !this.quests.isPinned(id) && this.quests.cards().every((v) => v.id !== id)) this.quests.pin(id);
     this.syncHint();
+  }
+
+  // Режим тестера вкл/выкл (запоминается на устройстве). Выключили — сдвиг часов и событие сбрасываются.
+  setTester(on, init) {
+    this.tester = !!on;
+    if (!init) { try { if (on) localStorage.setItem('farm.tester', '1'); else localStorage.removeItem('farm.tester'); } catch { /* приватный режим */ } }
+    this.devOn = this.urlDebug || this.tester;
+    if (this.devOn) { try { this.dev = JSON.parse(localStorage.getItem('farm.dev')) || {}; } catch { this.dev = {}; } }
+    else if (Object.keys(this.dev).length) { this.dev = {}; try { localStorage.removeItem('farm.dev'); } catch { /* приватный режим */ } }
+    if (!init) { this.quests.tick(); this.changed(); }
+  }
+
+  // Действие режима тестера: fn — правило из devRules.js над st; эффекты (звук, сохранение, HUD) — здесь
+  devDo(fn) {
+    if (!this.devOn) return null;
+    const r = fn(this.st);
+    if (r) { this.sfx('coin'); this.changed(); }
+    return r;
   }
 
   // Настройки разработчика для заданий: { shift: мс к часам, event: id события }
