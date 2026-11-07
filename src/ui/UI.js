@@ -5,6 +5,7 @@
 import { HOUSE, ITEMS, INV_TABS, SHOP, SHOP_TABS, xpToNext, houseNeedChunks } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
 import { QUEST_END } from '../game/quests.js';
+import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -179,6 +180,22 @@ export class UI {
       body.appendChild(h('div', 'pn-sub', q.title));
       body.appendChild(h('div', 'qp-task', `<span>${q.task}</span><b>${n}/${q.goal.n}</b><div class="qc-bar"><i style="width:${(n / q.goal.n) * 100}%"></i></div>`));
       body.appendChild(h('div', 'qp-reward', `Награда: ${this.rewardHtml(q.reward)}`));
+      // В первых заданиях стрелка видна сама, дальше — по переключателю: включили — окно закрывается
+      // и камера едет к цели; стрелка держится, пока задание не сменится
+      if (!done && hasHint(q) && !hintAuto(Q.st.i)) {
+        const on = f.hintOn();
+        const row = h('div', 'set-row tog qp-hint', `${this.ic('hint_arrow', 'ic')}<span>Показать стрелку</span>`);
+        const sw = h('button', 'switch' + (on ? ' on' : ''), '<i></i>');
+        sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', on);
+        row.appendChild(sw);
+        row.onclick = () => {
+          f.askHint(!on);
+          if (on) return this.refreshPanel();
+          this.closePanel();
+          if (f.hint) f.toHint(); else this.toast('Стрелка появится, когда будет что делать');
+        };
+        body.appendChild(row);
+      }
       const b = h('button', 'btn-main', done ? 'Забрать награду' : 'Понятно');
       b.onclick = () => {
         if (!done) return this.closePanel();

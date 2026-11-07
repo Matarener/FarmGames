@@ -359,11 +359,28 @@ export class Farm {
   // в секунду; this.hint — цель или null, hintV растёт, когда цель сменилась (сцена начинает новый прыжок).
   syncHint() {
     const Q = this.quests, p = this.player;
-    const h = this.editor || !p ? null : Hints.questHint(Q.current, Q.done,
+    const h = this.editor || !p || !this.hintOn() ? null : Hints.questHint(Q.current, Q.done,
       { st: this.st, world: this.world, beds: this.beds, px: p.tx, py: p.ty, now: Date.now() }, this.hint);
     if (!Hints.sameHint(h, this.hint)) this.hintV = (this.hintV || 0) + 1;
     this.hint = h;
     this.ui.hint(h && h.kind === 'ui' ? h.ui : null);
+  }
+
+  // Видна ли подсказка: в первых заданиях всегда, дальше — если игрок попросил её в окне задания.
+  // Просьба помнится на устройстве (а не в сохранении фермы) по названию задания: новое задание — снова без стрелки.
+  hintOn() {
+    const Q = this.quests, q = Q.current;
+    if (!q) return false;
+    if (Hints.hintAuto(Q.st.i)) return true;
+    if (this.hintAsk === undefined) { try { this.hintAsk = localStorage.getItem('farm.hintQ'); } catch { this.hintAsk = null; } }
+    return this.hintAsk === q.title;
+  }
+
+  askHint(on) {
+    const q = this.quests.current;
+    this.hintAsk = on && q ? q.title : null;
+    try { if (this.hintAsk) localStorage.setItem('farm.hintQ', this.hintAsk); else localStorage.removeItem('farm.hintQ'); } catch { /* приватный режим */ }
+    this.syncHint();
   }
 
   // Точка цели подсказки в мире (основание объекта, середина клетки или участка)
