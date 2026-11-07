@@ -7,6 +7,7 @@ import * as Inv from '../game/inventory.js';
 import * as Plant from '../game/planting.js';
 import * as R from '../game/questRules.js';
 import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ, MAX_PINS } from '../game/questData.js';
+import { GIFT_TABS, DAILY_GIFT } from '../game/giftData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 
@@ -57,6 +58,7 @@ export class UI {
     $('#btn-bag').onclick = () => this.bagPanel(farm);
     $('#btn-market').onclick = () => this.marketPanel(farm);
     $('#btn-quests').onclick = () => this.questPanel(farm);
+    $('#btn-gift').onclick = () => this.giftPanel(farm, 'daily');
     $('#btn-center').onclick = () => { farm.player.worldPos(this._p = this._p || {}); farm.cam.centerOn(this._p.x, this._p.y - 20); };
     $('#energy-pill').onclick = () => this.bagPanel(farm);
     $('#btn-more').onclick = () => this.toggleMore();
@@ -99,8 +101,8 @@ export class UI {
     if (this._safe) return this._safe;
     const R = this.root.getBoundingClientRect();
     const box = (sel) => { const e = $(sel, this.root); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return r.width ? r : null; };
-    const hud = box('.hud-top'), qc = box('#quest-cards'), nav = box('#btn-bag'), fab = box('#btn-center');
-    const t = Math.max(hud ? hud.bottom : 0, qc ? qc.bottom : 0) - R.top + 4;
+    const hud = box('.hud-top'), qc = box('#quest-cards'), nav = box('#btn-bag'), fab = box('#btn-center'), gift = box('#btn-gift');
+    const t = Math.max(hud ? hud.bottom : 0, qc ? qc.bottom : 0, gift ? gift.bottom : 0) - R.top + 4;
     const b = Math.min(nav ? nav.top : R.bottom, fab ? fab.top : R.bottom) - R.top - 4;
     this._safe = { l: 6, t, r: R.width - 6, b: Math.max(t + 40, b) };
     return this._safe;
@@ -120,6 +122,7 @@ export class UI {
     const pct = Math.min(100, (st.xp / xpToNext(st.level)) * 100).toFixed(1) + '%';
     if (this.last.xp !== pct) { this.last.xp = pct; $('#hud-xp').style.width = pct; }
     this.questCards(f);
+    this.giftTick(f, false);
     this.tick(f);
     const kind = this.panelEl.dataset.kind;
     if (kind && kind !== 'settings' && this.panelOpen) this.refreshPanel();
@@ -129,6 +132,7 @@ export class UI {
   tick(f) {
     const full = f.st.energy >= f.maxEnergy;
     this.set('hud-energy-t', full ? '' : fmtClock(f.energyLeftSec()));
+    this.giftTick(f, true);
     if (this.popupEl.classList.contains('show') && this._popupTick) this._popupTick();
   }
 
@@ -423,6 +427,7 @@ export class UI {
       () => firstQuest && this.questPanel(f, { id: firstQuest.id }),
       () => this.plantPanel(f, null),
       () => this.housePanel(f),
+      () => this.giftPanel(f),
       () => this.settingsPanel(f),
       () => { this.closePanel(); this.toggleMore(true); },
       () => { this.toggleMore(false); this.popup(this.root.clientWidth / 2, this.root.clientHeight / 2, { title: 'Дуб', text: 'Срубить', cost: { wood: 1 }, items: [{ icon: 'axe', label: 'Срубить', sub: '1', onClick() {} }] }); },
@@ -438,7 +443,7 @@ export class UI {
     } finally {
       this.closePanel(); this.closePopup(); this.toggleMore(false);
       Q.seen = seen; // окно задания сюжета помечает его прочитанным — возвращаем как было
-      this.qp = this.mk = this.inv = this.pl = null; // вкладки и выбор в окнах — по умолчанию
+      this.qp = this.mk = this.inv = this.pl = this.gp = null; // вкладки и выбор в окнах — по умолчанию
       this._openT = -1;
       void this.root.offsetHeight; // окна закрылись ещё без анимации
       this.root.classList.remove('warming');
@@ -473,6 +478,7 @@ export class UI {
     return [
       { label: 'Переставить', icon: 'move', open: () => f.mover.enter() },
       { label: 'Дом', icon: 'house', open: () => this.housePanel(f) },
+      { label: 'Подарки', icon: 'gift', open: () => this.giftPanel(f, 'daily'), dot: f.gifts.available() > 0 },
       { label: 'Настройки', icon: 'gear', open: () => this.settingsPanel(f) },
       { label: 'Животные', icon: 'paw', soon: true },
       { label: 'Мастерская', icon: 'build', soon: true },
@@ -488,7 +494,7 @@ export class UI {
     this.closePopup();
     m.innerHTML = '';
     for (const it of this.moreItems(this.farm)) {
-      const b = h('button', 'more-it' + (it.soon ? ' soon' : ''), `${this.ic(it.icon, 'ic mid')}<span>${it.label}</span>${it.soon ? '<i>скоро</i>' : ''}`);
+      const b = h('button', 'more-it' + (it.soon ? ' soon' : ''), `${this.ic(it.icon, 'ic mid')}<span>${it.label}</span>${it.soon ? '<i>скоро</i>' : ''}${it.dot ? '<b class="more-dot"></b>' : ''}`);
       b.onclick = () => {
         if (it.soon) { this.toast(`«${it.label}» появится в следующих обновлениях`); return; }
         this.toggleMore(false); it.open();
@@ -592,7 +598,7 @@ export class UI {
   // Проверка заданий без ожидания настоящих дат (только с ?debug в адресе)
   devQuests(f, body) {
     const d = f.dev, now = f.quests.ctx().now;
-    body.appendChild(h('div', 'pn-sub', 'Проверка заданий'));
+    body.appendChild(h('div', 'pn-sub', 'Проверка заданий и подарков'));
     body.appendChild(h('div', 'pn-text', `Время заданий: ${new Date(now + QUEST_TZ * 3600e3).toISOString().slice(0, 16).replace('T', ' ')} МСК` +
       `${d.shift ? ` (сдвиг ${Math.round(d.shift / 3600e3)} ч)` : ''} · событие: ${d.event ? EVENT_NAME(d.event) : 'по датам'}`));
     const row = h('div', 'gfx-row');
@@ -601,7 +607,100 @@ export class UI {
     btn('+7 дней', () => f.setDev({ shift: (d.shift || 0) + 7 * 86400e3 }));
     btn('Сейчас', () => f.setDev({ shift: 0 }));
     btn('Событие', () => { const i = EVENTS.findIndex((e) => e.id === d.event); f.setDev({ event: i + 1 < EVENTS.length ? EVENTS[i + 1].id : null }); });
+    btn('Подарки заново', () => f.gifts.devReset());
     body.appendChild(row);
+  }
+
+  // ---------- Подарки ----------
+  // Кнопка подарка (под монетами): видна и светится, пока есть подарок, который можно забрать; цифра —
+  // если подарков несколько. Раз в секунду (fromTick) — ещё и наступление нового дня: окно подарков
+  // открыто — оно обновляется, а время до следующего подарка в нём идёт.
+  giftTick(f, fromTick) {
+    const n = f.gifts.available(), open = this.panelOpen && this.panelEl.dataset.kind === 'gifts';
+    if (this.last.gift !== n) {
+      const was = this.last.gift;
+      this.last.gift = n;
+      $('#btn-gift').hidden = !n;
+      document.body.classList.toggle('gift-on', !!n);
+      const badge = $('#gift-badge');
+      badge.hidden = n < 2; badge.textContent = n;
+      this._safe = null;
+      if (fromTick && open && was != null) this.refreshPanel();
+    }
+    if (fromTick && open) { const e = $('#gf-next', this.panelEl); if (e) e.textContent = fmtLeft(f.gifts.daily().next - f.gifts.ctx().now); }
+  }
+
+  // Окно «Подарки»: вкладки-разделы, пока работает только «Ежедневные», остальные — заготовки
+  giftPanel(f, tab) {
+    const S = this.gp || (this.gp = { tab: 'daily' });
+    if (tab) S.tab = tab;
+    this.openPanel('gifts', 'Подарки', (body) => this.giftBody(f, body, S));
+    // сегодняшний день дорожки — на виду (на невысоком экране окно прокручивается к нему)
+    const body = $('.pn-body', this.panelEl), c = $('.gf-day.cur', this.panelEl);
+    if (body && c) {
+      const b = body.getBoundingClientRect(), r = c.getBoundingClientRect();
+      if (r.top < b.top || r.bottom > b.bottom - 80) body.scrollTop += r.top - b.top - b.height / 3;
+    }
+  }
+
+  giftBody(f, body, S) {
+    const v = f.gifts.daily(), row = h('div', 'qt-tabs gf-tabs');
+    for (const t of GIFT_TABS) {
+      const dot = t.key === 'daily' && v.can;
+      const b = h('button', 'qt-tab' + (S.tab === t.key ? ' on' : '') + (t.soon ? ' soon' : ''),
+        `${this.ic(t.icon)}<span>${t.name}</span>${dot ? '<i class="qt-dot"></i>' : ''}${t.soon ? '<i class="qt-soon">скоро</i>' : ''}`);
+      b.onclick = () => {
+        if (t.soon) { this.toast(t.soon); return; }
+        if (S.tab !== t.key) { S.tab = t.key; this.sfx('tap'); this.refreshPanel(); }
+      };
+      row.appendChild(b);
+    }
+    body.appendChild(row);
+    this.giftDaily(f, body, v);
+  }
+
+  // Награда ячейки дня: [{ icon, n }] — монеты, кристаллы, предметы
+  giftParts(r) {
+    return [r.coins && { icon: 'coin', n: r.coins }, r.gems && { icon: 'gem', n: r.gems },
+      ...Object.entries(r.items || {}).map(([id, n]) => ({ icon: ITEMS[id] ? ITEMS[id].icon : id, n }))].filter(Boolean);
+  }
+
+  // Ежедневные: дорожка из 30 дней входа по неделям (7 в ряд: каждый 7-й день — кристаллы, 30-й — сундук),
+  // «Забрать подарок» или время до следующего
+  giftDaily(f, body, v) {
+    const len = v.days.length, got = v.can ? v.idx : v.idx + 1;
+    body.appendChild(h('div', 'qt-head', `<b>Подарки за вход</b><span>${v.open ? `Получено ${got} из ${len}` : ''}</span>`));
+    if (!v.open) {
+      body.appendChild(h('div', 'pn-text', `Ежедневные подарки откроются с ${DAILY_GIFT.level} уровня.`));
+      return;
+    }
+    const grid = h('div', 'gf-days');
+    for (const d of v.days) {
+      const r = d.reward, parts = this.giftParts(r), cur = d.i === v.idx;
+      const cls = `gf-day ${d.state}${r.big ? ' big' : ''}${r.gems && !r.big ? ' gem' : ''}${cur ? ' cur' : ''}${cur && v.can ? ' ready' : ''}${cur && this._gfPop ? ' pop' : ''}`;
+      const items = r.big ? `${this.ic('chest', 'gf-chest')}<div class="gf-list">${parts.map((p) => `<span>${this.ic(p.icon)}${fmtNum(p.n)}</span>`).join('')}</div>` :
+        `<div class="gf-parts n${parts.length}">${parts.map((p) => `<span>${this.ic(p.icon)}<b>${fmtNum(p.n)}</b></span>`).join('')}</div>`;
+      grid.appendChild(h('div', cls, `<i class="gf-n">${r.big ? `${d.i + 1}-й день` : d.i + 1}</i>${items}${d.state === 'got' ? '<i class="gf-ok">✓</i>' : ''}`));
+    }
+    this._gfPop = false;
+    body.appendChild(grid);
+    // кнопка (или время до следующего) прилипает к низу окна: на невысоком экране её видно без прокрутки
+    const act = h('div', 'gf-act');
+    if (v.can) {
+      if (v.missed) body.appendChild(h('div', 'pn-text gf-miss', 'Был пропущен день, поэтому дорожка началась сначала.'));
+      const b = h('button', 'btn-main gf-get', 'Забрать подарок');
+      b.onclick = () => {
+        const r = f.gifts.claimDaily();
+        if (!r) return;
+        this._gfPop = true;
+        this.toast(`Подарок ${r.day}-го дня: +${this.rewardHtml(r.reward)}`, 'good');
+        this.refreshPanel();
+      };
+      act.appendChild(b);
+    } else act.appendChild(h('div', 'gf-wait', `Следующий подарок через <b id="gf-next">${fmtLeft(v.next - f.gifts.ctx().now)}</b>`));
+    body.appendChild(h('div', 'pn-text gf-note', `Заходи каждый день и забирай подарок: каждый 7-й день — кристаллы, а на ${len}-й — сундук с кристаллами. ` +
+      (DAILY_GIFT.resetOnMiss ? 'Пропустишь день — дорожка начнётся с первого дня.' : 'Пропущенные дни не сгорают: следующий подарок ждёт тебя.')));
+    body.appendChild(act);
   }
 
   housePanel(f) {
