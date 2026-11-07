@@ -155,7 +155,7 @@ export class PixiScene {
     const chars = [['a', 'z'], ['A', 'Z'], ['0', '9'], ['а', 'я'], ['А', 'Я'], 'ёЁ +-−–—×·:;!?.,%()/«»"\'№'];
     const font = { fontFamily: 'system-ui, sans-serif', fontWeight: '700' };
     PIXI.BitmapFont.install({ name: 'farm-dark', style: { ...font, fontSize: 11, fill: 0x3d2b1f }, chars, resolution: this.textRes, padding: 2 });
-    PIXI.BitmapFont.install({ name: 'farm-float', style: { ...font, fontSize: 11, fill: 0xfffbe8, stroke: { color: 0x28190f, width: 3, alpha: 0.8 } }, chars, resolution: this.textRes, padding: 3 });
+    PIXI.BitmapFont.install({ name: 'farm-float', style: { ...font, fontSize: 11, fill: 0xfffbe8, stroke: { color: 0x3a2717, width: 3, join: 'round' } }, chars, resolution: this.textRes, padding: 3 });
   }
 
   // спрайт игры → Pixi-спрайт в точке (x, y) — опорной точке спрайта
@@ -831,9 +831,13 @@ export class PixiScene {
       const iconOk = img && img.complete && img.naturalWidth;
       box.ic.visible = !!iconOk;
       if (iconOk) { const t = this.iconTex(img); if (box.ic.texture !== t) { box.ic.texture = t; box.ic.width = 12; box.ic.height = 12; } }
-      const k = fl.t / 1.3, tw = box.tx.width, iw = iconOk ? 12 : 0;
-      box.alpha = k < 0.75 ? 1 : (1 - k) * 4;
-      box.position.set(fl.x - (tw + iw) / 2, fl.y - k * 26);
+      // плавно: быстро всплывает и замедляется (ease-out), в начале мягко «выпрыгивает», в конце тает
+      const k = Math.min(1, fl.t / 1.3), tw = box.tx.width, iw = iconOk ? 12 : 0;
+      const rise = 1 - (1 - k) * (1 - k) * (1 - k);
+      const pop = k < 0.12 ? k / 0.12 : 1, sc = 0.7 + 0.3 * (1 - (1 - pop) * (1 - pop));
+      box.alpha = k < 0.12 ? pop : k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+      box.scale.set(sc);
+      box.position.set(fl.x - (tw + iw) * sc / 2, fl.y - rise * 28);
       box.ic.position.set(tw + 1, -6);
     });
   }
