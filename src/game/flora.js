@@ -56,6 +56,16 @@ export function chopFlora(st, o, now, rng) {
   return { items };
 }
 
+// Срубить росток. Дикий даёт добычу OBJECTS.sapling.wildDrops (1 дерево), свой — саженец обратно.
+// → { items: [{id, n}] }
+export function chopSapling(st, o, rng) {
+  const items = [];
+  if (o.own) { if (FLORA[o.tree]) give(st, items, floraSeedId(o.tree), 1); }
+  else for (const [id, r] of Object.entries(OBJECTS.sapling.wildDrops || {})) give(st, items, id, roll(rng, r));
+  forget(st, o);
+  return { items };
+}
+
 // Растение ушло с клетки (срубили, выкорчевали): забыть его таймер и запись о посадке
 export function forget(st, o) {
   if (st.fruit) delete st.fruit[cell(o)];

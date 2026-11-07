@@ -101,7 +101,7 @@ export const OBJECTS = {
   house:   { name: 'Дом',     static: true, w: 2, h: 2 },
   well:    { name: 'Колодец', static: true },
   // росток, посаженный игроком: o.tree — во что вырастет, o.born — когда посажен (мс)
-  sapling: { name: 'Росток',  hp: 1, action: 'chop', drops: {}, xp: 0 },
+  sapling: { name: 'Росток',  hp: 1, action: 'chop', drops: {}, wildDrops: { wood: [1, 1] }, xp: 0 }, // дикий росток рубится в дерево
   // дикая высокая трава (WILD.grass): срывается руками за один раз
   grass:   { name: 'Высокая трава', hp: 1, action: 'mow', drops: {}, xp: 0 },
 };
