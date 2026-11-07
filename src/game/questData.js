@@ -18,6 +18,8 @@ export const QUEST_XP = 5;
 export const QUEST_TZ = 3;
 // С какого уровня появляются задания дня, недели, месяца и события (не мешают обучению)
 export const PERIODIC_LEVEL = 3;
+// Сколько заданий игрок может закрепить на экране (карточки под ресурсами)
+export const MAX_PINS = 3;
 // Первые задания сюжета показывают стрелку сами (hints.js: HINT_AUTO)
 
 // Ветки. after — задание, после которого ветка открывается (id); у сюжета нет условия.
@@ -268,7 +270,8 @@ export const OLD_TITLES = [
 // ---------------- Задания на день, неделю и месяц ----------------
 // Каждый период из пула берётся count разных заданий (rng), только те, что игроку уже доступны.
 // Шаблон: { id, task, goal: { ev, key?, group? }, n: [база, прибавка за уровень], coins?, gems?, xp?, need?, level? }
-//   task   — {n} заменится на число, {name} — на название культуры
+//   task   — {n} заменится на число, {name} — на название культуры,
+//            {рыбу|рыбы|рыб} — на слово в нужной форме для этого числа (1 рыбу, 2 рыбы, 5 рыб)
 //   goal.key: 'crop' — случайная открытая культура, которая растёт не дольше часа
 //   coins  — монет за каждую единицу цели (округляется до 5), gems — кристаллов за задание
 //   need   — задание откроется после этого задания сюжета или ветки
@@ -277,39 +280,39 @@ export const PERIODS = {
     name: 'День', title: 'Задания дня', icon: 'energy', count: 3, swaps: 1, xp: 5,
     bonus: { gems: 1 }, bonusTask: 'Выполни все задания дня',
     pool: [
-      { id: 'harvest', task: 'Собери {n} урожаев', goal: { ev: 'harvest' }, n: [8, 1], coins: 4 },
+      { id: 'harvest', task: 'Собери {n} {урожай|урожая|урожаев}', goal: { ev: 'harvest' }, n: [8, 1], coins: 4 },
       { id: 'crop', task: 'Собери {n}: {name}', goal: { ev: 'harvest', key: 'crop' }, n: [4, 0.3], coins: 8 },
-      { id: 'plant', task: 'Посади {n} семян', goal: { ev: 'plant' }, n: [8, 1], coins: 3 },
-      { id: 'water', task: 'Полей грядки {n} раз', goal: { ev: 'water' }, n: [8, 1], coins: 3 },
-      { id: 'fish', task: 'Поймай {n} рыб', goal: { ev: 'fish' }, n: [3, 0.3], coins: 10, need: 'story.fishing' },
-      { id: 'chop', task: 'Сруби {n} дерева', goal: { ev: 'chop' }, n: [2, 0.1], coins: 12, need: 'story.wood' },
-      { id: 'pick', task: 'Собери {n} раза плоды с деревьев и кустов', goal: { ev: 'pick' }, n: [3, 0.2], coins: 8, need: 'story.wood' },
-      { id: 'mow', task: 'Скоси {n} травы', goal: { ev: 'mow' }, n: [3, 0.2], coins: 6 },
-      { id: 'sell', task: 'Продай {n} товаров', goal: { ev: 'sell' }, n: [10, 1], coins: 2 },
+      { id: 'plant', task: 'Посади {n} {семя|семени|семян}', goal: { ev: 'plant' }, n: [8, 1], coins: 3 },
+      { id: 'water', task: 'Полей грядки {n} {раз|раза|раз}', goal: { ev: 'water' }, n: [8, 1], coins: 3 },
+      { id: 'fish', task: 'Поймай {n} {рыбу|рыбы|рыб}', goal: { ev: 'fish' }, n: [3, 0.3], coins: 10, need: 'story.fishing' },
+      { id: 'chop', task: 'Сруби {n} {дерево|дерева|деревьев}', goal: { ev: 'chop' }, n: [2, 0.1], coins: 12, need: 'story.wood' },
+      { id: 'pick', task: 'Собери плоды с деревьев и кустов {n} {раз|раза|раз}', goal: { ev: 'pick' }, n: [3, 0.2], coins: 8, need: 'story.wood' },
+      { id: 'mow', task: 'Скоси траву {n} {раз|раза|раз}', goal: { ev: 'mow' }, n: [3, 0.2], coins: 6 },
+      { id: 'sell', task: 'Продай {n} {товар|товара|товаров}', goal: { ev: 'sell' }, n: [10, 1], coins: 2 },
     ],
   },
   week: {
     name: 'Неделя', title: 'Задания недели', icon: 'trophy', count: 4, xp: 15,
     bonus: { gems: 3 }, bonusTask: 'Выполни все задания недели',
     pool: [
-      { id: 'harvest', task: 'Собери {n} урожаев', goal: { ev: 'harvest' }, n: [50, 5], coins: 1, gems: 1 },
+      { id: 'harvest', task: 'Собери {n} {урожай|урожая|урожаев}', goal: { ev: 'harvest' }, n: [50, 5], coins: 1, gems: 1 },
       { id: 'crop', task: 'Собери {n}: {name}', goal: { ev: 'harvest', key: 'crop' }, n: [15, 1], gems: 1 },
-      { id: 'water', task: 'Полей грядки {n} раз', goal: { ev: 'water' }, n: [50, 5], gems: 1 },
-      { id: 'fish', task: 'Поймай {n} рыб', goal: { ev: 'fish' }, n: [15, 1], gems: 1, need: 'story.fishing' },
-      { id: 'pick', task: 'Собери {n} раз плоды с деревьев и кустов', goal: { ev: 'pick' }, n: [12, 1], gems: 1, need: 'story.wood' },
-      { id: 'chop', task: 'Сруби {n} деревьев', goal: { ev: 'chop' }, n: [8, 0.5], gems: 1, need: 'story.wood' },
-      { id: 'earn', task: 'Заработай на рынке {n} монет', goal: { ev: 'earn' }, n: [300, 60], gems: 2 },
+      { id: 'water', task: 'Полей грядки {n} {раз|раза|раз}', goal: { ev: 'water' }, n: [50, 5], gems: 1 },
+      { id: 'fish', task: 'Поймай {n} {рыбу|рыбы|рыб}', goal: { ev: 'fish' }, n: [15, 1], gems: 1, need: 'story.fishing' },
+      { id: 'pick', task: 'Собери плоды с деревьев и кустов {n} {раз|раза|раз}', goal: { ev: 'pick' }, n: [12, 1], gems: 1, need: 'story.wood' },
+      { id: 'chop', task: 'Сруби {n} {дерево|дерева|деревьев}', goal: { ev: 'chop' }, n: [8, 0.5], gems: 1, need: 'story.wood' },
+      { id: 'earn', task: 'Заработай на рынке {n} {монету|монеты|монет}', goal: { ev: 'earn' }, n: [300, 60], gems: 2 },
     ],
   },
   month: {
     name: 'Месяц', title: 'Задания месяца', icon: 'gem', count: 3, xp: 40,
     bonus: { gems: 10 }, bonusTask: 'Выполни все задания месяца',
     pool: [
-      { id: 'harvest', task: 'Собери {n} урожаев', goal: { ev: 'harvest' }, n: [250, 20], gems: 3 },
-      { id: 'fish', task: 'Поймай {n} рыб', goal: { ev: 'fish' }, n: [60, 4], gems: 3, need: 'story.fishing' },
-      { id: 'gold', task: 'Поймай {n} золотых рыбки', goal: { ev: 'fish', key: 'fish_gold' }, n: [3, 0.1], gems: 4, need: 'story.fishing' },
-      { id: 'pick', task: 'Собери {n} раз плоды с деревьев и кустов', goal: { ev: 'pick' }, n: [50, 3], gems: 3, need: 'story.wood' },
-      { id: 'earn', task: 'Заработай на рынке {n} монет', goal: { ev: 'earn' }, n: [2000, 400], gems: 3 },
+      { id: 'harvest', task: 'Собери {n} {урожай|урожая|урожаев}', goal: { ev: 'harvest' }, n: [250, 20], gems: 3 },
+      { id: 'fish', task: 'Поймай {n} {рыбу|рыбы|рыб}', goal: { ev: 'fish' }, n: [60, 4], gems: 3, need: 'story.fishing' },
+      { id: 'gold', task: 'Поймай {n} {золотую рыбку|золотые рыбки|золотых рыбок}', goal: { ev: 'fish', key: 'fish_gold' }, n: [3, 0.1], gems: 4, need: 'story.fishing' },
+      { id: 'pick', task: 'Собери плоды с деревьев и кустов {n} {раз|раза|раз}', goal: { ev: 'pick' }, n: [50, 3], gems: 3, need: 'story.wood' },
+      { id: 'earn', task: 'Заработай на рынке {n} {монету|монеты|монет}', goal: { ev: 'earn' }, n: [2000, 400], gems: 3 },
     ],
   },
 };

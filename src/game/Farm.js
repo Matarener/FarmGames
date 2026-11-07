@@ -362,29 +362,30 @@ export class Farm {
   // Подсказка к заданию (hints.js): куда показать стрелку. Считается после каждого действия и раз
   // в секунду; this.hint — цель или null, hintV растёт, когда цель сменилась (сцена начинает новый прыжок).
   syncHint() {
-    const p = this.player, q = this.quests.focus();
-    const h = this.editor || !p || !this.hintOn(q) ? null : Hints.questHint(q, q.done,
+    const p = this.player, q = this.hintQuest();
+    const h = this.editor || !p || !q ? null : Hints.questHint(q, q.done,
       { st: this.st, world: this.world, beds: this.beds, px: p.tx, py: p.ty, now: Date.now() }, this.hint);
     if (!Hints.sameHint(h, this.hint)) this.hintV = (this.hintV || 0) + 1;
     this.hint = h;
-    this.ui.hint(h && h.kind === 'ui' ? h.ui : null);
+    this.hintQ = q;
+    this.ui.hint(h && h.kind === 'ui' ? h.ui : null, q && q.id);
   }
 
-  // Видна ли подсказка к заданию q (на карточке): в первых заданиях сюжета всегда, дальше — если игрок
-  // попросил её в окне задания. Просьба помнится на устройстве (а не в сохранении фермы) по id задания:
-  // новое задание — снова без стрелки.
-  hintOn(q) {
-    if (!q) return false;
-    if (Hints.hintAuto(q)) return true;
+  // К какому заданию стрелка: о котором игрок попросил в окне задания, иначе — к первым заданиям сюжета
+  // (в них стрелка видна сама). Просьба помнится на устройстве (а не в сохранении фермы) по id задания:
+  // задание сдали — стрелки снова нет.
+  hintQuest(vs = this.quests.views()) {
     if (this.hintAsk === undefined) { try { this.hintAsk = localStorage.getItem('farm.hintQ'); } catch { this.hintAsk = null; } }
-    return this.hintAsk === q.id;
+    return (this.hintAsk && vs.find((v) => v.id === this.hintAsk && !v.claimed)) || vs.find((v) => !v.claimed && Hints.hintAuto(v)) || null;
   }
 
-  // Включить или выключить стрелку к заданию id. Задание со стрелкой встаёт на карточку.
+  hintOn(q) { const h = this.hintQuest(); return !!q && !!h && h.id === q.id; }
+
+  // Включить или выключить стрелку к заданию id. Задание со стрелкой закрепляется на экране, если есть место.
   askHint(on, id) {
     this.hintAsk = on && id ? id : null;
     try { if (this.hintAsk) localStorage.setItem('farm.hintQ', this.hintAsk); else localStorage.removeItem('farm.hintQ'); } catch { /* приватный режим */ }
-    if (on && id) this.quests.pin(id);
+    if (on && id && !this.quests.isPinned(id) && this.quests.cards().every((v) => v.id !== id)) this.quests.pin(id);
     this.syncHint();
   }
 

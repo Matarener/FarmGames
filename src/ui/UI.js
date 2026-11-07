@@ -5,7 +5,7 @@
 import { HOUSE, ITEMS, INV_TABS, SHOP, SHOP_TABS, xpToNext, houseNeedChunks } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
 import * as R from '../game/questRules.js';
-import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ } from '../game/questData.js';
+import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ, MAX_PINS } from '../game/questData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 
@@ -13,7 +13,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const RES_NAMES = { wood: 'Дерево', stone: 'Камень', ore: 'Руда', coins: 'Монеты', gems: 'Кристаллы' };
 // кнопки, к которым может показать стрелка-подсказка (UI.hint)
-const HINT_EL = { quest: '#quest-card', market: '#btn-market' };
+const HINT_EL = { quest: '#btn-quests', market: '#btn-market' };
 // вкладки окна «Задания»: периодические появляются с PERIODIC_LEVEL, «Событие» — пока оно идёт
 const QTABS = [
   { key: 'main', name: 'Основные', icon: 'star' },
@@ -46,10 +46,9 @@ export class UI {
     farm.onIcons = () => { clearTimeout(this._icT); this._icT = setTimeout(() => this.refreshIcons(), 30); };
     $('#btn-bag').onclick = () => this.bagPanel(farm);
     $('#btn-market').onclick = () => this.marketPanel(farm);
-    $('#btn-house').onclick = () => this.housePanel(farm);
+    $('#btn-quests').onclick = () => this.questPanel(farm);
     $('#btn-center').onclick = () => { farm.player.worldPos(this._p = this._p || {}); farm.cam.centerOn(this._p.x, this._p.y - 20); };
     $('#energy-pill').onclick = () => this.bagPanel(farm);
-    $('#quest-card').onclick = () => this.questPanel(farm, { focus: true });
     $('#btn-more').onclick = () => this.toggleMore();
     $('#mb-done').onclick = () => farm.mover.exit();
     $('#mb-cancel').onclick = () => farm.mover.cancel();
@@ -67,15 +66,13 @@ export class UI {
     if (this.icons.hint_arrow) this.root.style.setProperty('--hint-arrow', `url("${this.icons.hint_arrow}")`);
   }
 
-  // Стрелка-подсказка у кнопки интерфейса: 'quest' — карточка задания (забрать награду),
-  // 'market' — рынок (есть что продать), null — убрать. Цель выбирает hints.js.
-  hint(name) {
-    if (this._hint === name) return;
-    const el = (n) => n && $(HINT_EL[n], this.root);
-    const old = el(this._hint);
-    if (old) old.classList.remove('hint');
-    this._hint = name;
-    const e = el(name);
+  // Стрелка-подсказка у кнопки интерфейса: 'quest' — забрать награду (у карточки задания id, а если его
+  // нет на экране — у кнопки «Задания»), 'market' — рынок (есть что продать), null — убрать. Цель выбирает hints.js.
+  hint(name, id) {
+    const e = name === 'quest' ? $(`.quest-card[data-id="${id}"]`, this.root) || $(HINT_EL.quest, this.root) : name && $(HINT_EL[name], this.root);
+    if (this._hintEl === e) return;
+    if (this._hintEl) this._hintEl.classList.remove('hint');
+    this._hintEl = e || null;
     if (e) e.classList.add('hint');
   }
 
@@ -85,7 +82,7 @@ export class UI {
     if (this._safe) return this._safe;
     const R = this.root.getBoundingClientRect();
     const box = (sel) => { const e = $(sel, this.root); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return r.width ? r : null; };
-    const hud = box('.hud-top'), qc = box('#quest-card'), nav = box('#btn-bag'), fab = box('#btn-center');
+    const hud = box('.hud-top'), qc = box('#quest-cards'), nav = box('#btn-bag'), fab = box('#btn-center');
     const t = Math.max(hud ? hud.bottom : 0, qc ? qc.bottom : 0) - R.top + 4;
     const b = Math.min(nav ? nav.top : R.bottom, fab ? fab.top : R.bottom) - R.top - 4;
     this._safe = { l: 6, t, r: R.width - 6, b: Math.max(t + 40, b) };
@@ -105,7 +102,7 @@ export class UI {
     this.set('hud-can', `${st.can}/${f.canMax}`);
     const pct = Math.min(100, (st.xp / xpToNext(st.level)) * 100).toFixed(1) + '%';
     if (this.last.xp !== pct) { this.last.xp = pct; $('#hud-xp').style.width = pct; }
-    this.questCard(f);
+    this.questCards(f);
     this.tick(f);
     const kind = this.panelEl.dataset.kind;
     if (kind && kind !== 'settings' && this.panelOpen) this.refreshPanel();
@@ -152,23 +149,30 @@ export class UI {
   }
 
   // ---------- Задания ----------
-  // Карточка под ресурсами: задание «в фокусе» (Quests.focus — его же показывает стрелка).
-  // Красный кружок — сколько наград можно забрать во всех ветках.
-  questCard(f) {
-    const Q = f.quests, vs = Q.views(), q = Q.focus(vs), n = R.claimable(vs), el = $('#quest-card');
-    const key = q ? `${q.id}:${q.goals.map((g) => g.p).join(',')}:${q.done}:${n}` : 'none';
+  // Карточки заданий под ресурсами (Quests.cards): закреплённые игроком и сюжет, до трёх.
+  // Красный кружок на кнопке «Задания» — сколько наград можно забрать во всех ветках.
+  questCards(f) {
+    const Q = f.quests, vs = Q.views(), list = Q.cards(vs), n = R.claimable(vs);
+    const key = list.map((q) => `${q.id}:${q.goals.map((g) => g.p).join(',')}:${q.done}`).join('|') + '#' + n;
     if (this.last.quest === key) return;
     this.last.quest = key;
-    el.hidden = !q;
-    this._safe = null; // высота карточки могла поменяться
-    if (!q) return;
-    const done = q.done, g = q.goal, pct = (done ? 1 : g.p / g.n) * 100;
-    el.classList.toggle('done', done);
-    // число не отрывается от соседнего слова при переносе: «Полей грядки / 2 раза», а не «Полей грядки 2 / раза»
-    const task = (done ? 'Забрать награду!' : g.task || q.task).replace(/(\d+) /g, '$1 ');
-    const badge = n > 1 || (n === 1 && !done) ? `<i class="qc-badge">${n}</i>` : '';
-    el.innerHTML = `${this.ic(q.icon, 'ic')}<div class="qc-t"><b>${task}</b>` +
-      `<div class="qc-row"><div class="qc-bar"><i style="width:${pct}%"></i></div><span class="qc-n">${done ? '✓' : `${fmtNum(g.p)}/${fmtNum(g.n)}`}</span></div></div>${badge}`;
+    const badge = $('#quests-badge');
+    badge.hidden = !n; badge.textContent = n;
+    const box = $('#quest-cards');
+    box.innerHTML = '';
+    this._safe = null; // высота карточек могла поменяться
+    this._hintEl = null;
+    for (const q of list) {
+      const done = q.done, g = q.goal, pct = (done ? 1 : g.p / g.n) * 100;
+      // число не отрывается от соседнего слова при переносе: «Полей грядки / 2 раза», а не «Полей грядки 2 / раза»
+      const task = (done ? 'Забрать награду!' : g.task || q.task).replace(/(\d+) /g, '$1\u00a0');
+      const el = h('button', 'quest-card' + (done ? ' done' : ''), `${this.ic(q.icon, 'ic')}<div class="qc-t"><b>${task}</b>` +
+        `<div class="qc-row"><div class="qc-bar"><i style="width:${pct}%"></i></div><span class="qc-n">${done ? '✓' : `${fmtNum(g.p)}/${fmtNum(g.n)}`}</span></div></div>`);
+      el.dataset.id = q.id;
+      el.onclick = () => this.questPanel(f, { id: q.id });
+      box.appendChild(el);
+    }
+    if (this.farm) this.hint(this.farm.hint && this.farm.hint.kind === 'ui' ? this.farm.hint.ui : null, this.farm.hintQ && this.farm.hintQ.id);
   }
 
   questDone(v) {
@@ -186,12 +190,10 @@ export class UI {
 
   // Окно «Задания»: вкладки Основные / День / Неделя / Месяц / Событие, в каждой — список,
   // нажатие на задание открывает его целиком (текст, цели, награда, стрелка, «на экран»).
-  // focus: true — сразу задание с карточки; id — это задание. Вкладку и открытое задание помним.
-  questPanel(f, { focus, id } = {}) {
+  // id — сразу это задание (нажали на карточку). Вкладку помним.
+  questPanel(f, { id } = {}) {
     const S = this.qp || (this.qp = { tab: 'main', sel: null });
-    S.sel = null;
-    if (focus) { const q = f.quests.focus(); if (q) S.sel = q.id; }
-    if (id) S.sel = id;
+    S.sel = id || null;
     this.openPanel('quest', 'Задания', (body) => this.questBody(f, body, S));
   }
 
@@ -222,7 +224,7 @@ export class UI {
 
   // Строка задания в списке: иконка, подпись, цель с полоской, справа «Забрать» или ›
   questRow(f, S, v, cap) {
-    const g = v.goal, pct = (v.done ? 1 : g.p / g.n) * 100, pin = f.st.quests.pin === v.id;
+    const g = v.goal, pct = (v.done ? 1 : g.p / g.n) * 100, pin = f.quests.isPinned(v.id);
     const row = h('div', 'ql-row' + (v.claimed ? ' got' : v.done ? ' done' : '') + (pin ? ' pin' : ''),
       `${this.ic(v.icon, 'ic')}<div class="ql-t"><i>${cap}${pin ? ' · на экране' : ''}</i><b>${(v.done ? v.task : g.task || v.task).replace(/(\d+) /g, '$1 ')}</b>` +
       `<div class="qc-row"><div class="qc-bar"><i style="width:${pct}%"></i></div><span class="qc-n">${v.done ? '✓' : `${fmtNum(g.p)}/${fmtNum(g.n)}`}</span></div></div>`);
@@ -307,9 +309,14 @@ export class UI {
           if (f.hint) f.toHint(); else this.toast('Стрелка появится, когда будет что делать');
         }));
       }
-      // сюжет и так на карточке, если игрок не выбрал другое задание
-      const pin = Q.st.pin === v.id;
-      if (v.line !== 'story' || (Q.st.pin && !pin)) body.appendChild(this.qpSwitch('star', 'Показывать на экране', pin, () => { Q.pin(pin ? null : v.id); this.refreshPanel(); }));
+      // сюжет и так на экране, если есть место; закрепить можно до MAX_PINS заданий
+      const pin = Q.isPinned(v.id);
+      if (v.line !== 'story' || pin) {
+        body.appendChild(this.qpSwitch('star', 'Показывать на экране', pin, () => {
+          if (!Q.pin(v.id, !pin)) this.toast(`На экране уже ${MAX_PINS} задания. Сними одно, чтобы закрепить это.`, 'warn');
+          this.refreshPanel();
+        }));
+      }
       if (v.kind === 'day' && R.swapsLeft(f.st, 'day') > 0) {
         const sw = h('button', 'btn-link qp-swap', 'Заменить на другое задание');
         sw.onclick = () => { if (Q.swap(v.id)) { this.toast('Задание заменено'); this.refreshPanel(); } else this.toast('Заменить не на что'); };
@@ -406,7 +413,7 @@ export class UI {
   moreItems(f) {
     return [
       { label: 'Переставить', icon: 'move', open: () => f.mover.enter() },
-      { label: 'Задания', icon: 'note', open: () => this.questPanel(f) },
+      { label: 'Дом', icon: 'house', open: () => this.housePanel(f) },
       { label: 'Настройки', icon: 'gear', open: () => this.settingsPanel(f) },
       { label: 'Животные', icon: 'paw', soon: true },
       { label: 'Мастерская', icon: 'build', soon: true },
