@@ -117,12 +117,14 @@ export class Audio {
   }
 
   // ---------- звуки игры ----------
-  play(name) {
+  // delay — через сколько секунд (щелчки колеса фортуны ставятся в очередь звука все сразу)
+  play(name, delay = 0) {
     if (!this.ctx || this.s.muted || this.s.sfx <= 0 || this.ctx.state !== 'running') return;
-    const t = this.ctx.currentTime + 0.01, B = this.sfxBus, T = (...a) => this.tone(B, ...a), H = (...a) => this.hiss(B, ...a);
+    const t = this.ctx.currentTime + 0.01 + delay, B = this.sfxBus, T = (...a) => this.tone(B, ...a), H = (...a) => this.hiss(B, ...a);
     const v = 0.9 + Math.random() * 0.2; // лёгкий разброс высоты, чтобы не надоедало
     switch (name) {
       case 'tap': T(t, 880 * v, 0.07, { vol: 0.12, type: 'triangle' }); break;
+      case 'tick': T(t, 1900 * v, 0.03, { vol: 0.07, type: 'square', lp: 3200 }); break;
       case 'pop': T(t, 620 * v, 0.09, { vol: 0.16, slide: 1.6 }); break;
       case 'open': T(t, 520, 0.12, { vol: 0.14, type: 'triangle', slide: 1.5 }); T(t + 0.06, 780, 0.12, { vol: 0.1, type: 'triangle' }); break;
       case 'close': T(t, 700, 0.1, { vol: 0.1, type: 'triangle', slide: 0.6 }); break;

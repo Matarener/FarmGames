@@ -355,7 +355,9 @@ button:disabled { cursor: default; }
 /* прогрев окон за экраном загрузки (UI.warmup): без анимаций появления */
 .warming .panel, .warming .panel *, .warming .popup, .warming .popup *, .warming .more-menu, .warming .more-menu * { transition: none !important; animation: none !important; }
 .debug { position: fixed; right: 8px; top: calc(var(--safe-t) + 118px); z-index: 60; background: rgba(0,0,0,.6); color: #0f0; font: 11px monospace; padding: 3px 6px; border-radius: 4px; pointer-events: none; white-space: pre-line; max-width: calc(100vw - 16px); }
-body.gift-on .debug { top: calc(var(--safe-t) + 178px); } /* счётчик FPS не закрывает кнопку подарка */
+/* счётчик FPS не закрывает кнопки подарка и колеса (UI.sideSync) */
+body[data-side="1"] .debug { top: calc(var(--safe-t) + 178px); }
+body[data-side="2"] .debug { top: calc(var(--safe-t) + 248px); }
 
 /* ---------- Планшет ---------- */
 @media (min-width: 700px) and (min-height: 500px) {
@@ -557,6 +559,8 @@ body.digging .fab-dig { background: linear-gradient(#ffe48a, #f2b51d); }
   background: rgba(61,43,31,.8); text-shadow: 0 1px 0 rgba(0,0,0,.3);
 }
 .gift-btn .nav-badge { top: -4px; right: -2px; }
+.wheel-btn img { animation-delay: -1.6s; } /* качается не вместе с подарком */
+.wheel-btn .gift-glow { animation-delay: -.8s; }
 .gift-btn:active img { transform: scale(.92); animation: none; }
 @keyframes gift-glow { 0%, 100% { transform: scale(.78); opacity: .6; } 50% { transform: scale(1.06); opacity: 1; } }
 @keyframes gift-wiggle {
@@ -610,6 +614,41 @@ body.digging .fab-dig { background: linear-gradient(#ffe48a, #f2b51d); }
 .gf-wait b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .gf-miss { color: #8a2e1c; padding-top: 0; }
 .gf-note { font-size: 12px; padding: 0 0 4px; margin-top: -4px; }
+
+/* ---------- Колесо фортуны ---------- */
+.wh-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.wh-box { --wh: min(280px, 74vw, 46vh); position: relative; flex: none; width: var(--wh); height: var(--wh); margin-top: calc(var(--wh) * .06); }
+.wh-wheel { position: absolute; inset: 0; will-change: transform; }
+.wh-wheel > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.wh-prize {
+  position: absolute; left: 50%; top: 0; width: calc(var(--wh) * .2); height: 50%; margin-left: calc(var(--wh) * -.1);
+  transform-origin: 50% 100%; display: flex; flex-direction: column; align-items: center; padding-top: calc(var(--wh) * .11); pointer-events: none;
+}
+.wh-ic { width: calc(var(--wh) * .135); height: calc(var(--wh) * .135); object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,.3)); }
+.wh-prize b {
+  display: flex; align-items: center; gap: 1px; margin-top: 1px; font-size: calc(var(--wh) * .052 + 2px); font-weight: 900; line-height: 1; color: #fff;
+  text-shadow: 0 0 2px #3d2b1f, 1px 1px 0 #3d2b1f, -1px 1px 0 #3d2b1f, 1px -1px 0 #3d2b1f, -1px -1px 0 #3d2b1f;
+}
+.wh-mini { width: calc(var(--wh) * .055); height: calc(var(--wh) * .055); object-fit: contain; }
+.wh-ptr { position: absolute; z-index: 2; left: 50%; top: calc(var(--wh) * -.075); width: calc(var(--wh) * .13); margin-left: calc(var(--wh) * -.065); filter: drop-shadow(0 2px 0 rgba(0,0,0,.25)); }
+.wh-win { opacity: 0; animation: wh-win .45s ease-in-out 6 alternate; }
+@keyframes wh-win { to { opacity: .6; } }
+.wh-ctl { width: 100%; }
+.wh-act { display: flex; gap: 8px; }
+.wh-act .btn-main { margin-top: 0; }
+.wh-btn { flex: 1 1 0; min-width: 0; height: auto; min-height: 56px; padding: 5px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 15px; }
+.wh-btn span { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.wh-btn .ic { width: 20px; height: 20px; vertical-align: 0; }
+.wh-btn small { font-size: 11px; font-weight: 600; opacity: .92; }
+.wh-btn.gem { background: linear-gradient(#8db7ff, #4877dc); }
+.wh-btn.lack { filter: grayscale(.55); opacity: .75; }
+.wh-wrap.spinning .wh-act button { filter: grayscale(.6); opacity: .6; }
+.wh-note { text-align: center; font-size: 12.5px; padding-top: 8px; }
+.wh-note .ic { width: 16px; height: 16px; vertical-align: -3px; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .wh-wrap { flex-direction: row; gap: 18px; }
+  .wh-box { --wh: min(250px, calc(100vh - 120px)); margin: calc(var(--wh) * .07) 0 4px 8px; }
+}
 
 .bench-out { white-space: pre-wrap; font: 12px/1.35 monospace; color: #3d2b1f; margin: 6px 0; user-select: text; }
 .bench-out:empty { display: none; }
