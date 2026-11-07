@@ -2,7 +2,7 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
 import * as Plant from '../game/planting.js';
 import * as R from '../game/questRules.js';
@@ -11,6 +11,10 @@ import { GIFT_TABS, DAILY_GIFT } from '../game/giftData.js';
 import { WHEEL } from '../game/wheelData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
+import * as Dev from '../game/devRules.js';
+
+// версия сборки (tools/build.mjs); при локальном запуске — «локально»
+const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'локально';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -132,7 +136,7 @@ export class UI {
     this.tick(f);
     const kind = this.panelEl.dataset.kind;
     // окно колеса не пересобирается, пока оно крутится (иначе вращение оборвётся)
-    if (kind && kind !== 'settings' && this.panelOpen && !(kind === 'wheel' && this._wspin)) this.refreshPanel();
+    if (kind && kind !== 'settings' && kind !== 'devitems' && this.panelOpen && !(kind === 'wheel' && this._wspin)) this.refreshPanel();
     this.plantBar(f);
   }
 
@@ -588,7 +592,7 @@ export class UI {
         };
         body.appendChild(bt); body.appendChild(out);
       }
-      if (f.devOn) this.devQuests(f, body);
+      if (f.devOn) { this.devWallet(f, body); this.devQuests(f, body); }
       // новая игра — отдельная заметная кнопка; подтверждение прямо на месте
       body.appendChild(h('div', 'pn-sub', 'Игра'));
       const ng = h('div', 'newgame');
@@ -603,10 +607,112 @@ export class UI {
       const idle = () => { ng.innerHTML = ''; const b = h('button', 'btn-main ng-btn', 'Новая игра'); b.onclick = ask; ng.appendChild(b); };
       idle();
       body.appendChild(ng);
+      // строка версии; DEV_LIMITS.unlockTaps нажатий подряд включают режим тестера
+      const ver = h('div', 'set-ver', `Версия ${VERSION}${f.tester ? ' · режим тестера' : ''}`);
+      ver.onclick = () => this.versionTap(f);
+      body.appendChild(ver);
     });
   }
 
-  // Проверка заданий без ожидания настоящих дат (только с ?debug в адресе)
+  versionTap(f) {
+    if (f.tester) return;
+    const now = performance.now(), T = this._verTap = (this._verTap && now - this._verTap.t < 1500) ? this._verTap : { n: 0 };
+    T.n++; T.t = now;
+    const left = DEV_LIMITS.unlockTaps - T.n;
+    if (left > 0) { if (left <= 3) this.toast(`Ещё ${left} — и включится режим тестера`); return; }
+    this._verTap = null;
+    f.setTester(true);
+    this.toast('Режим тестера включён', 'good');
+    this.refreshPanel();
+  }
+
+  // Режим тестера: поставить монеты и кристаллы, полная энергия, выдать предметы
+  devWallet(f, body) {
+    body.appendChild(h('div', 'pn-sub', 'Режим тестера'));
+    for (const [cur, icon, name] of [['coins', 'coin', 'Монеты'], ['gems', 'gem', 'Кристаллы']]) {
+      const row = h('div', 'dev-row', `${this.ic(icon)}<span>${name}</span>`);
+      const inp = h('input', 'dev-num');
+      inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = 0; inp.max = DEV_LIMITS.wallet; inp.value = f.st[cur];
+      const b = h('button', 'btn-s gold', 'Поставить');
+      const go = () => { const r = f.devDo((st) => Dev.setWallet(st, cur, inp.value)); inp.value = f.st[cur]; inp.blur(); if (r) this.toast(`${name}: ${fmtNum(r.to)}`, 'good'); };
+      b.onclick = go;
+      inp.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+      row.append(inp, b);
+      body.appendChild(row);
+    }
+    const row = h('div', 'gfx-row');
+    const en = h('button', 'btn-s', `${this.ic('energy')} Полная энергия`);
+    en.onclick = () => { if (!f.devDo((st) => Dev.fillEnergy(st, f.maxEnergy))) this.toast('Энергия и так полная'); };
+    const items = h('button', 'btn-s gold', `${this.ic('bag')} Выдать предметы`);
+    items.onclick = () => this.devItemsPanel(f);
+    row.append(en, items);
+    if (f.tester) {
+      const off = h('button', 'btn-s', 'Выключить режим');
+      off.onclick = () => { f.setTester(false); this.toast('Режим тестера выключен'); this.refreshPanel(); };
+      row.appendChild(off);
+    }
+    body.appendChild(row);
+  }
+
+  // Окно «Выдать предметы» (режим тестера): все предметы игры по разделам рюкзака, у выбранного —
+  // сколько добавить (+1…+1000 или своё число) и «Убрать все»; «Каждого по 10» — всему разделу сразу
+  devItemsPanel(f) {
+    const S = this.dv || (this.dv = { tab: 'all', sel: null, n: 10 });
+    this.openPanel('devitems', 'Выдать предметы', (body, card) => {
+      const st = f.st, all = Dev.grantable();
+      const tabs = h('div', 'inv-tabs');
+      for (const t of INV_TABS) {
+        if (t.key !== 'all' && !all.some((it) => it.tabs.includes(t.key))) continue;
+        const b = h('button', 'inv-tab' + (S.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
+        b.onclick = () => { if (S.tab !== t.key) { S.tab = t.key; S.sel = null; this.sfx('tap'); this.refreshPanel(); } };
+        tabs.appendChild(b);
+      }
+      body.appendChild(tabs);
+      const list = all.filter((it) => S.tab === 'all' || it.tabs.includes(S.tab)).sort((a, b) => a.order - b.order);
+      const bulk = h('div', 'inv-sort', '<span>Всем в разделе:</span>');
+      for (const n of [10, 100]) {
+        const b = h('button', 'inv-chip', `+${n} каждого`);
+        b.onclick = () => { const r = f.devDo((s) => Dev.grantMany(s, list.map((it) => it.key), n)); if (r) this.toast(`Выдано: ${r.kinds} видов по ${n}`, 'good'); this.refreshPanel(); };
+        bulk.appendChild(b);
+      }
+      body.appendChild(bulk);
+      const g = h('div', 'inv-grid');
+      for (const it of list) {
+        const n = Inv.count(st, it.key);
+        const c = h('button', 'inv-cell' + (S.sel === it.key ? ' sel' : '') + (n ? '' : ' dev-none'),
+          `${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${n ? `<b>${fmtNum(n)}</b>` : ''}`);
+        c.title = it.name;
+        c.onclick = () => { S.sel = S.sel === it.key ? null : it.key; this.sfx('tap'); this.refreshPanel(); };
+        g.appendChild(c);
+      }
+      body.appendChild(g);
+      const it = S.sel && ITEMS[S.sel];
+      if (!it) return;
+      const have = Inv.count(st, it.key);
+      // карточка без описания: на телефоне под ней должны поместиться кнопки
+      const box = this.mkCard({ ...it, desc: `в рюкзаке: ${fmtNum(have)}` }, '', S);
+      const grant = (n) => { const r = f.devDo((s) => Dev.grantItem(s, it.key, n)); if (!r) this.toast('Не получилось добавить', 'warn'); this.refreshPanel(); };
+      const quick = h('div', 'ii-step');
+      for (const n of DEV_LIMITS.quick) { const b = h('button', 'btn-s', '+' + n); b.onclick = () => grant(n); quick.appendChild(b); }
+      const acts = h('div', 'ii-a dev-acts');
+      const inp = h('input', 'dev-num');
+      inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = 1; inp.max = DEV_LIMITS.item; inp.value = S.n;
+      inp.oninput = () => { S.n = Math.max(1, Math.min(DEV_LIMITS.item, Math.floor(+inp.value) || 1)); };
+      const add = h('button', 'btn-s gold', 'Добавить');
+      add.onclick = () => grant(S.n);
+      inp.onkeydown = (e) => { if (e.key === 'Enter') grant(S.n); };
+      const clr = h('button', 'btn-s', 'Убрать все');
+      clr.disabled = !have;
+      clr.onclick = () => { f.devDo((s) => Dev.clearItem(s, it.key)); this.refreshPanel(); };
+      acts.append(inp, add, clr);
+      const wrap = h('div', 'ii-sell');
+      wrap.append(quick, acts);
+      box.appendChild(wrap);
+      card.appendChild(box);
+    });
+  }
+
+  // Проверка заданий без ожидания настоящих дат (режим тестера или ?debug в адресе)
   devQuests(f, body) {
     const d = f.dev, now = f.quests.ctx().now;
     body.appendChild(h('div', 'pn-sub', 'Проверка заданий, подарков и колеса'));
@@ -1211,7 +1317,10 @@ function wheelTicks(from, to, seg, dur, [x1, y1, x2, y2]) {
   }
   return out;
 }
-function fmtNum(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
+function fmtNum(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M';
+  return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n);
+}
 // сколько осталось: «5 ч 12 мин», «2 д 3 ч», «7 мин»
 function fmtLeft(ms) {
   const m = Math.max(1, Math.ceil(ms / 60000)), d = Math.floor(m / 1440), hh = Math.floor((m % 1440) / 60), mm = m % 60;

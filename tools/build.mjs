@@ -28,11 +28,16 @@ cpSync(ART, join(DIST, 'assets', 'art'), { recursive: true });
 let MAP = 'null';
 try { MAP = JSON.stringify(JSON.parse(readFileSync(join(ROOT, 'assets', 'map.json'), 'utf8'))); } catch { /* карты нет */ }
 
+const PKG = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+const VERSION = `${PKG.version} · ${new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 16).replace('T', ' ')}`;
+
 // JS
 const js = await build({
   // manifest, список иконок и карту вшиваем в код: так dist/index.html открывается и без сервера (file://)
   define: {
     __ASSET_V__: JSON.stringify(ASSET_V),
+    // строка версии в «Настройках»: версия из package.json и время сборки (МСК)
+    __VERSION__: JSON.stringify(VERSION),
     __MAP__: MAP,
     // редактор карты — только для локального запуска, в сборку для игроков не попадает
     'window.FARM_EDITOR': 'false',
