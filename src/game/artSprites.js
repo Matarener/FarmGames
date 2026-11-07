@@ -73,8 +73,13 @@ export async function loadArt(onProgress) {
     const s = obj[type] && obj[type][0];
     if (!s || !/^(tree|bush)_/.test(s.name)) continue;
     flora[type] = { bare: A[s.name + '_bare'] || s, young: A[s.name + '_young'] };
-    // file:// не даёт читать пиксели картинок — тогда без своих иконок
-    try { floraIcons['sap_' + type] = floraIcons['own_' + type] = iconOf(s); } catch (e) { /* */ }
+    // иконки в рюкзаке: своё растение — картинка самого растения; саженец — иконка художника
+    // (ic_sap_<вид>), а если её нет — тоже растение. file:// не даёт читать пиксели — тогда без них
+    try {
+      const ic = iconOf(s);
+      floraIcons['own_' + type] = ic;
+      if (!icons['sap_' + type]) floraIcons['sap_' + type] = ic;
+    } catch (e) { /* */ }
   }
   try { floraIcons.path = iconOf(A.tile_path); } catch (e) { /* */ }
   const crops = {};
