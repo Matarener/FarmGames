@@ -6,11 +6,14 @@ import { toWorld, HW, HH } from '../engine/Iso.js';
 import { dimSprite, hash2 } from '../engine/Sprite.js';
 import { N, CHUNK, CHUNKS, T, FOG_W } from './World.js';
 import { HOUSE, FOG } from './data.js';
-import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM } from './bars.js';
+import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop } from './bars.js';
 
 const tmp = { x: 0, y: 0 };
 // кружки с номерами очереди: радиус в мировых единицах и плотность картинки (пикселей на единицу)
 const QBADGE_R = 6.5, QBADGE_RES = 12;
+// Стрелка подсказки: прыжок раз в HINT_HOP с длиной HINT_HOP_T с (между прыжками стоит — игра может
+// уйти в покой с редкими кадрами), высота прыжка; после того как призрак освободился — пауза HINT_WAIT с
+const HINT_HOP = 2.4, HINT_HOP_T = 0.6, HINT_HOP_H = 9, HINT_WAIT = 0.35;
 const ATLAS = 2048, PAD = 6;
 const Z = (depth, wy) => depth * 1e4 + wy * 0.1; // порядок отрисовки: глубина клетки, затем y
 
@@ -140,6 +143,7 @@ export class PixiScene {
     this.barsG = new PIXI.Graphics(); this.over.addChild(this.barsG); this.barsKey = { v: -1, x0: 0, y0: 0, x1: 0, y1: 0 };
     this.queueC = new PIXI.Container(); this.over.addChild(this.queueC);
     this.signsC = new PIXI.Container(); this.over.addChild(this.signsC);
+    this.hintArrow = new PIXI.Sprite(); this.hintArrow.visible = false; this.over.addChild(this.hintArrow); // стрелка над целью задания
     this.moverC = new PIXI.Container(); this.over.addChild(this.moverC);
     this.moverG = new PIXI.Graphics(); this.moverC.addChild(this.moverG);
     this.moverHi = new PIXI.Sprite(); this.moverHi.blendMode = 'add'; this.moverC.addChild(this.moverHi);
@@ -147,6 +151,17 @@ export class PixiScene {
     this.fx = new PIXI.Graphics(); this.over.addChild(this.fx);
     this.floatC = new PIXI.Container(); this.over.addChild(this.floatC);
     this.player = new PlayerView(this); this.objC.addChild(this.player.c);
+    // кольцо вокруг цели задания: задняя половина — под целью, передняя — над ней (сортируются с объектами)
+    this.hintRing = [new PIXI.Sprite(), new PIXI.Sprite()];
+    for (const r of this.hintRing) { r.visible = false; this.objC.addChild(r); }
+    // цель мягко вспыхивает, когда стрелка подпрыгивает: в густом лесу видно, какое именно дерево
+    this.hintGlow = new PIXI.Sprite(); this.hintGlow.blendMode = 'add'; this.hintGlow.visible = false; this.objC.addChild(this.hintGlow);
+    // кружок подсказки у края экрана (цель задания за экраном) — поверх мира, в пикселях экрана
+    this.hintEdge = new PIXI.Container(); this.hintEdge.visible = false; app.stage.addChild(this.hintEdge);
+    this.hintBadge = new PIXI.Sprite(); this.hintIcon = new PIXI.Sprite(); this.hintPtr = new PIXI.Sprite();
+    this.hintIcon.anchor.set(0.5);
+    this.hintEdge.addChild(this.hintPtr, this.hintBadge, this.hintIcon);
+    this.hintMoving = false; this.hintEdgeHit = null; this._ha = 0;
     this.objs = new Map(); this.crops = new Map(); this.bub = new Map();
     this.stamp = 0; this._obTick = 0;
     this.keys = {};
@@ -463,7 +478,7 @@ export class PixiScene {
     const GROUND = ['grass', 'path', 'water'];
     this.makeWaterTex(); this.groundAtlas.tex(this.waterT);
     for (const k of GROUND) for (const v of (S[k] instanceof Map ? S[k].values() : S[k] || [])) this.groundAtlas.tex(v);
-    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k) && k !== 'waterTex') add(v, k !== 'bubble' && k !== 'fog');
+    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k) && k !== 'waterTex') add(v, k !== 'bubble' && k !== 'fog' && k !== 'hint');
     for (const o of w.objects || []) { if (!o) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
     for (const arr of Object.values(S.objArt)) for (const t of arr) for (const id of [0, 1, 3]) { const st = S.stumpOf(t, id); if (st) { this.atlas.tex(st); this.atlas.tex(dimSprite(st)); } }
     for (const im of Object.values(f.iconImg)) if (im.complete && im.naturalWidth) this.iconTex(im);
@@ -683,6 +698,7 @@ export class PixiScene {
     if (f.editor) f.editor.overlay(g, outline);
 
     this.syncQueue();
+    this.syncHint();
     this.syncMover(outline);
     this.syncFx();
     this.syncFloaters();
@@ -724,6 +740,114 @@ export class PixiScene {
       }
       if (any) g.fill(BAR_COLORS[c]);
     }
+  }
+
+  // ---------- подсказка к заданию ----------
+  // Над целью (Farm.hint, считает hints.js) — стрелка, изредка подпрыгивает; на земле под целью — кольцо.
+  // Цель за экраном или под панелями — у края экрана кружок с иконкой и стрелкой в её сторону
+  // (нажатие — камера едет к цели). Пока призрак занят делом, подсказка прячется.
+  syncHint() {
+    const f = this.f, h = f.hint, HS = f.S.hint, cam = f.cam, p = f.player, t = f.time;
+    const dt = Math.min(0.1, Math.max(0, t - (this._hT ?? t))); this._hT = t;
+    if (p.state !== 'idle' || p.queue.length) this._hBusy = t;
+    const want = !!h && h.kind !== 'ui' && !!HS && !f.mover.active && !f.editor && !f.benching && t - (this._hBusy ?? -9) > HINT_WAIT;
+    // новая цель или подсказка снова появилась — сразу прыжок
+    if (this._hV !== f.hintV || (want && !this._hWant)) { this._hV = f.hintV; this._hop0 = t; }
+    this._hWant = want;
+    const A = want ? 1 : 0;
+    this._ha += (A - this._ha) * Math.min(1, dt * 10);
+    if (Math.abs(A - this._ha) < 0.02) this._ha = A;
+    const al = this._ha;
+    if (!al || !h || h.kind === 'ui') {
+      this.hintArrow.visible = this.hintRing[0].visible = this.hintRing[1].visible = this.hintEdge.visible = this.hintGlow.visible = false;
+      this.hintMoving = al > 0 && al < 1; this.hintEdgeHit = null;
+      return;
+    }
+    const ph = (t - this._hop0) % HINT_HOP, hop = ph < HINT_HOP_T ? Math.sin(Math.PI * ph / HINT_HOP_T) : 0;
+    this.hintMoving = hop > 0 || al < 1;
+    // где цель и на какой высоте над ней кончик стрелки (над картинкой, значком грядки, табличкой участка)
+    f.hintPoint(h, tmp);
+    const wx = tmp.x, wy = tmp.y;
+    // ring — размер кольца (1 — на клетку), z — порядок цели среди объектов, glow — картинка цели для вспышки
+    let top = 10, ring = 1.15, z, glow = null;
+    if (h.kind === 'obj') { const o = h.obj; glow = f.objSprite(o); top = barTop(glow) + 6; ring = o.w > 1 ? 2.5 : 1; z = Z(o.depth, o.wy); }
+    else if (h.kind === 'chunk') { top = 40; ring = 0; }
+    else {
+      z = Z(h.x + h.y + 1, wy);
+      const b = f.beds.get(h.y * N + h.x);
+      if (b && b.crop && f.world.tiles[b.i] === T.SOIL) { const fl = f.cropFlags(b); top = fl & 12 ? 54 : 36; glow = f.S.crops[b.crop][fl & 3]; }
+    }
+    // при отдалении стрелка на экране не мельче, чем при зуме 1.15
+    const k = Math.max(1, 1.15 / cam.zoom), tipY = wy - top;
+    const sx = (wx - cam.x) * cam.zoom + cam.viewW / 2, sy = (tipY - cam.y) * cam.zoom + cam.viewH / 2;
+    const sa = f.ui.safeArea();
+    const onScreen = sx > sa.l && sx < sa.r && sy > sa.t + 8 && sy < sa.b;
+    this.hintArrow.visible = onScreen;
+    this.hintRing[0].visible = this.hintRing[1].visible = onScreen && ring > 0;
+    const G = this.hintGlow;
+    G.visible = onScreen && !!glow && hop > 0.02;
+    if (G.visible) {
+      this.put(G, glow, wx, wy);
+      G.alpha = 0.4 * hop * al;
+      if (G.zIndex !== z + 0.004) G.zIndex = z + 0.004;
+    }
+    this.hintEdge.visible = !onScreen;
+    this.hintEdgeHit = null;
+    if (onScreen) {
+      const A2 = this.hintArrow;
+      this.put(A2, HS.arrow, wx, tipY - hop * HINT_HOP_H * k);
+      const t0 = A2.texture, bx = HS.arrow.w / t0.width, by = HS.arrow.h / t0.height;
+      A2.scale.set(bx * k * (1 - 0.06 * hop), by * k * (1 + 0.08 * hop));
+      A2.alpha = al;
+      if (ring > 0) {
+        const rk = ring * (1 + 0.06 * hop);
+        for (let i = 0; i < 2; i++) {
+          const R = this.hintRing[i], s = i ? HS.ringFront : HS.ringBack;
+          this.put(R, s, wx, wy);
+          const t1 = R.texture;
+          R.scale.set(s.w / t1.width * rk, s.h / t1.height * rk);
+          R.alpha = al;
+          const rz = z + (i ? 0.005 : -0.005);
+          if (R.zIndex !== rz) R.zIndex = rz;
+        }
+      }
+      return;
+    }
+    // у края экрана: на луче из середины свободной части экрана к цели
+    const rad = HS.badge.w / 2, cx = (sa.l + sa.r) / 2, cy = (sa.t + sa.b) / 2;
+    let vx = sx - cx, vy = sy - cy;
+    if (!vx && !vy) vy = 1;
+    // запас от края — на кружок и стрелку возле него
+    const hx = Math.max(1, (sa.r - sa.l) / 2 - rad - 16), hy = Math.max(1, (sa.b - sa.t) / 2 - rad - 16);
+    const m = Math.min(hx / Math.max(1e-6, Math.abs(vx)), hy / Math.max(1e-6, Math.abs(vy)));
+    const ex = cx + vx * m, ey = cy + vy * m, ang = Math.atan2(vy, vx);
+    const E = this.hintEdge;
+    E.alpha = al;
+    const pk = 1 + 0.08 * hop;
+    this.put(this.hintBadge, HS.badge, ex, ey);
+    const tb = this.hintBadge.texture;
+    this.hintBadge.scale.set(HS.badge.w / tb.width * pk, HS.badge.h / tb.height * pk);
+    // маленькая стрелка смотрит из кружка на цель (картинка стрелки смотрит вниз)
+    const P = this.hintPtr, d = rad + 14 + hop * 3;
+    this.put(P, HS.arrow, ex + Math.cos(ang) * d, ey + Math.sin(ang) * d);
+    const tp = P.texture;
+    P.scale.set(HS.arrow.w / tp.width * 0.72, HS.arrow.h / tp.height * 0.72);
+    P.rotation = ang - Math.PI / 2;
+    const img = h.icon && f.iconImg[h.icon];
+    this.hintIcon.visible = !!(img && img.complete && img.naturalWidth);
+    if (this.hintIcon.visible) {
+      const it = this.iconTex(img);
+      if (this.hintIcon.texture !== it) this.hintIcon.texture = it;
+      this.hintIcon.width = this.hintIcon.height = rad * 1.25 * pk;
+      this.hintIcon.position.set(ex, ey);
+    }
+    this.hintEdgeHit = { x: ex, y: ey, r: rad + 12 };
+  }
+
+  // Попал ли тап (пиксели экрана) в кружок подсказки у края экрана
+  hintHit(sx, sy) {
+    const e = this.hintEdgeHit;
+    return !!e && this.hintEdge.visible && Math.hypot(sx - e.x, sy - e.y) <= e.r;
   }
 
   // номера в очереди дел: готовые картинки высокого разрешения с мип-картами,

@@ -10,6 +10,8 @@ import { MUSIC } from '../engine/Audio.js';
 const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const RES_NAMES = { wood: 'Дерево', stone: 'Камень', ore: 'Руда', coins: 'Монеты', gems: 'Кристаллы' };
+// кнопки, к которым может показать стрелка-подсказка (UI.hint)
+const HINT_EL = { quest: '#quest-card', market: '#btn-market' };
 
 export class UI {
   constructor(root) {
@@ -24,6 +26,7 @@ export class UI {
     for (const el of root.querySelectorAll('.ui-layer')) el.addEventListener('pointerdown', (e) => e.stopPropagation());
     // нажатие мимо меню «Ещё» закрывает его
     document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#more-menu, #btn-more')) this.toggleMore(false); }, true);
+    window.addEventListener('resize', () => { this._safe = null; });
   }
 
   bind(farm, icons) {
@@ -50,6 +53,33 @@ export class UI {
     for (const img of this.root.querySelectorAll('img[data-icon]')) { const u = this.icons[img.dataset.icon]; if (u) img.src = u; }
     const av = this.root.querySelector('.avatar');
     if (av && this.icons.avatar && !av.querySelector('img')) av.innerHTML = `<img src="${this.icons.avatar}" alt="">`;
+    // стрелка-подсказка у кнопок (style.css: .hint::after)
+    if (this.icons.hint_arrow) this.root.style.setProperty('--hint-arrow', `url("${this.icons.hint_arrow}")`);
+  }
+
+  // Стрелка-подсказка у кнопки интерфейса: 'quest' — карточка задания (забрать награду),
+  // 'market' — рынок (есть что продать), null — убрать. Цель выбирает hints.js.
+  hint(name) {
+    if (this._hint === name) return;
+    const el = (n) => n && $(HINT_EL[n], this.root);
+    const old = el(this._hint);
+    if (old) old.classList.remove('hint');
+    this._hint = name;
+    const e = el(name);
+    if (e) e.classList.add('hint');
+  }
+
+  // Свободная от интерфейса часть экрана (пиксели холста): в ней видна стрелка над целью задания,
+  // а у её края встаёт кружок подсказки. Пересчитывается после поворота экрана и смены карточки задания.
+  safeArea() {
+    if (this._safe) return this._safe;
+    const R = this.root.getBoundingClientRect();
+    const box = (sel) => { const e = $(sel, this.root); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return r.width ? r : null; };
+    const hud = box('.hud-top'), qc = box('#quest-card'), nav = box('#btn-bag'), fab = box('#btn-center');
+    const t = Math.max(hud ? hud.bottom : 0, qc ? qc.bottom : 0) - R.top + 4;
+    const b = Math.min(nav ? nav.top : R.bottom, fab ? fab.top : R.bottom) - R.top - 4;
+    this._safe = { l: 6, t, r: R.width - 6, b: Math.max(t + 40, b) };
+    return this._safe;
   }
 
   ic(name, cls = 'ic') { return `<img class="${cls}" src="${this.icons[name] || ''}" alt="">`; }
@@ -118,6 +148,7 @@ export class UI {
     if (this.last.quest === key) return;
     this.last.quest = key;
     el.hidden = !q;
+    this._safe = null; // высота карточки могла поменяться
     if (!q) return;
     const done = Q.done, pct = (Q.progress() / q.goal.n) * 100;
     el.classList.toggle('done', done);
@@ -265,6 +296,7 @@ export class UI {
   moveBar(st) {
     const bar = $('#move-bar');
     document.body.classList.toggle('moving', !!st);
+    this._safe = null; // нижняя панель прячется и появляется
     bar.hidden = !st;
     if (!st) return;
     const t = $('#mb-text');

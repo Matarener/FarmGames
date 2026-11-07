@@ -13,6 +13,8 @@ import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
 import * as Wild from './wild.js';
 import * as Flora from './flora.js';
+import * as Beds from './beds.js';
+import * as Hints from './hints.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
   CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
@@ -58,6 +60,14 @@ export class Farm {
     // пузыри над грядками — те же иконки: квадрат 24×24 единицы, опора — низ хвостика
     this.S.bubble = {};
     for (const k of ['ready', 'water']) this.S.bubble[k] = { canvas: this.iconImg['bubble_' + k], w: 24, h: 24, ax: 12, ay: 24, name: 'bubble_' + k };
+    // подсказка к заданию: стрелка над целью (опора — кончик), кольцо на земле под целью,
+    // кружок у края экрана (он рисуется в пикселях экрана, остальное — в единицах мира)
+    const hs = (name, w, ax, ay) => {
+      const im = this.iconImg['hint_' + name], h = w * (im.naturalHeight || im.height) / (im.naturalWidth || im.width);
+      return { canvas: im, w, h, ax: w * ax, ay: h * ay, name: 'hint_' + name };
+    };
+    const ring = hs('ring', 48, 0.5, 0.5);
+    this.S.hint = { arrow: hs('arrow', 22, 0.5, 1), ringBack: halfOf(ring, 0), ringFront: halfOf(ring, 1), badge: hs('badge', 46, 0.5, 0.5) };
     // иконки, сделанные из спрайтов (свои растения в рюкзаке, тропинка), — data: URL, грузятся мгновенно
     const fl = Object.entries(a.floraIcons).map(([k, url]) => new Promise((res) => {
       const im = new Image();
@@ -210,6 +220,7 @@ export class Farm {
     this.player.worldPos(tmp);
     this.cam.centerOn(tmp.x, tmp.y - 20);
     this.tickEnergy();
+    this.syncHint();
     this.ui.update(this);
   }
 
@@ -342,7 +353,33 @@ export class Farm {
     };
   }
 
-  changed() { this.syncBars(); this.quests.check(); this.ui.update(this); this.save.schedule(() => this.serialize()); }
+  changed() { this.syncBars(); this.quests.check(); this.syncHint(); this.ui.update(this); this.save.schedule(() => this.serialize()); }
+
+  // Подсказка к заданию (hints.js): куда показать стрелку. Считается после каждого действия и раз
+  // в секунду; this.hint — цель или null, hintV растёт, когда цель сменилась (сцена начинает новый прыжок).
+  syncHint() {
+    const Q = this.quests, p = this.player;
+    const h = this.editor || !p ? null : Hints.questHint(Q.current, Q.done,
+      { st: this.st, world: this.world, beds: this.beds, px: p.tx, py: p.ty, now: Date.now() }, this.hint);
+    if (!Hints.sameHint(h, this.hint)) this.hintV = (this.hintV || 0) + 1;
+    this.hint = h;
+    this.ui.hint(h && h.kind === 'ui' ? h.ui : null);
+  }
+
+  // Точка цели подсказки в мире (основание объекта, середина клетки или участка)
+  hintPoint(h, out) {
+    if (h.kind === 'obj') { out.x = h.obj.wx; out.y = h.obj.wy; return out; }
+    return h.kind === 'chunk' ? toWorld(h.x, h.y, out) : toWorld(h.x + 0.5, h.y + 0.5, out);
+  }
+
+  // Нажали на кружок подсказки у края экрана: камера плавно едет к цели
+  toHint() {
+    const h = this.hint;
+    if (!h || h.kind === 'ui') return;
+    this.hintPoint(h, tmp);
+    this.cam.glideTo(tmp.x, tmp.y - 24);
+    this.sfx('tap');
+  }
 
   bedAt(i) {
     let b = this.beds.get(i);
@@ -356,21 +393,11 @@ export class Farm {
     return b;
   }
 
-  cropInfo(b) {
-    const c = CROPS[b.crop], total = c.time;
-    const ready = b.p >= total;
-    const stage = ready ? 3 : Math.min(2, Math.floor((b.p / total) * 3));
-    const needsWater = !ready && (b.w === 0 || (b.w === 1 && b.p >= total * 2 / 3));
-    return { c, total, ready, stage, needsWater, left: Math.max(0, total - b.p) };
-  }
+  // правила грядок — в beds.js
+  cropInfo(b) { return Beds.cropInfo(b); }
 
   // то же, что cropInfo, без создания объекта (для каждого кадра): стадия | готово<<2 | нужен полив<<3
-  cropFlags(b) {
-    const total = CROPS[b.crop].time, ready = b.p >= total;
-    const stage = ready ? 3 : Math.min(2, Math.floor((b.p / total) * 3));
-    const needsWater = !ready && (b.w === 0 || (b.w === 1 && b.p >= total * 2 / 3));
-    return stage | (ready ? 4 : 0) | (needsWater ? 8 : 0);
-  }
+  cropFlags(b) { return Beds.cropFlags(b); }
 
   grow(dt) {
     for (const b of this.beds.values()) {
@@ -430,6 +457,7 @@ export class Farm {
 
   onTap(sx, sy) {
     this.ui.closePopup();
+    if (this.scene && this.scene.hintHit(sx, sy)) return this.toHint(); // кружок подсказки у края экрана
     this.cam.screenToWorld(sx, sy, tmp);
     toGrid(tmp.x, tmp.y, tmp2);
     const gx = Math.floor(tmp2.x), gy = Math.floor(tmp2.y);
@@ -1028,7 +1056,7 @@ export class Farm {
     this.grow(this._wall ? Math.min(Math.max(0, (now - this._wall) / 1000), 7 * 86400) : dt);
     this._wall = now;
     this._eT = (this._eT || 0) + dt;
-    if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.floraTick(now); this.wildTick(now); this.ui.tick(this); }
+    if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.floraTick(now); this.wildTick(now); this.syncHint(); this.ui.tick(this); }
     this.player.update(dt);
     this.pourWater(dt);
     const OB = this.world.objects;
@@ -1045,7 +1073,9 @@ export class Farm {
   }
 
   isIdle() {
-    return !this.mover.active && this.player.idleTime > 2 && !this.particles.length && !this.floaters.length && !this.tapFx && !this.cam.animating && !this.hover;
+    // стрелка подсказки подпрыгивает изредка: только во время прыжка нужны частые кадры
+    return !this.mover.active && this.player.idleTime > 2 && !this.particles.length && !this.floaters.length && !this.tapFx && !this.cam.animating && !this.hover &&
+      !(this.scene && this.scene.hintMoving);
   }
 
   // ---------------- Отрисовка ----------------
@@ -1067,6 +1097,15 @@ export class Farm {
     }
     return r;
   }
+}
+
+// Половина картинки (0 — верхняя, 1 — нижняя) того же размера: кольцо вокруг цели рисуется
+// задней половиной под объектом, передней — над ним
+function halfOf(s, k) {
+  const im = s.canvas, w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+  const c = makeCanvas(w, h), g = c.getContext('2d'), y0 = Math.round(h / 2);
+  g.drawImage(im, 0, k ? y0 : 0, w, k ? h - y0 : y0, 0, k ? y0 : 0, w, k ? h - y0 : y0);
+  return { ...s, canvas: c, name: s.name + (k ? '_front' : '_back') };
 }
 
 export function fmtTime(sec) {

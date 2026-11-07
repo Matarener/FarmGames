@@ -7,6 +7,7 @@ export class Camera {
     this.bounds = null; // {minX,maxX,minY,maxY}
     this.vx = 0; this.vy = 0;
     this.dragging = false;
+    this.glide = null; // { x, y } — плавный переезд к точке (glideTo)
   }
 
   setViewport(w, h) { this.viewW = w; this.viewH = h; this.clamp(); }
@@ -42,6 +43,9 @@ export class Camera {
 
   fling(vx, vy) { this.vx = vx; this.vy = vy; }
 
+  // Плавно переехать к точке мира (палец на экране или новый бросок — переезд отменяется)
+  glideTo(wx, wy) { this.glide = { x: wx, y: wy }; this.vx = this.vy = 0; }
+
   centerOn(wx, wy) { this.x = wx; this.y = wy; this.clamp(); }
 
   clamp() {
@@ -52,12 +56,20 @@ export class Camera {
   }
 
   update(dt) {
-    if (this.dragging) return;
+    if (this.dragging) { this.glide = null; return; }
+    if (this.glide) {
+      const g = this.glide, k = 1 - Math.exp(-6 * dt), x0 = this.x, y0 = this.y;
+      this.x += (g.x - this.x) * k; this.y += (g.y - this.y) * k;
+      this.clamp();
+      // доехали (или упёрлись в край карты)
+      if (Math.hypot(g.x - this.x, g.y - this.y) < 0.5 || Math.hypot(this.x - x0, this.y - y0) < 0.02) this.glide = null;
+      return;
+    }
     if (Math.abs(this.vx) + Math.abs(this.vy) < 5) { this.vx = this.vy = 0; return; }
     this.panBy(this.vx * dt, this.vy * dt);
     const k = Math.exp(-5 * dt);
     this.vx *= k; this.vy *= k;
   }
 
-  get animating() { return this.vx !== 0 || this.vy !== 0; }
+  get animating() { return this.vx !== 0 || this.vy !== 0 || !!this.glide; }
 }

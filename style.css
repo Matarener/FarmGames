@@ -88,6 +88,18 @@ button:disabled { cursor: default; }
 .qc-bar i { display: block; height: 100%; background: linear-gradient(#9be06a, #5fb03a); border-radius: 4px; }
 .quest-card.done { background: linear-gradient(#fff1b0, #ffd75a); animation: qc-pulse 1.2s ease-in-out infinite; }
 @keyframes qc-pulse { 50% { transform: scale(1.05); } }
+
+/* Стрелка-подсказка у кнопки (UI.hint): задание выполнено — к карточке, есть что продать — к рынку.
+   Анимация только через transform — её считает видеокарта, кадры игры не нужны. */
+.quest-card, .nav-btn { position: relative; }
+.hint::after {
+  content: ''; position: absolute; z-index: 2; pointer-events: none; width: 26px; height: 30px;
+  background: var(--hint-arrow) center / contain no-repeat;
+}
+.nav-btn.hint::after { left: 50%; bottom: calc(100% + 3px); margin-left: -13px; animation: hint-down 1.2s ease-in-out infinite; }
+.quest-card.hint::after { left: calc(100% + 6px); top: 50%; margin-top: -15px; animation: hint-left 1.2s ease-in-out infinite; }
+@keyframes hint-down { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@keyframes hint-left { 0%, 100% { transform: rotate(90deg) translateY(0); } 50% { transform: rotate(90deg) translateY(-7px); } }
 .qp-story { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
 .qp-face { width: 64px; height: 64px; flex: none; }
 .qp-story .ic.big { flex: none; }
