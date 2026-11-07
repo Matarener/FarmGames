@@ -2,7 +2,7 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, SHOP, SHOP_TABS, xpToNext, houseNeedChunks } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, FLORA, xpToNext, houseNeedChunks } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
 import * as R from '../game/questRules.js';
 import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ, MAX_PINS } from '../game/questData.js';
@@ -583,14 +583,39 @@ export class UI {
     });
   }
 
+  // Продажа — как в рюкзаке: разделы и порядок, но только то, что можно продать
   marketSell(f, body, card, M) {
     const st = f.st;
-    const list = Inv.listItems(st, 'all', 'auto').filter((it) => it.sell);
-    if (!list.length) { body.appendChild(h('div', 'pn-empty', 'Пока нечего продать. Соберите урожай с грядок или поймайте рыбу.')); return; }
+    M.stab = M.stab || 'all'; M.sort = M.sort || 'auto';
+    const tabs = h('div', 'inv-tabs c2');
+    for (const t of INV_TABS.filter((t) => SELL_TABS.includes(t.key))) {
+      const b = h('button', 'inv-tab' + (M.stab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
+      b.onclick = () => {
+        if (M.stab === t.key) return;
+        M.stab = t.key;
+        if (M.sel && t.key !== 'all' && !ITEMS[M.sel].tabs.includes(t.key)) M.sel = null;
+        this.sfx('tap'); this.refreshPanel();
+      };
+      tabs.appendChild(b);
+    }
+    body.appendChild(tabs);
+    const sorts = h('div', 'inv-sort', '<span>Порядок:</span>');
+    for (const [k, name] of [['auto', 'Обычный'], ['price', 'По цене'], ['name', 'А–Я']]) {
+      const b = h('button', 'inv-chip' + (M.sort === k ? ' on' : ''), name);
+      b.onclick = () => { if (M.sort !== k) { M.sort = k; this.refreshPanel(); } };
+      sorts.appendChild(b);
+    }
+    body.appendChild(sorts);
+    const list = Inv.listItems(st, M.stab, M.sort).filter((it) => it.sell);
+    if (!list.length) {
+      body.appendChild(h('div', 'pn-empty', M.stab === 'all' ? 'Пока нечего продать. Соберите урожай с грядок или поймайте рыбу.' : 'В этом разделе пока нечего продать.'));
+      M.sel = null; return;
+    }
     const g = h('div', 'mk-grid');
     for (const it of list) {
       const c = h('button', 'mk-cell' + (M.sel === it.key ? ' sel' : ''),
         `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}<b>${fmtNum(Inv.count(st, it.key))}</b></i><span>${it.sell} ${this.ic('coin', 'ic-s')}</span>`);
+      c.title = it.name;
       c.onclick = () => { M.sel = M.sel === it.key ? null : it.key; this.sfx('tap'); this.refreshPanel(); };
       g.appendChild(c);
     }
@@ -604,7 +629,7 @@ export class UI {
 
   marketBuy(f, body, card, M) {
     const st = f.st;
-    const tabs = h('div', 'inv-tabs c2');
+    const tabs = h('div', 'inv-tabs c5');
     for (const t of SHOP_TABS) {
       const b = h('button', 'inv-tab' + (M.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
       b.onclick = () => { if (M.tab !== t.key) { M.tab = t.key; M.sel = null; this.sfx('tap'); this.refreshPanel(); } };
@@ -628,7 +653,7 @@ export class UI {
     const it = ITEMS[o.item], have = Inv.count(st, it.key), pack = o.qty || 1;
     const curKey = o.cur || 'coins', cur = curKey === 'gems' ? 'gem' : 'coin';
     const per = pack > 1 ? `${o.price} ${this.ic(cur)} за ${pack} шт.` : `${o.price} ${this.ic(cur)} за шт.`;
-    const box = this.mkCard(it, `${per}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
+    const box = this.mkCard(it, `${per}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${it.floraOf && FLORA[it.floraOf].pick ? ` · плоды: ${ITEMS[FLORA[it.floraOf].fruit].name.toLowerCase()} по ${ITEMS[FLORA[it.floraOf].fruit].sell} ${this.ic('coin')}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
     if (o.level > st.level) box.appendChild(h('div', 'ii-note', `Откроется с ${o.level} уровня.`));
     else {
       const max = Math.min(99, Math.floor(st[curKey] / o.price));

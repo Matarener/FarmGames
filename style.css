@@ -244,7 +244,7 @@ button:disabled { cursor: default; }
 /* разделы переносятся на вторую строку, а не прокручиваются: на компьютере мышью вбок не прокрутить */
 .inv-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-bottom: 6px; }
 .inv-tabs.c2 { grid-template-columns: repeat(2, 1fr); }
-@media (min-width: 700px) { .inv-tabs.c2 { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 700px) { .inv-tabs.c2 { grid-template-columns: repeat(4, 1fr); } .inv-tabs.c5 { grid-template-columns: repeat(5, 1fr); } }
 .inv-tab {
   min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 36px; padding: 0 6px; white-space: nowrap; border-radius: 18px;
   background: var(--paper-2); border: 2px solid transparent; font-size: 13px; color: #5a4434;

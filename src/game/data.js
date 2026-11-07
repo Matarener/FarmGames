@@ -182,6 +182,9 @@ export const INV_TABS = [
   { key: 'res',    name: 'Ресурсы',     icon: 'wood' },
 ];
 
+// Разделы на вкладке «Продать» рынка (инструменты и постройки не продаются)
+export const SELL_TABS = ['all', 'plants', 'food', 'res'];
+
 // Инструменты есть всегда, их не считают и не продают
 export const TOOLS = {
   tool_axe:    { name: 'Топор',  icon: 'axe',  desc: 'Рубит деревья, кусты и пни. Удар стоит 1 энергию.' },
@@ -238,6 +241,7 @@ for (const it of Object.values(ITEMS)) it.order = _ord++;
 export const SHOP_TABS = [
   { key: 'food',  name: 'Еда',       icon: 'food' },
   { key: 'seeds', name: 'Семена',    icon: 'seed' },
+  { key: 'trees', name: 'Саженцы',   icon: 'sap_apple' },
   { key: 'res',   name: 'Ресурсы',   icon: 'wood' },
   { key: 'build', name: 'Постройки', icon: 'build' },
 ];
@@ -246,6 +250,16 @@ export const SHOP = [];
 // cur — валюта ('coins' или 'gems'), qty — сколько штук в одной покупке
 for (const [k, f] of Object.entries(SHOP_FOOD)) SHOP.push({ tab: 'food', item: k, price: f.price, level: f.level });
 for (const c of Object.values(CROPS)) SHOP.push({ tab: 'seeds', item: seedId(c.key), price: c.seed, level: c.level });
+// Саженцы плодовых деревьев и кустов (FLORA с pick). Окупаются за несколько сборов,
+// зато плодоносят без конца; кусты дешевле и растут быстрее, деревья дают больше.
+export const SAPLING_SHOP = {
+  rosehip:   { price: 20, level: 2 },
+  raspberry: { price: 30, level: 3 },
+  blueberry: { price: 35, level: 4 },
+  cherry:    { price: 60, level: 5 },
+  apple:     { price: 75, level: 6 },
+};
+for (const [sp, o] of Object.entries(SAPLING_SHOP)) if (FLORA[sp] && FLORA[sp].pick) SHOP.push({ tab: 'trees', item: floraSeedId(sp), price: o.price, level: o.level });
 SHOP.push({ tab: 'res', item: 'stone', price: 4 });
 SHOP.push({ tab: 'res', item: 'wood', price: 1, cur: 'gems', qty: 10 });
 SHOP.push({ tab: 'res', item: 'ore', price: 1, cur: 'gems', qty: 3 });
