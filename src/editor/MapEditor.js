@@ -488,7 +488,7 @@ export class MapEditor {
     try {
       if (tool.tile === T.GRASS) s = S.grass[0];
       else if (tool.tile === T.PATH) s = S.path[0];
-      else if (tool.tile === T.SOIL) s = S.bed ? S.bed.plain[0] : S.soil[0];
+      else if (tool.tile === T.SOIL) s = S.bed[0];
       else if (tool.obj && tool.obj !== 'forest' && tool.obj !== 'fogforest') s = f.objSprite({ type: tool.obj, id: 0 });
       else if (tool.obj === 'forest' || tool.obj === 'fogforest') s = f.objSprite({ type: 'pine', id: 1 });
     } catch { s = null; }

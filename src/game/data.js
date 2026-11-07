@@ -1,30 +1,27 @@
 // Игровые таблицы. Все числа баланса — здесь.
 
 export const CROPS = {
-  carrot:     { name: 'Морковь',   level: 1,  seed: 2,   time: 120,   sell: 5,   xp: 1,  food: 3,  look: 'root',   leaf: '#4f9e36', fruit: '#f08a24' },
-  wheat:      { name: 'Пшеница',   level: 2,  seed: 3,   time: 240,   sell: 8,   xp: 2,  food: 2,  look: 'grain',  leaf: '#7cbf3a', fruit: '#e8c14a' },
-  beet:       { name: 'Свёкла',    level: 3,  seed: 5,   time: 480,   sell: 14,  xp: 3,  food: 4,  look: 'root',   leaf: '#3f8a2f', fruit: '#b5285f' },
-  cabbage:    { name: 'Капуста',   level: 4,  seed: 8,   time: 900,   sell: 22,  xp: 4,  food: 5,  look: 'round',  leaf: '#5fb03a', fruit: '#8fd35c', fruit2: '#d6f5a8' },
-  tomato:     { name: 'Помидор',   level: 5,  seed: 15,  time: 1800,  sell: 40,  xp: 7,  food: 6,  look: 'bush',   leaf: '#3f8a2f', fruit: '#e2392f' },
-  corn:       { name: 'Кукуруза',  level: 7,  seed: 25,  time: 3600,  sell: 70,  xp: 12, food: 8,  look: 'tall',   leaf: '#5fb03a', fruit: '#f2c230' },
-  sunflower:  { name: 'Подсолнух', level: 8,  seed: 30,  time: 5400,  sell: 90,  xp: 15, food: 0,  look: 'tall',   leaf: '#4f9e36', fruit: '#ffcf33' },
-  pumpkin:    { name: 'Тыква',     level: 10, seed: 50,  time: 10800, sell: 160, xp: 25, food: 12, look: 'ground', leaf: '#4f9e36', fruit: '#f08a24' },
-  strawberry: { name: 'Клубника',  level: 12, seed: 80,  time: 21600, sell: 280, xp: 40, food: 10, look: 'bush',   leaf: '#3f8a2f', fruit: '#e8334a' },
-  cotton:     { name: 'Хлопок',    level: 14, seed: 100, time: 28800, sell: 360, xp: 50, food: 0,  look: 'puff',   leaf: '#4f9e36', fruit: '#ffffff' },
+  carrot:     { name: 'Морковь',   level: 1,  seed: 2,   time: 120,   sell: 5,   xp: 1,  food: 3 },
+  wheat:      { name: 'Пшеница',   level: 2,  seed: 3,   time: 240,   sell: 8,   xp: 2,  food: 2 },
+  beet:       { name: 'Свёкла',    level: 3,  seed: 5,   time: 480,   sell: 14,  xp: 3,  food: 4 },
+  cabbage:    { name: 'Капуста',   level: 4,  seed: 8,   time: 900,   sell: 22,  xp: 4,  food: 5 },
+  tomato:     { name: 'Помидор',   level: 5,  seed: 15,  time: 1800,  sell: 40,  xp: 7,  food: 6 },
+  corn:       { name: 'Кукуруза',  level: 7,  seed: 25,  time: 3600,  sell: 70,  xp: 12, food: 8 },
+  sunflower:  { name: 'Подсолнух', level: 8,  seed: 30,  time: 5400,  sell: 90,  xp: 15, food: 0 },
+  pumpkin:    { name: 'Тыква',     level: 10, seed: 50,  time: 10800, sell: 160, xp: 25, food: 12 },
+  strawberry: { name: 'Клубника',  level: 12, seed: 80,  time: 21600, sell: 280, xp: 40, food: 10 },
+  cotton:     { name: 'Хлопок',    level: 14, seed: 100, time: 28800, sell: 360, xp: 50, food: 0 },
 };
 for (const [k, v] of Object.entries(CROPS)) v.key = k;
 
 // Рыба из пруда: хранится вместе с урожаем, её можно съесть или продать
 export const FISH = {
-  fish_carp:   { name: 'Карась',        chance: 60, sell: 4,  food: 3, xp: 1, color: '#c9a24a', belly: '#f0d98a' },
-  fish_perch:  { name: 'Окунь',         chance: 30, sell: 8,  food: 5, xp: 2, color: '#6f9a4a', belly: '#d9e8a0', stripes: true },
-  fish_gold:   { name: 'Золотая рыбка', chance: 10, sell: 40, food: 8, xp: 5, color: '#f29a1d', belly: '#ffd75a' },
+  fish_carp:   { name: 'Карась',        chance: 60, sell: 4,  food: 3, xp: 1 },
+  fish_perch:  { name: 'Окунь',         chance: 30, sell: 8,  food: 5, xp: 2 },
+  fish_gold:   { name: 'Золотая рыбка', chance: 10, sell: 40, food: 8, xp: 5 },
 };
 for (const [k, v] of Object.entries(FISH)) v.key = k;
 export const FISH_CATCH = 0.75; // шанс, что рыба не сорвётся
-
-// Всё, что лежит в рюкзаке как еда/товар
-export const GOODS = { ...CROPS, ...FISH };
 
 export const RESOURCES = {
   wood: { name: 'Дерево' },
@@ -39,21 +36,20 @@ export const RESOURCES = {
 // Рубка даёт дерево (wood), добычу (у pick — если плоды висят) и с шансом seedChop — саженец
 // этого вида. Сбором саженцы не добываются.
 // grow — сколько секунд растёт посаженное игроком семя до взрослого растения.
-// group — старое имя группы (карта v1, рисованная кодом графика).
 export const FLORA = {
-  oak:       { name: 'Дуб',       kind: 'tree', group: 'oak',   fruit: 'acorn',        n: [1, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, grow: 3 * 3600 },
-  birch:     { name: 'Берёза',    kind: 'tree', group: 'oak',   fruit: 'birch_bark',   n: [1, 2], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, grow: 3 * 3600 },
-  sakura:    { name: 'Сакура',    kind: 'tree', group: 'oak2',  fruit: 'sakura_petal', n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, grow: 4 * 3600 },
-  cherry:    { name: 'Вишня',     kind: 'tree', group: 'oak2',  pick: true, fruit: 'cherry',       n: [2, 4], regrow: 3 * 3600, wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, grow: 4 * 3600 },
-  maple:     { name: 'Клён',      kind: 'tree', group: 'oak2',  fruit: 'maple_leaf',   n: [2, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, grow: 3 * 3600 },
-  apple:     { name: 'Яблоня',    kind: 'tree', group: 'apple', pick: true, fruit: 'apple',        n: [2, 4], regrow: 3 * 3600, wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, grow: 4 * 3600 },
-  pine:      { name: 'Ель',       kind: 'tree', group: 'pine',  fruit: 'pinecone',     n: [1, 3], wood: [3, 5], hp: 4, xp: 3, seedChop: 0.25, grow: 3 * 3600 },
-  blueberry: { name: 'Голубика',  kind: 'bush', group: 'berry', pick: true, fruit: 'blueberry',    n: [2, 4], regrow: 1.5 * 3600, wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
-  raspberry: { name: 'Малина',    kind: 'bush', group: 'berry', pick: true, fruit: 'raspberry',    n: [2, 4], regrow: 1.5 * 3600, wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
-  rosehip:   { name: 'Шиповник',  kind: 'bush', group: 'bush',  pick: true, fruit: 'rosehip',      n: [2, 3], regrow: 2 * 3600, wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
-  hydrangea: { name: 'Гортензия', kind: 'bush', group: 'bush',  fruit: 'hydrangea',    n: [1, 2], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
-  lavender:  { name: 'Лаванда',   kind: 'bush', group: 'bush',  fruit: 'lavender',     n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
-  rose:      { name: 'Роза',      kind: 'bush', group: 'bush',  fruit: 'rose_petal',   n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
+  oak:       { name: 'Дуб',       kind: 'tree', fruit: 'acorn',        n: [1, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, grow: 3 * 3600 },
+  birch:     { name: 'Берёза',    kind: 'tree', fruit: 'birch_bark',   n: [1, 2], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, grow: 3 * 3600 },
+  sakura:    { name: 'Сакура',    kind: 'tree', fruit: 'sakura_petal', n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, grow: 4 * 3600 },
+  cherry:    { name: 'Вишня',     kind: 'tree', fruit: 'cherry',       n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
+  maple:     { name: 'Клён',      kind: 'tree', fruit: 'maple_leaf',   n: [2, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, grow: 3 * 3600 },
+  apple:     { name: 'Яблоня',    kind: 'tree', fruit: 'apple',        n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
+  pine:      { name: 'Ель',       kind: 'tree', fruit: 'pinecone',     n: [1, 3], wood: [3, 5], hp: 4, xp: 3, seedChop: 0.25, grow: 3 * 3600 },
+  blueberry: { name: 'Голубика',  kind: 'bush', fruit: 'blueberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
+  raspberry: { name: 'Малина',    kind: 'bush', fruit: 'raspberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
+  rosehip:   { name: 'Шиповник',  kind: 'bush', fruit: 'rosehip',      n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600,     pick: true, regrow: 2 * 3600 },
+  hydrangea: { name: 'Гортензия', kind: 'bush', fruit: 'hydrangea',    n: [1, 2], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
+  lavender:  { name: 'Лаванда',   kind: 'bush', fruit: 'lavender',     n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
+  rose:      { name: 'Роза',      kind: 'bush', fruit: 'rose_petal',   n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
 };
 for (const [k, v] of Object.entries(FLORA)) v.key = k;
 
@@ -70,22 +66,22 @@ export function floraByGroup(type, id) {
 }
 
 // Плоды и прочее, что даёт растение. food — энергия (можно съесть), sell — цена продажи.
-// look/color — для временных иконок, нарисованных кодом.
+// color — цвет брызг, когда плоды собирают.
 export const FLORA_GOODS = {
-  acorn:        { name: 'Жёлудь',          sell: 2, look: 'nut',    color: '#b9803f', desc: 'Жёлуди с дуба. Пригодятся для поделок.' },
-  birch_bark:   { name: 'Берёста',         sell: 3, look: 'bark',   color: '#f2eee2', desc: 'Кора берёзы. Пригодится для поделок.' },
-  sakura_petal: { name: 'Лепестки сакуры', sell: 6, look: 'petals', color: '#f7a8c8', desc: 'Нежные лепестки сакуры.' },
-  cherry:       { name: 'Вишня',           sell: 4, food: 2, look: 'cherry', color: '#c8213a', desc: 'Спелая вишня. Можно съесть или продать.' },
-  maple_leaf:   { name: 'Кленовый лист',   sell: 3, look: 'leaf',   color: '#ef7d22', desc: 'Яркий осенний лист клёна.' },
-  apple:        { name: 'Яблоко',          sell: 5, food: 4, look: 'apple',  color: '#e2392f', desc: 'Сочное яблоко. Можно съесть или продать.' },
-  pinecone:     { name: 'Шишка',           sell: 2, look: 'cone',   color: '#9a6538', desc: 'Еловая шишка. Пригодится для поделок.' },
-  blueberry:    { name: 'Голубика',        sell: 3, food: 2, look: 'berry',  color: '#3f5fc8', desc: 'Горсть голубики. Можно съесть или продать.' },
-  raspberry:    { name: 'Малина',          sell: 3, food: 2, look: 'berry',  color: '#e0335a', desc: 'Сладкая малина. Можно съесть или продать.' },
-  rosehip:      { name: 'Шиповник',        sell: 3, food: 1, look: 'hip',    color: '#e2552f', desc: 'Плоды шиповника. Полезные, но кислые.' },
-  hydrangea:    { name: 'Гортензия',       sell: 4, look: 'flower', color: '#6f8fe8', desc: 'Пышные цветы гортензии.' },
-  lavender:     { name: 'Лаванда',         sell: 4, look: 'spike',  color: '#9b6fd6', desc: 'Душистые веточки лаванды.' },
-  rose_petal:   { name: 'Лепестки розы',   sell: 5, look: 'petals', color: '#e8406a', desc: 'Ароматные лепестки розы.' },
-  hay:          { name: 'Сено',            sell: 1, look: 'spike',  color: '#d9b44a', desc: 'Скошенная дикая трава. Пригодится для животных.' },
+  acorn:        { name: 'Жёлудь',          sell: 2,          color: '#b9803f', desc: 'Жёлуди с дуба. Пригодятся для поделок.' },
+  birch_bark:   { name: 'Берёста',         sell: 3,          color: '#f2eee2', desc: 'Кора берёзы. Пригодится для поделок.' },
+  sakura_petal: { name: 'Лепестки сакуры', sell: 6,          color: '#f7a8c8', desc: 'Нежные лепестки сакуры.' },
+  cherry:       { name: 'Вишня',           sell: 4, food: 2, color: '#c8213a', desc: 'Спелая вишня. Можно съесть или продать.' },
+  maple_leaf:   { name: 'Кленовый лист',   sell: 3,          color: '#ef7d22', desc: 'Яркий осенний лист клёна.' },
+  apple:        { name: 'Яблоко',          sell: 5, food: 4, color: '#e2392f', desc: 'Сочное яблоко. Можно съесть или продать.' },
+  pinecone:     { name: 'Шишка',           sell: 2,          color: '#9a6538', desc: 'Еловая шишка. Пригодится для поделок.' },
+  blueberry:    { name: 'Голубика',        sell: 3, food: 2, color: '#3f5fc8', desc: 'Горсть голубики. Можно съесть или продать.' },
+  raspberry:    { name: 'Малина',          sell: 3, food: 2, color: '#e0335a', desc: 'Сладкая малина. Можно съесть или продать.' },
+  rosehip:      { name: 'Шиповник',        sell: 3, food: 1, color: '#e2552f', desc: 'Плоды шиповника. Полезные, но кислые.' },
+  hydrangea:    { name: 'Гортензия',       sell: 4,          color: '#6f8fe8', desc: 'Пышные цветы гортензии.' },
+  lavender:     { name: 'Лаванда',         sell: 4,          color: '#9b6fd6', desc: 'Душистые веточки лаванды.' },
+  rose_petal:   { name: 'Лепестки розы',   sell: 5,          color: '#e8406a', desc: 'Ароматные лепестки розы.' },
+  hay:          { name: 'Сено',            sell: 1,          color: '#d9b44a', desc: 'Скошенная дикая трава. Пригодится для животных.' },
 };
 for (const [k, v] of Object.entries(FLORA_GOODS)) v.key = k;
 export const floraSeedId = (sp) => 'sap_' + sp;

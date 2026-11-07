@@ -1,96 +1,71 @@
-// Сцена фермы: состояние игрока, взаимодействия, рост растений, отрисовка мира.
+// Ферма: состояние игрока, правила взаимодействий (тапы, очередь действий, рост, урожай, рынок)
+// и набор спрайтов из картинок художника. Рисует её PixiScene, интерфейс — UI.
 
-import { toWorld, toGrid, HW, HH } from '../engine/Iso.js';
-import { dimSprite, hash2, makeCanvas } from '../engine/Sprite.js';
-import { World, N, CHUNK, CHUNKS, T, START_CHUNK } from './World.js';
+import { toWorld, toGrid } from '../engine/Iso.js';
+import { makeCanvas } from '../engine/Sprite.js';
+import { World, N, CHUNK, CHUNKS, T } from './World.js';
 import { Player } from './Player.js';
 import { makeGhostData, ROD_TIP } from './ghost.js';
-import * as art from './art.js';
+import { shoreTile } from './shore.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
 import * as Wild from './wild.js';
 import * as Flora from './flora.js';
-import { BAR_KIND, BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop } from './bars.js';
-import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, STORAGE, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC, FOG } from './data.js';
+import { BAR_KIND, barTop } from './bars.js';
+import {
+  CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
+  ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC,
+} from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 
-// вид объёмной грядки: 'plain' — без каймы, 'grass' — с травяной каймой
-export let BED_STYLE = 'plain';
-export function setBedStyle(v) { BED_STYLE = v; }
 export const BG = '#3d7a35';
 
 export class Farm {
   constructor({ renderer, camera, ui, tg, save, perf, audio }) {
     this.audio = audio;
     this.r = renderer; this.cam = camera; this.ui = ui; this.tg = tg; this.save = save; this.perf = perf;
-    this.drawList = [];
     this.particles = [];
     this.floaters = [];
     this.hover = null;
     this.focus = [];
     this.tapFx = null;
     this.time = 0;
-    this.dirty = true;
     this.quests = new Quests(this);
     this.mover = new Mover(this);
     this.groundV = 0; // растёт, когда меняются клетки земли
-    this.buildSprites();
-    this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
-      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, waterTex: a.waterTex, decor: a.decor, objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, fog: a.fog && a.fog.clouds.length ? a.fog : null });
-      if (a.wildGrass && a.wildGrass.length) this.S.wildGrass = a.wildGrass;
-      a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
-      a.well.forEach((s, i) => { if (s) this.S.well[i] = s; });
-      if (a.water.every(Boolean) || a.waterTex) { this.S.waterArt = a.waterTex ? null : a.water; this.S.water.clear(); }
-      this.groundV++;
-      for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
-      // иконки художника уже загружены (loadArt ждёт их); иконки саженцев — data: URL, грузятся мгновенно
-      for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
-      // пузыри над грядками из арта: квадрат 24×24 единицы, опора — низ хвостика
-      for (const k of ['ready', 'water']) {
-        const im = this.iconImg['bubble_' + k];
-        if (im) this.S.bubble[k] = { canvas: im, w: 24, h: 24, ax: 12, ay: 24, name: 'bubble_' + k };
-      }
-      const fl = Object.entries(a.floraIcons).map(([k, url]) => new Promise((res) => {
-        const im = new Image();
-        im.onload = () => { this.icons[k] = url; this.iconImg[k] = im; res(); };
-        im.onerror = () => res();
-        im.src = url;
-      }));
-      this.dirty = true;
-      return Promise.all(fl).then(() => { this.onIcons && this.onIcons(); });
-    });
+    // Спрайты и иконки — из картинок художника. Пока они грузятся, игра не запущена (экран загрузки),
+    // поэтому до applyArt здесь пусто. water — берега прудов, рисуются кодом по мере надобности.
+    this.S = { water: new Map() };
+    this.icons = {}; // имя → адрес картинки (для <img> в интерфейсе)
+    this.iconImg = {}; // имя → загруженная картинка (для текстур сцены)
+    this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => this.applyArt(a));
     // ошибку загрузки обрабатывает main.js (экран загрузки с кнопкой «Повторить»)
     this.artReady.catch((e) => console.warn('art', e));
   }
 
-  buildSprites() {
-    const S = {};
-    S.grass = [0, 1, 2, 3].map((v) => art.grassTile(v));
-    S.path = [0, 1].map((v) => art.pathTile(v));
-    S.soil = [art.soilTile(false), art.soilTile(true)];
-    S.water = new Map();
-    S.trees = { oak: art.treeSprite('oak'), oak2: art.treeSprite('oak2'), apple: art.treeSprite('apple'), pine: art.treeSprite('pine') };
-    const stump = art.stumpSprite(), rock = art.rockSprite(false);
-    S.stumps = [stump, stump];
-    S.rocks = [rock, rock];
-    S.bush = art.bushSprite(false); S.berry = art.bushSprite(true);
-    S.sprout = art.sproutSprite();
-    S.wildGrass = [0, 1, 2].map((v) => art.grassTuftSprite(v)); // дикая высокая трава (пока нет арта)
-    S.flora = {}; // из арта: { вид: { bare — без плодов, young — молодое } }
-    S.boulder = art.rockSprite(true);
-    S.house = [null, 1, 2, 3, 4, 5].map((l) => l && art.houseSprite(l));
-    S.well = [art.wellSprite(false), art.wellSprite(true)];
-    S.crops = {};
-    for (const c of Object.values(CROPS)) S.crops[c.key] = [0, 1, 2, 3].map((s) => art.cropSprite(c, s));
-    S.bubble = { water: art.bubbleSprite('water'), ready: art.bubbleSprite('ready'), lock: art.bubbleSprite('lock') };
-    this.S = S;
-    this.icons = art.makeIcons(CROPS, FISH, FLORA_GOODS);
-    try { this.icons.path = S.path[0].canvas.toDataURL(); } catch (e) { /* */ }
-    this.iconImg = {};
-    for (const [k, url] of Object.entries(this.icons)) { const im = new Image(); im.src = url; this.iconImg[k] = im; }
+  // Картинки художника загружены (artSprites.loadArt): раскладываем их в спрайты игры и иконки
+  applyArt(a) {
+    Object.assign(this.S, {
+      grass: a.grass, path: a.path, bed: a.bed, waterTex: a.waterTex, decor: a.decor,
+      objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, wildGrass: a.wildGrass,
+      house: a.house, well: a.well, crops: a.crops, fog: a.fog.clouds.length ? a.fog : null,
+    });
+    this.groundV++;
+    for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
+    // пузыри над грядками — те же иконки: квадрат 24×24 единицы, опора — низ хвостика
+    this.S.bubble = {};
+    for (const k of ['ready', 'water']) this.S.bubble[k] = { canvas: this.iconImg['bubble_' + k], w: 24, h: 24, ax: 12, ay: 24, name: 'bubble_' + k };
+    // иконки, сделанные из спрайтов (свои растения в рюкзаке, тропинка), — data: URL, грузятся мгновенно
+    const fl = Object.entries(a.floraIcons).map(([k, url]) => new Promise((res) => {
+      const im = new Image();
+      im.onload = () => { this.icons[k] = url; this.iconImg[k] = im; res(); };
+      im.onerror = () => res();
+      im.src = url;
+    }));
+    return Promise.all(fl).then(() => { this.onIcons && this.onIcons(); });
   }
 
   // средний цвет травы (у арта свой оттенок) — им рисуется травяной край берега
@@ -105,22 +80,8 @@ export class Farm {
     return this._gc;
   }
 
-  // Текстура воды по координатам карты: одна картинка на весь пруд, без повторов по клеткам
-  waterFill(ctx, gx, gy) {
-    const t = this.S.waterTex;
-    if (!this._wpat) {
-      const p = ctx.createPattern(t.canvas, 'repeat');
-      if (!p || !p.setTransform) { this.S.waterTex = null; this.S.water.clear(); return; }
-      p.setTransform(new DOMMatrix().scale(1 / 128));
-      this._wpat = p;
-    }
-    ctx.save();
-    ctx.transform(HW, HH, -HW, HH, 0, 0); // клетка сетки → ромб на карте
-    ctx.fillStyle = this._wpat;
-    ctx.fillRect(gx - 0.02, gy - 0.02, 1.04, 1.04);
-    ctx.restore();
-  }
-
+  // Спрайт берега для клетки воды (сама вода — общая текстура, её кладёт PixiScene).
+  // Посреди пруда берега нет: у такого спрайта empty = true.
   waterSprite(x, y) {
     const w = this.world;
     const land = (xx, yy) => (!w.inside(xx, yy) || w.tile(xx, yy) !== T.WATER ? 1 : 0);
@@ -128,50 +89,38 @@ export class Farm {
     // суша только по диагонали (угол тайла): углы T, R, B, L
     const dg = (land(x - 1, y - 1) && !(mask & 9) ? 1 : 0) | (land(x + 1, y - 1) && !(mask & 3) ? 2 : 0) |
       (land(x + 1, y + 1) && !(mask & 6) ? 4 : 0) | (land(x - 1, y + 1) && !(mask & 12) ? 8 : 0);
-    const h = hash2(x * 7, y * 13), WA = this.S.waterArt;
-    // с водой художника: 0 — гладь, 1 — блики, 2 — кувшинка, 3 — камыш (камыш только у берега)
-    const lily = WA ? (h < 0.55 ? 0 : h < 0.75 ? 1 : h < 0.88 ? 2 : mask ? 3 : 1) : this.S.waterTex ? 0 : h < 0.3 ? 1 : 0;
-    const key = (dg * 16 + mask) * 4 + lily;
+    const key = dg * 16 + mask;
     let s = this.S.water.get(key);
     if (!s) {
-      s = art.waterTile(mask, lily, this.S.waterTex ? 'none' : WA && WA[lily], this.grassColor(), dg);
-      s.empty = !!this.S.waterTex && !mask && !dg && !lily; // посреди пруда — только текстура, без слоя берега
+      s = shoreTile(mask, dg, this.grassColor());
+      s.empty = !mask && !dg;
       this.S.water.set(key, s);
     }
     return s;
   }
 
-  bedStyle(v) { setBedStyle(v); this.groundV++; this.dirty = true; }
-  bedStyleName() { return BED_STYLE; }
-
+  // Картинка объекта на карте (у камней, пней и деревьев вариант выбирается по id)
   objSprite(o) {
     const S = this.S;
-    if (o.type === 'stump' && o.was && S.stumpOf) {
+    if (o.type === 'stump' && o.was) {
       // пень того дерева, которое срубили
       const tree = S.objArt[o.was], st = tree && S.stumpOf(tree[o.id % tree.length], o.id);
       if (st) return st;
     }
     if (o.type === 'sapling') {
-      // свой росток: o.stage считает floraTick
-      const fl = S.flora[o.tree], fd = FLORA[o.tree], sp = S.sprouts && fd && S.sprouts[fd.kind];
-      return o.stage >= 1 && fl ? fl.young : sp || S.sprout;
+      // свой росток: o.stage считает floraTick (0 — росток, 1 — молодое растение)
+      const fl = S.flora[o.tree], fd = FLORA[o.tree];
+      return o.stage >= 1 && fl ? fl.young : S.sprouts[fd ? fd.kind : 'tree'];
     }
     if (o.bare && S.flora[o.type]) return S.flora[o.type].bare; // плоды собраны
-    const v = S.objArt && S.objArt[o.type];
+    const v = S.objArt[o.type];
     if (v && v.length) return v[o.id % v.length];
-    const fd = FLORA[o.type];
-    if (fd) return fd.kind === 'tree' ? S.trees[fd.group] : fd.group === 'berry' ? S.berry : S.bush;
     switch (o.type) {
-      case 'stump': return S.stumps[o.id & 1];
       case 'grass': return S.wildGrass[o.id % S.wildGrass.length];
-      case 'bush': return S.bush;
-      case 'berry': return S.berry;
-      case 'rock': return S.rocks[o.id & 1];
-      case 'boulder': return S.boulder;
       case 'house': return S.house[this.st.house];
       case 'well': return S.well[this.st.well ? 1 : 0];
     }
-    return S.rocks[0];
+    return S.objArt.rock[0];
   }
 
   // ---------------- Состояние ----------------
@@ -308,7 +257,6 @@ export class Farm {
     const out = Wild.wildTick(this.st, this.world, ctx).concat(Wild.treeTick(this.st, this.world, ctx));
     if (!out.length) return;
     if (!quiet) for (const ev of out) { toWorld(ev.x + 0.5, ev.y + 0.5, tmp); this.burst(tmp.x, tmp.y - 6, '#7ccf4f', 6, true); }
-    this.dirty = true;
     this.syncBars(now);
     this.save.schedule(() => this.serialize());
   }
@@ -352,7 +300,7 @@ export class Farm {
         if (o.bare !== bare) { o.bare = bare; changed = true; }
       }
     }
-    if (changed) { w.version++; this.dirty = true; }
+    if (changed) w.version++;
     this.syncBars(now);
   }
 
@@ -435,7 +383,6 @@ export class Farm {
 
   get maxEnergy() { return HOUSE[this.st.house].energy; }
   get canMax() { return HOUSE[this.st.house].can; }
-  get storage() { return STORAGE; }
 
   tickEnergy() {
     const st = this.st, now = Date.now(), period = ENERGY_REGEN_SEC * 1000;
@@ -508,17 +455,21 @@ export class Farm {
     this.hover = { x: Math.floor(tmp2.x), y: Math.floor(tmp2.y) };
   }
 
+  // Объект, чья картинка под точкой мира (wx, wy): крона дерева, крыша дома. Из нескольких —
+  // ближний к зрителю (рисуется поверх). Рамка уже картинки: прозрачные края кроны не должны
+  // перехватывать нажатия по соседним клеткам.
   pick(wx, wy) {
-    const L = this.drawList;
-    for (let i = L.length - 1; i >= 0; i--) {
-      const d = L[i];
-      if (d.kind !== 'o') continue;
-      const s = this.objSprite(d);
-      const big = d.type === 'house' || d.type === 'boulder';
+    let best = null;
+    for (const o of this.world.objects) {
+      if (!o) continue;
+      const s = this.objSprite(o);
+      const big = o.type === 'house' || o.type === 'boulder';
       const kx = big ? 0.9 : 0.62;
-      if (wx >= d.wx - s.ax * kx && wx <= d.wx + (s.w - s.ax) * kx && wy >= d.wy - s.ay * 0.92 && wy <= d.wy + (big ? (s.h - s.ay) * 0.8 : 6)) return d;
+      const hit = wx >= o.wx - s.ax * kx && wx <= o.wx + (s.w - s.ax) * kx &&
+        wy >= o.wy - s.ay * 0.92 && wy <= o.wy + (big ? (s.h - s.ay) * 0.8 : 6);
+      if (hit && (!best || o.depth > best.depth || (o.depth === best.depth && o.wy > best.wy))) best = o;
     }
-    return null;
+    return best;
   }
 
   tapObject(o, sx, sy) {
@@ -624,7 +575,6 @@ export class Farm {
     this.sfx('unlock');
     this.addXp(5);
     this.player.celebrate();
-    this.dirty = true;
     this.changed();
     return true;
   }
@@ -1024,22 +974,6 @@ export class Farm {
     return { x, y, bx, by, k, bite, yank };
   }
 
-  drawFishing(ctx) {
-    const fs = this.fishingState();
-    if (!fs) return;
-    const { x, y, k, bite, yank } = fs;
-    let { bx, by } = fs;
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 0.5;
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo((x + bx) / 2, Math.max(y, by) + 6, bx, by); ctx.stroke();
-    if (k >= 1 && !yank) { // круги на воде
-      ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 0.6;
-      ctx.beginPath(); ctx.ellipse(bx, by + 1.5, 4 + bite * 3, 1.8 + bite * 1.2, 0, 0, Math.PI * 2); ctx.stroke();
-    }
-    ctx.fillStyle = '#3d2b1f'; ctx.beginPath(); ctx.arc(bx, by, 2.1, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bx, by + 0.4, 1.5, 0, Math.PI); ctx.fill();
-    ctx.fillStyle = '#e2392f'; ctx.beginPath(); ctx.arc(bx, by - 0.2, 1.5, Math.PI, 0); ctx.fill();
-  }
-
   // Полив: пока лейка наклонена, из носика падают капли
   pourWater(dt) {
     const p = this.player, an = p.anim;
@@ -1116,227 +1050,7 @@ export class Farm {
 
   // ---------------- Отрисовка ----------------
 
-  drawGround(ctx) {
-    const r = this.r, w = this.world, v = r.view;
-    // видимый диапазон клеток
-    let gx0 = Infinity, gx1 = -Infinity, gy0 = Infinity, gy1 = -Infinity;
-    for (const [x, y] of [[v.minX, v.minY], [v.maxX, v.minY], [v.minX, v.maxY], [v.maxX, v.maxY]]) {
-      toGrid(x, y, tmp);
-      gx0 = Math.min(gx0, tmp.x); gx1 = Math.max(gx1, tmp.x); gy0 = Math.min(gy0, tmp.y); gy1 = Math.max(gy1, tmp.y);
-    }
-    gx0 = Math.max(0, Math.floor(gx0) - 1); gy0 = Math.max(0, Math.floor(gy0) - 1);
-    gx1 = Math.min(N - 1, Math.ceil(gx1) + 1); gy1 = Math.min(N - 1, Math.ceil(gy1) + 1);
-
-    // основа карты (закрывает швы между тайлами)
-    ctx.fillStyle = '#7cc44f';
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(N * HW, N * HH); ctx.lineTo(0, N * 2 * HH); ctx.lineTo(-N * HW, N * HH); ctx.closePath(); ctx.fill();
-
-    // земля
-    const S = this.S, raised = [];
-    for (let gy = gy0; gy <= gy1; gy++) {
-      for (let gx = gx0; gx <= gx1; gx++) {
-        const cx = (gx - gy) * HW, cy = (gx + gy + 1) * HH;
-        if (cx + HW < v.minX || cx - HW > v.maxX || cy + HH < v.minY || cy - HH > v.maxY) continue;
-        const i = gy * N + gx, t = w.tiles[i];
-        let s;
-        if (t === T.GRASS) s = S.grass[w.variant[i]];
-        else if (t === T.PATH) s = S.path[(gx + gy) & 1];
-        else if (t === T.WATER) { if (S.waterTex) this.waterFill(ctx, gx, gy); s = this.waterSprite(gx, gy); }
-        else {
-          const b = this.beds.get(i);
-          const wet = b && b.crop && !this.cropInfo(b).needsWater && !this.cropInfo(b).ready;
-          if (S.bed) {
-            // объёмная грядка выше земли: сначала трава под ней, сама грядка — вторым проходом
-            raised.push([cx, cy, wet ? 1 : 0]);
-            s = S.grass[w.variant[i]];
-          } else s = S.soil[wet ? 1 : 0];
-        }
-        ctx.drawImage(s.canvas, cx - s.ax, cy - s.ay, s.w, s.h);
-      }
-    }
-    // ближние грядки ложатся поверх дальних
-    if (raised.length) {
-      const BS = S.bed[BED_STYLE];
-      raised.sort((a, b) => a[1] - b[1]);
-      for (const [x, y, wet] of raised) { const s = BS[wet]; ctx.drawImage(s.canvas, x - s.ax, y - s.ay, s.w, s.h); }
-    }
-    // украшения пруда (в 2D — вместе с землёй)
-    if (S.decor && w.decor) for (const d of w.decor) {
-      const s = S.decor[d.type]; if (!s) continue;
-      toWorld(d.x, d.y, tmp);
-      if (r.visible(tmp.x - s.ax, tmp.y - s.ay, s.w, s.h)) ctx.drawImage(s.canvas, tmp.x - s.ax, tmp.y - s.ay, s.w, s.h);
-    }
-
-    // туман над закрытыми участками
-    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
-      if (w.unlocked[c]) continue;
-      const cb = w.chunkBounds(c);
-      if (!r.visible(cb.minX, cb.minY, cb.maxX - cb.minX, cb.maxY - cb.minY)) continue;
-      const x0 = (c % CHUNKS) * CHUNK, y0 = ((c / CHUNKS) | 0) * CHUNK;
-      ctx.fillStyle = w.canUnlock(c) ? 'rgba(18,44,24,0.34)' : 'rgba(14,34,20,0.5)';
-      ctx.beginPath();
-      toWorld(x0, y0, tmp); ctx.moveTo(tmp.x, tmp.y);
-      toWorld(x0 + CHUNK, y0, tmp); ctx.lineTo(tmp.x, tmp.y);
-      toWorld(x0 + CHUNK, y0 + CHUNK, tmp); ctx.lineTo(tmp.x, tmp.y);
-      toWorld(x0, y0 + CHUNK, tmp); ctx.lineTo(tmp.x, tmp.y);
-      ctx.closePath(); ctx.fill();
-    }
-    // туман вокруг карты (в 2D — несколько колец, без леса)
-    const F = FOG.width, col = FOG.color, rgb = `${(col >> 16) & 255},${(col >> 8) & 255},${col & 255}`;
-    const sq = (d, back) => {
-      const P = [[-d, -d], [N + d, -d], [N + d, N + d], [-d, N + d]];
-      if (back) P.reverse();
-      toWorld(P[0][0], P[0][1], tmp); ctx.moveTo(tmp.x, tmp.y);
-      for (let k = 1; k < 4; k++) { toWorld(P[k][0], P[k][1], tmp); ctx.lineTo(tmp.x, tmp.y); }
-      ctx.closePath();
-    };
-    const D = [0, 1, 2, 3, F, 80];
-    for (let k = 0; k < D.length - 1; k++) {
-      const m = (D[k] + D[k + 1]) / 2, t = Math.min(1, m / F), a = k === D.length - 2 ? 1 : t * t * (3 - 2 * t);
-      ctx.fillStyle = `rgba(${rgb},${a.toFixed(3)})`;
-      ctx.beginPath(); sq(D[k], false); sq(D[k + 1], true); ctx.fill();
-    }
-    // граница открытой территории
-    this.drawBorder(ctx);
-  }
-
-  render() {
-    if (this.scene) return this.scene.render(); // WebGL (PixiJS)
-    const r = this.r, ctx = r.ctx, w = this.world, S = this.S;
-    r.begin(this.cam, BG);
-
-    // Земля, туман и граница меняются редко: рисуем их в отдельный холст и, пока камера
-    // и клетки те же, только копируем его (на слабых телефонах это половина кадра).
-    let wet = 0;
-    for (const b of this.beds.values()) if (b.crop) { const i = this.cropInfo(b); if (!i.needsWater && !i.ready) wet = (wet * 31 + b.i) % 1e9; }
-    const key = `${this.cam.x.toFixed(2)}|${this.cam.y.toFixed(2)}|${this.cam.zoom.toFixed(4)}|${r.canvas.width}x${r.canvas.height}|${this.groundV}|${w.unlockedCount()}|${wet}`;
-    let gc = this._ground;
-    if (!gc || gc.width !== r.canvas.width || gc.height !== r.canvas.height) {
-      gc = this._ground = makeCanvas(r.canvas.width, r.canvas.height); this._groundKey = '';
-    }
-    if (key !== this._groundKey) {
-      this._groundKey = key;
-      const g = gc.getContext('2d');
-      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = ctx.imageSmoothingQuality;
-      g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = BG; g.fillRect(0, 0, gc.width, gc.height);
-      g.setTransform(r.va, 0, 0, r.va, r.ve, r.vf);
-      this.drawGround(g);
-    }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(gc, 0, 0);
-    r.resetView();
-
-    // объекты + растения + персонаж, по глубине
-    const L = this.drawList; L.length = 0;
-    for (const o of w.objects) {
-      if (!o) continue;
-      const s = this.objSprite(o);
-      if (!r.visible(o.wx - s.ax - 4, o.wy - s.ay, s.w + 8, s.h)) continue;
-      o.kind = 'o';
-      L.push(o);
-    }
-    for (const b of this.beds.values()) {
-      if (!b.crop || !r.visible(b.wx - 32, b.wy - 44, 64, 60)) continue;
-      L.push(b.dr);
-    }
-    const p = this.player;
-    toWorld(p.x, p.y, tmp);
-    this._pd = this._pd || { kind: 'p' };
-    this._pd.depth = p.x + p.y; this._pd.wy = tmp.y;
-    L.push(this._pd);
-    L.sort((a, b) => a.depth - b.depth || a.wy - b.wy);
-
-    // Что нельзя закрывать: фермер, клетка под курсором, клетка последнего тапа.
-    // Высокие объекты перед ними становятся полупрозрачными.
-    const F = this.focus; F.length = 0;
-    F.push({ x0: tmp.x - 11, y0: tmp.y - 50, x1: tmp.x + 11, y1: tmp.y, depth: p.x + p.y, gx: -1, gy: -1 });
-    for (const t of [this.hover, this.tapFx]) {
-      if (!t || !w.inside(t.x, t.y)) continue;
-      toWorld(t.x + 0.5, t.y + 0.5, tmp);
-      F.push({ x0: tmp.x - HW + 6, y0: tmp.y - HH + 3, x1: tmp.x + HW - 6, y1: tmp.y + HH - 3, depth: t.x + t.y + 1, gx: t.x, gy: t.y });
-    }
-    let playerHidden = false;
-
-    for (const d of L) {
-      if (d.kind === 'o') {
-        let s = this.objSprite(d);
-        if (!w.isOpen(d.gx, d.gy)) s = dimSprite(s);
-        const sh = d.shake > 0 ? Math.sin(this.time * 70) * 2.2 * (d.shake / 0.25) : 0;
-        const fade = this.occludes(d, s, F);
-        d.fade = (d.fade || 0) + (fade - (d.fade || 0)) * 0.3;
-        if (d.fade < 0.02) d.fade = 0;
-        if (fade && F[0].hit) playerHidden = true;
-        if (d.fade) ctx.globalAlpha = 1 - 0.62 * d.fade;
-        ctx.drawImage(s.canvas, d.wx - s.ax + sh, d.wy - s.ay, s.w, s.h);
-        ctx.globalAlpha = 1;
-      } else if (d.kind === 'c') {
-        const b = d.bed, info = this.cropInfo(b);
-        const s = S.crops[b.crop][info.stage];
-        ctx.drawImage(s.canvas, b.wx - s.ax, b.wy - s.ay, s.w, s.h);
-      } else {
-        p.draw(r);
-      }
-    }
-
-    // фермер за объектом: полупрозрачная копия поверх
-    if (playerHidden) { ctx.globalAlpha = 0.4; p.draw(r); ctx.globalAlpha = 1; }
-
-    // рамки поверх объектов: граница участка (бледно), клетка под курсором, тап
-    ctx.globalAlpha = 0.45; this.drawBorder(ctx); ctx.globalAlpha = 1;
-    if (this.hover && w.inside(this.hover.x, this.hover.y)) this.tileOutline(ctx, this.hover.x, this.hover.y, 'rgba(255,255,255,0.75)', 1.8);
-    if (this.tapFx) this.tileOutline(ctx, this.tapFx.x, this.tapFx.y, `rgba(255,250,200,${Math.min(1, this.tapFx.t * 2.4)})`, 2.5);
-
-    // значки над грядками
-    const bob = Math.sin(this.time * 4) * 1.5;
-    for (const b of this.beds.values()) {
-      if (!b.crop || !r.visible(b.wx - 12, b.wy - 70, 24, 40)) continue;
-      const info = this.cropInfo(b);
-      const s = info.ready ? S.bubble.ready : info.needsWater ? S.bubble.water : null;
-      if (s) ctx.drawImage(s.canvas, b.wx - s.ax, b.wy - 26 - s.ay + bob, s.w, s.h);
-    }
-
-    // полоски времени роста
-    const BR = this.bars;
-    if (BR && BR.length && this.cam.zoom >= BAR_MIN_ZOOM) {
-      for (let i = 0; i < BR.length; i += 4) {
-        const x = BR[i] - BAR_W / 2, y = BR[i + 1] - BAR_H / 2;
-        if (!r.visible(x - 1, y - 1, BAR_W + 2, BAR_H + 2)) continue;
-        ctx.fillStyle = 'rgba(30,24,16,0.6)'; ctx.fillRect(x - 1, y - 1, BAR_W + 2, BAR_H + 2);
-        ctx.fillStyle = '#' + BAR_COLORS[BR[i + 3]].toString(16).padStart(6, '0');
-        ctx.fillRect(x, y, Math.max(1, BAR_W * BR[i + 2]), BAR_H);
-      }
-    }
-
-    this.drawQueue(ctx);
-    this.drawSigns(ctx);
-    this.mover.draw(ctx);
-
-    this.drawFishing(ctx);
-
-    // частицы
-    for (const q of this.particles) {
-      ctx.globalAlpha = Math.max(0, 1 - q.t / q.life);
-      ctx.fillStyle = q.c;
-      ctx.fillRect(q.x - q.s / 2, q.y - q.s / 2, q.s, q.s);
-    }
-    ctx.globalAlpha = 1;
-
-    // всплывающие числа
-    ctx.font = '700 11px system-ui, sans-serif';
-    ctx.textBaseline = 'middle';
-    for (const f of this.floaters) {
-      const k = f.t / 1.3;
-      ctx.globalAlpha = k < 0.75 ? 1 : (1 - k) * 4;
-      const y = f.y - k * 26;
-      const tw = ctx.measureText(f.text).width;
-      const iw = f.icon ? 12 : 0;
-      const x = f.x - (tw + iw) / 2;
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(40,25,15,0.8)';
-      ctx.strokeText(f.text, x, y); ctx.fillStyle = '#fffbe8'; ctx.fillText(f.text, x, y);
-      if (f.icon && this.iconImg[f.icon]) ctx.drawImage(this.iconImg[f.icon], x + tw + 1, y - 6, 12, 12);
-    }
-    ctx.globalAlpha = 1;
-  }
+  render() { this.scene.render(); }
 
   // Закрывает ли объект что-то из списка F (фермер, выделенная клетка): объект
   // должен стоять ближе к камере и пересекаться по картинке. Низкие объекты не трогаем.
@@ -1352,74 +1066,6 @@ export class Farm {
       f.hit = true; r = 1;
     }
     return r;
-  }
-
-  tileOutline(ctx, x, y, color, lw) {
-    toWorld(x + 0.5, y + 0.5, tmp);
-    ctx.strokeStyle = color; ctx.lineWidth = lw;
-    ctx.beginPath();
-    ctx.moveTo(tmp.x, tmp.y - HH + 1); ctx.lineTo(tmp.x + HW - 2, tmp.y); ctx.lineTo(tmp.x, tmp.y + HH - 1); ctx.lineTo(tmp.x - HW + 2, tmp.y);
-    ctx.closePath(); ctx.stroke();
-  }
-
-  drawBorder(ctx) {
-    const w = this.world;
-    ctx.strokeStyle = 'rgba(255,240,190,0.55)'; ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 5]);
-    ctx.beginPath();
-    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
-      if (!w.unlocked[c]) continue;
-      const cx = c % CHUNKS, cy = (c / CHUNKS) | 0, x0 = cx * CHUNK, y0 = cy * CHUNK;
-      const open = (dx, dy) => { const x = cx + dx, y = cy + dy; return x >= 0 && y >= 0 && x < CHUNKS && y < CHUNKS && w.unlocked[y * CHUNKS + x]; };
-      const seg = (ax, ay, bx, by) => { toWorld(ax, ay, tmp); ctx.moveTo(tmp.x, tmp.y); toWorld(bx, by, tmp); ctx.lineTo(tmp.x, tmp.y); };
-      if (!open(0, -1)) seg(x0, y0, x0 + CHUNK, y0);
-      if (!open(1, 0)) seg(x0 + CHUNK, y0, x0 + CHUNK, y0 + CHUNK);
-      if (!open(0, 1)) seg(x0, y0 + CHUNK, x0 + CHUNK, y0 + CHUNK);
-      if (!open(-1, 0)) seg(x0, y0, x0, y0 + CHUNK);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  drawQueue(ctx) {
-    const p = this.player;
-    const list = p.current && p.current.kind !== 'walk' ? [p.current, ...p.queue] : p.queue;
-    ctx.font = '700 8px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    list.forEach((a, i) => {
-      let x, y;
-      if (a.obj) { const s = this.objSprite(a.obj); x = a.obj.wx; y = a.obj.wy - Math.min(s.ay * 0.7, 60) - 6; }
-      else { toWorld(a.x + 0.5, a.y + 0.5, tmp); x = tmp.x; y = tmp.y - 8; }
-      ctx.fillStyle = 'rgba(61,43,31,0.9)'; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = i === 0 && a === p.current ? '#ffe066' : '#ffffff';
-      ctx.beginPath(); ctx.arc(x, y, 4.8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#3d2b1f'; ctx.fillText(String(i + 1), x, y + 0.3);
-    });
-    ctx.textAlign = 'left';
-  }
-
-  drawSigns(ctx) {
-    const w = this.world, r = this.r;
-    const n = w.unlockedCount();
-    const blocked = n >= HOUSE[this.st.house].chunks;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
-      if (!w.canUnlock(c)) continue;
-      const cx = c % CHUNKS, cy = (c / CHUNKS) | 0;
-      toWorld(cx * CHUNK + CHUNK / 2, cy * CHUNK + CHUNK / 2, tmp);
-      if (!r.visible(tmp.x - 50, tmp.y - 40, 100, 60)) continue;
-      const x = tmp.x, y = tmp.y - 24;
-      const label = blocked ? 'Нужен дом выше' : 'Открыть участок';
-      ctx.font = '700 9px system-ui, sans-serif';
-      const tw = ctx.measureText(label).width, bw = tw + 30;
-      ctx.fillStyle = 'rgba(61,43,31,0.92)';
-      ctx.beginPath(); ctx.roundRect(x - bw / 2 - 2, y - 13, bw + 4, 26, 8); ctx.fill();
-      ctx.fillStyle = blocked ? '#c9b48a' : '#f6d37a';
-      ctx.beginPath(); ctx.roundRect(x - bw / 2, y - 11, bw, 22, 7); ctx.fill();
-      ctx.fillStyle = '#3d2b1f';
-      ctx.fillText(label, x + 8, y + 0.5);
-      if (this.iconImg.lock) ctx.drawImage(this.iconImg.lock, x - bw / 2 + 3, y - 7, 14, 14);
-    }
-    ctx.textAlign = 'left';
   }
 }
 

@@ -6,7 +6,6 @@ export class Perf {
     const cores = navigator.hardwareConcurrency || 4;
     const mem = navigator.deviceMemory || 4;
     const dpr = window.devicePixelRatio || 1;
-    const coarse = matchMedia('(pointer: coarse)').matches;
 
     let tier = 'high';
     if (cores <= 4 || mem <= 3) tier = 'mid';
@@ -15,7 +14,6 @@ export class Perf {
     if (q === 'low' || q === 'mid' || q === 'high') tier = q;
 
     this.tier = tier;
-    this.mobile = coarse;
     this.maxScale = tier === 'low' ? 1 : tier === 'mid' ? 1.5 : 2;
     // выбор графики игроком: high — до x2, mid — x1.5, low — x1 (меньше пикселей — легче видеокарте)
     try { this.gfx = localStorage.getItem('farm.gfx') || 'auto'; } catch { this.gfx = 'auto'; }
@@ -29,7 +27,6 @@ export class Perf {
     this.idleFps = 20; // когда на экране ничего не происходит
     this.fps = 60;
     this.onScaleChange = null;
-    this.keepScale = false; // WebGL: разрешение не снижаем (мыло), при нехватке — только 30 FPS
     this.idle = false;
 
     this._acc = 0; this._n = 0; this._slow = 0; this._warmup = 2;
@@ -78,8 +75,9 @@ export class Perf {
 
   work(ms) { this._work += ms; if (ms > this._workMax) this._workMax = ms; }
 
-  // dt — реальная длительность кадра, сек. Если кадры долго не укладываются
-  // в бюджет, сначала уменьшаем разрешение, затем ограничиваем FPS до 30.
+  // dt — реальная длительность кадра, сек. Если кадры долго не укладываются в бюджет,
+  // ограничиваем FPS до 30 и время от времени пробуем 60 снова. Разрешение сами не снижаем:
+  // в WebGL это даёт «мыло», а его игрок выбирает сам (Настройки → Графика).
   sample(dt, budgetFps) {
     this._acc += dt; this._n++;
     if (dt > 1.4 / this.targetFps) this._over = (this._over || 0) + 1; // кадр не уложился
@@ -105,12 +103,7 @@ export class Perf {
     if (slow) this._slow++; else this._slow = Math.max(0, this._slow - 1);
     if (this._slow >= 3) {
       this._slow = 0;
-      if (this.renderScale > 1 && !this.keepScale) {
-        this.renderScale = Math.max(1, this.renderScale - 0.25);
-        this.onScaleChange && this.onScaleChange();
-      } else if (this.targetFps > 30) {
-        this.targetFps = 30; this._lockSec = 0; this._probeIn = this._probeIn || 15;
-      }
+      if (this.targetFps > 30) { this.targetFps = 30; this._lockSec = 0; this._probeIn = this._probeIn || 15; }
     }
   }
 }

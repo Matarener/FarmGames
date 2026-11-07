@@ -176,20 +176,12 @@ button:disabled { cursor: default; }
 }
 .btn-main:disabled { filter: grayscale(.8); opacity: .6; }
 .btn-link { margin-top: 18px; font-size: 12px; color: #a0806a; text-decoration: underline; }
-.item { display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--paper-2); border-radius: 12px; margin-bottom: 6px; }
-.it-t { flex: 1; min-width: 0; }
-.it-t span { display: block; font-size: 12px; font-weight: 500; color: #6b5442; }
-.it-a { display: flex; gap: 6px; }
 .btn-s {
   min-height: 38px; padding: 0 10px; border-radius: 10px; font-size: 12.5px; white-space: nowrap;
   background: #fff; border: 2px solid rgba(61,43,31,.5); display: inline-flex; align-items: center; gap: 3px;
 }
 .btn-s.gold { background: linear-gradient(#ffe48a, #f2b51d); }
 .btn-s:disabled { opacity: .45; }
-.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.cell { background: var(--paper-2); border-radius: 12px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.cell b { font-size: 15px; }
-.cell span { font-size: 10.5px; color: #6b5442; text-align: center; }
 
 /* ---------- Рюкзак: клетки ---------- */
 .inv-en { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; }
@@ -320,7 +312,6 @@ button:disabled { cursor: default; }
   .nav-btn img { width: 40px; height: 40px; }
   .panel { align-items: center; }
   .pn-card { width: min(520px, 92vw); max-height: 80%; border-radius: 20px; border-bottom: 3px solid var(--ink); padding-bottom: 0; }
-  .grid { grid-template-columns: repeat(5, 1fr); }
 }
 /* ---------- ПК: кнопки слева внизу, как на концепте ---------- */
 @media (min-width: 1100px) and (pointer: fine) {
@@ -352,8 +343,6 @@ button:disabled { cursor: default; }
   .pn-x { width: 32px; height: 32px; }
   .pn-body { padding: 8px 14px 12px; }
   .pn-sub { margin: 8px 0 5px; }
-  .grid { grid-template-columns: repeat(6, 1fr); }
-  .cell { padding: 5px 4px; }
   .qp-story { margin-bottom: 6px; }
   .qp-face { width: 52px; height: 52px; }
   .btn-main { height: 44px; }

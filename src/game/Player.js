@@ -12,7 +12,6 @@ const TOOL_ANIM = {
   pick: ['pick', null], sow: ['pick', 'seedbag'], mow: ['pick', null],
 };
 const MAX_QUEUE = 6;
-const tmp = { x: 0, y: 0 };
 
 export class Player {
   constructor(world, data, x, y) {
@@ -129,16 +128,6 @@ export class Player {
   }
 
   worldPos(out) { return toWorld(this.x, this.y, out); }
-
-  draw(r) {
-    toWorld(this.x, this.y, tmp);
-    const ctx = r.ctx;
-    // тень сжимается, когда персонаж поднимается выше
-    const f = this.sk.boneMap.float, lift = f ? Math.max(0, -f.ty) : 0, k = Math.max(0.55, 1.15 - lift * 0.035);
-    ctx.fillStyle = `rgba(20,40,10,${(0.24 * k).toFixed(3)})`;
-    ctx.beginPath(); ctx.ellipse(tmp.x, tmp.y, 9 * k, 4 * k, 0, 0, Math.PI * 2); ctx.fill();
-    this.sk.draw(ctx, r, tmp.x, tmp.y, 1, this.flip);
-  }
 }
 
 export function actionKey(a) {

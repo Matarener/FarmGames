@@ -55,7 +55,7 @@ export class Audio {
     if (MUSIC) {
       this.startVinyl();
       this.nextT = c.currentTime + 0.1;
-      this._timer = setInterval(() => this.schedule(), 90);
+      setInterval(() => this.schedule(), 90); // музыка: ноты планируются чуть вперёд
     }
   }
 

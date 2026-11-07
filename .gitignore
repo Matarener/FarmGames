@@ -1,4 +1,7 @@
 node_modules/
+# сборка: её делает GitHub Actions при каждом пуше в main (npm run build → dist/)
+dist/
+__pycache__/
 .DS_Store
 Thumbs.db
 *.log

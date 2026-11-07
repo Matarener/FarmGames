@@ -22,16 +22,18 @@ const ART = join(ROOT, 'assets', 'art');
 const ASSET_V = hash(Buffer.concat(readdirSync(ART).sort().map((f) => readFileSync(join(ART, f)))));
 cpSync(ART, join(DIST, 'assets', 'art'), { recursive: true });
 
-// Карта уровня (редактор карты пишет assets/map.json): копия в dist и версия по содержимому
-let MAP_V = '';
-try { const m = readFileSync(join(ROOT, 'assets', 'map.json')); MAP_V = hash(m); writeFileSync(join(DIST, 'assets', 'map.json'), m); } catch { /* карты нет — случайная генерация */ }
+// Стартовая карта (assets/map.json, её пишет редактор карты) вшивается в код: если бы файл карты
+// не загрузился по сети, игра собрала бы случайный мир, и сохранение игрока потеряло бы тропинки,
+// посадки и перестановки. Файла нет — null: мир генерируется случайно.
+let MAP = 'null';
+try { MAP = JSON.stringify(JSON.parse(readFileSync(join(ROOT, 'assets', 'map.json'), 'utf8'))); } catch { /* карты нет */ }
 
 // JS
 const js = await build({
-  // manifest и список иконок вшиваем в код: так dist/index.html открывается и без сервера (file://)
+  // manifest, список иконок и карту вшиваем в код: так dist/index.html открывается и без сервера (file://)
   define: {
     __ASSET_V__: JSON.stringify(ASSET_V),
-    __MAP_V__: JSON.stringify(MAP_V),
+    __MAP__: MAP,
     // редактор карты — только для локального запуска, в сборку для игроков не попадает
     'window.FARM_EDITOR': 'false',
     __ART_MANIFEST__: readFileSync(join(ART, 'manifest.json'), 'utf8'),

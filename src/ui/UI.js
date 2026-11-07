@@ -4,7 +4,6 @@
 
 import { HOUSE, ITEMS, INV_TABS, SHOP, SHOP_TABS, xpToNext, houseNeedChunks } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
-import { fmtTime } from '../game/Farm.js';
 import { QUEST_END } from '../game/quests.js';
 import { MUSIC } from '../engine/Audio.js';
 
@@ -47,7 +46,8 @@ export class UI {
   }
 
   refreshIcons() {
-    for (const img of this.root.querySelectorAll('img[data-icon]')) img.src = this.icons[img.dataset.icon];
+    // иконки грузятся вместе с картинками художника; до этого у <img> нет адреса
+    for (const img of this.root.querySelectorAll('img[data-icon]')) { const u = this.icons[img.dataset.icon]; if (u) img.src = u; }
     const av = this.root.querySelector('.avatar');
     if (av && this.icons.avatar && !av.querySelector('img')) av.innerHTML = `<img src="${this.icons.avatar}" alt="">`;
   }
@@ -363,7 +363,6 @@ export class UI {
   marketPanel(f) {
     const M = this.mk || (this.mk = { mode: 'sell', tab: 'seeds', sel: null });
     this.openPanel('market', 'Рынок', (body, card) => {
-      const st = f.st;
       const seg = h('div', 'mk-seg');
       for (const [k, name] of [['buy', 'Купить'], ['sell', 'Продать']]) {
         const b = h('button', M.mode === k ? 'on' : '', name);
@@ -556,4 +555,3 @@ export class UI {
 
 function fmtNum(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
 function fmtClock(s) { s = Math.max(0, s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
-export { fmtTime };

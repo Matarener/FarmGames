@@ -12,7 +12,7 @@ import { OBJECTS, FLORA, ITEMS } from './data.js';
 import * as Flora from './flora.js';
 import * as Inv from './inventory.js';
 import { N, T } from './World.js';
-import { toWorld, HW, HH } from '../engine/Iso.js';
+import { toWorld } from '../engine/Iso.js';
 
 const tmp = { x: 0, y: 0 };
 
@@ -35,7 +35,6 @@ export class Mover {
     f.player.queue.length = 0; // очередь дел отменяется: объекты могут переехать
     f.ui.closePopup(); f.ui.closePanel();
     this.hint();
-    f.dirty = true;
   }
 
   exit() {
@@ -43,7 +42,6 @@ export class Mover {
     this.active = false;
     this.sel = null; this.to = null;
     this.f.ui.moveBar(null);
-    this.f.dirty = true;
   }
 
   hint(msg, bad) {
@@ -193,13 +191,11 @@ export class Mover {
     this.to = { gx: tx, gy: ty, ok: c.ok, why: c.why };
     this.hint();
     if (!c.ok) { this.f.sfx('error'); this.f.ui.moveBarShake(); }
-    this.f.dirty = true;
   }
 
   cancel() {
     this.sel = null; this.to = null;
     this.hint();
-    this.f.dirty = true;
   }
 
   place() {
@@ -235,7 +231,6 @@ export class Mover {
     f.sfx('dig');
     this.sel = null; this.to = null;
     this.hint('Готово! Выберите, что ещё передвинуть');
-    f.dirty = true;
     f.changed();
     return true;
   }
@@ -275,7 +270,6 @@ export class Mover {
     f.sfx('dig');
     this.sel = null; this.to = null;
     this.hint(`${s.name}: в рюкзаке. Поставить обратно — нажмите на пустую траву`);
-    f.dirty = true;
     f.changed();
     return true;
   }
@@ -322,46 +316,7 @@ export class Mover {
     }
     f.sfx('dig');
     this.hint(`${it.name}: поставлено`);
-    f.dirty = true;
     f.changed();
     return true;
-  }
-
-  // ---------- отрисовка ----------
-  draw(ctx) {
-    if (!this.active) return;
-    const f = this.f, s = this.sel, t = this.to;
-    const pulse = 0.55 + 0.45 * Math.sin(f.time * 6);
-    if (s && s.kind === 'obj') {
-      // выбранная постройка мягко подсвечивается
-      const sp = f.objSprite(s.o);
-      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.12 + 0.18 * pulse;
-      ctx.drawImage(sp.canvas, s.o.wx - sp.ax, s.o.wy - sp.ay, sp.w, sp.h);
-      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-    }
-    if (s) {
-      for (let y = s.gy; y < s.gy + s.h; y++) for (let x = s.gx; x < s.gx + s.w; x++) f.tileOutline(ctx, x, y, `rgba(255,230,90,${pulse.toFixed(2)})`, 2.5);
-    }
-    if (s && t) {
-      const fill = t.ok ? 'rgba(110,220,90,0.38)' : 'rgba(235,70,50,0.38)', line = t.ok ? '#8ff06a' : '#ff6a50';
-      for (let y = t.gy; y < t.gy + s.h; y++) for (let x = t.gx; x < t.gx + s.w; x++) {
-        toWorld(x + 0.5, y + 0.5, tmp);
-        ctx.fillStyle = fill;
-        ctx.beginPath(); ctx.moveTo(tmp.x, tmp.y - HH); ctx.lineTo(tmp.x + HW, tmp.y); ctx.lineTo(tmp.x, tmp.y + HH); ctx.lineTo(tmp.x - HW, tmp.y); ctx.closePath(); ctx.fill();
-        f.tileOutline(ctx, x, y, line, 2);
-      }
-      // призрак объекта на новом месте
-      ctx.globalAlpha = 0.6;
-      if (s.kind === 'obj') {
-        const sp = f.objSprite(s.o);
-        toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp);
-        ctx.drawImage(sp.canvas, tmp.x - sp.ax, tmp.y - sp.ay, sp.w, sp.h);
-      } else {
-        const sp = s.kind === 'path' ? f.S.path[0] : f.S.bed ? f.S.bed.grass[0] : f.S.soil[0];
-        toWorld(t.gx + 0.5, t.gy + 0.5, tmp);
-        ctx.drawImage(sp.canvas, tmp.x - sp.ax, tmp.y - sp.ay, sp.w, sp.h);
-      }
-      ctx.globalAlpha = 1;
-    }
   }
 }
