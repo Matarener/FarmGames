@@ -40,20 +40,22 @@ export const RESOURCES = {
 // Рубка даёт дерево (wood), добычу (у pick — если плоды висят) и с шансом seedChop — саженец
 // этого вида. Сбором саженцы не добываются.
 // grow — сколько секунд растёт посаженное игроком семя до взрослого растения.
+// sapSell — цена продажи саженца (ниже цены в магазине SAPLING_SHOP, чтобы не было перепродажи).
+// ownSell — цена продажи выкопанного взрослого растения (тоже ниже цены саженца в магазине).
 export const FLORA = {
-  oak:       { name: 'Дуб',       kind: 'tree', fruit: 'acorn',        n: [1, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, grow: 3 * 3600 },
-  birch:     { name: 'Берёза',    kind: 'tree', fruit: 'birch_bark',   n: [1, 2], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, grow: 3 * 3600 },
-  sakura:    { name: 'Сакура',    kind: 'tree', fruit: 'sakura_petal', n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, grow: 4 * 3600 },
-  cherry:    { name: 'Вишня',     kind: 'tree', fruit: 'cherry',       n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
-  maple:     { name: 'Клён',      kind: 'tree', fruit: 'maple_leaf',   n: [2, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, grow: 3 * 3600 },
-  apple:     { name: 'Яблоня',    kind: 'tree', fruit: 'apple',        n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
-  pine:      { name: 'Ель',       kind: 'tree', fruit: 'pinecone',     n: [1, 3], wood: [3, 5], hp: 4, xp: 3, seedChop: 0.25, grow: 3 * 3600 },
-  blueberry: { name: 'Голубика',  kind: 'bush', fruit: 'blueberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
-  raspberry: { name: 'Малина',    kind: 'bush', fruit: 'raspberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
-  rosehip:   { name: 'Шиповник',  kind: 'bush', fruit: 'rosehip',      n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600,     pick: true, regrow: 2 * 3600 },
-  hydrangea: { name: 'Гортензия', kind: 'bush', fruit: 'hydrangea',    n: [1, 2], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
-  lavender:  { name: 'Лаванда',   kind: 'bush', fruit: 'lavender',     n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
-  rose:      { name: 'Роза',      kind: 'bush', fruit: 'rose_petal',   n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, grow: 3600 },
+  oak:       { name: 'Дуб',       kind: 'tree', fruit: 'acorn',        n: [1, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
+  birch:     { name: 'Берёза',    kind: 'tree', fruit: 'birch_bark',   n: [1, 2], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
+  sakura:    { name: 'Сакура',    kind: 'tree', fruit: 'sakura_petal', n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 10, ownSell: 30, grow: 4 * 3600 },
+  cherry:    { name: 'Вишня',     kind: 'tree', fruit: 'cherry',       n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 15, ownSell: 45, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
+  maple:     { name: 'Клён',      kind: 'tree', fruit: 'maple_leaf',   n: [2, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 8, ownSell: 24, grow: 3 * 3600 },
+  apple:     { name: 'Яблоня',    kind: 'tree', fruit: 'apple',        n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 18, ownSell: 54, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
+  pine:      { name: 'Ель',       kind: 'tree', fruit: 'pinecone',     n: [1, 3], wood: [3, 5], hp: 4, xp: 3, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
+  blueberry: { name: 'Голубика',  kind: 'bush', fruit: 'blueberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 9, ownSell: 27, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
+  raspberry: { name: 'Малина',    kind: 'bush', fruit: 'raspberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 8, ownSell: 24, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
+  rosehip:   { name: 'Шиповник',  kind: 'bush', fruit: 'rosehip',      n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 5, ownSell: 15, grow: 3600,     pick: true, regrow: 2 * 3600 },
+  hydrangea: { name: 'Гортензия', kind: 'bush', fruit: 'hydrangea',    n: [1, 2], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 6, ownSell: 18, grow: 3600 },
+  lavender:  { name: 'Лаванда',   kind: 'bush', fruit: 'lavender',     n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 6, ownSell: 18, grow: 3600 },
+  rose:      { name: 'Роза',      kind: 'bush', fruit: 'rose_petal',   n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 7, ownSell: 21, grow: 3600 },
 };
 for (const [k, v] of Object.entries(FLORA)) v.key = k;
 
@@ -225,11 +227,11 @@ for (const g of Object.values(FLORA_GOODS)) ITEMS[g.key] = {
   tabs: g.food ? ['food', 'plants'] : ['res'], desc: g.desc,
 };
 for (const f of Object.values(FLORA)) ITEMS[floraSeedId(f.key)] = {
-  key: floraSeedId(f.key), name: (f.kind === 'tree' ? 'Саженец: ' : 'Отросток: ') + f.name.toLowerCase(), icon: floraSeedId(f.key), badge: 'seed', tabs: ['plants'], floraOf: f.key,
+  key: floraSeedId(f.key), name: (f.kind === 'tree' ? 'Саженец: ' : 'Отросток: ') + f.name.toLowerCase(), icon: floraSeedId(f.key), badge: 'seed', tabs: ['plants'], floraOf: f.key, sell: f.sapSell,
   desc: `Посадите на свободную траву. Вырастет ${f.name.toLowerCase()} за ${fmtMin(f.grow)}` + (f.pick ? ' и будет давать плоды.' : '.'),
 };
 for (const f of Object.values(FLORA)) ITEMS[floraOwnId(f.key)] = {
-  key: floraOwnId(f.key), name: f.name + (f.kind === 'tree' ? ' (взрослое)' : ' (взрослый куст)'), icon: floraOwnId(f.key), tabs: ['plants'], floraOf: f.key, grown: true,
+  key: floraOwnId(f.key), name: f.name + (f.kind === 'tree' ? ' (взрослое)' : ' (взрослый куст)'), icon: floraOwnId(f.key), tabs: ['plants'], floraOf: f.key, grown: true, sell: f.ownSell,
   desc: `Ваше выкопанное растение. Посадите на свободную траву — встанет сразу взрослым` + (f.pick ? `, первые плоды через ${fmtMin(f.regrow)}` : '') + '. Можно и в режиме «Переставить».',
 };
 // Еда из магазина: её не выращивают и не продают, зато она даёт больше энергии
