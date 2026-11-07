@@ -14,6 +14,10 @@ export const CROPS = {
 };
 for (const [k, v] of Object.entries(CROPS)) v.key = k;
 
+// Окно посадки (нажали на пустую грядку): «Быстрые» — культуры, которые растут не дольше fast секунд;
+// закрытых по уровню культур в конце сетки — не больше locked, ближайших по уровню.
+export const PLANT_PICK = { fast: 1800, locked: 4 };
+
 // Рыба из пруда: хранится вместе с урожаем, её можно съесть или продать
 export const FISH = {
   fish_carp:   { name: 'Карась',        chance: 60, sell: 4,  food: 3, xp: 1 },

@@ -14,6 +14,7 @@ import * as Inv from './inventory.js';
 import * as Wild from './wild.js';
 import * as Flora from './flora.js';
 import * as Beds from './beds.js';
+import * as Plant from './planting.js';
 import * as Hints from './hints.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
@@ -578,17 +579,17 @@ export class Farm {
     return o;
   }
 
-  // Свободная трава: что можно посадить из рюкзака (саженцы деревьев и отростки кустов)
-  sowPopup(x, y, sx, sy) {
-    const st = this.st;
-    const grown = [], items = [];
+  // Свободная трава: что можно посадить из рюкзака (саженцы деревьев и отростки кустов) — окно-сетка UI.sowPanel.
+  // → [{ id — предмет в рюкзаке, species, grown — встанет сразу взрослым, n — сколько есть }]
+  sowChoices() {
+    const st = this.st, grown = [], saps = [];
     for (const f of Object.values(FLORA)) {
       const own = Inv.count(st, floraOwnId(f.key)), sap = Inv.count(st, floraSeedId(f.key));
       // свои выкопанные — первыми: встают сразу взрослыми
-      if (own) grown.push({ icon: floraOwnId(f.key), label: `${f.name}, взрослое`, sub: `есть: ${own} · сразу`, onClick: () => this.queue({ kind: 'sow', x, y, species: f.key, grown: true }) });
-      if (sap) items.push({ icon: floraSeedId(f.key), label: f.name, sub: `есть: ${sap} · ${fmtTime(f.grow)}`, onClick: () => this.queue({ kind: 'sow', x, y, species: f.key }) });
+      if (own) grown.push({ id: floraOwnId(f.key), species: f.key, grown: true, n: own });
+      if (sap) saps.push({ id: floraSeedId(f.key), species: f.key, grown: false, n: sap });
     }
-    this.ui.popup(sx, sy, { title: 'Что посадить?', items: [...grown, ...items], wide: true });
+    return grown.concat(saps);
   }
 
   tapTile(x, y, sx, sy) {
@@ -607,7 +608,7 @@ export class Farm {
     const items = [{ icon: 'walk', label: 'Идти сюда', onClick: () => this.queue({ kind: 'walk', x, y }) }];
     if (t === T.GRASS) items.push({ icon: 'dig', label: 'Вскопать грядку', sub: `⚡ ${ENERGY.dig}`, onClick: () => this.queue({ kind: 'dig', x, y }) });
     if (t === T.GRASS && Object.keys(FLORA).some((k) => Inv.count(this.st, floraSeedId(k)) || Inv.count(this.st, floraOwnId(k)))) {
-      items.push({ icon: 'seed', label: 'Посадить дерево или куст', onClick: () => setTimeout(() => this.sowPopup(x, y, sx, sy), 0) });
+      items.push({ icon: 'seed', label: 'Посадить дерево или куст', onClick: () => this.ui.sowPanel(this, x, y) });
     }
     // одно действие (например, дорожка: только «идти») — выполняем сразу, без меню
     if (items.length === 1) { this.ui.closePopup(); return items[0].onClick(); }
@@ -642,7 +643,7 @@ export class Farm {
   isWell(x, y) { const o = this.world.well; return !!o && this.st.well > 0 && o.gx === x && o.gy === y; }
 
   tapBed(b, sx, sy) {
-    if (!b.crop) return this.seedPopup(b, sx, sy);
+    if (!b.crop) return this.planting ? this.plantTap(b) : this.ui.plantPanel(this, b);
     const info = this.cropInfo(b);
     if (info.ready) return this.queue({ kind: 'harvest', x: b.x, y: b.y });
     if (info.needsWater) return this.queue({ kind: 'water', x: b.x, y: b.y });
@@ -655,19 +656,42 @@ export class Farm {
     });
   }
 
-  seedPopup(b, sx, sy) {
-    const st = this.st;
-    const items = Object.values(CROPS).filter((c) => c.level <= st.level + 1).map((c) => {
-      const locked = c.level > st.level;
-      const have = Inv.count(st, seedId(c.key));
-      return {
-        icon: c.key, label: c.name,
-        sub: locked ? `с ${c.level} ур.` : have ? `семян: ${have} · ${fmtTime(c.time)}` : `${c.seed} ${this.ui.ic('coin', 'ic ic-s')} · ${fmtTime(c.time)}`,
-        disabled: locked || (!have && st.coins < c.seed),
-        onClick: () => this.queue({ kind: 'plant', x: b.x, y: b.y, crop: c.key }),
-      };
-    });
-    this.ui.popup(sx, sy, { title: 'Что посадить?', items, wide: true });
+  // ---------------- Режим посадки ----------------
+  // Культуру выбрали в окне (UI.plantPanel): она сажается на эту грядку, а дальше — на каждую пустую,
+  // по которой нажмут, пока не нажмут ✕ на плашке внизу или не кончатся семена и монеты.
+  // b — грядка, с которой открыли окно (null — сменили культуру с плашки).
+  pickCrop(key, b) {
+    const c = CROPS[key];
+    if (!c || c.level > this.st.level) return;
+    if (!Plant.plantLeft(this.st, key, this.pendingPlants(key))) return this.toast('Не хватает монет на семена', 'warn');
+    this.planting = { crop: key };
+    if (b && !b.crop) this.plantTap(b);
+    else this.ui.plantBar(this);
+  }
+
+  plantTap(b) {
+    const key = this.planting.crop;
+    if (!Plant.plantLeft(this.st, key, this.pendingPlants(key))) return this.stopPlanting(true);
+    this.queue({ kind: 'plant', x: b.x, y: b.y, crop: key });
+    // это была последняя грядка, на которую хватает семян и монет
+    if (!Plant.plantLeft(this.st, key, this.pendingPlants(key))) this.stopPlanting(true);
+    else this.ui.plantBar(this);
+  }
+
+  // Сколько посадок культуры key уже ждут в очереди призрака
+  pendingPlants(key) {
+    const p = this.player;
+    let n = p.current && p.current.kind === 'plant' && p.current.crop === key ? 1 : 0;
+    for (const a of p.queue) if (a.kind === 'plant' && a.crop === key) n++;
+    return n;
+  }
+
+  stopPlanting(out) {
+    if (!this.planting) return;
+    const c = CROPS[this.planting.crop];
+    this.planting = null;
+    this.ui.plantBar(this);
+    if (out) this.toast(`Семена «${c.name.toLowerCase()}» закончились, а на новые не хватает монет`, 'warn');
   }
 
   expandPopup(c, sx, sy) {
@@ -803,7 +827,7 @@ export class Farm {
       case 'plant': {
         const b = this.bedAt(w.idx(a.x, a.y));
         if (t !== T.SOIL || b.crop) return false;
-        if (!Inv.count(st, seedId(a.crop)) && st.coins < CROPS[a.crop].seed) { this.toast('Не хватает монет на семена', 'warn'); return false; }
+        if (!Plant.plantLeft(st, a.crop)) { this.toast('Не хватает монет на семена', 'warn'); return false; }
         return true;
       }
       case 'water': {
@@ -898,9 +922,8 @@ export class Farm {
       }
       case 'plant': {
         if (w.tiles[w.idx(a.x, a.y)] !== T.SOIL) return false;
-        const b = this.bedAt(w.idx(a.x, a.y)), c = CROPS[a.crop];
-        if (Inv.takeItem(st, seedId(a.crop), 1)) { /* свои семена */ } else if (st.coins >= c.seed) st.coins -= c.seed; else return false;
-        b.crop = a.crop; b.p = 0; b.w = 0;
+        const b = this.bedAt(w.idx(a.x, a.y));
+        if (!Plant.plantBed(st, b, a.crop)) return false;
         this.burst(b.wx, b.wy, '#7ccf4f', 6);
         this.quests.emit('plant', a.crop);
         this.sfx('plant');

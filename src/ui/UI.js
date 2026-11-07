@@ -2,8 +2,9 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, FLORA, xpToNext, houseNeedChunks } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, seedId, xpToNext, houseNeedChunks } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
+import * as Plant from '../game/planting.js';
 import * as R from '../game/questRules.js';
 import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ, MAX_PINS } from '../game/questData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
@@ -36,6 +37,15 @@ export class UI {
     for (const el of root.querySelectorAll('.ui-layer')) el.addEventListener('pointerdown', (e) => e.stopPropagation());
     // нажатие мимо меню «Ещё» закрывает его
     document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#more-menu, #btn-more')) this.toggleMore(false); }, true);
+    // Нажатие «насквозь». Меню и окна у карты открываются, когда палец отпускают (Input.onTap), и телефон
+    // сразу присылает click в ту же точку: он попадал по кнопке только что открытого меню (сама сажалась
+    // морковка) или по фону окна (окно тут же закрывалось). По меню и окну засчитываем только нажатия,
+    // начатые после их открытия (_openT). Нажатия с клавиатуры (detail 0) — всегда.
+    this._downT = 0; this._openT = -1;
+    document.addEventListener('pointerdown', () => { this._downT = performance.now(); }, true);
+    root.addEventListener('click', (e) => {
+      if (e.detail && this._downT <= this._openT && e.target.closest('#popup, #panel')) { e.stopPropagation(); e.preventDefault(); }
+    }, true);
     window.addEventListener('resize', () => { this._safe = null; });
   }
 
@@ -54,6 +64,8 @@ export class UI {
     $('#mb-cancel').onclick = () => farm.mover.cancel();
     $('#mb-place').onclick = () => farm.mover.place();
     $('#mb-store').onclick = () => farm.mover.store();
+    $('#pb-pick').onclick = () => this.plantPanel(farm, null);
+    $('#pb-x').onclick = () => farm.stopPlanting();
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && farm.mover.active) farm.mover.exit(); });
   }
 
@@ -106,6 +118,7 @@ export class UI {
     this.tick(f);
     const kind = this.panelEl.dataset.kind;
     if (kind && kind !== 'settings' && this.panelOpen) this.refreshPanel();
+    this.plantBar(f);
   }
 
   tick(f) {
@@ -355,6 +368,7 @@ export class UI {
     }
     p.appendChild(list);
     p.classList.add('show');
+    this._openT = performance.now();
     this.sfx('pop');
     // позиция: над точкой касания, в пределах экрана
     const R = this.root.getBoundingClientRect();
@@ -370,17 +384,18 @@ export class UI {
   closePopup() { this.popupEl.classList.remove('show'); this._popupTick = null; this.toggleMore(false); }
 
   // ---------- Окна ----------
-  openPanel(kind, title, build) {
+  // music: false — музыка фермы не сменяется на музыку меню (короткие окна выбора у грядки)
+  openPanel(kind, title, build, { music = true } = {}) {
     if (this.farm && this.farm.mover && this.farm.mover.active) this.farm.mover.exit();
     const p = this.panelEl;
     p.dataset.kind = kind;
     this._build = build;
     this._title = title;
     this.refreshPanel();
-    if (!this.panelOpen) this.sfx('open');
+    if (!this.panelOpen) { this.sfx('open'); this._openT = performance.now(); }
     p.classList.add('show');
     this.closePopup();
-    if (this.farm && this.farm.audio) this.farm.audio.setTheme('menu');
+    if (music && this.farm && this.farm.audio) this.farm.audio.setTheme('menu');
   }
 
   get panelOpen() { return this.panelEl.classList.contains('show'); }
@@ -760,6 +775,81 @@ export class UI {
     return row;
   }
 
+  // ---------- Посадка: окно-сетка и плашка режима посадки ----------
+  // Нажали на пустую грядку b (или на плашку посадки — тогда b = null, меняем культуру): сетка культур,
+  // 5 в ряд, порядок и фильтры — Plant.cropChoices. Выбрали — окно закрывается, культура сажается на b,
+  // и включается режим посадки (Farm.pickCrop). Фильтр помним между открытиями.
+  plantPanel(f, b) {
+    const S = this.pl || (this.pl = { filter: 'all' });
+    this.openPanel('plant', 'Что посадить?', (body) => {
+      const chips = h('div', 'pl-chips');
+      for (const [k, name] of [['all', 'Все'], ['seeds', 'Есть семена'], ['fast', 'Быстрые']]) {
+        const c = h('button', 'inv-chip' + (S.filter === k ? ' on' : ''), name);
+        c.onclick = () => { if (S.filter !== k) { S.filter = k; this.sfx('tap'); this.refreshPanel(); } };
+        chips.appendChild(c);
+      }
+      body.appendChild(chips);
+      const list = Plant.cropChoices(f.st, S.filter);
+      if (!list.length) {
+        body.appendChild(h('div', 'pn-empty', S.filter === 'seeds'
+          ? 'Своих семян пока нет: без них посадка стоит монет. Семена бывают в высокой траве и в урожае с грядок.'
+          : 'Быстрых культур пока нет.'));
+        return;
+      }
+      const g = h('div', 'pl-grid');
+      for (const r of list) {
+        const c = r.c;
+        // в клетке: сверху справа — время роста (у закрытой — уровень), снизу справа — сколько своих семян,
+        // цена семян или замок; под клеткой — название
+        const corner = !r.open ? this.ic('lock', 'pl-lock') : r.seeds ? `${this.ic('seed', 'inv-badge')}<b class="pl-n">${fmtNum(r.seeds)}</b>`
+          : `<b class="pl-p">${c.seed}${this.ic('coin', 'ic-s')}</b>`;
+        const cell = h('button', 'pl-cell' + (r.last ? ' last' : '') + (!r.open ? ' locked' : !r.can ? ' poor' : ''),
+          `<i>${this.ic(c.key)}<s class="pl-t">${r.open ? fmtShort(c.time) : `${c.level} ур.`}</s>${corner}</i><span class="pl-name">${c.name}</span>`);
+        cell.onclick = () => {
+          if (!r.open) return this.toast(`${c.name}: откроется с ${c.level} уровня`);
+          if (!r.can) return f.toast('Не хватает монет на семена', 'warn');
+          this.closePanel();
+          f.pickCrop(c.key, b);
+        };
+        g.appendChild(cell);
+      }
+      body.appendChild(g);
+    }, { music: false });
+  }
+
+  // Свободная трава → «Посадить дерево или куст»: сетка саженцев и своих выкопанных растений (Farm.sowChoices)
+  sowPanel(f, x, y) {
+    this.openPanel('sow', 'Что посадить?', (body) => {
+      const list = f.sowChoices();
+      if (!list.length) { body.appendChild(h('div', 'pn-empty', 'Саженцев больше нет.')); return; }
+      const g = h('div', 'pl-grid');
+      for (const r of list) {
+        const fl = FLORA[r.species];
+        const cell = h('button', 'pl-cell' + (r.grown ? ' last' : ''),
+          `<i>${this.ic(ITEMS[r.id].icon)}<s class="pl-t">${r.grown ? 'сразу' : fmtShort(fl.grow)}</s>${r.grown ? '' : this.ic('seed', 'inv-badge')}<b class="pl-n">${fmtNum(r.n)}</b></i>` +
+          `<span class="pl-name">${fl.name}</span>`);
+        cell.onclick = () => { this.closePanel(); f.queue({ kind: 'sow', x, y, species: r.species, grown: r.grown }); };
+        g.appendChild(cell);
+      }
+      body.appendChild(g);
+      body.appendChild(h('div', 'pn-text', 'Свои выкопанные растения (в жёлтой рамке) встают сразу взрослыми, саженцы растут указанное время.'));
+    }, { music: false });
+  }
+
+  // Плашка режима посадки внизу (вместо нижних кнопок): «Сажаем: морковь» — нажатие меняет культуру, ✕ — выход
+  plantBar(f) {
+    const P = f.planting, on = !!P, body = document.body;
+    if (body.classList.contains('planting') !== on) { body.classList.toggle('planting', on); $('#plant-bar').hidden = !on; this._safe = null; }
+    if (!on) { this.last.pb = null; return; }
+    const c = CROPS[P.crop], seeds = Inv.count(f.st, seedId(c.key));
+    const key = `${c.key}:${seeds}:${c.seed}:${this.icons[c.key] ? 1 : 0}`;
+    if (this.last.pb === key) return;
+    this.last.pb = key;
+    $('#pb-ic').src = this.icons[c.key] || '';
+    $('#pb-name').textContent = `Сажаем: ${c.name.toLowerCase()}`;
+    $('#pb-sub').innerHTML = `${seeds ? `семян: ${fmtNum(seeds)}` : `по ${c.seed} ${this.ic('coin', 'ic-s')}`} · нажимай на грядки`;
+  }
+
   itemInfo(f, it) {
     const st = f.st, n = Inv.count(st, it.key);
     const tags = it.tabs.map((k) => INV_TABS.find((t) => t.key === k).name).join(' · ');
@@ -786,6 +876,12 @@ export class UI {
   }
 }
 
+// время роста коротко, для клеток: «2 мин», «1,5 ч», «2 д»
+function fmtShort(s) {
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))} мин`;
+  if (s < 86400) return `${String(+(s / 3600).toFixed(1)).replace('.', ',')} ч`;
+  return `${String(+(s / 86400).toFixed(1)).replace('.', ',')} д`;
+}
 function fmtNum(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
 // сколько осталось: «5 ч 12 мин», «2 д 3 ч», «7 мин»
 function fmtLeft(ms) {

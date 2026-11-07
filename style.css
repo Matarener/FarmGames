@@ -443,6 +443,56 @@ body.moving .toast { bottom: calc(var(--safe-b) + 112px); }
 .move-bar.shake { animation: mb-shake .32s; }
 @keyframes mb-shake { 20% { transform: translateX(calc(-50% - 6px)); } 45% { transform: translateX(calc(-50% + 5px)); } 70% { transform: translateX(calc(-50% - 3px)); } }
 
+/* ---------- Посадка: сетка культур и плашка режима посадки ---------- */
+.pl-chips { display: flex; gap: 6px; margin: 0 0 10px; }
+.panel[data-kind="plant"] .pn-card, .panel[data-kind="sow"] .pn-card { max-height: 90%; }
+.pl-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px 6px; }
+.pl-cell { min-width: 0; display: flex; flex-direction: column; align-items: center; padding: 0; background: none; }
+.pl-cell > i {
+  position: relative; width: 100%; aspect-ratio: 1; border-radius: 12px; background: var(--paper-2);
+  border: 2px solid rgba(61,43,31,.18); display: flex; align-items: center; justify-content: center;
+}
+.pl-cell > i > .ic { width: 64%; height: 64%; }
+.pl-cell:not(.locked):active > i { background: #f0d9a8; }
+/* мешочек семян — снизу слева, рядом с числом: сверху справа время роста */
+.pl-cell .inv-badge { top: auto; bottom: 3px; left: 3px; width: 32%; height: 32%; }
+.pl-n { position: absolute; right: 4px; bottom: 1px; font-size: 12.5px; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+.pl-p {
+  position: absolute; right: 2px; bottom: 2px; display: inline-flex; align-items: center; gap: 1px; padding: 0 3px 0 4px;
+  border-radius: 7px; background: rgba(255,255,255,.88); font-size: 11px; line-height: 16px;
+}
+.pl-p .ic-s { width: 12px; height: 12px; margin: 0; vertical-align: 0; }
+.pl-lock { position: absolute; right: 3px; bottom: 3px; width: 34%; height: 34%; }
+.pl-t {
+  position: absolute; right: 2px; top: 2px; padding: 0 3px; border-radius: 6px; background: rgba(255,255,255,.85);
+  font-size: 9.5px; line-height: 14px; font-weight: 700; color: #5a4434; text-decoration: none; white-space: nowrap;
+}
+.pl-name { width: 100%; margin-top: 2px; font-size: 10.5px; line-height: 1.2; letter-spacing: -.1px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-cell.last > i { border-color: #d99a12; background: #fff3c4; }
+.pl-cell.poor > i > .ic { opacity: .55; }
+.pl-cell.poor .pl-p { color: #c0392b; }
+.pl-cell.locked > i > .ic { filter: grayscale(1); opacity: .45; }
+.pl-cell.locked .pl-name, .pl-cell.locked .pl-t { color: #a08a76; }
+@media (min-width: 420px) { .pl-grid { grid-template-columns: repeat(6, 1fr); } }
+@media (max-height: 500px) and (orientation: landscape) { .pl-grid { grid-template-columns: repeat(8, 1fr); } }
+
+.plant-bar {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--safe-b) + 10px); z-index: 25;
+  width: min(440px, calc(100% - 16px)); display: flex; align-items: center; gap: 6px;
+  background: var(--paper); border: 2.5px solid var(--ink); border-radius: 16px; padding: 5px 6px 5px 5px; box-shadow: 0 5px 0 rgba(0,0,0,.2);
+}
+.plant-bar[hidden] { display: none; }
+.pb-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 2px 6px 2px 2px; border-radius: 12px; text-align: left; }
+.pb-pick:active { background: #f0d9a8; }
+.pb-ic { width: 42px; height: 42px; flex: none; background: var(--paper-2); border-radius: 10px; }
+.pb-t { flex: 1; min-width: 0; }
+.pb-t b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-t span { display: block; font-size: 11.5px; font-weight: 600; color: #6b5442; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-more { flex: none; font-style: normal; font-size: 13px; color: #8a6a50; }
+.pb-x { flex: none; width: 44px; height: 44px; border-radius: 12px; background: rgba(61,43,31,.12); font-size: 18px; }
+.pb-x:active { background: rgba(61,43,31,.22); }
+body.planting .hud-bottom { display: none; }
+
 /* ---------- Меню «Ещё» и кнопка «К фермеру» ---------- */
 .nav-btn.on { background: linear-gradient(#ffe48a, #f2c15c); }
 .more-menu {
