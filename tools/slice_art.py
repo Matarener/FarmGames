@@ -17,38 +17,45 @@ DENSITY = 4  # пикселей на мировую единицу
 TILE_W, TILE_H = 64, 32
 YOUNG_K = 0.65  # молодое растение ниже взрослого во столько раз
 
+# Имена картинок: <вид>_<вариант>. Деревья — tree_<вид>, кусты — bush_<вид> (вид — ключ FLORA в
+# src/game/data.js), _bare — без плодов (после сбора), _young — молодое растение.
+
 # Лист → объекты по порядку (сверху вниз, слева направо) и ширина «пятачка» под объектом
-# в мировых единицах (по ней считается масштаб).
+# в мировых единицах (по ней считается масштаб). Отрицательная ширина: «пятачок» — весь ромб
+# объекта (ширина по краям картинки), опора — его центр.
 SHEETS = {
     'trees':  [('tree_oak', 62), ('tree_apple', 62), ('tree_sakura', 62), ('tree_pine', 60)],
-    'trees2': [('tree_blossom', 62), ('tree_autumn', 62), ('tree_birch', 60)],
-    'rocks':  [('rock_big', 118), ('rock_mid', 54), ('rock_small', 40), ('rock_moss', 116)],
-    'bushes': [('bush_blue', 40), ('bush_rasp', 40), ('bush_pink', 40),
-               ('bush_hydra', 40), ('bush_lav', 40), ('bush_rose', 40)],
-    # без плодов (после сбора): те же деревья и кусты, правка исходной картинки
-    'trees_apple_bare': [('tree_apple_bare', 62)],
-    'trees_cherry_bare': [('tree_blossom_bare', 62)],
-    'trees_sakura_bare': [('tree_sakura_bare', 62)],
-    'bushes_blue_bare': [('bush_blue_bare', 40)], 'bushes_rasp_bare': [('bush_rasp_bare', 40)],
-    'bushes_pink_bare': [('bush_pink_bare', 40)], 'bushes_hydra_bare': [('bush_hydra_bare', 40)],
-    'bushes_rose_bare': [('bush_rose_bare', 40)], 'bushes_lav_bare': [('bush_lav_bare', 40)],
-    # молодые растения (стадия 2 из 3): высота — YOUNG_K от взрослого (YOUNG ниже)
-    'young_oak': [('tree_oak_young', 62)], 'young_birch': [('tree_birch_young', 60)],
-    'young_sakura': [('tree_sakura_young', 62)], 'young_cherry': [('tree_blossom_young', 62)],
-    'young_maple': [('tree_autumn_young', 62)], 'young_apple': [('tree_apple_young', 62)],
-    'young_pine': [('tree_pine_young', 60)],
-    'youngb_blue': [('bush_blue_young', 40)], 'youngb_rasp': [('bush_rasp_young', 40)], 'youngb_pink': [('bush_pink_young', 40)],
-    'youngb_hydra': [('bush_hydra_young', 40)], 'youngb_lav': [('bush_lav_young', 40)], 'youngb_rose': [('bush_rose_young', 40)],
+    # вишня на этом листе цветёт: так она выглядит, пока ягоды отрастают после сбора
+    'trees2': [('tree_cherry_bare', 62), ('tree_maple', 62), ('tree_birch', 60)],
+    'rocks':  [('boulder', 118), ('rock', 54), ('rock_small', 40), ('boulder_moss', 116)],
+    'bushes': [('bush_blueberry', 40), ('bush_raspberry', 40), ('bush_rosehip', 40),
+               ('bush_hydrangea', 40), ('bush_lavender', 40), ('bush_rose', 40)],
     # ростки посаженных игроком растений (стадия 0): под деревья и под кусты
     'sprouts': [('sprout_tree', -30), ('sprout_bush', -32)],
-    # отрицательная ширина: «пятачок» — весь ромб объекта (ширина по краям картинки)
-    'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_moss', -42)],
-    'stumps2': [('stump_apple', -42), ('stump_sakura', -42), ('stump_blossom', -42), ('stump_autumn', -42)],
+    'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_oak_moss', -42)],
+    'stumps2': [('stump_apple', -42), ('stump_sakura', -42), ('stump_cherry', -42), ('stump_maple', -42)],
     'well': [('well_broken', 41), ('well_fixed', 42)],
     # дикая высокая трава (WILD): 3 варианта, «пятачок» — ромб чуть меньше клетки
     'grass_tall': [('grass_tall_0', -44), ('grass_tall_1', -48), ('grass_tall_2', -48)],
-    'house1': [('house_1', -132)], 'house2': [('house_2', -132)], 'house3': [('house_3', -132)], 'house4': [('house_4', -132)], 'house5': [('house_5', -132)],
 }
+# Листы с одной картинкой: лист называется так же, как картинка. Значение — ширина «пятачка».
+SINGLE = {
+    # с плодами и без плодов: правка исходной картинки того же растения
+    'tree_cherry': 62,  # вишня с ягодами (созревшая)
+    'tree_apple_bare': 62, 'tree_sakura_bare': 62,
+    'bush_blueberry_bare': 40, 'bush_raspberry_bare': 40, 'bush_rosehip_bare': 40,
+    'bush_hydrangea_bare': 40, 'bush_lavender_bare': 40, 'bush_rose_bare': 40,
+    # молодые растения (росток → молодое → взрослое): высота — YOUNG_K от взрослого (YOUNG_OF — от какого)
+    'tree_oak_young': 62, 'tree_birch_young': 60, 'tree_sakura_young': 62, 'tree_cherry_young': 62,
+    'tree_maple_young': 62, 'tree_apple_young': 62, 'tree_pine_young': 60,
+    'bush_blueberry_young': 40, 'bush_raspberry_young': 40, 'bush_rosehip_young': 40,
+    'bush_hydrangea_young': 40, 'bush_lavender_young': 40, 'bush_rose_young': 40,
+    # дом по уровням
+    'house_1': -132, 'house_2': -132, 'house_3': -132, 'house_4': -132, 'house_5': -132,
+}
+SHEETS.update({name: [(name, w)] for name, w in SINGLE.items()})
+# молодое растение по высоте взрослого: по умолчанию — <имя без _young>
+YOUNG_OF = {'tree_cherry_young': 'tree_cherry_bare'}  # молодая вишня — по цветущей
 # Урожай: лист = 5 стадий слева направо, сверху вниз; в игре 4 стадии (третью пропускаем).
 # Растения заполняют ромб грядки: масштаб по ширине, опора — центр ромба.
 CROPS = {'crop_wheat': 'wheat', 'crop_carrot': 'carrot', 'crop_beet': 'beet',
@@ -75,7 +82,7 @@ GRID_SHEETS = {
 BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), None, None]}
 WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)
 # третья плитка листа — голая земля (грядки рисуются объёмными, плитка не нужна)
-TILE_SHEETS = [('tiles', ['tile_grass', 'tile_flowers', None, 'tile_sand'])]
+TILE_SHEETS = [('tiles', ['tile_grass', 'tile_grass_flowers', None, 'tile_path'])]
 
 
 # Иконки интерфейса: листы на тёмном фоне со свечением (не прозрачные) — фон срезаем по контуру.
@@ -227,15 +234,16 @@ def main(only=None):
                 bw, bx, by = base_of(crop)
                 # у деревьев «пятачок» травы — ромб, его самая широкая строка и есть центр
                 # (как у пней, иначе пень встаёт выше дерева)
-                if sheet.startswith('trees') or sheet.startswith('young_'): by += bw / 4
+                if name.startswith('tree_'): by += bw / 4
                 # у колодца самая широкая строка — середина круглой кладки; опора — от низа кладки
                 # под центром (иначе колодец «съезжает» на клетку перед собой)
                 if sheet == 'well':
                     mm = crop[..., 3] > 128; c = int(bx)
                     by = np.where(mm[:, max(0, c - 3):c + 3].any(1))[0].max()
             k = base_w / bw  # мир/пиксель
-            if name.endswith('_young') and name[:-6] in man:  # по высоте взрослого
-                k = YOUNG_K * man[name[:-6]]['h'] / (y1 - y0)
+            if name.endswith('_young'):  # молодое — по высоте взрослого
+                adult = YOUNG_OF.get(name, name[:-len('_young')])
+                if adult in man: k = YOUNG_K * man[adult]['h'] / (y1 - y0)
             W, H = (x1 - x0) * k, (y1 - y0) * k
             img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
             # опора — центр ромба основания (низ минус четверть ширины)
@@ -339,7 +347,7 @@ def main(only=None):
 
     # Текстура воды: бесшовная, вид сверху. Игра кладёт её на весь пруд по координатам карты
     # (128 px на клетку). Делаем светлее и сочнее под общий стиль.
-    src = os.path.join(SRC, 'tex_water_src.png')
+    src = os.path.join(SRC, 'tex_water.png')
     if os.path.exists(src):
         t = np.array(Image.open(src).convert('RGB')).astype(np.float32)
         t = np.clip(t * WATER_GAIN + np.array(WATER_LIFT), 0, 255).astype(np.uint8)

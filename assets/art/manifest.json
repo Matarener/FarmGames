@@ -23,13 +23,13 @@
   "ax": 31.61,
   "ay": 76.96
  },
- "tree_blossom": {
+ "tree_cherry_bare": {
   "w": 98.6,
   "h": 112.38,
   "ax": 46.93,
   "ay": 98.38
  },
- "tree_autumn": {
+ "tree_maple": {
   "w": 96.84,
   "h": 110.94,
   "ax": 46.14,
@@ -41,13 +41,13 @@
   "ax": 51.52,
   "ay": 133.48
  },
- "rock_big": {
+ "boulder": {
   "w": 127.31,
   "h": 89.31,
   "ax": 61.47,
   "ay": 44.42
  },
- "rock_mid": {
+ "rock": {
   "w": 58.63,
   "h": 37.79,
   "ax": 30.17,
@@ -59,37 +59,37 @@
   "ax": 20.6,
   "ay": 10.83
  },
- "rock_moss": {
+ "boulder_moss": {
   "w": 126.49,
   "h": 71.0,
   "ax": 63.46,
   "ay": 29.11
  },
- "bush_blue": {
+ "bush_blueberry": {
   "w": 53.54,
   "h": 54.77,
   "ax": 25.78,
   "ay": 34.8
  },
- "bush_rasp": {
+ "bush_raspberry": {
   "w": 55.68,
   "h": 55.43,
   "ax": 27.9,
   "ay": 35.43
  },
- "bush_pink": {
+ "bush_rosehip": {
   "w": 55.88,
   "h": 55.14,
   "ax": 27.63,
   "ay": 35.17
  },
- "bush_hydra": {
+ "bush_hydrangea": {
   "w": 54.77,
   "h": 57.6,
   "ax": 27.02,
   "ay": 37.14
  },
- "bush_lav": {
+ "bush_lavender": {
   "w": 53.25,
   "h": 58.77,
   "ax": 26.75,
@@ -119,7 +119,7 @@
   "ax": 21.0,
   "ay": 16.69
  },
- "stump_moss": {
+ "stump_oak_moss": {
   "w": 42.13,
   "h": 28.46,
   "ax": 21.0,
@@ -137,13 +137,13 @@
   "ax": 21.0,
   "ay": 14.26
  },
- "stump_blossom": {
+ "stump_cherry": {
   "w": 42.13,
   "h": 26.28,
   "ax": 21.07,
   "ay": 15.65
  },
- "stump_autumn": {
+ "stump_maple": {
   "w": 42.13,
   "h": 25.9,
   "ax": 21.06,
@@ -209,13 +209,13 @@
   "ax": 33.0,
   "ay": 16.5
  },
- "tile_flowers": {
+ "tile_grass_flowers": {
   "w": 66,
   "h": 33,
   "ax": 33.0,
   "ay": 16.5
  },
- "tile_sand": {
+ "tile_path": {
   "w": 66,
   "h": 33,
   "ax": 33.0,
@@ -503,7 +503,7 @@
   "ax": 45.22,
   "ay": 83.42
  },
- "tree_blossom_bare": {
+ "tree_cherry": {
   "w": 95.57,
   "h": 108.36,
   "ax": 46.15,
@@ -515,31 +515,31 @@
   "ax": 45.26,
   "ay": 80.37
  },
- "bush_blue_bare": {
+ "bush_blueberry_bare": {
   "w": 52.75,
   "h": 53.97,
   "ax": 25.64,
   "ay": 34.22
  },
- "bush_rasp_bare": {
+ "bush_raspberry_bare": {
   "w": 54.4,
   "h": 54.34,
   "ax": 27.22,
   "ay": 34.52
  },
- "bush_pink_bare": {
+ "bush_rosehip_bare": {
   "w": 54.17,
   "h": 53.74,
   "ax": 27.3,
   "ay": 34.05
  },
- "bush_hydra_bare": {
+ "bush_hydrangea_bare": {
   "w": 54.07,
   "h": 55.99,
   "ax": 27.01,
   "ay": 35.88
  },
- "bush_lav_bare": {
+ "bush_lavender_bare": {
   "w": 50.54,
   "h": 56.29,
   "ax": 25.57,
@@ -581,13 +581,13 @@
   "ax": 21.18,
   "ay": 49.98
  },
- "tree_blossom_young": {
+ "tree_cherry_young": {
   "w": 52.81,
   "h": 73.05,
   "ax": 26.29,
   "ay": 63.95
  },
- "tree_autumn_young": {
+ "tree_maple_young": {
   "w": 56.48,
   "h": 72.11,
   "ax": 26.96,
@@ -599,31 +599,31 @@
   "ax": 24.71,
   "ay": 55.18
  },
- "bush_blue_young": {
+ "bush_blueberry_young": {
   "w": 30.45,
   "h": 35.6,
   "ax": 15.6,
   "ay": 23.02
  },
- "bush_rasp_young": {
+ "bush_raspberry_young": {
   "w": 30.6,
   "h": 36.03,
   "ax": 15.19,
   "ay": 23.81
  },
- "bush_pink_young": {
+ "bush_rosehip_young": {
   "w": 32.18,
   "h": 35.84,
   "ax": 16.29,
   "ay": 23.22
  },
- "bush_hydra_young": {
+ "bush_hydrangea_young": {
   "w": 32.31,
   "h": 37.44,
   "ax": 15.82,
   "ay": 23.87
  },
- "bush_lav_young": {
+ "bush_lavender_young": {
   "w": 33.27,
   "h": 38.2,
   "ax": 16.54,

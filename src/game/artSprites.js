@@ -2,20 +2,20 @@
 // игра не открывается, пока не загружены все картинки (графика из кода игроку не показывается).
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
+import { FLORA } from './data.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
 const BASE = 'assets/art/';
 
-// Какие картинки у каких объектов (у камней и пней вариант выбирается по id объекта)
+// Какие картинки у каких объектов (у камней и пней вариант выбирается по id объекта).
+// Деревья и кусты — по имени вида: tree_<вид> / bush_<вид>, а ещё <имя>_bare (без плодов) и <имя>_young.
 const OBJ = {
-  oak: ['tree_oak'], birch: ['tree_birch'], sakura: ['tree_sakura'], cherry: ['tree_blossom'], maple: ['tree_autumn'],
-  apple: ['tree_apple'], pine: ['tree_pine'],
-  blueberry: ['bush_blue'], raspberry: ['bush_rasp'], rosehip: ['bush_pink'], hydrangea: ['bush_hydra'], lavender: ['bush_lav'], rose: ['bush_rose'],
-  rock: ['rock_mid', 'rock_small'],
-  boulder: ['rock_big', 'rock_moss'],
-  stump: ['stump_oak', 'stump_birch', 'stump_pine', 'stump_moss'],
+  rock: ['rock', 'rock_small'],
+  boulder: ['boulder', 'boulder_moss'],
+  stump: ['stump_oak', 'stump_birch', 'stump_pine', 'stump_oak_moss'],
 };
+for (const [k, f] of Object.entries(FLORA)) OBJ[k] = [f.kind + '_' + k];
 
 // Иконка саженца: само растение в квадрате 64×64
 function iconOf(s) {
@@ -76,12 +76,7 @@ export async function loadArt(onProgress) {
     // file:// не даёт читать пиксели картинок — тогда без своих иконок
     try { floraIcons['sap_' + type] = floraIcons['own_' + type] = iconOf(s); } catch (e) { /* */ }
   }
-  // вишня: цветёт, пока плоды отрастают, а созревшая — с ягодами (картинки художника наоборот)
-  if (A.tree_blossom_bare && obj.cherry && obj.cherry[0] && flora.cherry) {
-    const bloom = obj.cherry[0];
-    obj.cherry = [A.tree_blossom_bare]; flora.cherry.bare = bloom;
-  }
-  try { if (A.tile_sand) floraIcons.path = iconOf(A.tile_sand); } catch (e) { /* */ }
+  try { floraIcons.path = iconOf(A.tile_path); } catch (e) { /* */ }
   const crops = {};
   for (const name of Object.keys(A)) {
     const m = /^crop_(\w+)_(\d)$/.exec(name);
@@ -99,13 +94,13 @@ export async function loadArt(onProgress) {
     stumpOf: (tree, id) => {
       const k = tree && tree.name && tree.name.replace('tree_', '').replace(/_bare$/, '');
       if (!k) return null;
-      return (k === 'oak' && id % 3 === 0 && A.stump_moss) || A['stump_' + k] || null;
+      return (k === 'oak' && id % 3 === 0 && A.stump_oak_moss) || A['stump_' + k] || null;
     },
     house: [null, A.house_1, A.house_2, A.house_3, A.house_4, A.house_5],
     well: [A.well_broken, A.well_fixed],
     // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%)
-    grass: [A.tile_grass, flipped(A.tile_grass), A.tile_flowers, flipped(A.tile_flowers)],
-    path: [A.tile_sand, flipped(A.tile_sand)],
+    grass: [A.tile_grass, flipped(A.tile_grass), A.tile_grass_flowers, flipped(A.tile_grass_flowers)],
+    path: [A.tile_path, flipped(A.tile_path)],
     // объёмные грядки: [сухая, политая]; рисуются поверх травы
     bed: [A.bed_dry, A.bed_wet],
     // вода: бесшовная текстура на весь пруд, берег рисуется кодом (shore.js)
