@@ -80,9 +80,20 @@ export class UI {
   toast(msg, kind) {
     const t = h('div', 'toast-item' + (kind ? ' ' + kind : ''), msg);
     this.toastEl.appendChild(t);
-    while (this.toastEl.children.length > 3) this.toastEl.firstChild.remove();
-    setTimeout(() => t.classList.add('hide'), 2200);
-    setTimeout(() => t.remove(), 2600);
+    // лишние старые уходят плавно (а не исчезают рывком, сдвигая остальные)
+    const live = [...this.toastEl.children].filter((e) => !e.classList.contains('hide'));
+    for (let i = 0; i < live.length - 3; i++) this.toastOut(live[i]);
+    setTimeout(() => this.toastOut(t), 2200);
+  }
+
+  // уведомление тает и плавно схлопывается по высоте — соседние съезжают мягко
+  toastOut(t) {
+    if (t.classList.contains('hide')) return;
+    t.style.height = t.offsetHeight + 'px';
+    void t.offsetHeight; // зафиксировать высоту, чтобы переход сработал
+    t.classList.add('hide');
+    t.style.height = '0px';
+    setTimeout(() => t.remove(), 450);
   }
 
   levelUp(level, opened, coins) {
