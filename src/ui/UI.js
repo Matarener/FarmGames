@@ -92,7 +92,8 @@ export class UI {
   hint(name, id) {
     const e = name === 'quest' ? $(`.quest-card[data-id="${id}"]`, this.root) || $(HINT_EL.quest, this.root) : name && $(HINT_EL[name], this.root);
     if (this._hintEl === e) return;
-    if (this._hintEl) this._hintEl.classList.remove('hint');
+    // снимаем со всех, а не только с запомненной: стрелка не должна остаться висеть у кнопки
+    for (const o of this.root.querySelectorAll('.hint')) if (o !== e) o.classList.remove('hint');
     this._hintEl = e || null;
     if (e) e.classList.add('hint');
   }
@@ -190,7 +191,8 @@ export class UI {
     const box = $('#quest-cards');
     box.innerHTML = '';
     this._safe = null; // высота карточек могла поменяться
-    this._hintEl = null;
+    // карточки пересозданы: если стрелка была на старой карточке, она ушла вместе с ней
+    if (this._hintEl && !this._hintEl.isConnected) this._hintEl = null;
     for (const q of list) {
       const done = q.done, g = q.goal, pct = (done ? 1 : g.p / g.n) * 100;
       // число не отрывается от соседнего слова при переносе: «Полей грядки / 2 раза», а не «Полей грядки 2 / раза»
