@@ -8,6 +8,7 @@ import * as Plant from '../game/planting.js';
 import * as R from '../game/questRules.js';
 import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ, MAX_PINS } from '../game/questData.js';
 import { GIFT_TABS, DAILY_GIFT } from '../game/giftData.js';
+import { WHEEL } from '../game/wheelData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 
@@ -59,6 +60,7 @@ export class UI {
     $('#btn-market').onclick = () => this.marketPanel(farm);
     $('#btn-quests').onclick = () => this.questPanel(farm);
     $('#btn-gift').onclick = () => this.giftPanel(farm, 'daily');
+    $('#btn-wheel').onclick = () => this.wheelPanel(farm);
     $('#btn-center').onclick = () => { farm.player.worldPos(this._p = this._p || {}); farm.cam.centerOn(this._p.x, this._p.y - 20); };
     $('#energy-pill').onclick = () => this.bagPanel(farm);
     $('#btn-more').onclick = () => this.toggleMore();
@@ -101,8 +103,8 @@ export class UI {
     if (this._safe) return this._safe;
     const R = this.root.getBoundingClientRect();
     const box = (sel) => { const e = $(sel, this.root); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return r.width ? r : null; };
-    const hud = box('.hud-top'), qc = box('#quest-cards'), nav = box('#btn-bag'), fab = box('#btn-center'), gift = box('#btn-gift');
-    const t = Math.max(hud ? hud.bottom : 0, qc ? qc.bottom : 0, gift ? gift.bottom : 0) - R.top + 4;
+    const hud = box('.hud-top'), qc = box('#quest-cards'), nav = box('#btn-bag'), fab = box('#btn-center'), side = box('.hud-side');
+    const t = Math.max(hud ? hud.bottom : 0, qc ? qc.bottom : 0, side ? side.bottom : 0) - R.top + 4;
     const b = Math.min(nav ? nav.top : R.bottom, fab ? fab.top : R.bottom) - R.top - 4;
     this._safe = { l: 6, t, r: R.width - 6, b: Math.max(t + 40, b) };
     return this._safe;
@@ -115,17 +117,21 @@ export class UI {
   update(f) {
     const st = f.st;
     this.set('hud-level', st.level);
-    this.set('hud-coins', fmtNum(st.coins));
-    this.set('hud-gems', fmtNum(st.gems));
+    // пока крутится колесо, приз ещё не показан: в кошельке — без него (только цена вращения списана)
+    const hold = this._wspin && this._wspin.hold;
+    this.set('hud-coins', fmtNum(hold ? hold.coins : st.coins));
+    this.set('hud-gems', fmtNum(hold ? hold.gems : st.gems));
     this.set('hud-energy', `${st.energy}/${f.maxEnergy}`);
     this.set('hud-can', `${st.can}/${f.canMax}`);
     const pct = Math.min(100, (st.xp / xpToNext(st.level)) * 100).toFixed(1) + '%';
     if (this.last.xp !== pct) { this.last.xp = pct; $('#hud-xp').style.width = pct; }
     this.questCards(f);
     this.giftTick(f, false);
+    this.wheelTick(f, false);
     this.tick(f);
     const kind = this.panelEl.dataset.kind;
-    if (kind && kind !== 'settings' && this.panelOpen) this.refreshPanel();
+    // окно колеса не пересобирается, пока оно крутится (иначе вращение оборвётся)
+    if (kind && kind !== 'settings' && this.panelOpen && !(kind === 'wheel' && this._wspin)) this.refreshPanel();
     this.plantBar(f);
   }
 
@@ -133,6 +139,7 @@ export class UI {
     const full = f.st.energy >= f.maxEnergy;
     this.set('hud-energy-t', full ? '' : fmtClock(f.energyLeftSec()));
     this.giftTick(f, true);
+    this.wheelTick(f, true);
     if (this.popupEl.classList.contains('show') && this._popupTick) this._popupTick();
   }
 
@@ -428,6 +435,7 @@ export class UI {
       () => this.plantPanel(f, null),
       () => this.housePanel(f),
       () => this.giftPanel(f),
+      () => this.wheelPanel(f),
       () => this.settingsPanel(f),
       () => { this.closePanel(); this.toggleMore(true); },
       () => { this.toggleMore(false); this.popup(this.root.clientWidth / 2, this.root.clientHeight / 2, { title: 'Дуб', text: 'Срубить', cost: { wood: 1 }, items: [{ icon: 'axe', label: 'Срубить', sub: '1', onClick() {} }] }); },
@@ -479,6 +487,7 @@ export class UI {
       { label: 'Переставить', icon: 'move', open: () => f.mover.enter() },
       { label: 'Дом', icon: 'house', open: () => this.housePanel(f) },
       { label: 'Подарки', icon: 'gift', open: () => this.giftPanel(f, 'daily'), dot: f.gifts.available() > 0 },
+      { label: 'Колесо', icon: 'wheel', open: () => this.wheelPanel(f), dot: f.wheel.freeLeft() > 0 },
       { label: 'Настройки', icon: 'gear', open: () => this.settingsPanel(f) },
       { label: 'Животные', icon: 'paw', soon: true },
       { label: 'Мастерская', icon: 'build', soon: true },
@@ -598,7 +607,7 @@ export class UI {
   // Проверка заданий без ожидания настоящих дат (только с ?debug в адресе)
   devQuests(f, body) {
     const d = f.dev, now = f.quests.ctx().now;
-    body.appendChild(h('div', 'pn-sub', 'Проверка заданий и подарков'));
+    body.appendChild(h('div', 'pn-sub', 'Проверка заданий, подарков и колеса'));
     body.appendChild(h('div', 'pn-text', `Время заданий: ${new Date(now + QUEST_TZ * 3600e3).toISOString().slice(0, 16).replace('T', ' ')} МСК` +
       `${d.shift ? ` (сдвиг ${Math.round(d.shift / 3600e3)} ч)` : ''} · событие: ${d.event ? EVENT_NAME(d.event) : 'по датам'}`));
     const row = h('div', 'gfx-row');
@@ -608,6 +617,7 @@ export class UI {
     btn('Сейчас', () => f.setDev({ shift: 0 }));
     btn('Событие', () => { const i = EVENTS.findIndex((e) => e.id === d.event); f.setDev({ event: i + 1 < EVENTS.length ? EVENTS[i + 1].id : null }); });
     btn('Подарки заново', () => f.gifts.devReset());
+    btn('Колесо заново', () => f.wheel.devReset());
     body.appendChild(row);
   }
 
@@ -621,10 +631,9 @@ export class UI {
       const was = this.last.gift;
       this.last.gift = n;
       $('#btn-gift').hidden = !n;
-      document.body.classList.toggle('gift-on', !!n);
       const badge = $('#gift-badge');
       badge.hidden = n < 2; badge.textContent = n;
-      this._safe = null;
+      this.sideSync();
       if (fromTick && open && was != null) this.refreshPanel();
     }
     if (fromTick && open) { const e = $('#gf-next', this.panelEl); if (e) e.textContent = fmtLeft(f.gifts.daily().next - f.gifts.ctx().now); }
@@ -701,6 +710,130 @@ export class UI {
     body.appendChild(h('div', 'pn-text gf-note', `Заходи каждый день и забирай подарок: каждый 7-й день — кристаллы, а на ${len}-й — сундук с кристаллами. ` +
       (DAILY_GIFT.resetOnMiss ? 'Пропустишь день — дорожка начнётся с первого дня.' : 'Пропущенные дни не сгорают: следующий подарок ждёт тебя.')));
     body.appendChild(act);
+  }
+
+  // Сколько кнопок в колонке справа (подарок, колесо): счётчик FPS встаёт под ними, стрелка-подсказка — ниже
+  sideSync() {
+    document.body.dataset.side = ['#btn-gift', '#btn-wheel'].filter((s) => !$(s, this.root).hidden).length;
+    this._safe = null;
+  }
+
+  // ---------- Колесо фортуны ----------
+  // Кнопка колеса (под подарком) видна и светится, пока есть бесплатное вращение на сегодня.
+  // Раз в секунду (fromTick) — ещё и новый день: окно колеса обновляется, время до бесплатного идёт.
+  wheelTick(f, fromTick) {
+    const n = f.wheel.freeLeft(), open = this.panelOpen && this.panelEl.dataset.kind === 'wheel';
+    if (this.last.wheel !== n && !this._wspin) { // кнопка гаснет, когда колесо остановится
+      const was = this.last.wheel;
+      this.last.wheel = n;
+      $('#btn-wheel').hidden = !n;
+      this.sideSync();
+      if (fromTick && open && was != null && !this._wspin) this.refreshPanel();
+    }
+    if (fromTick && open) { const e = $('#wh-next', this.panelEl); if (e) e.textContent = fmtLeft(f.wheel.view().next - f.wheel.ctx().now); }
+  }
+
+  wheelPanel(f) { this.openPanel('wheel', 'Колесо фортуны', (body) => this.wheelBody(f, body)); }
+
+  // Колесо: сектора из WHEEL.sectors по часовой стрелке от верхнего, стрелка сверху неподвижна.
+  // Угол колеса помнится (_whA): окно пересобирается — колесо стоит там же, где остановилось.
+  wheelBody(f, body) {
+    const v = f.wheel.view(), S = WHEEL.sectors, seg = 360 / S.length;
+    const wrap = h('div', 'wh-wrap' + (this._wspin ? ' spinning' : ''));
+    const box = h('div', 'wh-box');
+    box.innerHTML = `<div class="wh-wheel" style="transform:rotate(${this._whA || 0}deg)">${this.wheelSvg(S, seg)}` +
+      S.map((s, i) => this.wheelPrize(s, i, seg)).join('') + '</div>' +
+      '<svg class="wh-ptr" viewBox="0 0 40 50" aria-hidden="true"><path d="M20 47 L6 17 A15.5 15.5 0 1 1 34 17 Z" fill="#e2483b" stroke="#3d2b1f" stroke-width="3" stroke-linejoin="round"/>' +
+      '<circle cx="20" cy="15.5" r="6" fill="#ffd45a" stroke="#3d2b1f" stroke-width="2"/><circle cx="18" cy="13.5" r="1.8" fill="#fff8d0"/></svg>';
+    this._whWin = null;
+    wrap.appendChild(box);
+    const ctl = h('div', 'wh-ctl');
+    wrap.appendChild(ctl);
+    body.appendChild(wrap);
+    if (!v.open) { ctl.appendChild(h('div', 'pn-text wh-note', `Колесо фортуны откроется с ${WHEEL.level} уровня.`)); return; }
+    const act = h('div', 'wh-act');
+    if (v.freeLeft) {
+      const b = h('button', 'btn-main gf-get', 'Крутить бесплатно');
+      b.onclick = () => this.wheelSpin(f, 'free');
+      act.appendChild(b);
+    } else {
+      const total = WHEEL.coins.length;
+      const cb = h('button', 'btn-main wh-btn' + (v.coinLeft && !v.can.coins ? ' lack' : ''), v.coinLeft ?
+        `<span>Крутить за ${fmtNum(v.coinCost)} ${this.ic('coin')}</span><small>ещё ${v.coinLeft} из ${total} сегодня</small>` :
+        `<span>За ${this.ic('coin')} — завтра</span><small>сегодня уже ${total} из ${total}</small>`);
+      cb.disabled = !v.coinLeft;
+      cb.onclick = () => this.wheelSpin(f, 'coins');
+      const gb = h('button', 'btn-main wh-btn gem' + (v.can.gems ? '' : ' lack'), `<span>Крутить за ${v.gemCost} ${this.ic('gem')}</span><small>сколько хочешь</small>`);
+      gb.onclick = () => this.wheelSpin(f, 'gems');
+      act.append(cb, gb);
+    }
+    if (this._wspin) for (const b of act.querySelectorAll('button')) b.disabled = true;
+    ctl.appendChild(act);
+    const now = f.wheel.ctx().now;
+    ctl.appendChild(h('div', 'pn-text wh-note', (v.freeLeft ? 'Бесплатно — раз в день.' : `Бесплатное вращение через <b id="wh-next">${fmtLeft(v.next - now)}</b>.`) +
+      ` За монеты — ${WHEEL.coins.length} раз в день, за кристаллы — сколько хочешь. Главный приз — ${this.rewardHtml(S.find((s) => s.big) || S[0])}!`));
+  }
+
+  wheelSvg(S, seg) {
+    const COLORS = ['#e2483b', '#f6c431', '#6dba3b', '#3f8fdc'], R = 84, rad = Math.PI / 180;
+    const pt = (a, r) => `${(r * Math.sin(a * rad)).toFixed(2)} ${(-r * Math.cos(a * rad)).toFixed(2)}`;
+    const arc = (i, r) => `M0 0 L${pt(i * seg - seg / 2, r)} A${r} ${r} 0 0 1 ${pt(i * seg + seg / 2, r)} Z`;
+    let c = 0, out = '<svg viewBox="-100 -100 200 200" aria-hidden="true"><defs>' +
+      '<radialGradient id="whRim" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#ffe27a"/><stop offset="1" stop-color="#d9951c"/></radialGradient>' +
+      '<radialGradient id="whShine" cx="50%" cy="50%" r="50%"><stop offset=".25" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>' +
+      '<radialGradient id="whHub" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="#fff1a8"/><stop offset="1" stop-color="#e0a020"/></radialGradient></defs>' +
+      '<circle r="98" fill="url(#whRim)" stroke="#3d2b1f" stroke-width="3"/>';
+    S.forEach((s, i) => { out += `<path d="${arc(i, R)}" fill="${s.big ? '#9a5fd8' : COLORS[c++ % COLORS.length]}" stroke="#3d2b1f" stroke-width="1.8" stroke-linejoin="round"/>`; });
+    if (this._whWin != null) out += `<path class="wh-win" d="${arc(this._whWin, R)}" fill="#fff"/>`;
+    out += `<circle r="${R}" fill="url(#whShine)"/><circle r="${R}" fill="none" stroke="#3d2b1f" stroke-width="2.6"/>`;
+    for (let i = 0; i < 16; i++) out += `<circle cx="${(91 * Math.sin(i * 22.5 * rad)).toFixed(2)}" cy="${(-91 * Math.cos(i * 22.5 * rad)).toFixed(2)}" r="3.6" fill="#fff6c4" stroke="#b9791a" stroke-width="1.2"/>`;
+    return out + '<circle r="13" fill="url(#whHub)" stroke="#3d2b1f" stroke-width="2.6"/><circle cx="-4" cy="-4.5" r="3.2" fill="#fffbe0" opacity=".85"/></svg>';
+  }
+
+  wheelPrize(s, i, seg) {
+    const p = this.giftParts(s)[0];
+    const inner = s.big ? `${this.ic('chest', 'wh-ic')}<b>${fmtNum(p.n)}${this.ic(p.icon, 'wh-mini')}</b>` : `${this.ic(p.icon, 'wh-ic')}<b>${fmtNum(p.n)}</b>`;
+    return `<div class="wh-prize" style="transform:rotate(${i * seg}deg)">${inner}</div>`;
+  }
+
+  // Крутить: правила сразу решают сектор, списывают цену и начисляют приз (так будет и на сервере),
+  // а окно ~4.5 с крутит колесо до этого сектора и только потом показывает приз. Щёлкает на каждом секторе.
+  wheelSpin(f, mode) {
+    if (this._wspin) return;
+    const st = f.st, hold = { coins: st.coins, gems: st.gems };
+    this._wspin = { hold };
+    const r = f.wheel.spin(mode);
+    if (!r) {
+      this._wspin = null;
+      const v = f.wheel.view();
+      this.toast(mode === 'coins' && v.coinLeft ? 'Не хватает монет' : mode === 'gems' ? 'Не хватает кристаллов' : 'Сейчас так крутить нельзя', 'warn');
+      this.sfx('error');
+      return;
+    }
+    hold.coins -= r.cost.coins || 0; hold.gems -= r.cost.gems || 0;
+    this.update(f);
+    const S = WHEEL.sectors, seg = 360 / S.length, from = this._whA || 0, DUR = 4600, EASE = [0.12, 0.72, 0.14, 1];
+    const aim = -(r.idx * seg) + (Math.random() - 0.5) * seg * 0.7; // куда-то внутрь сектора (не на границу)
+    const to = from + 5 * 360 + ((((aim - from) % 360) + 360) % 360);
+    this._whA = to;
+    const el = $('.wh-wheel', this.panelEl), wrap = $('.wh-wrap', this.panelEl);
+    if (el) {
+      void el.offsetWidth;
+      el.style.transition = `transform ${DUR}ms cubic-bezier(${EASE.join(',')})`;
+      el.style.transform = `rotate(${to}deg)`;
+    }
+    if (wrap) { wrap.classList.add('spinning'); for (const b of wrap.querySelectorAll('.wh-act button')) b.disabled = true; }
+    if (f.audio && !this._quiet) for (const d of wheelTicks(from, to, seg, DUR, EASE)) f.audio.play('tick', d);
+    this._wspin.t = setTimeout(() => this.wheelDone(f, r), DUR + 120);
+  }
+
+  wheelDone(f, r) {
+    this._wspin = null;
+    this._whWin = r.idx;
+    this.toast(`${r.reward.big ? 'Главный приз! ' : 'Колесо фортуны: '}+${this.rewardHtml(r.reward)}`, 'good');
+    this.sfx(r.reward.big ? 'level' : 'coin');
+    f.player.celebrate();
+    this.update(f);
   }
 
   housePanel(f) {
@@ -1058,6 +1191,23 @@ function fmtShort(s) {
   if (s < 3600) return `${Math.max(1, Math.round(s / 60))} мин`;
   if (s < 86400) return `${String(+(s / 3600).toFixed(1)).replace('.', ',')} ч`;
   return `${String(+(s / 86400).toFixed(1)).replace('.', ',')} д`;
+}
+// Когда стрелка проходит границу сектора: колесо крутится от from до to градусов за dur мс по кривой
+// cubic-bezier(ease). Возвращает задержки щелчков в секундах (не чаще, чем раз в 45 мс).
+function wheelTicks(from, to, seg, dur, [x1, y1, x2, y2]) {
+  const bz = (a, b, s) => 3 * (1 - s) * (1 - s) * s * a + 3 * (1 - s) * s * s * b + s * s * s;
+  const out = [];
+  let last = -1;
+  // границы секторов проходят под стрелкой, когда угол колеса = seg/2 + k·seg
+  for (let a = Math.ceil((from - seg / 2) / seg) * seg + seg / 2; a < to; a += seg) {
+    if (a <= from) continue;
+    const p = (a - from) / (to - from);
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (bz(y1, y2, m) < p) lo = m; else hi = m; }
+    const t = bz(x1, x2, (lo + hi) / 2) * dur / 1000;
+    if (t - last >= 0.045) { out.push(t); last = t; }
+  }
+  return out;
 }
 function fmtNum(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
 // сколько осталось: «5 ч 12 мин», «2 д 3 ч», «7 мин»

@@ -10,6 +10,7 @@ import { shoreTile } from './shore.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Gifts } from './gifts.js';
+import { Wheel } from './wheel.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
 import * as Wild from './wild.js';
@@ -39,6 +40,7 @@ export class Farm {
     this.time = 0;
     this.quests = new Quests(this);
     this.gifts = new Gifts(this);
+    this.wheel = new Wheel(this);
     // Проверка заданий (только с ?debug в адресе): сдвиг часов заданий и событие (окно «Настройки»)
     this.devOn = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
     this.dev = {};
