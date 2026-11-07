@@ -23,7 +23,6 @@ export class Farm {
   constructor({ renderer, camera, ui, tg, save, perf, audio }) {
     this.audio = audio;
     this.r = renderer; this.cam = camera; this.ui = ui; this.tg = tg; this.save = save; this.perf = perf;
-    this.drawList = [];
     this.particles = [];
     this.floaters = [];
     this.hover = null;
@@ -452,17 +451,21 @@ export class Farm {
     this.hover = { x: Math.floor(tmp2.x), y: Math.floor(tmp2.y) };
   }
 
+  // Объект, чья картинка под точкой мира (wx, wy): крона дерева, крыша дома. Из нескольких —
+  // ближний к зрителю (рисуется поверх). Рамка уже картинки: прозрачные края кроны не должны
+  // перехватывать нажатия по соседним клеткам.
   pick(wx, wy) {
-    const L = this.drawList;
-    for (let i = L.length - 1; i >= 0; i--) {
-      const d = L[i];
-      if (d.kind !== 'o') continue;
-      const s = this.objSprite(d);
-      const big = d.type === 'house' || d.type === 'boulder';
+    let best = null;
+    for (const o of this.world.objects) {
+      if (!o) continue;
+      const s = this.objSprite(o);
+      const big = o.type === 'house' || o.type === 'boulder';
       const kx = big ? 0.9 : 0.62;
-      if (wx >= d.wx - s.ax * kx && wx <= d.wx + (s.w - s.ax) * kx && wy >= d.wy - s.ay * 0.92 && wy <= d.wy + (big ? (s.h - s.ay) * 0.8 : 6)) return d;
+      const hit = wx >= o.wx - s.ax * kx && wx <= o.wx + (s.w - s.ax) * kx &&
+        wy >= o.wy - s.ay * 0.92 && wy <= o.wy + (big ? (s.h - s.ay) * 0.8 : 6);
+      if (hit && (!best || o.depth > best.depth || (o.depth === best.depth && o.wy > best.wy))) best = o;
     }
-    return null;
+    return best;
   }
 
   tapObject(o, sx, sy) {
