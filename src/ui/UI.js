@@ -4,7 +4,8 @@
 
 import { HOUSE, ITEMS, INV_TABS, SHOP, SHOP_TABS, xpToNext, houseNeedChunks } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
-import { QUEST_END } from '../game/quests.js';
+import * as R from '../game/questRules.js';
+import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ } from '../game/questData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 
@@ -13,6 +14,14 @@ const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) 
 const RES_NAMES = { wood: 'Дерево', stone: 'Камень', ore: 'Руда', coins: 'Монеты', gems: 'Кристаллы' };
 // кнопки, к которым может показать стрелка-подсказка (UI.hint)
 const HINT_EL = { quest: '#quest-card', market: '#btn-market' };
+// вкладки окна «Задания»: периодические появляются с PERIODIC_LEVEL, «Событие» — пока оно идёт
+const QTABS = [
+  { key: 'main', name: 'Основные', icon: 'star' },
+  ...Object.entries(PERIODS).map(([key, p]) => ({ key, name: p.name, icon: p.icon })),
+  { key: 'event', name: 'Событие', icon: 'decor' },
+];
+const tabOf = (v) => (v.kind === 'line' ? 'main' : v.kind);
+const EVENT_NAME = (id) => { const e = EVENTS.find((x) => x.id === id); return e ? e.name : 'Событие'; };
 
 export class UI {
   constructor(root) {
@@ -40,7 +49,7 @@ export class UI {
     $('#btn-house').onclick = () => this.housePanel(farm);
     $('#btn-center').onclick = () => { farm.player.worldPos(this._p = this._p || {}); farm.cam.centerOn(this._p.x, this._p.y - 20); };
     $('#energy-pill').onclick = () => this.bagPanel(farm);
-    $('#quest-card').onclick = () => this.questPanel(farm);
+    $('#quest-card').onclick = () => this.questPanel(farm, { focus: true });
     $('#btn-more').onclick = () => this.toggleMore();
     $('#mb-done').onclick = () => farm.mover.exit();
     $('#mb-cancel').onclick = () => farm.mover.cancel();
@@ -143,67 +152,183 @@ export class UI {
   }
 
   // ---------- Задания ----------
+  // Карточка под ресурсами: задание «в фокусе» (Quests.focus — его же показывает стрелка).
+  // Красный кружок — сколько наград можно забрать во всех ветках.
   questCard(f) {
-    const Q = f.quests, q = Q.current, el = $('#quest-card');
-    const key = q ? `${Q.st.i}:${Q.progress()}` : 'end';
+    const Q = f.quests, vs = Q.views(), q = Q.focus(vs), n = R.claimable(vs), el = $('#quest-card');
+    const key = q ? `${q.id}:${q.goals.map((g) => g.p).join(',')}:${q.done}:${n}` : 'none';
     if (this.last.quest === key) return;
     this.last.quest = key;
     el.hidden = !q;
     this._safe = null; // высота карточки могла поменяться
     if (!q) return;
-    const done = Q.done, pct = (Q.progress() / q.goal.n) * 100;
+    const done = q.done, g = q.goal, pct = (done ? 1 : g.p / g.n) * 100;
     el.classList.toggle('done', done);
     // число не отрывается от соседнего слова при переносе: «Полей грядки / 2 раза», а не «Полей грядки 2 / раза»
-    const task = (done ? 'Забрать награду!' : q.task).replace(/(\d+) /g, '$1\u00a0');
-    el.innerHTML = `${this.ic(q.who === 'note' ? 'note' : 'star', 'ic')}<div class="qc-t"><b>${task}</b>` +
-      `<div class="qc-row"><div class="qc-bar"><i style="width:${pct}%"></i></div><span class="qc-n">${Q.progress()}/${q.goal.n}</span></div></div>`;
+    const task = (done ? 'Забрать награду!' : g.task || q.task).replace(/(\d+) /g, '$1 ');
+    const badge = n > 1 || (n === 1 && !done) ? `<i class="qc-badge">${n}</i>` : '';
+    el.innerHTML = `${this.ic(q.icon, 'ic')}<div class="qc-t"><b>${task}</b>` +
+      `<div class="qc-row"><div class="qc-bar"><i style="width:${pct}%"></i></div><span class="qc-n">${done ? '✓' : `${fmtNum(g.p)}/${fmtNum(g.n)}`}</span></div></div>${badge}`;
   }
 
-  questDone(q) {
-    this.toast(`Задание выполнено: ${q.title}`, 'good');
+  questDone(v) {
+    const msg = v.kind === 'line' ? `Задание выполнено: ${v.title}` :
+      v.kind === 'event' ? (v.bonus ? `Главный приз события «${v.title}» ждёт тебя!` : `Задание события выполнено: ${v.title}`) :
+        v.bonus ? `Все ${v.title.toLowerCase()} выполнены!` : `Выполнено: ${v.task}`;
+    this.toast(msg, 'good');
     this.last.quest = null;
   }
 
   rewardHtml(r) {
-    return [r.coins && `${r.coins} ${this.ic('coin')}`, r.gems && `${r.gems} ${this.ic('gem')}`].filter(Boolean).join(' ');
+    return [r.coins && `${fmtNum(r.coins)} ${this.ic('coin')}`, r.gems && `${r.gems} ${this.ic('gem')}`,
+      ...Object.entries(r.items || {}).map(([id, n]) => `${n} ${this.ic(ITEMS[id] ? ITEMS[id].icon : id)}`)].filter(Boolean).join(' ');
   }
 
-  questPanel(f) {
-    this.openPanel('quest', 'Задания', (body) => {
-      const Q = f.quests, q = Q.current || QUEST_END;
-      if (Q.current) Q.st.seen = true;
-      const who = q.who === 'note' ? 'Записка бабушки Марфы' : 'Призрачок';
-      const face = q.who === 'note' ? this.ic('note', 'ic big') : `<img class="qp-face" src="${this.icons.avatar || this.icons.star}" alt="">`;
-      body.appendChild(h('div', 'qp-story' + (q.who === 'note' ? ' note' : ''), `${face}<div class="qp-say"><b>${who}</b><p>${q.text}</p></div>`));
-      if (!Q.current) return;
-      const n = Q.progress(), done = Q.done;
-      body.appendChild(h('div', 'pn-sub', q.title));
-      body.appendChild(h('div', 'qp-task', `<span>${q.task}</span><b>${n}/${q.goal.n}</b><div class="qc-bar"><i style="width:${(n / q.goal.n) * 100}%"></i></div>`));
-      body.appendChild(h('div', 'qp-reward', `Награда: ${this.rewardHtml(q.reward)}`));
-      // В первых заданиях стрелка видна сама, дальше — по переключателю: включили — окно закрывается
-      // и камера едет к цели; стрелка держится, пока задание не сменится
-      if (!done && hasHint(q) && !hintAuto(Q.st.i)) {
-        const on = f.hintOn();
-        const row = h('div', 'set-row tog qp-hint', `${this.ic('hint_arrow', 'ic')}<span>Показать стрелку</span>`);
-        const sw = h('button', 'switch' + (on ? ' on' : ''), '<i></i>');
-        sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', on);
-        row.appendChild(sw);
-        row.onclick = () => {
-          f.askHint(!on);
+  // Окно «Задания»: вкладки Основные / День / Неделя / Месяц / Событие, в каждой — список,
+  // нажатие на задание открывает его целиком (текст, цели, награда, стрелка, «на экран»).
+  // focus: true — сразу задание с карточки; id — это задание. Вкладку и открытое задание помним.
+  questPanel(f, { focus, id } = {}) {
+    const S = this.qp || (this.qp = { tab: 'main', sel: null });
+    S.sel = null;
+    if (focus) { const q = f.quests.focus(); if (q) S.sel = q.id; }
+    if (id) S.sel = id;
+    this.openPanel('quest', 'Задания', (body) => this.questBody(f, body, S));
+  }
+
+  questBody(f, body, S) {
+    const Q = f.quests, vs = Q.views();
+    if (S.sel) {
+      const v = vs.find((x) => x.id === S.sel);
+      if (v) { S.tab = tabOf(v); return this.questDetail(f, body, S, v); }
+      S.sel = null;
+    }
+    const ctx = Q.ctx(), events = R.eventRows(f.st, ctx), per = f.st.quests.per;
+    const tabs = QTABS.filter((t) => t.key === 'main' || (t.key === 'event' ? events.length : per[t.key] && f.st.level >= PERIODIC_LEVEL));
+    if (!tabs.some((t) => t.key === S.tab)) S.tab = 'main';
+    if (tabs.length > 1) {
+      const row = h('div', 'qt-tabs');
+      for (const t of tabs) {
+        const dot = vs.some((v) => v.done && !v.claimed && tabOf(v) === t.key);
+        const b = h('button', 'qt-tab' + (S.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>${dot ? '<i class="qt-dot"></i>' : ''}`);
+        b.onclick = () => { if (S.tab !== t.key) { S.tab = t.key; this.sfx('tap'); this.refreshPanel(); } };
+        row.appendChild(b);
+      }
+      body.appendChild(row);
+    }
+    if (S.tab === 'main') this.questLines(f, body, S);
+    else if (S.tab === 'event') this.questEvents(f, body, S, events);
+    else this.questPeriod(f, body, S, S.tab, ctx);
+  }
+
+  // Строка задания в списке: иконка, подпись, цель с полоской, справа «Забрать» или ›
+  questRow(f, S, v, cap) {
+    const g = v.goal, pct = (v.done ? 1 : g.p / g.n) * 100, pin = f.st.quests.pin === v.id;
+    const row = h('div', 'ql-row' + (v.claimed ? ' got' : v.done ? ' done' : '') + (pin ? ' pin' : ''),
+      `${this.ic(v.icon, 'ic')}<div class="ql-t"><i>${cap}${pin ? ' · на экране' : ''}</i><b>${(v.done ? v.task : g.task || v.task).replace(/(\d+) /g, '$1 ')}</b>` +
+      `<div class="qc-row"><div class="qc-bar"><i style="width:${pct}%"></i></div><span class="qc-n">${v.done ? '✓' : `${fmtNum(g.p)}/${fmtNum(g.n)}`}</span></div></div>`);
+    if (v.done && !v.claimed) {
+      const b = h('button', 'btn-s gold ql-get', 'Забрать');
+      b.onclick = (e) => { e.stopPropagation(); this.questClaim(f, S, v, false); };
+      row.appendChild(b);
+    } else row.appendChild(h('span', 'ql-go', v.claimed ? '' : '›'));
+    if (!v.claimed) row.onclick = () => { S.sel = v.id; this.sfx('tap'); this.refreshPanel(); };
+    return row;
+  }
+
+  // Забрать награду. Из окна задания (detail) — показываем следующее задание этой ветки, чтобы история
+  // читалась дальше; из списка — только после задания сюжета (там новый текст бабушки или призрачка).
+  questClaim(f, S, v, detail) {
+    const r = f.quests.claim(v.id);
+    if (!r) return;
+    this.toast(`+${this.rewardHtml(r.reward)}`, 'good');
+    S.sel = r.next && (detail || v.line === 'story') ? r.next : null;
+    this.refreshPanel();
+  }
+
+  questLines(f, body, S) {
+    for (const r of R.lineRows(f.st)) {
+      const L = r.line;
+      if (r.view) { body.appendChild(this.questRow(f, S, r.view, L.key === 'story' ? `${L.name} · ${r.view.title}` : L.name)); continue; }
+      const sub = r.status === 'lock' ? `Откроется после задания «${r.after.title}»` :
+        r.status === 'level' ? `${L.key === 'story' ? 'Продолжение истории' : 'Следующее задание'} — с ${r.q.level} уровня` : 'Все задания выполнены!';
+      body.appendChild(h('div', 'ql-row off', `${this.ic(r.status === 'lock' ? 'lock' : L.icon, 'ic')}<div class="ql-t"><i>${L.name}</i><b>${sub}</b></div>`));
+    }
+  }
+
+  questPeriod(f, body, S, kind, ctx) {
+    const T = PERIODS[kind], vs = R.periodViews(f.st, kind);
+    body.appendChild(h('div', 'qt-head', `<b>${T.title}</b><span>Обновятся через ${fmtLeft(R.nextReset(kind, ctx.now, ctx.tz) - ctx.now)}</span>`));
+    for (const v of vs) body.appendChild(this.questRow(f, S, v, v.bonus ? 'Бонус' : `Награда: ${this.rewardHtml(v.reward)}`));
+    if (T.swaps && R.swapsLeft(f.st, kind) > 0) body.appendChild(h('div', 'pn-text', 'Не нравится задание? Открой его и замени на другое (один раз в день).'));
+    body.appendChild(h('div', 'pn-text', 'Не забранные награды за выполненные задания начислятся сами, когда задания обновятся.'));
+  }
+
+  questEvents(f, body, S, events) {
+    for (const e of events) {
+      body.appendChild(h('div', 'qt-head', `<b>${e.ev.name}</b><span>${e.end ? 'до ' + fmtDay(e.end - 1) : 'проверка события'}</span>`));
+      body.appendChild(h('div', 'pn-text', e.ev.text));
+      for (const c of e.chain) {
+        if (c.state === 'cur') { body.appendChild(this.questRow(f, S, c.view, c.q.title)); continue; }
+        body.appendChild(h('div', 'ql-row off' + (c.state === 'done' ? ' got' : ''),
+          `${this.ic(c.state === 'done' ? e.ev.icon : 'lock', 'ic')}<div class="ql-t"><i>${c.q.title}</i><b>${c.state === 'done' ? '✓ ' + c.q.task : 'Откроется после предыдущего'}</b></div>`));
+      }
+      body.appendChild(this.questRow(f, S, e.prize, 'Главный приз'));
+    }
+  }
+
+  // Задание целиком
+  questDetail(f, body, S, v) {
+    const Q = f.quests;
+    const back = h('button', 'qp-back', '‹ Все задания');
+    back.onclick = () => { S.sel = null; this.sfx('tap'); this.refreshPanel(); };
+    body.appendChild(back);
+    if (v.text) {
+      if (v.line === 'story') Q.st.seen = v.id;
+      const note = v.who === 'note';
+      const who = note ? 'Записка бабушки Марфы' : v.who === 'ghost' ? 'Призрачок' : v.title;
+      const face = note ? this.ic('note', 'ic big') : v.who === 'ghost' ? `<img class="qp-face" src="${this.icons.avatar || this.icons.star}" alt="">` : this.ic(v.icon, 'ic big');
+      body.appendChild(h('div', 'qp-story' + (note ? ' note' : ''), `${face}<div class="qp-say"><b>${who}</b><p>${v.text}</p></div>`));
+    }
+    const cap = v.kind === 'line' ? (v.line === 'story' ? 'Сюжет' : R.LINE[v.line].name) : v.kind === 'event' ? EVENT_NAME(v.ev) : PERIODS[v.kind].title;
+    body.appendChild(h('div', 'pn-sub', v.kind === 'line' || (v.kind === 'event' && !v.bonus) ? `${cap} · ${v.title}` : cap));
+    for (const g of v.goals) {
+      body.appendChild(h('div', 'qp-task', `<span>${g.task || v.task}</span><b>${fmtNum(g.p)}/${fmtNum(g.n)}</b><div class="qc-bar"><i style="width:${(g.p / g.n) * 100}%"></i></div>`));
+    }
+    body.appendChild(h('div', 'qp-reward', `Награда: ${this.rewardHtml(v.reward)}`));
+    if (!v.done && !v.bonus) {
+      // В первых заданиях сюжета стрелка видна сама, дальше — по переключателю: включили — окно закрывается
+      // и камера едет к цели; стрелка держится, пока задание не сменится. Задание со стрелкой — на карточке.
+      if (hasHint(v) && !hintAuto(v)) {
+        const on = f.hintOn(v);
+        body.appendChild(this.qpSwitch('hint_arrow', 'Показать стрелку', on, () => {
+          f.askHint(!on, v.id);
           if (on) return this.refreshPanel();
           this.closePanel();
           if (f.hint) f.toHint(); else this.toast('Стрелка появится, когда будет что делать');
-        };
-        body.appendChild(row);
+        }));
       }
-      const b = h('button', 'btn-main', done ? 'Забрать награду' : 'Понятно');
-      b.onclick = () => {
-        if (!done) return this.closePanel();
-        const r = q.reward;
-        if (Q.claim()) { this.toast(`+${this.rewardHtml(r)}`, 'good'); this.refreshPanel(); }
-      };
-      body.appendChild(b);
-    });
+      // сюжет и так на карточке, если игрок не выбрал другое задание
+      const pin = Q.st.pin === v.id;
+      if (v.line !== 'story' || (Q.st.pin && !pin)) body.appendChild(this.qpSwitch('star', 'Показывать на экране', pin, () => { Q.pin(pin ? null : v.id); this.refreshPanel(); }));
+      if (v.kind === 'day' && R.swapsLeft(f.st, 'day') > 0) {
+        const sw = h('button', 'btn-link qp-swap', 'Заменить на другое задание');
+        sw.onclick = () => { if (Q.swap(v.id)) { this.toast('Задание заменено'); this.refreshPanel(); } else this.toast('Заменить не на что'); };
+        body.appendChild(sw);
+      }
+    }
+    const b = h('button', 'btn-main', v.claimed ? 'Награда получена' : v.done ? 'Забрать награду' : 'Понятно');
+    b.disabled = v.claimed;
+    b.onclick = () => { if (v.done) this.questClaim(f, S, v, true); else this.closePanel(); };
+    body.appendChild(b);
+  }
+
+  qpSwitch(icon, label, on, toggle) {
+    const row = h('div', 'set-row tog qp-hint', `${this.ic(icon, 'ic')}<span>${label}</span>`);
+    const sw = h('button', 'switch' + (on ? ' on' : ''), '<i></i>');
+    sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', on);
+    row.appendChild(sw);
+    row.onclick = toggle;
+    return row;
   }
 
   // ---------- Всплывающее меню у точки на карте ----------
@@ -380,6 +505,7 @@ export class UI {
         };
         body.appendChild(bt); body.appendChild(out);
       }
+      if (f.devOn) this.devQuests(f, body);
       // новая игра — отдельная заметная кнопка; подтверждение прямо на месте
       body.appendChild(h('div', 'pn-sub', 'Игра'));
       const ng = h('div', 'newgame');
@@ -395,6 +521,21 @@ export class UI {
       idle();
       body.appendChild(ng);
     });
+  }
+
+  // Проверка заданий без ожидания настоящих дат (только с ?debug в адресе)
+  devQuests(f, body) {
+    const d = f.dev, now = f.quests.ctx().now;
+    body.appendChild(h('div', 'pn-sub', 'Проверка заданий'));
+    body.appendChild(h('div', 'pn-text', `Время заданий: ${new Date(now + QUEST_TZ * 3600e3).toISOString().slice(0, 16).replace('T', ' ')} МСК` +
+      `${d.shift ? ` (сдвиг ${Math.round(d.shift / 3600e3)} ч)` : ''} · событие: ${d.event ? EVENT_NAME(d.event) : 'по датам'}`));
+    const row = h('div', 'gfx-row');
+    const btn = (label, fn) => { const b = h('button', 'btn-s', label); b.onclick = () => { fn(); this.refreshPanel(); }; row.appendChild(b); };
+    btn('+1 день', () => f.setDev({ shift: (d.shift || 0) + 86400e3 }));
+    btn('+7 дней', () => f.setDev({ shift: (d.shift || 0) + 7 * 86400e3 }));
+    btn('Сейчас', () => f.setDev({ shift: 0 }));
+    btn('Событие', () => { const i = EVENTS.findIndex((e) => e.id === d.event); f.setDev({ event: i + 1 < EVENTS.length ? EVENTS[i + 1].id : null }); });
+    body.appendChild(row);
   }
 
   housePanel(f) {
@@ -614,4 +755,12 @@ export class UI {
 }
 
 function fmtNum(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
+// сколько осталось: «5 ч 12 мин», «2 д 3 ч», «7 мин»
+function fmtLeft(ms) {
+  const m = Math.max(1, Math.ceil(ms / 60000)), d = Math.floor(m / 1440), hh = Math.floor((m % 1440) / 60), mm = m % 60;
+  return d ? `${d} д ${hh} ч` : hh ? `${hh} ч ${mm} мин` : `${mm} мин`;
+}
+// день по московскому времени (как сброс заданий): «7 ноября»
+const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+function fmtDay(t) { const d = new Date(t + QUEST_TZ * 3600e3); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; }
 function fmtClock(s) { s = Math.max(0, s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
