@@ -1,11 +1,11 @@
 // Сцена фермы: состояние игрока, взаимодействия, рост растений, отрисовка мира.
 
 import { toWorld, toGrid } from '../engine/Iso.js';
-import { hash2, makeCanvas } from '../engine/Sprite.js';
+import { makeCanvas } from '../engine/Sprite.js';
 import { World, N, CHUNK, CHUNKS, T } from './World.js';
 import { Player } from './Player.js';
 import { makeGhostData, ROD_TIP } from './ghost.js';
-import * as art from './art.js';
+import { shoreTile } from './shore.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Mover } from './Mover.js';
@@ -17,9 +17,6 @@ import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, flor
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 
-// вид объёмной грядки: 'plain' — без каймы, 'grass' — с травяной каймой
-export let BED_STYLE = 'plain';
-export function setBedStyle(v) { BED_STYLE = v; }
 export const BG = '#3d7a35';
 
 export class Farm {
@@ -37,60 +34,36 @@ export class Farm {
     this.quests = new Quests(this);
     this.mover = new Mover(this);
     this.groundV = 0; // растёт, когда меняются клетки земли
-    this.buildSprites();
-    this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => {
-      Object.assign(this.S, { grass: a.grass, path: a.path, soil: a.soil, bed: a.bed, waterTex: a.waterTex, decor: a.decor, objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, fog: a.fog && a.fog.clouds.length ? a.fog : null });
-      if (a.wildGrass && a.wildGrass.length) this.S.wildGrass = a.wildGrass;
-      a.house.forEach((h, l) => { if (h) this.S.house[l] = h; });
-      a.well.forEach((s, i) => { if (s) this.S.well[i] = s; });
-      if (a.water.every(Boolean) || a.waterTex) { this.S.waterArt = a.waterTex ? null : a.water; this.S.water.clear(); }
-      this.groundV++;
-      for (const [k, v] of Object.entries(a.crops)) if (v.length === 4 && this.S.crops[k]) this.S.crops[k] = v;
-      // иконки художника уже загружены (loadArt ждёт их); иконки саженцев — data: URL, грузятся мгновенно
-      for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
-      // пузыри над грядками из арта: квадрат 24×24 единицы, опора — низ хвостика
-      for (const k of ['ready', 'water']) {
-        const im = this.iconImg['bubble_' + k];
-        if (im) this.S.bubble[k] = { canvas: im, w: 24, h: 24, ax: 12, ay: 24, name: 'bubble_' + k };
-      }
-      const fl = Object.entries(a.floraIcons).map(([k, url]) => new Promise((res) => {
-        const im = new Image();
-        im.onload = () => { this.icons[k] = url; this.iconImg[k] = im; res(); };
-        im.onerror = () => res();
-        im.src = url;
-      }));
-      this.dirty = true;
-      return Promise.all(fl).then(() => { this.onIcons && this.onIcons(); });
-    });
+    // Спрайты и иконки — из картинок художника. Пока они грузятся, игра не запущена (экран загрузки),
+    // поэтому до applyArt здесь пусто. water — берега прудов, рисуются кодом по мере надобности.
+    this.S = { water: new Map() };
+    this.icons = {}; // имя → адрес картинки (для <img> в интерфейсе)
+    this.iconImg = {}; // имя → загруженная картинка (для текстур сцены)
+    this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => this.applyArt(a));
     // ошибку загрузки обрабатывает main.js (экран загрузки с кнопкой «Повторить»)
     this.artReady.catch((e) => console.warn('art', e));
   }
 
-  buildSprites() {
-    const S = {};
-    S.grass = [0, 1, 2, 3].map((v) => art.grassTile(v));
-    S.path = [0, 1].map((v) => art.pathTile(v));
-    S.soil = [art.soilTile(false), art.soilTile(true)];
-    S.water = new Map();
-    S.trees = { oak: art.treeSprite('oak'), oak2: art.treeSprite('oak2'), apple: art.treeSprite('apple'), pine: art.treeSprite('pine') };
-    const stump = art.stumpSprite(), rock = art.rockSprite(false);
-    S.stumps = [stump, stump];
-    S.rocks = [rock, rock];
-    S.bush = art.bushSprite(false); S.berry = art.bushSprite(true);
-    S.sprout = art.sproutSprite();
-    S.wildGrass = [0, 1, 2].map((v) => art.grassTuftSprite(v)); // дикая высокая трава (пока нет арта)
-    S.flora = {}; // из арта: { вид: { bare — без плодов, young — молодое } }
-    S.boulder = art.rockSprite(true);
-    S.house = [null, 1, 2, 3, 4, 5].map((l) => l && art.houseSprite(l));
-    S.well = [art.wellSprite(false), art.wellSprite(true)];
-    S.crops = {};
-    for (const c of Object.values(CROPS)) S.crops[c.key] = [0, 1, 2, 3].map((s) => art.cropSprite(c, s));
-    S.bubble = { water: art.bubbleSprite('water'), ready: art.bubbleSprite('ready'), lock: art.bubbleSprite('lock') };
-    this.S = S;
-    this.icons = art.makeIcons(CROPS, FISH, FLORA_GOODS);
-    try { this.icons.path = S.path[0].canvas.toDataURL(); } catch (e) { /* */ }
-    this.iconImg = {};
-    for (const [k, url] of Object.entries(this.icons)) { const im = new Image(); im.src = url; this.iconImg[k] = im; }
+  // Картинки художника загружены (artSprites.loadArt): раскладываем их в спрайты игры и иконки
+  applyArt(a) {
+    Object.assign(this.S, {
+      grass: a.grass, path: a.path, bed: a.bed, waterTex: a.waterTex, decor: a.decor,
+      objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, wildGrass: a.wildGrass,
+      house: a.house, well: a.well, crops: a.crops, fog: a.fog.clouds.length ? a.fog : null,
+    });
+    this.groundV++;
+    for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
+    // пузыри над грядками — те же иконки: квадрат 24×24 единицы, опора — низ хвостика
+    this.S.bubble = {};
+    for (const k of ['ready', 'water']) this.S.bubble[k] = { canvas: this.iconImg['bubble_' + k], w: 24, h: 24, ax: 12, ay: 24, name: 'bubble_' + k };
+    // иконки, сделанные из спрайтов (свои растения в рюкзаке, тропинка), — data: URL, грузятся мгновенно
+    const fl = Object.entries(a.floraIcons).map(([k, url]) => new Promise((res) => {
+      const im = new Image();
+      im.onload = () => { this.icons[k] = url; this.iconImg[k] = im; res(); };
+      im.onerror = () => res();
+      im.src = url;
+    }));
+    return Promise.all(fl).then(() => { this.onIcons && this.onIcons(); });
   }
 
   // средний цвет травы (у арта свой оттенок) — им рисуется травяной край берега
@@ -105,6 +78,8 @@ export class Farm {
     return this._gc;
   }
 
+  // Спрайт берега для клетки воды (сама вода — общая текстура, её кладёт PixiScene).
+  // Посреди пруда берега нет: у такого спрайта empty = true.
   waterSprite(x, y) {
     const w = this.world;
     const land = (xx, yy) => (!w.inside(xx, yy) || w.tile(xx, yy) !== T.WATER ? 1 : 0);
@@ -112,50 +87,38 @@ export class Farm {
     // суша только по диагонали (угол тайла): углы T, R, B, L
     const dg = (land(x - 1, y - 1) && !(mask & 9) ? 1 : 0) | (land(x + 1, y - 1) && !(mask & 3) ? 2 : 0) |
       (land(x + 1, y + 1) && !(mask & 6) ? 4 : 0) | (land(x - 1, y + 1) && !(mask & 12) ? 8 : 0);
-    const h = hash2(x * 7, y * 13), WA = this.S.waterArt;
-    // с водой художника: 0 — гладь, 1 — блики, 2 — кувшинка, 3 — камыш (камыш только у берега)
-    const lily = WA ? (h < 0.55 ? 0 : h < 0.75 ? 1 : h < 0.88 ? 2 : mask ? 3 : 1) : this.S.waterTex ? 0 : h < 0.3 ? 1 : 0;
-    const key = (dg * 16 + mask) * 4 + lily;
+    const key = dg * 16 + mask;
     let s = this.S.water.get(key);
     if (!s) {
-      s = art.waterTile(mask, lily, this.S.waterTex ? 'none' : WA && WA[lily], this.grassColor(), dg);
-      s.empty = !!this.S.waterTex && !mask && !dg && !lily; // посреди пруда — только текстура, без слоя берега
+      s = shoreTile(mask, dg, this.grassColor());
+      s.empty = !mask && !dg;
       this.S.water.set(key, s);
     }
     return s;
   }
 
-  bedStyle(v) { setBedStyle(v); this.groundV++; this.dirty = true; }
-  bedStyleName() { return BED_STYLE; }
-
+  // Картинка объекта на карте (у камней, пней и деревьев вариант выбирается по id)
   objSprite(o) {
     const S = this.S;
-    if (o.type === 'stump' && o.was && S.stumpOf) {
+    if (o.type === 'stump' && o.was) {
       // пень того дерева, которое срубили
       const tree = S.objArt[o.was], st = tree && S.stumpOf(tree[o.id % tree.length], o.id);
       if (st) return st;
     }
     if (o.type === 'sapling') {
-      // свой росток: o.stage считает floraTick
-      const fl = S.flora[o.tree], fd = FLORA[o.tree], sp = S.sprouts && fd && S.sprouts[fd.kind];
-      return o.stage >= 1 && fl ? fl.young : sp || S.sprout;
+      // свой росток: o.stage считает floraTick (0 — росток, 1 — молодое растение)
+      const fl = S.flora[o.tree], fd = FLORA[o.tree];
+      return o.stage >= 1 && fl ? fl.young : S.sprouts[fd ? fd.kind : 'tree'];
     }
     if (o.bare && S.flora[o.type]) return S.flora[o.type].bare; // плоды собраны
-    const v = S.objArt && S.objArt[o.type];
+    const v = S.objArt[o.type];
     if (v && v.length) return v[o.id % v.length];
-    const fd = FLORA[o.type];
-    if (fd) return fd.kind === 'tree' ? S.trees[fd.group] : fd.group === 'berry' ? S.berry : S.bush;
     switch (o.type) {
-      case 'stump': return S.stumps[o.id & 1];
       case 'grass': return S.wildGrass[o.id % S.wildGrass.length];
-      case 'bush': return S.bush;
-      case 'berry': return S.berry;
-      case 'rock': return S.rocks[o.id & 1];
-      case 'boulder': return S.boulder;
       case 'house': return S.house[this.st.house];
       case 'well': return S.well[this.st.well ? 1 : 0];
     }
-    return S.rocks[0];
+    return S.objArt.rock[0];
   }
 
   // ---------------- Состояние ----------------

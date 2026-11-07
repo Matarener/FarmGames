@@ -47,7 +47,8 @@ export class UI {
   }
 
   refreshIcons() {
-    for (const img of this.root.querySelectorAll('img[data-icon]')) img.src = this.icons[img.dataset.icon];
+    // иконки грузятся вместе с картинками художника; до этого у <img> нет адреса
+    for (const img of this.root.querySelectorAll('img[data-icon]')) { const u = this.icons[img.dataset.icon]; if (u) img.src = u; }
     const av = this.root.querySelector('.avatar');
     if (av && this.icons.avatar && !av.querySelector('img')) av.innerHTML = `<img src="${this.icons.avatar}" alt="">`;
   }

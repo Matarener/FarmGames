@@ -109,10 +109,6 @@ async function main() {
     save.disabled = true; // редактор не трогает сохранение игры
   }
   const saved = EDITOR ? null : await save.load();
-  farm.init(saved, map);
-  if (EDITOR) { /* без приветствий */ }
-  else if (saved && farm.awaySec > 60) ui.toast(`С возвращением! Вас не было ${Math.round(farm.awaySec / 60)} мин, растения подросли.`);
-  else if (!saved) ui.toast('Добро пожаловать на ферму! Нажмите на дерево или камень, чтобы добыть ресурсы.');
 
   const game = new Game(perf);
   game.update = (dt) => {
@@ -140,6 +136,11 @@ async function main() {
     return;
   }
   clearTimeout(slow);
+  // мир собираем, когда картинки уже есть: рост растений и полоски над ними берут размеры спрайтов
+  farm.init(saved, map);
+  if (EDITOR) { /* без приветствий */ }
+  else if (saved && farm.awaySec > 60) ui.toast(`С возвращением! Вас не было ${Math.round(farm.awaySec / 60)} мин, растения подросли.`);
+  else if (!saved) ui.toast('Добро пожаловать на ферму! Нажмите на дерево или камень, чтобы добыть ресурсы.');
   progress(0.85); await nextFrame(); // полоса успевает показаться до тяжёлого шага
   try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); }
   // Разгон: ~2 с кадров с движением камеры ещё за экраном загрузки — движок JS успевает

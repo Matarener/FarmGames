@@ -168,7 +168,6 @@ export class PixiScene {
   _syncGround() {
     const f = this.f, w = f.world, S = f.S;
     this.makeWaterTex();
-    const BS = S.bed && S.bed[f.bedStyleName()];
     const per = this.chunks.map(() => []);
     for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
       const i = gy * N + gx, t = w.tiles[i];
@@ -177,16 +176,15 @@ export class PixiScene {
       if (t === T.GRASS) s = S.grass[w.variant[i]];
       else if (t === T.PATH) s = S.path[(gx + gy) & 1];
       else if (t === T.WATER) {
+        // вода — общей текстурой по координатам карты, поверх — берег (у клеток посреди пруда его нет)
         const ws = f.waterSprite(gx, gy);
-        if (this.waterT) {
-          // вода — общей текстурой по координатам карты, поверх — берег (у клеток посреди пруда его нет)
-          per[w.chunkOf(gx, gy)].push(this.waterT, gx, gy);
-          s = ws.empty ? null : ws;
-        } else s = ws;
+        per[w.chunkOf(gx, gy)].push(this.waterT, gx, gy);
+        s = ws.empty ? null : ws;
       } else {
+        // грядка: трава, а поверх неё — объёмная грядка (сухая или политая)
         const b = f.beds.get(i);
         const wet = b && b.crop && !f.cropInfo(b).needsWater && !f.cropInfo(b).ready ? 1 : 0;
-        if (BS) { s = S.grass[w.variant[i]]; bed = BS[wet]; } else s = S.soil[wet];
+        s = S.grass[w.variant[i]]; bed = S.bed[wet];
       }
       if (s) per[w.chunkOf(gx, gy)].push(s, cx, cy);
       // объёмная грядка — поверх земли, ближние поверх дальних
@@ -263,7 +261,7 @@ export class PixiScene {
   // швов на стыках, в том числе на уменьшенных копиях — мипмапах)
   makeWaterTex() {
     const t = this.f.S.waterTex;
-    if (!t || this.waterT !== undefined) return;
+    if (this.waterT) return;
     const img = t.canvas, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, M = 16;
     const c = document.createElement('canvas'); c.width = w + 2 * M; c.height = h + 2 * M;
     const g = c.getContext('2d');
@@ -277,7 +275,7 @@ export class PixiScene {
   syncDecor() {
     const f = this.f, w = f.world, D = f.S.decor;
     if (!this.decorSp) this.decorSp = [];
-    const list = (D && w.decor) || [];
+    const list = w.decor || [];
     for (let i = 0; i < list.length; i++) {
       const d = list[i];
       let s = D[d.type];
@@ -435,10 +433,7 @@ export class PixiScene {
         .roundRect(-bw / 2 - 2, -13, bw + 4, 26, 8).fill({ color: 0x3d2b1f, alpha: 0.92 })
         .roundRect(-bw / 2, -11, bw, 22, 7).fill(blocked ? 0xc9b48a : 0xf6d37a));
       tx.anchor.set(0.5); tx.position.set(8, 0.5); box.addChild(tx);
-      const lock = f.iconImg.lock;
-      if (lock && lock.complete && lock.naturalWidth) {
-        const ls = new PIXI.Sprite(this.iconTex(lock)); ls.width = 14; ls.height = 14; ls.position.set(-bw / 2 + 3, -7); box.addChild(ls);
-      }
+      const ls = new PIXI.Sprite(this.iconTex(f.iconImg.lock)); ls.width = 14; ls.height = 14; ls.position.set(-bw / 2 + 3, -7); box.addChild(ls);
       box.cx = tmp.x; box.cy = tmp.y;
       this.signsC.addChild(box);
     }
@@ -456,12 +451,12 @@ export class PixiScene {
     };
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.WATER) f.waterSprite(x, y);
     const S = f.S;
-    const GROUND = ['grass', 'path', 'soil', 'water'];
-    this.makeWaterTex(); if (this.waterT) this.groundAtlas.tex(this.waterT);
+    const GROUND = ['grass', 'path', 'water'];
+    this.makeWaterTex(); this.groundAtlas.tex(this.waterT);
     for (const k of GROUND) for (const v of (S[k] instanceof Map ? S[k].values() : S[k] || [])) this.groundAtlas.tex(v);
-    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k) && k !== 'waterArt' && k !== 'waterTex') add(v, k !== 'bubble' && k !== 'fog');
+    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k) && k !== 'waterTex') add(v, k !== 'bubble' && k !== 'fog');
     for (const o of w.objects || []) { if (!o) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
-    if (S.stumpOf && S.objArt) for (const arr of Object.values(S.objArt)) for (const t of arr || []) for (const id of [0, 1, 3]) { const st = S.stumpOf(t, id); if (st) { this.atlas.tex(st); this.atlas.tex(dimSprite(st)); } }
+    for (const arr of Object.values(S.objArt)) for (const t of arr) for (const id of [0, 1, 3]) { const st = S.stumpOf(t, id); if (st) { this.atlas.tex(st); this.atlas.tex(dimSprite(st)); } }
     for (const im of Object.values(f.iconImg)) if (im.complete && im.naturalWidth) this.iconTex(im);
     // все вложения скелета фермера (кадры хвоста, инструменты) — иначе они грузятся в видеокарту
     // посреди игры, когда фермер впервые берёт топор или удочку
@@ -549,12 +544,11 @@ export class PixiScene {
     // постоянные части: пересобираются, только когда изменились
     let wet = 0;
     f.beds.forEach((b) => { if (b.crop && !(f.cropFlags(b) & 12)) wet = (wet * 31 + b.i) % 1e9; });
-    const K = this.keys, bsn = f.bedStyleName();
-    if (K.gv !== f.groundV || K.wet !== wet || K.bs !== bsn) { K.gv = f.groundV; K.wet = wet; K.bs = bsn; this.syncGround(); }
+    const K = this.keys;
+    if (K.gv !== f.groundV || K.wet !== wet) { K.gv = f.groundV; K.wet = wet; this.syncGround(); }
     const uc = w.unlockedCount();
-    if (K.uc !== uc || K.house !== f.st.house || K.dec !== !!f.S.decor) { K.uc = uc; K.dec = !!f.S.decor; K.house = f.st.house; this.syncFog(); this.syncSigns(); this.syncDecor(); }
-    if (this.keys.lock !== !!f.iconImg.lock) { this.keys.lock = !!f.iconImg.lock; this.syncSigns(); }
-    if (K.fogV !== w.fogV || K.fogArt !== !!f.S.objArt || K.fogW !== w) { K.fogV = w.fogV; K.fogArt = !!f.S.objArt; K.fogW = w; this.syncFogForest(); this.syncFog(); }
+    if (K.uc !== uc || K.house !== f.st.house) { K.uc = uc; K.house = f.st.house; this.syncFog(); this.syncSigns(); this.syncDecor(); }
+    if (K.fogV !== w.fogV || K.fogW !== w) { K.fogV = w.fogV; K.fogW = w; this.syncFogForest(); this.syncFog(); }
     if (K.fogS !== f.S.fog) { K.fogS = f.S.fog; this.syncFogClouds(); }
     this.fogC.visible = !(f.editor && f.editor.hideFog);
     const FS = this.fogSp;
@@ -788,7 +782,7 @@ export class PixiScene {
       }
       if (s.kind === 'obj') { toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp); this.put(this.moverGhost, f.objSprite(s.o), tmp.x, tmp.y); }
       else {
-        const sp = s.kind === 'path' ? f.S.path[0] : f.S.bed ? f.S.bed.grass[0] : f.S.soil[0];
+        const sp = s.kind === 'path' ? f.S.path[0] : f.S.bed[0];
         toWorld(t.gx + 0.5, t.gy + 0.5, tmp); this.put(this.moverGhost, sp, tmp.x, tmp.y);
       }
     }
