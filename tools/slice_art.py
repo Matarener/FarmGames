@@ -106,6 +106,8 @@ ICON_SHEETS = {
     'ui_saplings2': ['sap_blueberry', 'sap_raspberry', 'sap_rosehip', 'sap_hydrangea', 'sap_lavender', 'sap_rose'],
     # стрелка-подсказка к заданию, кольцо под целью, кружок у края экрана (Farm.applyArt → PixiScene.syncHint)
     'ui_hints': ['hint_arrow', 'hint_ring', 'hint_badge'],
+    # подарки: кнопка в интерфейсе, вкладки окна «Подарки», сундук 7-го дня
+    'ui_gifts': ['gift', 'calendar', 'friends', 'invite', 'event', 'chest'],
 }
 ICON_PX = 128
 # Иконки не в квадрате 128, а по контуру картинки (без полей), длинная сторона — столько пикселей:
