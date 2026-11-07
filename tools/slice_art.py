@@ -24,12 +24,6 @@ YOUNG_K = 0.65  # молодое растение ниже взрослого в
 # в мировых единицах (по ней считается масштаб). Отрицательная ширина: «пятачок» — весь ромб
 # объекта (ширина по краям картинки), опора — его центр.
 SHEETS = {
-    'trees':  [('tree_oak', 62), ('tree_apple', 62), ('tree_sakura', 62), ('tree_pine', 60)],
-    # вишня на этом листе цветёт: так она выглядит, пока ягоды отрастают после сбора
-    'trees2': [('tree_cherry_bare', 62), ('tree_maple', 62), ('tree_birch', 60)],
-    'rocks':  [('boulder', 118), ('rock', 54), ('rock_small', 40), ('boulder_moss', 116)],
-    'bushes': [('bush_blueberry', 40), ('bush_raspberry', 40), ('bush_rosehip', 40),
-               ('bush_hydrangea', 40), ('bush_lavender', 40), ('bush_rose', 40)],
     # ростки посаженных игроком растений (стадия 0): под деревья и под кусты
     'sprouts': [('sprout_tree', -30), ('sprout_bush', -32)],
     'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_oak_moss', -42)],
@@ -39,7 +33,15 @@ SHEETS = {
     'grass_tall': [('grass_tall_0', -44), ('grass_tall_1', -48), ('grass_tall_2', -48)],
 }
 # Листы с одной картинкой: лист называется так же, как картинка. Значение — ширина «пятачка».
+# Каждый объект — на своей картинке: на общих листах «пиксели» стиля выходили крупными (пикселили).
 SINGLE = {
+    # взрослые деревья, камни, кусты (до 2026-11-07 были листы trees, trees2, rocks, bushes)
+    'tree_oak': 62, 'tree_apple': 62, 'tree_sakura': 62, 'tree_pine': 60,
+    'tree_cherry_bare': 62,  # вишня цветёт: так она выглядит, пока ягоды отрастают после сбора
+    'tree_maple': 62, 'tree_birch': 60,
+    'boulder': 118, 'rock': 54, 'rock_small': 40, 'boulder_moss': 116,
+    'bush_blueberry': 40, 'bush_raspberry': 40, 'bush_rosehip': 40,
+    'bush_hydrangea': 40, 'bush_lavender': 40, 'bush_rose': 40,
     # с плодами и без плодов: правка исходной картинки того же растения
     'tree_cherry': 62,  # вишня с ягодами (созревшая)
     'tree_apple_bare': 62, 'tree_sakura_bare': 62,
@@ -56,17 +58,12 @@ SINGLE = {
 SHEETS.update({name: [(name, w)] for name, w in SINGLE.items()})
 # молодое растение по высоте взрослого: по умолчанию — <имя без _young>
 YOUNG_OF = {'tree_cherry_young': 'tree_cherry_bare'}  # молодая вишня — по цветущей
-# Урожай: лист = 5 стадий слева направо, сверху вниз; в игре 4 стадии (третью пропускаем).
-# Растения заполняют ромб грядки: масштаб по ширине, опора — центр ромба.
-CROPS = {'crop_wheat': 'wheat', 'crop_carrot': 'carrot', 'crop_beet': 'beet',
-         'crop_tomato': 'tomato', 'crop_sunflower': 'sunflower', 'crop_pumpkin': 'pumpkin',
-         'crop_strawberry': 'strawberry', 'crop_cotton': 'cotton',
-         'crop_corn': ('corn', [0, 1, 2, 3]),
-         'crop_cabbage': 'cabbage'}
-# культуры, где стадии на листе нарисованы в одном масштабе (росток маленький)
-CROP_UNIFORM = {'cabbage'}  # у кукурузы на 5-й стадии лишние корнеплоды
-CROP_STAGES = [0, 1, 3, 4]
+# Урожай: каждая стадия (0–3) — своя картинка crop_<культура>_<стадия>.png. Растения заполняют
+# ромб грядки: масштаб по ширине (ширина стадии в мире), опора — центр ромба.
+CROPS = ['wheat', 'carrot', 'beet', 'tomato', 'sunflower', 'pumpkin', 'strawberry', 'cotton', 'corn', 'cabbage']
 CROP_W = 54
+# капуста растёт вширь: маленький росток → кочан на всю грядку
+CROP_STAGE_W = {'cabbage': [17.6, 29.65, 47.13, 56.7]}
 
 # None в списке листа — предмет нарисован, но игре не нужен: его место учитывается, картинка не сохраняется.
 
@@ -81,8 +78,8 @@ GRID_SHEETS = {
 # грядки: сухая и политая; вторая пара — с травяной каймой (не используется)
 BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), None, None]}
 WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)
-# третья плитка листа — голая земля (грядки рисуются объёмными, плитка не нужна)
-TILE_SHEETS = [('tiles', ['tile_grass', 'tile_grass_flowers', None, 'tile_path'])]
+# плитки земли: каждая — своя картинка с одним ромбом
+TILES = ['tile_grass', 'tile_grass_flowers', 'tile_path']
 
 
 # Иконки интерфейса: листы на тёмном фоне со свечением (не прозрачные) — фон срезаем по контуру.
@@ -293,41 +290,34 @@ def main(only=None):
             print(f'{name:14s} bed {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
 
     # Плитки земли: вырезаем ромб чуть внутри контура (без тёмной обводки)
-    for sheet, names in TILE_SHEETS:
-        a = load(sheet)
-        boxes, lab = components(a, len(names))
-        TW, TH = (TILE_W + 2) * DENSITY, (TILE_H + 1) * DENSITY
-        yy, xx = np.mgrid[0:TH, 0:TW]
-        diamond = (np.abs(xx + 0.5 - TW / 2) / (TW / 2) + np.abs(yy + 0.5 - TH / 2) / (TH / 2)) <= 1.0
-        for (y0, y1, x0, x1, i), name in zip(boxes, names):
-            if name is None: continue
-            inset = 0.045
-            w, h = x1 - x0, y1 - y0
-            crop = a[y0 + int(h * inset):y1 - int(h * inset), x0 + int(w * inset):x1 - int(w * inset)]
-            img = np.array(Image.fromarray(crop).resize((TW, TH), Image.LANCZOS))
-            img[..., 3] = np.where(diamond, 255, 0)
-            save(Image.fromarray(img), name, TILE_W + 2, TILE_H + 1, (TILE_W + 2) / 2, (TILE_H + 1) / 2, man)
-            print(f'{name:14s} tile')
+    TW, TH = (TILE_W + 2) * DENSITY, (TILE_H + 1) * DENSITY
+    yy, xx = np.mgrid[0:TH, 0:TW]
+    diamond = (np.abs(xx + 0.5 - TW / 2) / (TW / 2) + np.abs(yy + 0.5 - TH / 2) / (TH / 2)) <= 1.0
+    for name in TILES:
+        a = load(name)
+        boxes, lab = components(a, 1)
+        y0, y1, x0, x1, i = boxes[0]
+        inset = 0.045
+        w, h = x1 - x0, y1 - y0
+        crop = a[y0 + int(h * inset):y1 - int(h * inset), x0 + int(w * inset):x1 - int(w * inset)]
+        img = np.array(Image.fromarray(crop).resize((TW, TH), Image.LANCZOS))
+        img[..., 3] = np.where(diamond, 255, 0)
+        save(Image.fromarray(img), name, TILE_W + 2, TILE_H + 1, (TILE_W + 2) / 2, (TILE_H + 1) / 2, man)
+        print(f'{name:14s} tile')
 
-    for sheet, crop in CROPS.items():
-        crop, stages = crop if isinstance(crop, tuple) else (crop, CROP_STAGES)
-        a = load(sheet)
-        # подбираем склейку: ростки одной стадии вместе, соседние стадии отдельно
-        for d in (30, 24, 18, 14, 10):
-            boxes, lab = components(a, 5, dilate=d)
-            if len(boxes) == 5 and max(b[3] - b[2] for b in boxes) < a.shape[1] * 0.42:
-                break
-        for st, si in enumerate(stages):
-            y0, y1, x0, x1, i = boxes[si]
+    for crop in CROPS:
+        for st in range(4):
+            name = f'crop_{crop}_{st}'
+            a = load(name)
+            boxes, lab = components(a, 1, dilate=30)  # ростки одной стадии — вместе
+            y0, y1, x0, x1, i = boxes[0]
             c = a[y0:y1, x0:x1].copy()
             c[lab[y0:y1, x0:x1] != i, 3] = 0
-            k = CROP_W / (x1 - x0)
-            if crop in CROP_UNIFORM:  # общий масштаб по самой крупной стадии
-                k = CROP_W / max(b[3] - b[2] for b in boxes) * 1.05
+            k = CROP_STAGE_W.get(crop, [CROP_W] * 4)[st] / (x1 - x0)
             W, H = (x1 - x0) * k, (y1 - y0) * k
             img = Image.fromarray(c).resize((round(W * DENSITY), round(H * DENSITY)), Image.LANCZOS)
-            save(img, f'crop_{crop}_{st}', W, H, W / 2, H - W / 4 - 2, man)
-            print(f'crop_{crop}_{st}  {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
+            save(img, name, W, H, W / 2, H - W / 4 - 2, man)
+            print(f'{name}  {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
 
     for sheet, (cols, rows, items) in GRID_SHEETS.items():
         if not os.path.exists(os.path.join(SRC, sheet + '.png')): continue
