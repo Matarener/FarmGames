@@ -12,6 +12,15 @@ export const BAR_MIN_ZOOM = 0.7;
 // Высота над точкой опоры, где у картинки кончаются непрозрачные пиксели (+ отступ), кэш на картинку
 const barTops = new WeakMap();
 let barScratch = null;
+// Высота для картинки уже известна (атлас при загрузке и так читает её пиксели — PixiScene opaqueBox):
+// y40 — первая строка пикселей с непрозрачностью больше 40 (-1 — таких нет). Тогда barTop в игре
+// не читает пиксели заново (getImageData большой картинки — рывок, когда полоска появилась впервые).
+export function primeBarTop(s, y40) {
+  if (!s || !s.canvas || barTops.has(s.canvas)) return;
+  const h = s.canvas.height;
+  barTops.set(s.canvas, y40 >= 0 && h ? (s.ay - y40 * s.h / h) + 5 : s.ay * 0.8);
+}
+
 export function barTop(s) {
   if (!s) return 30;
   let t = barTops.get(s.canvas);

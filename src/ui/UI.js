@@ -405,7 +405,46 @@ export class UI {
 
   get panelOpen() { return this.panelEl.classList.contains('show'); }
 
-  sfx(name) { if (this.farm) this.farm.sfx(name); }
+  sfx(name) { if (this.farm && !this._quiet) this.farm.sfx(name); }
+
+  // Прогрев за экраном загрузки: каждое окно, меню «Ещё» и всплывающее меню один раз собираются,
+  // показываются на кадр (под экраном загрузки их не видно) и закрываются. Движок JS компилирует их код,
+  // браузер считает стили и вёрстку, распаковывает и рисует иконки — первое открытие окна в игре
+  // уже не дольше следующих (без прогрева оно примерно вдвое дольше). Состояние окон и игры не меняется.
+  async warmup(f, onProgress) {
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const Q = f.quests.st, seen = Q.seen;
+    const firstQuest = f.quests.views().find((v) => !v.claimed);
+    const steps = [
+      () => this.bagPanel(f),
+      () => this.marketPanel(f),
+      () => { this.mk.mode = 'buy'; this.refreshPanel(); },
+      () => this.questPanel(f),
+      () => firstQuest && this.questPanel(f, { id: firstQuest.id }),
+      () => this.plantPanel(f, null),
+      () => this.housePanel(f),
+      () => this.settingsPanel(f),
+      () => { this.closePanel(); this.toggleMore(true); },
+      () => { this.toggleMore(false); this.popup(this.root.clientWidth / 2, this.root.clientHeight / 2, { title: 'Дуб', text: 'Срубить', cost: { wood: 1 }, items: [{ icon: 'axe', label: 'Срубить', sub: '1', onClick() {} }] }); },
+    ];
+    this._quiet = true;
+    this.root.classList.add('warming'); // без анимаций появления: окно сразу целиком на кадр
+    try {
+      for (let i = 0; i < steps.length; i++) {
+        try { steps[i](); void this.root.offsetHeight; } catch (e) { console.warn('прогрев окна', e); }
+        await frame();
+        onProgress && onProgress((i + 1) / steps.length);
+      }
+    } finally {
+      this.closePanel(); this.closePopup(); this.toggleMore(false);
+      Q.seen = seen; // окно задания сюжета помечает его прочитанным — возвращаем как было
+      this.qp = this.mk = this.inv = this.pl = null; // вкладки и выбор в окнах — по умолчанию
+      this._openT = -1;
+      void this.root.offsetHeight; // окна закрылись ещё без анимации
+      this.root.classList.remove('warming');
+      this._quiet = false;
+    }
+  }
 
   refreshPanel() {
     const p = this.panelEl;

@@ -28,20 +28,36 @@ export class Audio {
     this.theme = 'menu';
     this.step = 0; this.nextT = 0; this.bar = 0;
     this.seed = 1;
+    this.unlocked = false; // было нажатие: браузер разрешил звук
     document.addEventListener('visibilitychange', () => {
       if (!this.ctx) return;
-      if (document.hidden) this.ctx.suspend(); else if (!this.s.muted) this.ctx.resume();
+      if (document.hidden) this.ctx.suspend(); else this.resume();
     });
   }
 
   saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.s)); } catch (e) { /* */ } }
 
-  // Браузеры разрешают звук только после нажатия пользователя
+  // Браузеры разрешают звук только после нажатия пользователя: до него звук «на паузе», нажатие его включает
   unlock() {
-    if (this.ctx) { if (this.ctx.state === 'suspended' && !document.hidden && !this.s.muted) this.ctx.resume(); return; }
+    this.unlocked = true;
+    if (!this.ctx) this.prepare();
+    if (this.ctx && this.ctx.state === 'suspended') this.resume();
+  }
+
+  resume() {
+    if (!this.ctx || !this.unlocked || this.s.muted || document.hidden) return;
+    const p = this.ctx.resume();
+    if (p && p.catch) p.catch(() => { /* ещё не разрешено — включится со следующим нажатием */ });
+  }
+
+  // Звуковой движок создаётся заранее, за экраном загрузки (сам звук включится по первому нажатию):
+  // на телефоне создание AudioContext и шума — заметная пауза, и раньше она приходилась на первое касание в игре
+  prepare() {
+    if (this.ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    const c = this.ctx = new AC();
+    let c;
+    try { c = this.ctx = new AC(); } catch (e) { return; }
     this.master = c.createGain(); this.master.gain.value = 2.2; // телефонные динамики тихие
     const comp = c.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 3;
     this.master.connect(comp); comp.connect(c.destination);
@@ -64,7 +80,7 @@ export class Audio {
     const t = this.ctx.currentTime, m = this.s.muted ? 0 : 1;
     this.musicBus.gain.setTargetAtTime(this.s.music * 0.5 * m, t, 0.3);
     this.sfxBus.gain.setTargetAtTime(this.s.sfx * 0.8 * m, t, 0.05);
-    if (this.s.muted) this.ctx.suspend(); else if (!document.hidden) this.ctx.resume();
+    if (this.s.muted) this.ctx.suspend(); else this.resume();
   }
 
   set(key, v) { this.s[key] = v; this.saveSettings(); this.applyVolume(); }

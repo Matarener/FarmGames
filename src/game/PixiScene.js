@@ -6,18 +6,21 @@ import { toWorld, HW, HH } from '../engine/Iso.js';
 import { dimSprite, hash2 } from '../engine/Sprite.js';
 import { N, CHUNK, CHUNKS, T, FOG_W } from './World.js';
 import { HOUSE, FOG } from './data.js';
-import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop } from './bars.js';
+import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop, primeBarTop } from './bars.js';
 
 const tmp = { x: 0, y: 0 };
+const MX = new PIXI.Matrix();
 // кружки с номерами очереди: радиус в мировых единицах и плотность картинки (пикселей на единицу)
 const QBADGE_R = 6.5, QBADGE_RES = 12;
 // Стрелка подсказки: прыжок раз в HINT_HOP с длиной HINT_HOP_T с (между прыжками стоит — игра может
 // уйти в покой с редкими кадрами), высота прыжка; после того как призрак освободился — пауза HINT_WAIT с
 const HINT_HOP = 2.4, HINT_HOP_T = 0.6, HINT_HOP_H = 9, HINT_WAIT = 0.35;
+const QUEUE_SHOW = 7; // сколько номеров очереди готовить заранее (Player: 6 в очереди + текущее дело)
 const ATLAS = 2048, PAD = 6;
 const Z = (depth, wy) => depth * 1e4 + wy * 0.1; // порядок отрисовки: глубина клетки, затем y
 
-// прямоугольник непрозрачных пикселей картинки (с запасом в 1 px), null — если пусто
+// прямоугольник непрозрачных пикселей картинки (с запасом в 1 px), null — если пусто;
+// y40 — первая строка с непрозрачностью больше 40 (для высоты полосок над растениями, bars.js)
 let scratch = null;
 function opaqueBox(img, w, h) {
   if (!scratch) scratch = document.createElement('canvas');
@@ -25,14 +28,17 @@ function opaqueBox(img, w, h) {
   const g = scratch.getContext('2d', { willReadFrequently: true });
   g.clearRect(0, 0, w, h); g.drawImage(img, 0, 0);
   const d = g.getImageData(0, 0, w, h).data;
-  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1, y40 = -1;
   for (let y = 0; y < h; y++) {
     const row = y * w * 4;
-    for (let x = 0; x < w; x++) if (d[row + x * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; }
+    for (let x = 0; x < w; x++) {
+      const a = d[row + x * 4 + 3];
+      if (a) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; if (a > 40 && y40 < 0) y40 = y; }
+    }
   }
   if (x1 < 0) return null;
   x0 = Math.max(0, x0 - 1); y0 = Math.max(0, y0 - 1); x1 = Math.min(w - 1, x1 + 1); y1 = Math.min(h - 1, y1 + 1);
-  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1, y40 };
 }
 
 // ---------- атласы: все спрайты игры в нескольких больших текстурах ----------
@@ -63,6 +69,7 @@ class Atlases {
     // пустые прозрачные поля обрезаем: видеокарта не тратит на них время, атлас меньше
     const b = this.trim ? opaqueBox(img, w, h) : { x: 0, y: 0, w, h };
     if (!b) { t = PIXI.Texture.EMPTY; this.map.set(img, t); return t; }
+    if (b.y40 !== undefined) primeBarTop(s, b.y40);
     let p = this.list[this.list.length - 1] || this.page();
     if (p.x + b.w + PAD > ATLAS) { p.x = PAD; p.y += p.rowH + PAD; p.rowH = 0; }
     if (p.y + b.h + PAD > ATLAS) { p = this.page(); }
@@ -108,7 +115,7 @@ class PlayerView {
       // спрайт рисуется с (-ax,-ay) размером (w,h) в системе вложения
       const kx = s.w / t.width, ky = s.h / t.height;
       sp.anchor.set(s.ax / s.w, s.ay / s.h);
-      sp.setFromMatrix(new PIXI.Matrix(a * kx, b * kx, c * ky, d * ky, e, f2));
+      sp.setFromMatrix(MX.set(a * kx, b * kx, c * ky, d * ky, e, f2)); // одна матрица на всех: без мусора в каждом кадре
       n++;
     });
     for (let i = n; i < this.parts.length; i++) this.parts[i].visible = false;
@@ -490,11 +497,16 @@ export class PixiScene {
     this.atlas.sealed = this.groundAtlas.sealed = true; this.atlas.perf = this.groundAtlas.perf = f.perf;
     const R = this.app.renderer;
     for (const p of [...this.atlas.list, ...this.groundAtlas.list]) R.texture?.initSource?.(p.source);
+    // номера очереди дел (до 6 в очереди + текущее) — картинки рисуются и уходят в видеокарту сейчас,
+    // а не когда игрок впервые поставит несколько дел подряд
+    for (let n = 1; n <= QUEUE_SHOW; n++) for (const cur of [false, true]) R.texture?.initSource?.(this.queueTex(n, cur).source);
     // первые кадры (сборка сцены, загрузка в видеокарту, сборка шейдеров для всех видов
     // отрисовки: надписи, частицы, рамки) — ещё за экраном загрузки
     const cam = f.cam, z0 = cam.zoom, x0 = cam.x, y0 = cam.y;
     const p = f.player, tx = Math.floor(p.x), ty = Math.floor(p.y);
-    f.float(x0, y0, '+1 Дерево', 'wood'); f.burst(x0, y0, '#fff', 4, true); f.tapFx = { x: tx, y: ty, t: 0.35 };
+    // всплывающих надписей сразу несколько (за один удар их бывает до пяти): их спрайты создаются здесь
+    for (let i = 0; i < 6; i++) f.float(x0, y0 - i * 12, i ? '+1 опыт' : '+1 Дерево', i ? 'star' : 'wood');
+    f.burst(x0, y0, '#fff', 4, true); f.tapFx = { x: tx, y: ty, t: 0.35 };
     for (const z of [cam.minZoom, 1, cam.maxZoom, z0]) { cam.zoom = z; this.render(); }
     f.floaters.length = 0; f.particles.length = 0; f.tapFx = null;
     cam.zoom = z0; cam.x = x0; cam.y = y0;
@@ -613,6 +625,8 @@ export class PixiScene {
     }
 
     // объекты
+    const P = this.f.perf;
+    let tp = performance.now();
     const stamp = ++this.stamp;
     let playerHidden = false;
     const OB = w.objects;
@@ -659,6 +673,7 @@ export class PixiScene {
         CV[c] = near;
       }
     }
+    tp = P.part(full ? 'объекты, все' : 'объекты', tp);
 
     // растения и значки над грядками
     const bob = Math.sin(f.time * 4) * 1.5;
@@ -702,12 +717,16 @@ export class PixiScene {
     this.syncMover(outline);
     this.syncFx();
     this.syncFloaters();
+    P.part('растения и значки', tp);
 
-    const P = this.f.perf; this.atlas.flush(P);
+    this.atlas.flush(P);
+    // Pixi пересобирает список отрисовки мира, когда у спрайта поменялись видимость, порядок или их число
+    // (при движении камеры — почти каждый кадр): для фриза полезно знать, была ли пересборка
+    const RG = this.world.renderGroup, rebuilt = !!(RG && RG.structureDidChange);
     const tr = performance.now(), DST = this.app.drawStats; DST.calls = 0; DST.tris = 0;
     this.app.renderer.render(this.app.stage);
     this.calls = DST.calls; this.tris = DST.tris;
-    const pm = performance.now() - tr; if (pm >= 3) P.mark('отрисовка', pm);
+    const pm = performance.now() - tr; if (pm >= 3) { P.mark('отрисовка', pm); if (rebuilt) P.mark('пересборка'); }
   }
 
   // Полоски времени роста — одна Graphics на всех. Пересобирается, когда Farm пересчитал полоски
@@ -990,15 +1009,22 @@ export async function createPixiApp(canvas, perf, bg) {
     app.ticker && app.ticker.stop();
     // счётчик вызовов отрисовки (для профайлинга: показывается в счётчике FPS и в тесте видеокарты)
     { const gl = app.renderer.gl, st = app.drawStats = { calls: 0, tris: 0 };
-      for (const n of ['drawElements', 'drawArrays']) { const o = gl[n].bind(gl); gl[n] = (mode, count, ...a) => { st.calls++; st.tris += count / 3; return o(mode, count, ...a); }; } }
-    // первый запуск на слабой видеокарте — сразу «Средняя» графика (игрок может сменить в настройках)
-    if (perf.gfx === 'auto' && (window.devicePixelRatio || 1) > 1.5) {
-      try {
-        const gl = app.renderer.gl, ext = gl.getExtension('WEBGL_debug_renderer_info');
-        const name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
-        if (/PowerVR|Mali-(4|T[0-9]|G(31|51|52|57|68))|Adreno \(TM\) (3|4|50|51|60)\d/i.test(name)) perf.setGfx('mid');
-      } catch { /* нет данных о видеокарте */ }
-    }
+      // без «...a»: массив аргументов на каждый вызов — лишний мусор в каждом кадре
+      const de = gl.drawElements.bind(gl), da = gl.drawArrays.bind(gl);
+      gl.drawElements = (mode, count, type, offset) => { st.calls++; st.tris += count / 3; return de(mode, count, type, offset); };
+      gl.drawArrays = (mode, first, count) => { st.calls++; st.tris += count / 3; return da(mode, first, count); }; }
+    // название видеокарты — для счётчика FPS; первый запуск на слабой видеокарте — сразу «Средняя» графика
+    // (игрок может сменить в настройках)
+    let name = '';
+    try {
+      const gl = app.renderer.gl, ext = gl.getExtension('WEBGL_debug_renderer_info');
+      name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+    } catch { /* нет данных о видеокарте */ }
+    // «ANGLE (ARM, Mali-G57 MC2, OpenGL ES 3.2)» → «Mali-G57 MC2»
+    const angle = /^ANGLE \(([^,]*), ([^,]*)/.exec(name);
+    perf.gpu = (angle ? angle[2] : name).slice(0, 48);
+    if (perf.gfx === 'auto' && (window.devicePixelRatio || 1) > 1.5 &&
+      /PowerVR|Mali-(4|T[0-9]|G(31|51|52|57|68))|Adreno \(TM\) (3|4|50|51|60)\d/i.test(name)) perf.setGfx('mid');
     return app;
   } catch (e) {
     console.warn('WebGL', e);
