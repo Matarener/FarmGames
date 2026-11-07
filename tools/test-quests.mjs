@@ -197,17 +197,45 @@ test('event chain, prize, end credit', () => {
   assert.equal(R.refresh(st, c).filter((e) => e.type !== 'new').length, 0);
 });
 
-test('focus order and pin', () => {
+test('cards on screen: pins (up to 3) and story', () => {
   const st = fresh(); st.level = 5; const Q = R.questState(st), c = at('2026-11-07T12:00:00Z');
   Q.done['story.water'] = Q.done['story.wake'] = Q.done['story.note'] = 1;
   R.refresh(st, c);
-  let vs = R.views(st, c);
-  assert.equal(R.focus(st, vs, null).id, 'story.fishing');
-  Q.pin = 'garden.beds';
-  assert.equal(R.focus(st, vs, null).id, 'garden.beds');
+  const cards = () => ids(R.cards(st, R.views(st, c), null));
+  assert.deepEqual(cards(), ['story.fishing']);
+  assert.ok(R.setPin(st, 'garden.beds', true, c));
+  assert.ok(R.setPin(st, 'day:0', true, c));
+  assert.deepEqual(cards(), ['garden.beds', 'day:0', 'story.fishing']);
+  assert.ok(R.setPin(st, 'week:0', true, c));
+  assert.deepEqual(cards(), ['garden.beds', 'day:0', 'week:0'], 'story hidden when 3 pinned');
+  assert.equal(R.setPin(st, 'month:0', true, c), false, 'no 4th pin');
+  // сдали закреплённое — на его месте следующее задание ветки
   R.onEvent(st, 'dig', null, 2, c);
   R.claim(st, 'garden.beds', c);
-  assert.equal(Q.pin, 'garden.first', 'pin moves along the branch');
+  assert.deepEqual(Q.pins, ['garden.first', 'day:0', 'week:0']);
+  assert.ok(R.setPin(st, 'day:0', false, c));
+  assert.deepEqual(cards(), ['garden.first', 'week:0', 'story.fishing']);
+  // день сменился: устаревшее закрепление не мешает закрепить новое
+  Q.per.week.list[0].got = 1;
+  assert.ok(R.setPin(st, 'month:1', true, c));
+  assert.deepEqual(Q.pins, ['garden.first', 'month:1']);
+  // старое сохранение с одним pin
+  const st2 = fresh(); st2.quests = { done: {}, prog: {}, told: {}, pin: 'x', per: {}, ev: {} };
+  assert.deepEqual(R.questState(st2).pins, ['x']);
+});
+
+test('task texts: number and word agree', () => {
+  const f = (n) => R.plural(n, ['рыбу', 'рыбы', 'рыб']);
+  assert.deepEqual([1, 2, 4, 5, 11, 12, 14, 21, 22, 25, 101, 111].map(f),
+    ['рыбу', 'рыбы', 'рыбы', 'рыб', 'рыб', 'рыб', 'рыб', 'рыбу', 'рыбы', 'рыб', 'рыбу', 'рыб']);
+  // в готовых текстах не остаётся скобок
+  for (const kind of Object.keys(PERIODS)) for (const t of PERIODS[kind].pool) {
+    assert.ok(!/[{}]/.test(t.task.replace('{n}', '').replace('{name}', '').replace(/\{[^{}]*\|[^{}]*\}/g, '')), t.task);
+  }
+  const st = fresh(); st.level = 5; Object.assign(R.questState(st).done, { 'story.fishing': 1, 'story.wood': 1 });
+  const c = at('2026-11-07T12:00:00Z');
+  R.refresh(st, c);
+  for (const v of R.views(st, c).filter((v) => v.kind !== 'line')) assert.ok(!/[{}|]/.test(v.task + v.title), v.task);
 });
 
 test('full playthrough of branches', () => {

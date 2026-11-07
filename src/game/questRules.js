@@ -10,7 +10,7 @@
 //   done  { id: 1 }        — сданные задания веток
 //   prog  { id: [n, …] }   — счётчики целей открытых заданий веток (по одной на цель)
 //   told  { id: 1 }        — о выполнении уже сказали (тост был)
-//   pin                    — задание, которое игрок выбрал для карточки на экране
+//   pins  [id, …]          — задания, которые игрок закрепил на экране (до MAX_PINS, по порядку)
 //   seen                   — последнее задание сюжета, текст которого игрок видел
 //   per   { day|week|month: { k, list: [{ t, key?, n, p, r, got?, told? }], bonus, btold, swap } }
 //   ev    { 'ghost:2026': { done, prog, told, prize, ptold } | { end: 1 } }
@@ -18,7 +18,7 @@
 // «Вид» задания (view) — то, что показывает окно и карточка: { id, kind, title, who, text, task, goals, goal,
 // reward, done, claimed, frac, … }. goals — цели с прогрессом p, goal — первая невыполненная (для стрелки).
 
-import { LINES, QUESTS, QUEST_XP, PERIODIC_LEVEL, OLD_ORDER, OLD_TITLES, PERIODS, EVENTS } from './questData.js';
+import { LINES, QUESTS, QUEST_XP, PERIODIC_LEVEL, OLD_ORDER, OLD_TITLES, PERIODS, EVENTS, MAX_PINS } from './questData.js';
 import { CROPS, FISH, FLORA_GOODS, ITEMS } from './data.js';
 import { addItem } from './inventory.js';
 
@@ -50,10 +50,12 @@ export function matches(g, ev, key) {
 
 export function questState(st) {
   if (!st.quests) {
-    st.quests = { done: {}, prog: {}, told: {}, pin: null, seen: null, per: {}, ev: {} };
+    st.quests = { done: {}, prog: {}, told: {}, pins: [], seen: null, per: {}, ev: {} };
     if (st.quest) migrateOld(st);
   }
-  return st.quests;
+  const Q = st.quests;
+  if (!Q.pins) { Q.pins = Q.pin ? [Q.pin] : []; delete Q.pin; } // одно закреплённое задание (первая версия)
+  return Q;
 }
 
 // Старое сохранение: одна цепочка st.quest = { i, n, t, told, seen } (t — название текущего задания).
@@ -197,8 +199,16 @@ function itemGoal(t, it) {
   return g;
 }
 
+// Форма слова для числа: plural(1|2|5, ['рыбу', 'рыбы', 'рыб'])
+export function plural(n, [one, few, many]) {
+  const a = Math.abs(n) % 100, b = a % 10;
+  return a > 10 && a < 20 ? many : b === 1 ? one : b >= 2 && b <= 4 ? few : many;
+}
+
 function itemTask(t, it) {
-  return t.task.replace('{n}', it.n).replace('{name}', it.key && CROPS[it.key] ? CROPS[it.key].name.toLowerCase() : '');
+  return t.task.replace('{n}', it.n)
+    .replace('{name}', it.key && CROPS[it.key] ? CROPS[it.key].name.toLowerCase() : '')
+    .replace(/\{([^{}]*\|[^{}]*)\}/g, (_, f) => plural(it.n, f.split('|')));
 }
 
 export function periodViews(st, kind) {
@@ -289,12 +299,30 @@ export function views(st, ctx) {
   return out;
 }
 
-// Задание для карточки на экране: выбранное игроком → сюжет → готовое к сдаче → то, что было на карточке → ближе всех к концу
-export function focus(st, vs, prev) {
+// Карточки на экране: закреплённые игроком (по порядку), потом сюжет, если осталось место (всего до MAX_PINS).
+// Ничего не закреплено и сюжета нет — одна карточка: готовое к сдаче → то, что было (prev) → ближе всех к концу.
+export function cards(st, vs, prev) {
   const Q = questState(st), open = vs.filter((v) => !v.claimed && !v.bonus);
-  return open.find((v) => v.id === Q.pin) || open.find((v) => v.line === 'story') || open.find((v) => v.done) ||
-    open.find((v) => v.id === prev) || open.reduce((b, v) => (!b || v.frac > b.frac ? v : b), null) ||
-    vs.find((v) => v.done && !v.claimed) || null; // остался только бонус
+  const out = Q.pins.map((id) => open.find((v) => v.id === id)).filter(Boolean).slice(0, MAX_PINS);
+  const story = open.find((v) => v.line === 'story');
+  if (story && out.length < MAX_PINS && !out.includes(story)) out.push(story);
+  if (out.length) return out;
+  const one = open.find((v) => v.done) || open.find((v) => v.id === prev) ||
+    open.reduce((b, v) => (!b || v.frac > b.frac ? v : b), null) || vs.find((v) => v.done && !v.claimed); // остался только бонус
+  return one ? [one] : [];
+}
+
+export const isPinned = (st, id) => questState(st).pins.includes(id);
+
+// Закрепить задание на экране (on) или снять. Закреплённые, которых больше нет (кончился день, событие), не мешают:
+// они вычищаются. Возвращает false, если на экране уже MAX_PINS заданий.
+export function setPin(st, id, on, ctx) {
+  const Q = questState(st), live = new Set(views(st, ctx).filter((v) => !v.claimed).map((v) => v.id));
+  Q.pins = Q.pins.filter((x) => live.has(x) && x !== id);
+  if (!on) return true;
+  if (Q.pins.length >= MAX_PINS) return false;
+  Q.pins.push(id);
+  return true;
 }
 
 export const claimable = (vs) => vs.filter((v) => v.done && !v.claimed).length;
@@ -375,7 +403,9 @@ export function claim(st, id, ctx) {
     else { E.done[id] = 1; delete E.prog[id]; delete E.told[id]; const e = eventInfo(st, EVENTS.find((x) => x.id === v.ev), v.key); next = e.cur ? e.cur.id : null; }
   } else if (v.bonus) Q.per[v.kind].bonus = 1;
   else Q.per[v.kind].list[v.idx].got = 1;
-  if (Q.pin === id) Q.pin = next;
+  // закреплённое задание сменяется следующим в той же ветке (или снимается)
+  const pi = Q.pins.indexOf(id);
+  if (pi >= 0) { if (next && !Q.pins.includes(next)) Q.pins[pi] = next; else Q.pins.splice(pi, 1); }
   return { view: v, reward: v.reward, next, events: check(st, ctx) };
 }
 

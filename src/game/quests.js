@@ -7,7 +7,7 @@ import { QUEST_TZ, PERIODS } from './questData.js';
 export class Quests {
   constructor(farm) {
     this.farm = farm;
-    this.focusId = null; // что было на карточке: без причины карточка не перескакивает
+    this.lastCard = null; // что было на карточке, когда ничего не закреплено: без причины она не перескакивает
   }
 
   get st() { return R.questState(this.farm.st); }
@@ -22,12 +22,14 @@ export class Quests {
 
   view(id) { return this.views().find((v) => v.id === id) || null; }
 
-  // Задание на карточке под ресурсами (его же показывает стрелка)
-  focus(vs = this.views()) {
-    const f = R.focus(this.farm.st, vs, this.focusId);
-    this.focusId = f ? f.id : null;
-    return f;
+  // Карточки заданий под ресурсами (до MAX_PINS)
+  cards(vs = this.views()) {
+    const c = R.cards(this.farm.st, vs, this.lastCard);
+    this.lastCard = c.length === 1 ? c[0].id : null;
+    return c;
   }
+
+  isPinned(id) { return R.isPinned(this.farm.st, id); }
 
   emit(ev, key, n = 1) { this.handle(R.onEvent(this.farm.st, ev, key, n, this.ctx())); }
 
@@ -77,10 +79,10 @@ export class Quests {
     return true;
   }
 
-  // Игрок выбрал задание для карточки (или снял выбор: id = null)
-  pin(id) {
-    this.st.pin = id;
-    if (id) this.focusId = id;
+  // Закрепить задание на экране или снять. false — на экране уже MAX_PINS заданий.
+  pin(id, on = true) {
+    const ok = R.setPin(this.farm.st, id, on, this.ctx());
     this.farm.changed();
+    return ok;
   }
 }
