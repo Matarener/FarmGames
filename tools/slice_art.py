@@ -9,6 +9,7 @@ import json, os, sys
 import numpy as np
 from PIL import Image
 from scipy import ndimage
+import grass_tiles
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 SRC = os.path.join(ROOT, 'assets', 'source')
@@ -78,8 +79,10 @@ GRID_SHEETS = {
 # грядки: сухая и политая; вторая пара — с травяной каймой (не используется)
 BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), None, None]}
 WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)
-# плитки земли: каждая — своя картинка с одним ромбом
-TILES = ['tile_grass', 'tile_grass_flowers', 'tile_path']
+# плитки земли: каждая — своя картинка с одним ромбом. Трава собирается бесшовной из двух картинок
+# (tile_grass.png, tile_grass_flowers.png) в 4 варианта; отзеркаливать их в игре нельзя
+TILES = ['tile_path']
+GRASS_TILES = ['tile_grass', 'tile_grass_2', 'tile_grass_flowers', 'tile_grass_flowers_2']
 
 
 # Иконки интерфейса: листы на тёмном фоне со свечением (не прозрачные) — фон срезаем по контуру.
@@ -224,6 +227,35 @@ def save(img, name, w, h, ax, ay, man):
     man[name] = {'w': round(w, 2), 'h': round(h, 2), 'ax': round(ax, 2), 'ay': round(ay, 2)}
 
 
+def tile_src(name):
+    """Ромб плитки с картинки: чуть внутри контура (без тёмной обводки)."""
+    a = load(name)
+    boxes, lab = components(a, 1)
+    y0, y1, x0, x1, i = boxes[0]
+    inset = 0.045
+    w, h = x1 - x0, y1 - y0
+    return a[y0 + int(h * inset):y1 - int(h * inset), x0 + int(w * inset):x1 - int(w * inset)]
+
+
+def tiles(man):
+    """Плитки земли. Ромб чуть больше клетки (на 1 единицу), чтобы между клетками не было щелей."""
+    TW, TH = (TILE_W + 2) * DENSITY, (TILE_H + 1) * DENSITY
+    yy, xx = np.mgrid[0:TH, 0:TW]
+    diamond = (np.abs(xx + 0.5 - TW / 2) / (TW / 2) + np.abs(yy + 0.5 - TH / 2) / (TH / 2)) <= 1.0
+    out = {}
+    # трава — бесшовная (tools/grass_tiles.py): у всех вариантов одинаковая кайма, любые две рядом стыкуются
+    sq = grass_tiles.build(tile_src('tile_grass')[..., :3].astype(np.float64),
+                           tile_src('tile_grass_flowers')[..., :3].astype(np.float64))
+    for name, s in zip(GRASS_TILES, sq):
+        out[name] = grass_tiles.render(s, TILE_W + 2, TILE_H + 1, DENSITY)
+    for name in TILES:
+        out[name] = np.array(Image.fromarray(tile_src(name)).resize((TW, TH), Image.LANCZOS))
+    for name, img in out.items():
+        img[..., 3] = np.where(diamond, 255, 0)
+        save(Image.fromarray(img), name, TILE_W + 2, TILE_H + 1, (TILE_W + 2) / 2, (TILE_H + 1) / 2, man)
+        print(f'{name:14s} tile')
+
+
 def main(only=None):
     """only — нарезать только эти листы SHEETS и дописать их в существующий manifest.json"""
     os.makedirs(OUT, exist_ok=True)
@@ -247,6 +279,10 @@ def main(only=None):
                 # у деревьев «пятачок» травы — ромб, его самая широкая строка и есть центр
                 # (как у пней, иначе пень встаёт выше дерева)
                 if name.startswith('tree_'): by += bw / 4
+                # у кустов газон на земляном блоке, его самая широкая строка — не центр, а выше низа на
+                # высоту стенок: опора — центр ромба, нижний угол которого — низ блока
+                # (иначе куст стоит ниже своей клетки)
+                if name.startswith('bush_'): by = np.where((crop[..., 3] > 128).any(1))[0].max()
                 # у колодца самая широкая строка — середина круглой кладки; опора — от низа кладки
                 # под центром (иначе колодец «съезжает» на клетку перед собой)
                 if sheet == 'well':
@@ -265,6 +301,7 @@ def main(only=None):
     # Грядки: объёмный ромб (верх + бортик). Ширина — по краям картинки, центр ромба —
     # строка самой левой точки (левый угол верхней грани).
     if only:
+        if 'tiles' in only: tiles(man)
         with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
             json.dump(man, f, indent=1)
         ic = [n for n in only if n in ICON_SHEETS]
@@ -289,21 +326,7 @@ def main(only=None):
             save(img, name, W, H, (left + right) / 2 * k, (cy + ry) / 2 * k, man)
             print(f'{name:14s} bed {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
 
-    # Плитки земли: вырезаем ромб чуть внутри контура (без тёмной обводки)
-    TW, TH = (TILE_W + 2) * DENSITY, (TILE_H + 1) * DENSITY
-    yy, xx = np.mgrid[0:TH, 0:TW]
-    diamond = (np.abs(xx + 0.5 - TW / 2) / (TW / 2) + np.abs(yy + 0.5 - TH / 2) / (TH / 2)) <= 1.0
-    for name in TILES:
-        a = load(name)
-        boxes, lab = components(a, 1)
-        y0, y1, x0, x1, i = boxes[0]
-        inset = 0.045
-        w, h = x1 - x0, y1 - y0
-        crop = a[y0 + int(h * inset):y1 - int(h * inset), x0 + int(w * inset):x1 - int(w * inset)]
-        img = np.array(Image.fromarray(crop).resize((TW, TH), Image.LANCZOS))
-        img[..., 3] = np.where(diamond, 255, 0)
-        save(Image.fromarray(img), name, TILE_W + 2, TILE_H + 1, (TILE_W + 2) / 2, (TILE_H + 1) / 2, man)
-        print(f'{name:14s} tile')
+    tiles(man)
 
     for crop in CROPS:
         for st in range(4):
@@ -368,4 +391,5 @@ def main(only=None):
 
 if __name__ == '__main__':
     # python tools/slice_art.py [лист ...] — только эти листы деревьев/кустов, остальное не трогать
+    # python tools/slice_art.py tiles        — только плитки земли
     main(sys.argv[1:] or None)

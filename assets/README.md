@@ -23,7 +23,7 @@ assets/map.json  стартовая карта (редактор карты)
 | камень / валун | `rock`, `rock_small` / `boulder`, `boulder_moss` | |
 | дикая высокая трава | `grass_tall_<n>` | `grass_tall_0` |
 | урожай на грядке | `crop_<культура>_<стадия 0–3>` | `crop_carrot_3` |
-| плитки земли | `tile_grass`, `tile_grass_flowers`, `tile_path` | |
+| плитки земли | `tile_grass`, `tile_grass_2`, `tile_grass_flowers`, `tile_grass_flowers_2`, `tile_path` | |
 | грядка | `bed_dry`, `bed_wet` | |
 | вода и пруд | `tex_water` (текстура), `pond_<что>` | `pond_lily` |
 | дом, колодец | `house_<уровень>`, `well_broken`, `well_fixed` | |
@@ -43,6 +43,13 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 Деревья, камни, кусты, каждая стадия урожая (`crop_<культура>_<стадия>.png`) и плитки земли — по одному
 объекту на картинку: на общих листах «пиксели» стиля выходили крупными и в игре было видно ступеньки.
 
+Трава бесшовная: `tools/grass_tiles.py` собирает из `tile_grass.png` и `tile_grass_flowers.png` четыре
+плитки с одинаковой каймой у краёв (любые две рядом стыкуются), цветы с второй картинки накладываются
+поверх. Поэтому плитки травы в игре не отзеркаливаются: у зеркальной другой край, будет шов.
+
+Опора кустов — центр ромба, нижний угол которого — низ земляного блока под кустом (иначе куст стоит
+ниже своей клетки).
+
 ## Как нарезать
 
 Нужен Python с numpy, Pillow и scipy (`pip install numpy pillow scipy`).
@@ -52,6 +59,7 @@ python tools/slice_art.py                   # всё: картинки, manifest
 python tools/slice_fog.py                   # облака тумана (дописывает manifest.json)
 
 python tools/slice_art.py tree_apple_bare   # только эти листы (остальное в манифесте не трогается)
+python tools/slice_art.py tiles             # только плитки земли
 python tools/cut_grass_base.py assets/source/grass_tall_raw.png assets/source/grass_tall.png
 ```
 
