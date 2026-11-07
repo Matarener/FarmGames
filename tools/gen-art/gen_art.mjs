@@ -27,7 +27,7 @@ const flag = (f) => { const i = argv.indexOf(f); if (i < 0) return false; argv.s
 const opt = (f) => { const i = argv.indexOf(f); if (i < 0) return null; const v = argv[i + 1]; argv.splice(i, 2); return v; };
 const DRY = flag('--dry'), SLICE = flag('--slice'), KEEP = flag('--keep');
 const COUNT = opt('--count');
-const MODEL = opt('--model') || process.env.GEN_ART_MODEL; // модель из ~/.codex/config.toml может не работать со входом ChatGPT
+const MODEL = opt('--model') || process.env.GEN_ART_MODEL || 'gpt-5.6-terra'; // модель из ~/.codex/config.toml может не работать со входом ChatGPT
 const [jobsFile, ...only] = argv;
 if (!jobsFile) {
   console.log('node tools/gen-art/gen_art.mjs <jobs.json> [имя ...] [--count N] [--slice] [--dry] [--keep]');
@@ -45,7 +45,7 @@ function buildPrompt(job, refs) {
     'Generate exactly ONE image with your built-in image generation tool (image_gen).',
     'Do not write or run any scripts, do not call any APIs, do not use an API key, do not edit files.',
     'Do not ask questions: just generate the image and reply "done".',
-    refs.length ? `Use the attached reference image(s) as the style reference (${refs.join(', ')}): match their art style, outline, palette and lighting exactly. The reference is a style guide, not something to copy.` : '',
+    refs.length ? `The reference image(s) are already attached to this message (${refs.join(', ')}); do not try to open or read any files. Use them as the style reference: match their art style, outline, palette and lighting exactly. The reference is a style guide, not something to copy.` : '',
     `Image size: ${size}.`,
     `Background: one flat, perfectly uniform solid ${hex} color filling the whole background, no gradient, no texture, no vignette, no ground, no cast shadow on the background, no checkerboard. Do not use the ${hex} color anywhere on the objects themselves.`,
     'Objects must not touch each other or the image edges; leave generous empty space around every object.',
@@ -68,6 +68,7 @@ function listImages(dir, since, out = []) {
 function runCodex(prompt, cwd, images, logFile) {
   const args = ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '--cd', cwd];
   if (MODEL) args.push('--model', MODEL);
+  args.push('-c', 'model_reasoning_effort=low'); // думать тут не о чем, бережём лимит
   if (images.length) args.push('--image', images.join(','));
   args.push('--', '-'); // промпт из stdin: так в Windows не ломаются кавычки и переносы
   const env = { ...process.env };

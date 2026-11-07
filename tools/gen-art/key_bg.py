@@ -54,6 +54,7 @@ def key_out(a, key='auto', lo=40.0, hi=110.0):
         sizes = ndimage.sum(solid, lab, range(1, n + 1))
         tiny = np.isin(lab, np.where(sizes < 60)[0] + 1)
         al[tiny] = 0
+    rgb[al == 0] = 0  # в прозрачных пикселях не оставляем шум фона (ресайз и атласы его тянут)
     out = np.dstack([rgb, al * 255]).round().astype(np.uint8)
     return out, k
 
