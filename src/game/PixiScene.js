@@ -154,8 +154,14 @@ export class PixiScene {
     // Надписи — растровые шрифты: буквы рисуются один раз в атлас, новая надпись ничего не грузит в видеокарту
     const chars = [['a', 'z'], ['A', 'Z'], ['0', '9'], ['а', 'я'], ['А', 'Я'], 'ёЁ +-−–—×·:;!?.,%()/«»"\'№'];
     const font = { fontFamily: 'system-ui, sans-serif', fontWeight: '700' };
-    PIXI.BitmapFont.install({ name: 'farm-dark', style: { ...font, fontSize: 11, fill: 0x3d2b1f }, chars, resolution: this.textRes, padding: 2 });
-    PIXI.BitmapFont.install({ name: 'farm-float', style: { ...font, fontSize: 11, fill: 0xfffbe8, stroke: { color: 0x3a2717, width: 3, join: 'round' } }, chars, resolution: this.textRes, padding: 3 });
+    // Pixi рисует буквы шрифтом размера 100 и отступ между ними тоже меряет в нём: 36 ≈ 4 px при размере 11.
+    // С маленьким отступом при отдалении (mip-уровни текстуры) в букву «затекали» края соседних —
+    // тёмные полоски над буквами и сбоку от них.
+    const pad = 36;
+    // Лист с буквами: 2048 px вместо 4096 по умолчанию — все буквы и так влезают, а видеопамяти в 4 раза меньше
+    PIXI.DynamicBitmapFont.defaultOptions.textureSize = Math.floor(2048 / this.textRes);
+    PIXI.BitmapFont.install({ name: 'farm-dark', style: { ...font, fontSize: 11, fill: 0x3d2b1f }, chars, resolution: this.textRes, padding: pad });
+    PIXI.BitmapFont.install({ name: 'farm-float', style: { ...font, fontSize: 11, fill: 0xfffbe8, stroke: { color: 0x3a2717, width: 3, join: 'round' } }, chars, resolution: this.textRes, padding: pad });
   }
 
   // спрайт игры → Pixi-спрайт в точке (x, y) — опорной точке спрайта
