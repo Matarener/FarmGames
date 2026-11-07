@@ -103,8 +103,9 @@ export async function loadArt(onProgress) {
     },
     house: [null, A.house_1, A.house_2, A.house_3, A.house_4, A.house_5],
     well: [A.well_broken, A.well_fixed],
-    // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%)
-    grass: [A.tile_grass, flipped(A.tile_grass), A.tile_grass_flowers, flipped(A.tile_grass_flowers)],
+    // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%). Не отзеркаливать: плитки
+    // бесшовные (tools/grass_tiles.py), у зеркальной край другой — будет шов
+    grass: [A.tile_grass, A.tile_grass_2, A.tile_grass_flowers, A.tile_grass_flowers_2],
     path: [A.tile_path, flipped(A.tile_path)],
     // объёмные грядки: [сухая, политая]; рисуются поверх травы
     bed: [A.bed_dry, A.bed_wet],
