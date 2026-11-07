@@ -20,6 +20,11 @@ export function sowLeft(st, species, grown, pending = 0) {
   return Math.max(0, Inv.count(st, (grown ? floraOwnId : floraSeedId)(species)) - pending);
 }
 
+// Хватит ли энергии вскопать ещё одну грядку, если pending грядок уже ждут в очереди (по cost энергии)
+export function digLeft(st, cost, pending = 0) {
+  return st.energy - pending * cost >= cost;
+}
+
 // Посадить key на пустую грядку b: своё семя, а если его нет — семена за монеты.
 // Запоминает культуру: в окне выбора она встанет первой. → 'seed' | 'coins' | null (нечем платить)
 export function plantBed(st, b, key) {

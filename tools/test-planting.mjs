@@ -26,6 +26,13 @@ test('sowLeft: саженцы и свои взрослые растения сч
   assert.equal(P.sowLeft(st, 'nope', false), 0);
 });
 
+test('digLeft: энергия с учётом грядок в очереди', () => {
+  assert.equal(P.digLeft(st0({ energy: 4 }), 2), true);
+  assert.equal(P.digLeft(st0({ energy: 4 }), 2, 1), true);
+  assert.equal(P.digLeft(st0({ energy: 4 }), 2, 2), false);
+  assert.equal(P.digLeft(st0({ energy: 1 }), 2), false);
+});
+
 test('plantBed: сначала свои семена, потом монеты; запоминает культуру', () => {
   const st = st0({ coins: 2, items: { [seedId('carrot')]: 1 } }), a = bed(), b = bed(), c = bed();
   assert.equal(P.plantBed(st, a, 'carrot'), 'seed');

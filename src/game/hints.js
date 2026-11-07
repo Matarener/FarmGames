@@ -6,7 +6,7 @@
 //   { step, kind: 'obj', obj, x, y, icon }  — объект на карте: дерево, камень, пень, колодец, дом
 //   { step, kind: 'tile', x, y, icon }      — клетка: грядка, вода, трава под новую грядку
 //   { step, kind: 'chunk', c, x, y, icon }  — закрытый участок (x, y — его середина)
-//   { step, kind: 'ui', ui }                — кнопка: 'quest' (забрать награду), 'market'
+//   { step, kind: 'ui', ui }                — кнопка: 'quest' (забрать награду), 'market', 'dig' (лопата), 'bag' (рюкзак)
 // step — шаг из HINT_STEPS, icon — иконка для кружка у края экрана, когда цель за экраном.
 
 import { N, CHUNK, CHUNKS, T } from './World.js';
@@ -66,7 +66,9 @@ const ICON = {
 };
 
 // q — задание (вид из questRules.js), done — его уже можно сдать;
-// s = { st, world, beds, px, py, now } — состояние фермы, клетка призрака и время (мс).
+// s = { st, world, beds, px, py, now, mode } — состояние фермы, клетка призрака, время (мс) и режим посадки
+// ('dig' | 'sow' | 'crop' | null). Трава под грядку или росток — цель, только когда включён нужный режим;
+// без него стрелка у кнопки, которая его включает: лопата или рюкзак.
 // prev — прошлая подсказка: пока её цель годится, стрелка не перескакивает к другой, даже если та ближе.
 export function questHint(q, done, s, prev) {
   if (!q) return null;
@@ -74,7 +76,10 @@ export function questHint(q, done, s, prev) {
   const g = q.goal, steps = g && stepsFor(g);
   if (!steps) return null;
   const c = { st: s.st, world: s.world, beds: s.beds, now: s.now, key: g.key || null, group: g.group || null, prev: prev || null, cache: { px: s.px, py: s.py } };
-  return first(steps, c, 0);
+  const h = first(steps, c, 0);
+  if (h && h.step === 'dig' && s.mode !== 'dig') return { step: 'dig', kind: 'ui', ui: 'dig' };
+  if (h && h.step === 'sow' && s.mode !== 'sow') return { step: 'sow', kind: 'ui', ui: 'bag' };
+  return h;
 }
 
 // Та же ли цель у двух подсказок
