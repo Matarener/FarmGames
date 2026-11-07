@@ -86,7 +86,11 @@ async function main() {
   else if (!saved) ui.toast('Добро пожаловать на ферму! Нажмите на дерево или камень, чтобы добыть ресурсы.');
   bar.set(0.85); await nextFrame(); // полоса успевает показаться до тяжёлого шага
   try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); }
-  await warmUpFrames(farm, perf, (k) => bar.set(0.85 + 0.15 * k));
+  // Всё, что иначе случилось бы в первые минуты игры, — сейчас, за экраном загрузки:
+  // звуковой движок (раньше создавался при первом касании), окна и меню (первое открытие было вдвое дольше)
+  audio.prepare();
+  try { await ui.warmup(farm, (k) => bar.set(0.85 + 0.05 * k)); } catch (e) { console.warn('warmup ui', e); }
+  await warmUpFrames(farm, perf, (k) => bar.set(0.9 + 0.1 * k));
 
   // Игровой цикл создаём только теперь: он сам запускается, когда вкладка снова видна,
   // а до farm.init обновлять ещё нечего.
@@ -104,7 +108,11 @@ async function main() {
   game.start();
   perf.restart();
   await wait(450); // дать полосе доехать до конца
-  document.getElementById('loading').classList.add('hide');
+  const ld = document.getElementById('loading');
+  ld.classList.add('hide');
+  // после того как экран загрузки растаял — убрать его совсем: его анимации (призрак, блик на полосе)
+  // иначе крутятся всю игру под прозрачностью 0, и браузер каждый кадр перерисовывает лишний слой
+  setTimeout(() => { ld.style.display = 'none'; }, 600);
   if (!ui.panelOpen) audio.setTheme('farm');
   if (EDITOR) { new editorMod.MapEditor(farm, { input, map }).start(); return; }
   // начало истории и новые главы: задание сюжета, которое игрок ещё не читал, показываем сразу
@@ -119,9 +127,9 @@ async function main() {
 function startAudio() {
   const audio = new Audio();
   audio.setTheme('menu');
+  // нажатие пальцем браузер засчитывает, когда палец отпускают (pointerup/touchend), мышью — сразу
   const unlock = () => audio.unlock();
-  window.addEventListener('pointerdown', unlock, true);
-  window.addEventListener('keydown', unlock, true);
+  for (const ev of ['pointerdown', 'pointerup', 'touchend', 'keydown']) window.addEventListener(ev, unlock, true);
   return audio;
 }
 
@@ -230,12 +238,17 @@ function fpsOverlay(on, farm, perf, canvas) {
   fpsEl.className = 'debug';
   document.body.appendChild(fpsEl);
   const paint = () => {
-    const now = (performance.now() - perf._t0) / 1000;
-    const sp = perf.spikes.map((x) => `${x.ms.toFixed(0)} мс ${Math.round(now - x.at)} с назад: ${x.tags}`).join('\n');
+    const t = performance.now(), now = (t - perf._t0) / 1000;
+    const sp = perf.spikes.map((x) => `${x.ms.toFixed(0)} мс ${Math.round(now - x.at)} с назад: ${x.tags}${x.why ? ` [${x.why}]` : ''}`).join('\n');
+    // в покое (ничего не движется, экран не трогают) игра нарочно рисует не больше idleFps кадров — бережёт батарею;
+    // сколько выходит, когда камера и призрак двигаются, — «в движении»
+    const ago = Math.round((t - perf.fpsActiveAt) / 1000);
+    const act = perf.fpsActive ? ` · в движении ${perf.fpsActive.toFixed(0)} fps${ago > 5 ? ` (${ago} с назад)` : ''}` : '';
     fpsEl.textContent =
-      `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
-      ` · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}${perf.idle ? ' · покой' : ''}` +
+      `${perf.fps.toFixed(0)} fps${perf.idle ? ` · покой: нарочно до ${perf.idleFps}` : ''}${act}${perf.hz ? ` · экран ${perf.hz} Гц` : ''}` +
+      `\nкадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)}) · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}` +
       `\nвызовов отрисовки ${farm.scene.calls} · треугольников ${Math.round(farm.scene.tris)} · холст ${canvas.width}×${canvas.height}` +
+      (perf.gpu ? `\nвидеокарта ${perf.gpu}` : '') +
       (sp ? `\nфризы:\n${sp}` : '');
   };
   paint(); fpsTimer = setInterval(paint, 500);

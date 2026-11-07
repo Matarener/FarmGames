@@ -1159,14 +1159,27 @@ export class Farm {
   // ---------------- Обновление ----------------
 
   update(dt) {
+    // pf.part отмечает долгие части логики: в описании фриза видно, какая именно была долгой
+    const pf = this.perf;
+    let t = performance.now();
     this.time += dt;
     // рост — по настоящим часам: в фоне (Telegram свёрнут) кадры не идут, а грядки растут
     const now = Date.now();
     this.grow(this._wall ? Math.min(Math.max(0, (now - this._wall) / 1000), 7 * 86400) : dt);
     this._wall = now;
+    t = pf.part('рост', t);
     this._eT = (this._eT || 0) + dt;
-    if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.floraTick(now); this.wildTick(now); this.quests.tick(); this.syncHint(); this.ui.tick(this); }
+    if (this._eT > 1) {
+      this._eT = 0;
+      this.tickEnergy(); t = pf.part('энергия', t);
+      this.floraTick(now); t = pf.part('растения', t);
+      this.wildTick(now); t = pf.part('поросль', t);
+      this.quests.tick(); t = pf.part('задания', t);
+      this.syncHint(); t = pf.part('подсказка', t);
+      this.ui.tick(this); t = pf.part('интерфейс', t);
+    }
     this.player.update(dt);
+    t = pf.part('призрак', t);
     this.pourWater(dt);
     const OB = this.world.objects;
     for (let i = 0; i < OB.length; i++) { const o = OB[i]; if (o && o.shake > 0) o.shake = Math.max(0, o.shake - dt); }

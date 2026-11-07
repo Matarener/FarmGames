@@ -35,6 +35,7 @@ export class Game {
   _frame(t) {
     if (!this.running) return;
     this._raf = requestAnimationFrame(this._frame);
+    this.perf.vsync(t);
     const idle = this.perf.idle = this.isIdle();
     const fps = idle ? Math.min(this.perf.idleFps, this.perf.targetFps) : this.perf.targetFps;
     const elapsed = t - this.last;
@@ -47,7 +48,7 @@ export class Game {
     this.render();
     const t2 = performance.now();
     this.perf.work(t2 - t0);
-    this.perf.frame(t2 - t0, elapsed, 1000 / fps, { логика: t1 - t0, кадр: t2 - t1 });
+    this.perf.frame(t2 - t0, elapsed, 1000 / fps, { логика: t1 - t0, кадр: t2 - t1 }, t);
     this.perf.sample(elapsed / 1000, fps);
   }
 }
