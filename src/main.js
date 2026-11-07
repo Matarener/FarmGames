@@ -17,14 +17,13 @@ import { Audio } from './engine/Audio.js';
 // В сборку для игроков (dist, GitHub Pages) его код не попадает: при сборке window.FARM_EDITOR = false.
 const EDITOR = !!window.FARM_EDITOR;
 
-// Карта из редактора (assets/map.json). Нет файла — мир генерируется случайно, как раньше.
+/* global __MAP__ */
+// Стартовая карта (assets/map.json, её рисует редактор карты). В сборке она вшита в код (tools/build.mjs),
+// при локальном запуске читается из файла. Файла нет — мир генерируется случайно.
 async function loadMap() {
-  const v = typeof __MAP_V__ !== 'undefined' ? __MAP_V__ : null;
-  if (v === '') return null; // в сборке карты нет — не делаем лишний запрос
-  try {
-    const r = await fetch('assets/map.json' + (v ? '?v=' + v : ''), { cache: 'no-cache' });
-    return r.ok ? await r.json() : null;
-  } catch { return null; }
+  if (typeof __MAP__ !== 'undefined') return __MAP__;
+  const r = await fetch('assets/map.json', { cache: 'no-cache' });
+  return r.ok ? r.json() : null;
 }
 
 async function main() {
