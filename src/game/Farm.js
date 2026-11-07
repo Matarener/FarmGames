@@ -605,6 +605,7 @@ export class Farm {
     }
     if (t === T.SOIL) return this.tapBed(this.bedAt(w.idx(x, y)), sx, sy);
     if (w.occ[w.idx(x, y)] >= 0) return;
+    if (t === T.GRASS && this.planting && this.planting.species) return this.sowTap(x, y); // режим посадки саженцев
     const items = [{ icon: 'walk', label: 'Идти сюда', onClick: () => this.queue({ kind: 'walk', x, y }) }];
     if (t === T.GRASS) items.push({ icon: 'dig', label: 'Вскопать грядку', sub: `⚡ ${ENERGY.dig}`, onClick: () => this.queue({ kind: 'dig', x, y }) });
     if (t === T.GRASS && Object.keys(FLORA).some((k) => Inv.count(this.st, floraSeedId(k)) || Inv.count(this.st, floraOwnId(k)))) {
@@ -643,7 +644,7 @@ export class Farm {
   isWell(x, y) { const o = this.world.well; return !!o && this.st.well > 0 && o.gx === x && o.gy === y; }
 
   tapBed(b, sx, sy) {
-    if (!b.crop) return this.planting ? this.plantTap(b) : this.ui.plantPanel(this, b);
+    if (!b.crop) return this.planting && this.planting.crop ? this.plantTap(b) : this.ui.plantPanel(this, b);
     const info = this.cropInfo(b);
     if (info.ready) return this.queue({ kind: 'harvest', x: b.x, y: b.y });
     if (info.needsWater) return this.queue({ kind: 'water', x: b.x, y: b.y });
@@ -657,9 +658,12 @@ export class Farm {
   }
 
   // ---------------- Режим посадки ----------------
-  // Культуру выбрали в окне (UI.plantPanel): она сажается на эту грядку, а дальше — на каждую пустую,
-  // по которой нажмут, пока не нажмут ✕ на плашке внизу или не кончатся семена и монеты.
-  // b — грядка, с которой открыли окно (null — сменили культуру с плашки).
+  // this.planting: { crop } — культура на пустые грядки, { species, grown } — саженец (или своё взрослое
+  // растение) на свободную траву. Включается выбором в окне посадки или кнопкой «Посадить» в рюкзаке;
+  // дальше каждое нажатие по пустой грядке (по траве) сажает то же самое, пока не нажмут ✕ на плашке
+  // внизу или не кончатся семена и монеты (саженцы).
+  // Культуру выбрали в окне (UI.plantPanel) или в рюкзаке: она сажается на грядку b, если окно открыли с неё
+  // (null — из рюкзака или сменили культуру с плашки).
   pickCrop(key, b) {
     const c = CROPS[key];
     if (!c || c.level > this.st.level) return;
@@ -678,6 +682,28 @@ export class Farm {
     else this.ui.plantBar(this);
   }
 
+  // Саженец вида species (grown — своё выкопанное растение) из рюкзака: дальше нажатия по траве сажают его
+  pickSow(species, grown) {
+    if (!Plant.sowLeft(this.st, species, grown, this.pendingSows(species, grown))) return this.toast('Таких саженцев больше нет', 'warn');
+    this.planting = { species, grown: !!grown };
+    this.ui.plantBar(this);
+  }
+
+  sowTap(x, y) {
+    const { species, grown } = this.planting;
+    if (!Plant.sowLeft(this.st, species, grown, this.pendingSows(species, grown))) return this.stopPlanting(true);
+    this.queue({ kind: 'sow', x, y, species, grown });
+    if (!Plant.sowLeft(this.st, species, grown, this.pendingSows(species, grown))) this.stopPlanting(true);
+    else this.ui.plantBar(this);
+  }
+
+  pendingSows(species, grown) {
+    const p = this.player, is = (a) => a && a.kind === 'sow' && a.species === species && !!a.grown === !!grown;
+    let n = is(p.current) ? 1 : 0;
+    for (const a of p.queue) if (is(a)) n++;
+    return n;
+  }
+
   // Сколько посадок культуры key уже ждут в очереди призрака
   pendingPlants(key) {
     const p = this.player;
@@ -687,11 +713,13 @@ export class Farm {
   }
 
   stopPlanting(out) {
-    if (!this.planting) return;
-    const c = CROPS[this.planting.crop];
+    const P = this.planting;
+    if (!P) return;
     this.planting = null;
     this.ui.plantBar(this);
-    if (out) this.toast(`Семена «${c.name.toLowerCase()}» закончились, а на новые не хватает монет`, 'warn');
+    if (!out) return;
+    if (P.crop) this.toast(`Семена «${CROPS[P.crop].name.toLowerCase()}» закончились, а на новые не хватает монет`, 'warn');
+    else this.toast(`${P.grown ? 'Растения' : 'Саженцы'} «${FLORA[P.species].name.toLowerCase()}» в рюкзаке закончились`);
   }
 
   expandPopup(c, sx, sy) {
