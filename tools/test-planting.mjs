@@ -1,7 +1,7 @@
 // Проверка правил посадки (src/game/planting.js) без браузера: node tools/test-planting.mjs
 import assert from 'node:assert/strict';
 import * as P from '../src/game/planting.js';
-import { CROPS, PLANT_PICK, seedId } from '../src/game/data.js';
+import { CROPS, PLANT_PICK, seedId, floraSeedId, floraOwnId } from '../src/game/data.js';
 
 let tests = 0;
 const test = (name, fn) => { fn(); tests++; console.log('ok', name); };
@@ -15,6 +15,22 @@ test('plantLeft: свои семена плюс семена на монеты, 
   assert.equal(P.plantLeft(st, 'carrot', 9), 0);
   assert.equal(P.plantLeft(st, 'wheat'), 0, 'закрыто по уровню');
   assert.equal(P.plantLeft(st, 'nope'), 0);
+});
+
+test('sowLeft: саженцы и свои взрослые растения считаются отдельно', () => {
+  const st = st0({ items: { [floraSeedId('apple')]: 2, [floraOwnId('apple')]: 1 } });
+  assert.equal(P.sowLeft(st, 'apple', false), 2);
+  assert.equal(P.sowLeft(st, 'apple', true), 1);
+  assert.equal(P.sowLeft(st, 'apple', false, 2), 0);
+  assert.equal(P.sowLeft(st, 'pine', false), 0);
+  assert.equal(P.sowLeft(st, 'nope', false), 0);
+});
+
+test('digLeft: энергия с учётом грядок в очереди', () => {
+  assert.equal(P.digLeft(st0({ energy: 4 }), 2), true);
+  assert.equal(P.digLeft(st0({ energy: 4 }), 2, 1), true);
+  assert.equal(P.digLeft(st0({ energy: 4 }), 2, 2), false);
+  assert.equal(P.digLeft(st0({ energy: 1 }), 2), false);
 });
 
 test('plantBed: сначала свои семена, потом монеты; запоминает культуру', () => {

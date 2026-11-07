@@ -1,7 +1,7 @@
 // Правила посадки культур на грядки: чистые функции над состоянием st (без звуков, DOM и Date.now),
 // чтобы их же потом мог выполнять сервер. Эффекты делает Farm, окно выбора рисует UI.
 
-import { CROPS, PLANT_PICK, seedId } from './data.js';
+import { CROPS, FLORA, PLANT_PICK, seedId, floraSeedId, floraOwnId } from './data.js';
 import * as Inv from './inventory.js';
 
 // Сколько ещё грядок можно засадить культурой key: свои семена плюс семена на все монеты,
@@ -11,6 +11,18 @@ export function plantLeft(st, key, pending = 0) {
   if (!c || c.level > st.level) return 0;
   const coins = c.seed > 0 ? Math.floor(st.coins / c.seed) : Infinity;
   return Math.max(0, Inv.count(st, seedId(key)) + coins - pending);
+}
+
+// Сколько ещё можно посадить саженцев вида species (grown — своих выкопанных взрослых) из рюкзака,
+// минус pending — посадки, которые уже ждут в очереди призрака
+export function sowLeft(st, species, grown, pending = 0) {
+  if (!FLORA[species]) return 0;
+  return Math.max(0, Inv.count(st, (grown ? floraOwnId : floraSeedId)(species)) - pending);
+}
+
+// Хватит ли энергии вскопать ещё одну грядку, если pending грядок уже ждут в очереди (по cost энергии)
+export function digLeft(st, cost, pending = 0) {
+  return st.energy - pending * cost >= cost;
 }
 
 // Посадить key на пустую грядку b: своё семя, а если его нет — семена за монеты.

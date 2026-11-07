@@ -491,7 +491,7 @@ body.moving .toast { bottom: calc(var(--safe-b) + 112px); }
 .pb-more { flex: none; font-style: normal; font-size: 13px; color: #8a6a50; }
 .pb-x { flex: none; width: 44px; height: 44px; border-radius: 12px; background: rgba(61,43,31,.12); font-size: 18px; }
 .pb-x:active { background: rgba(61,43,31,.22); }
-body.planting .hud-bottom { display: none; }
+body.planting .hud-bottom, body.digging .pb-more { display: none; }
 
 /* ---------- Меню «Ещё» и кнопка «К фермеру» ---------- */
 .nav-btn.on { background: linear-gradient(#ffe48a, #f2c15c); }
@@ -517,12 +517,19 @@ body.planting .hud-bottom { display: none; }
 .fab img { width: 30px; height: 30px; }
 .fab:active { transform: translateY(2px); }
 .more-menu:not([hidden]) ~ .fab, body.moving .fab { display: none; }
+/* лопата над кнопкой «К фермеру»: режим «Копаем грядки»; в режиме — жёлтая, нажатие выключает */
+.fab-dig { bottom: calc(var(--safe-b) + 140px); }
+body.digging .fab-dig { background: linear-gradient(#ffe48a, #f2b51d); }
+.fab.hint::after { right: calc(100% + 6px); top: 50%; margin-top: -15px; animation: hint-right 1.2s ease-in-out infinite; }
+@keyframes hint-right { 0%, 100% { transform: rotate(-90deg) translateY(0); } 50% { transform: rotate(-90deg) translateY(-7px); } }
 @media (min-width: 700px) and (min-height: 500px) {
   .fab { bottom: calc(var(--safe-b) + 92px); width: 54px; height: 54px; }
+  .fab-dig { bottom: calc(var(--safe-b) + 156px); }
   .more-menu { bottom: calc(var(--safe-b) + 90px); }
 }
 @media (max-height: 500px) and (orientation: landscape) {
   .fab { bottom: calc(var(--safe-b) + 64px); width: 42px; height: 42px; }
+  .fab-dig { bottom: calc(var(--safe-b) + 114px); }
   .fab img { width: 26px; height: 26px; }
   .more-menu { bottom: calc(var(--safe-b) + 62px); grid-template-columns: repeat(4, 1fr); width: min(400px, calc(100% - 16px)); }
 }

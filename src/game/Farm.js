@@ -365,7 +365,7 @@ export class Farm {
   syncHint() {
     const p = this.player, q = this.hintQuest();
     const h = this.editor || !p || !q ? null : Hints.questHint(q, q.done,
-      { st: this.st, world: this.world, beds: this.beds, px: p.tx, py: p.ty, now: Date.now() }, this.hint);
+      { st: this.st, world: this.world, beds: this.beds, px: p.tx, py: p.ty, now: Date.now(), mode: this.plantMode() }, this.hint);
     if (!Hints.sameHint(h, this.hint)) this.hintV = (this.hintV || 0) + 1;
     this.hint = h;
     this.hintQ = q;
@@ -605,14 +605,12 @@ export class Farm {
     }
     if (t === T.SOIL) return this.tapBed(this.bedAt(w.idx(x, y)), sx, sy);
     if (w.occ[w.idx(x, y)] >= 0) return;
-    const items = [{ icon: 'walk', label: 'Идти сюда', onClick: () => this.queue({ kind: 'walk', x, y }) }];
-    if (t === T.GRASS) items.push({ icon: 'dig', label: 'Вскопать грядку', sub: `⚡ ${ENERGY.dig}`, onClick: () => this.queue({ kind: 'dig', x, y }) });
-    if (t === T.GRASS && Object.keys(FLORA).some((k) => Inv.count(this.st, floraSeedId(k)) || Inv.count(this.st, floraOwnId(k)))) {
-      items.push({ icon: 'seed', label: 'Посадить дерево или куст', onClick: () => this.ui.sowPanel(this, x, y) });
-    }
-    // одно действие (например, дорожка: только «идти») — выполняем сразу, без меню
-    if (items.length === 1) { this.ui.closePopup(); return items[0].onClick(); }
-    this.ui.popup(sx, sy, { items });
+    // Свободная трава: в режиме «Копаем» — новая грядка, в режиме посадки саженцев — росток,
+    // иначе призрак просто идёт сюда (меню на каждое нажатие по земле было лишним)
+    const P = this.planting;
+    if (t === T.GRASS && P && P.dig) return this.digTap(x, y);
+    if (t === T.GRASS && P && P.species) return this.sowTap(x, y);
+    this.queue({ kind: 'walk', x, y });
   }
 
   wellPopup(o, sx, sy) {
@@ -643,7 +641,7 @@ export class Farm {
   isWell(x, y) { const o = this.world.well; return !!o && this.st.well > 0 && o.gx === x && o.gy === y; }
 
   tapBed(b, sx, sy) {
-    if (!b.crop) return this.planting ? this.plantTap(b) : this.ui.plantPanel(this, b);
+    if (!b.crop) return this.planting && this.planting.crop ? this.plantTap(b) : this.ui.plantPanel(this, b);
     const info = this.cropInfo(b);
     if (info.ready) return this.queue({ kind: 'harvest', x: b.x, y: b.y });
     if (info.needsWater) return this.queue({ kind: 'water', x: b.x, y: b.y });
@@ -657,9 +655,12 @@ export class Farm {
   }
 
   // ---------------- Режим посадки ----------------
-  // Культуру выбрали в окне (UI.plantPanel): она сажается на эту грядку, а дальше — на каждую пустую,
-  // по которой нажмут, пока не нажмут ✕ на плашке внизу или не кончатся семена и монеты.
-  // b — грядка, с которой открыли окно (null — сменили культуру с плашки).
+  // this.planting: { crop } — культура на пустые грядки, { species, grown } — саженец (или своё взрослое
+  // растение) на свободную траву. Включается выбором в окне посадки или кнопкой «Посадить» в рюкзаке;
+  // дальше каждое нажатие по пустой грядке (по траве) сажает то же самое, пока не нажмут ✕ на плашке
+  // внизу или не кончатся семена и монеты (саженцы).
+  // Культуру выбрали в окне (UI.plantPanel) или в рюкзаке: она сажается на грядку b, если окно открыли с неё
+  // (null — из рюкзака или сменили культуру с плашки).
   pickCrop(key, b) {
     const c = CROPS[key];
     if (!c || c.level > this.st.level) return;
@@ -678,6 +679,54 @@ export class Farm {
     else this.ui.plantBar(this);
   }
 
+  // Режим «Копаем грядки» (кнопка-лопата): каждое нажатие по свободной траве — новая грядка,
+  // пока не нажмут ✕ или лопату ещё раз или не кончится энергия
+  pickDig() {
+    if (this.planting && this.planting.dig) return this.stopPlanting();
+    if (!Plant.digLeft(this.st, ENERGY.dig, this.pendingDigs())) return this.toast('Не хватает энергии. Съешьте что-нибудь из рюкзака или подождите.', 'warn');
+    this.planting = { dig: true };
+    this.ui.plantBar(this);
+  }
+
+  digTap(x, y) {
+    if (!Plant.digLeft(this.st, ENERGY.dig, this.pendingDigs())) return this.stopPlanting(true);
+    this.queue({ kind: 'dig', x, y });
+    if (!Plant.digLeft(this.st, ENERGY.dig, this.pendingDigs())) this.stopPlanting(true);
+    else this.ui.plantBar(this);
+  }
+
+  pendingDigs() {
+    const p = this.player;
+    let n = p.current && p.current.kind === 'dig' ? 1 : 0;
+    for (const a of p.queue) if (a.kind === 'dig') n++;
+    return n;
+  }
+
+  // Саженец вида species (grown — своё выкопанное растение) из рюкзака: дальше нажатия по траве сажают его
+  pickSow(species, grown) {
+    if (!Plant.sowLeft(this.st, species, grown, this.pendingSows(species, grown))) return this.toast('Таких саженцев больше нет', 'warn');
+    this.planting = { species, grown: !!grown };
+    this.ui.plantBar(this);
+  }
+
+  sowTap(x, y) {
+    const { species, grown } = this.planting;
+    if (!Plant.sowLeft(this.st, species, grown, this.pendingSows(species, grown))) return this.stopPlanting(true);
+    this.queue({ kind: 'sow', x, y, species, grown });
+    if (!Plant.sowLeft(this.st, species, grown, this.pendingSows(species, grown))) this.stopPlanting(true);
+    else this.ui.plantBar(this);
+  }
+
+  pendingSows(species, grown) {
+    const p = this.player, is = (a) => a && a.kind === 'sow' && a.species === species && !!a.grown === !!grown;
+    let n = is(p.current) ? 1 : 0;
+    for (const a of p.queue) if (is(a)) n++;
+    return n;
+  }
+
+  // Какой режим посадки включён: 'dig' | 'sow' | 'crop' | null (для подсказок к заданиям)
+  plantMode() { const P = this.planting; return !P ? null : P.dig ? 'dig' : P.species ? 'sow' : 'crop'; }
+
   // Сколько посадок культуры key уже ждут в очереди призрака
   pendingPlants(key) {
     const p = this.player;
@@ -687,11 +736,14 @@ export class Farm {
   }
 
   stopPlanting(out) {
-    if (!this.planting) return;
-    const c = CROPS[this.planting.crop];
+    const P = this.planting;
+    if (!P) return;
     this.planting = null;
     this.ui.plantBar(this);
-    if (out) this.toast(`Семена «${c.name.toLowerCase()}» закончились, а на новые не хватает монет`, 'warn');
+    if (!out) return;
+    if (P.dig) this.toast('Энергия кончилась. Съешьте что-нибудь из рюкзака или подождите.', 'warn');
+    else if (P.crop) this.toast(`Семена «${CROPS[P.crop].name.toLowerCase()}» закончились, а на новые не хватает монет`, 'warn');
+    else this.toast(`${P.grown ? 'Растения' : 'Саженцы'} «${FLORA[P.species].name.toLowerCase()}» в рюкзаке закончились`);
   }
 
   expandPopup(c, sx, sy) {

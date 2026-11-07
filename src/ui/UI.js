@@ -2,7 +2,7 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, seedId, xpToNext, houseNeedChunks } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
 import * as Plant from '../game/planting.js';
 import * as R from '../game/questRules.js';
@@ -14,7 +14,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const RES_NAMES = { wood: 'Дерево', stone: 'Камень', ore: 'Руда', coins: 'Монеты', gems: 'Кристаллы' };
 // кнопки, к которым может показать стрелка-подсказка (UI.hint)
-const HINT_EL = { quest: '#btn-quests', market: '#btn-market' };
+const HINT_EL = { quest: '#btn-quests', market: '#btn-market', dig: '#btn-dig', bag: '#btn-bag' };
 // вкладки окна «Задания»: периодические появляются с PERIODIC_LEVEL, «Событие» — пока оно идёт
 const QTABS = [
   { key: 'main', name: 'Основные', icon: 'star' },
@@ -64,7 +64,12 @@ export class UI {
     $('#mb-cancel').onclick = () => farm.mover.cancel();
     $('#mb-place').onclick = () => farm.mover.place();
     $('#mb-store').onclick = () => farm.mover.store();
-    $('#pb-pick').onclick = () => this.plantPanel(farm, null);
+    $('#pb-pick').onclick = () => {
+      const P = farm.planting;
+      if (!P || P.dig) return;
+      if (P.species) this.sowPanel(farm, null, null); else this.plantPanel(farm, null);
+    };
+    $('#btn-dig').onclick = () => farm.pickDig();
     $('#pb-x').onclick = () => farm.stopPlanting();
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && farm.mover.active) farm.mover.exit(); });
   }
@@ -817,7 +822,8 @@ export class UI {
     }, { music: false });
   }
 
-  // Свободная трава → «Посадить дерево или куст»: сетка саженцев и своих выкопанных растений (Farm.sowChoices)
+  // Сетка саженцев и своих выкопанных растений (Farm.sowChoices). x = null — открыли с плашки посадки:
+  // выбранный саженец становится саженцем режима посадки; x, y — посадить на эту клетку.
   sowPanel(f, x, y) {
     this.openPanel('sow', 'Что посадить?', (body) => {
       const list = f.sowChoices();
@@ -828,7 +834,7 @@ export class UI {
         const cell = h('button', 'pl-cell' + (r.grown ? ' last' : ''),
           `<i>${this.ic(ITEMS[r.id].icon)}<s class="pl-t">${r.grown ? 'сразу' : fmtShort(fl.grow)}</s>${r.grown ? '' : this.ic('seed', 'inv-badge')}<b class="pl-n">${fmtNum(r.n)}</b></i>` +
           `<span class="pl-name">${fl.name}</span>`);
-        cell.onclick = () => { this.closePanel(); f.queue({ kind: 'sow', x, y, species: r.species, grown: r.grown }); };
+        cell.onclick = () => { this.closePanel(); if (x == null) f.pickSow(r.species, r.grown); else f.queue({ kind: 'sow', x, y, species: r.species, grown: r.grown }); };
         g.appendChild(cell);
       }
       body.appendChild(g);
@@ -840,9 +846,31 @@ export class UI {
   plantBar(f) {
     const P = f.planting, on = !!P, body = document.body;
     if (body.classList.contains('planting') !== on) { body.classList.toggle('planting', on); $('#plant-bar').hidden = !on; this._safe = null; }
+    body.classList.toggle('digging', !!(P && P.dig));
     if (!on) { this.last.pb = null; return; }
+    if (P.dig) {
+      // режим «Копаем грядки»: менять нечего, только ✕
+      const key = `dig:${f.st.energy}:${this.icons.dig ? 1 : 0}`;
+      if (this.last.pb === key) return;
+      this.last.pb = key;
+      $('#pb-ic').src = this.icons.dig || '';
+      $('#pb-name').textContent = 'Копаем грядки';
+      $('#pb-sub').innerHTML = `${ENERGY.dig} ${this.ic('energy', 'ic-s')} за грядку · нажимай на траву`;
+      return;
+    }
+    if (P.species) {
+      // саженец или своё растение на свободную траву
+      const fl = FLORA[P.species], id = (P.grown ? floraOwnId : floraSeedId)(P.species), it = ITEMS[id], n = Inv.count(f.st, id);
+      const key = `sow:${id}:${n}:${this.icons[it.icon] ? 1 : 0}`;
+      if (this.last.pb === key) return;
+      this.last.pb = key;
+      $('#pb-ic').src = this.icons[it.icon] || '';
+      $('#pb-name').textContent = `Сажаем: ${fl.name.toLowerCase()}${P.grown ? ' (взрослое)' : ''}`;
+      $('#pb-sub').textContent = `есть: ${fmtNum(n)} · нажимай на траву`;
+      return;
+    }
     const c = CROPS[P.crop], seeds = Inv.count(f.st, seedId(c.key));
-    const key = `${c.key}:${seeds}:${c.seed}:${this.icons[c.key] ? 1 : 0}`;
+    const key = `crop:${c.key}:${seeds}:${c.seed}:${this.icons[c.key] ? 1 : 0}`;
     if (this.last.pb === key) return;
     this.last.pb = key;
     $('#pb-ic').src = this.icons[c.key] || '';
@@ -868,6 +896,17 @@ export class UI {
     if (it.food) {
       const b = h('button', 'btn-s', `Съесть +${it.food} ${this.ic('energy')}`);
       b.disabled = st.energy >= f.maxEnergy; b.onclick = () => f.eat(it.key);
+      acts.appendChild(b);
+    }
+    // семена и саженцы: «Посадить» закрывает рюкзак и включает режим посадки (нажимай на грядки или траву)
+    if ((it.seedOf || it.floraOf) && n > 0) {
+      const lock = it.seedOf && CROPS[it.seedOf].level > st.level;
+      const b = h('button', 'btn-s gold', lock ? `Посадить с ${CROPS[it.seedOf].level} ур.` : `${this.ic('seed')} Посадить`);
+      b.disabled = lock;
+      b.onclick = () => {
+        this.closePanel();
+        if (it.seedOf) f.pickCrop(it.seedOf, null); else f.pickSow(it.floraOf, !!it.grown);
+      };
       acts.appendChild(b);
     }
     if (acts.children.length) box.appendChild(acts);
