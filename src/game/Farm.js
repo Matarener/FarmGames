@@ -36,6 +36,10 @@ export class Farm {
     this.tapFx = null;
     this.time = 0;
     this.quests = new Quests(this);
+    // Проверка заданий (только с ?debug в адресе): сдвиг часов заданий и событие (окно «Настройки»)
+    this.devOn = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+    this.dev = {};
+    if (this.devOn) { try { this.dev = JSON.parse(localStorage.getItem('farm.dev')) || {}; } catch { this.dev = {}; } }
     this.mover = new Mover(this);
     this.groundV = 0; // растёт, когда меняются клетки земли
     // Спрайты и иконки — из картинок художника. Пока они грузятся, игра не запущена (экран загрузки),
@@ -204,7 +208,7 @@ export class Farm {
     Flora.tidyFruit(this.st, Date.now());
     this.floraTick(Date.now());
     // старые сохранения: первое задание ещё не выполнено — стартовая морковка созревает сразу
-    if (saved && !this.st.stats.harvested && !(this.st.quest && this.st.quest.i > 0)) {
+    if (saved && !this.st.stats.harvested && !this.quests.st.done['story.wake']) {
       const b = this.beds.get(w.startBeds[0]);
       if (b && b.crop === 'carrot') { b.p = CROPS.carrot.time; b.w = 2; }
     }
@@ -358,29 +362,39 @@ export class Farm {
   // Подсказка к заданию (hints.js): куда показать стрелку. Считается после каждого действия и раз
   // в секунду; this.hint — цель или null, hintV растёт, когда цель сменилась (сцена начинает новый прыжок).
   syncHint() {
-    const Q = this.quests, p = this.player;
-    const h = this.editor || !p || !this.hintOn() ? null : Hints.questHint(Q.current, Q.done,
+    const p = this.player, q = this.quests.focus();
+    const h = this.editor || !p || !this.hintOn(q) ? null : Hints.questHint(q, q.done,
       { st: this.st, world: this.world, beds: this.beds, px: p.tx, py: p.ty, now: Date.now() }, this.hint);
     if (!Hints.sameHint(h, this.hint)) this.hintV = (this.hintV || 0) + 1;
     this.hint = h;
     this.ui.hint(h && h.kind === 'ui' ? h.ui : null);
   }
 
-  // Видна ли подсказка: в первых заданиях всегда, дальше — если игрок попросил её в окне задания.
-  // Просьба помнится на устройстве (а не в сохранении фермы) по названию задания: новое задание — снова без стрелки.
-  hintOn() {
-    const Q = this.quests, q = Q.current;
+  // Видна ли подсказка к заданию q (на карточке): в первых заданиях сюжета всегда, дальше — если игрок
+  // попросил её в окне задания. Просьба помнится на устройстве (а не в сохранении фермы) по id задания:
+  // новое задание — снова без стрелки.
+  hintOn(q) {
     if (!q) return false;
-    if (Hints.hintAuto(Q.st.i)) return true;
+    if (Hints.hintAuto(q)) return true;
     if (this.hintAsk === undefined) { try { this.hintAsk = localStorage.getItem('farm.hintQ'); } catch { this.hintAsk = null; } }
-    return this.hintAsk === q.title;
+    return this.hintAsk === q.id;
   }
 
-  askHint(on) {
-    const q = this.quests.current;
-    this.hintAsk = on && q ? q.title : null;
+  // Включить или выключить стрелку к заданию id. Задание со стрелкой встаёт на карточку.
+  askHint(on, id) {
+    this.hintAsk = on && id ? id : null;
     try { if (this.hintAsk) localStorage.setItem('farm.hintQ', this.hintAsk); else localStorage.removeItem('farm.hintQ'); } catch { /* приватный режим */ }
+    if (on && id) this.quests.pin(id);
     this.syncHint();
+  }
+
+  // Настройки разработчика для заданий: { shift: мс к часам, event: id события }
+  setDev(patch) {
+    if (patch.event && patch.event !== this.dev.event) delete this.quests.st.ev[patch.event + ':dev']; // проверить с начала
+    Object.assign(this.dev, patch);
+    try { localStorage.setItem('farm.dev', JSON.stringify(this.dev)); } catch { /* приватный режим */ }
+    this.quests.tick();
+    this.changed();
   }
 
   // Точка цели подсказки в мире (основание объекта, середина клетки или участка)
@@ -723,6 +737,7 @@ export class Farm {
     const r = Inv.sellItem(this.st, key, n);
     if (!r) return;
     this.quests.emit('sell', key, r.n);
+    this.quests.emit('earn', key, r.coins);
     this.sfx('coin');
     this.changed();
   }
@@ -852,6 +867,7 @@ export class Farm {
         this.sfx('harvest');
         if (r.xp) this.addXp(r.xp);
         w.remove(o);
+        this.quests.emit('mow');
         this.changed();
         return false;
       }
@@ -971,7 +987,7 @@ export class Farm {
       this.dropFx(o, r.items);
       this.addXp(def.xp || 1);
       st.stats.cleared++;
-      this.quests.emit(def.stump ? 'chop' : 'clear');
+      this.quests.emit(def.stump ? 'chop' : 'clear', o.type);
       this.burst(o.wx, o.wy - 10, '#7a4b28', 12);
       this.sfx('break');
       // своё дерево уходит целиком, дикое оставляет пень
@@ -991,7 +1007,7 @@ export class Farm {
     }
     this.addXp(def.xp || 1);
     st.stats.cleared++;
-    this.quests.emit(def.stump ? 'chop' : o.type === 'stump' ? 'stump' : def.action === 'mine' ? 'mine' : 'clear');
+    this.quests.emit(def.stump ? 'chop' : o.type === 'stump' ? 'stump' : def.action === 'mine' ? 'mine' : 'clear', o.type);
     this.burst(o.wx, o.wy - 10, o.type === 'rock' || o.type === 'boulder' ? '#9aa1a7' : '#7a4b28', 12);
     this.sfx('break');
     if (def.stump) { o.was = o.type; o.type = 'stump'; o.hp = OBJECTS.stump.hp; this.world.version++; }
@@ -1073,7 +1089,7 @@ export class Farm {
     this.grow(this._wall ? Math.min(Math.max(0, (now - this._wall) / 1000), 7 * 86400) : dt);
     this._wall = now;
     this._eT = (this._eT || 0) + dt;
-    if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.floraTick(now); this.wildTick(now); this.syncHint(); this.ui.tick(this); }
+    if (this._eT > 1) { this._eT = 0; this.tickEnergy(); this.floraTick(now); this.wildTick(now); this.quests.tick(); this.syncHint(); this.ui.tick(this); }
     this.player.update(dt);
     this.pourWater(dt);
     const OB = this.world.objects;

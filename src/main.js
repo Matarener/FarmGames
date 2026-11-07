@@ -52,6 +52,7 @@ async function main() {
   bar.set(0.05); await nextFrame();
 
   const farm = new Farm({ renderer, camera, ui, tg, save, perf, audio });
+  if (farm.devOn) window.farm = farm; // ?debug: ферма доступна из консоли (проверка заданий)
   farm.scene = new PixiScene(farm, app);
   farm.onArtProgress = (k) => bar.set(0.08 + k * 0.72);
   window.__farm = farm; // для тестов в браузере
@@ -106,8 +107,9 @@ async function main() {
   document.getElementById('loading').classList.add('hide');
   if (!ui.panelOpen) audio.setTheme('farm');
   if (EDITOR) { new editorMod.MapEditor(farm, { input, map }).start(); return; }
-  // начало истории: новое задание показываем сразу
-  if (farm.quests.current && !farm.quests.st.seen) setTimeout(() => ui.questPanel(farm), 700);
+  // начало истории и новые главы: задание сюжета, которое игрок ещё не читал, показываем сразу
+  const story = farm.quests.views().find((v) => v.line === 'story');
+  if (story && farm.quests.st.seen !== story.id) setTimeout(() => ui.questPanel(farm, { id: story.id }), 700);
   // счётчик FPS и времени кадра: включается в настройках (или ?debug в адресе)
   perf.onShowFps = (on) => fpsOverlay(on, farm, perf, canvas);
   fpsOverlay(perf.showFps || new URLSearchParams(location.search).has('debug'), farm, perf, canvas);

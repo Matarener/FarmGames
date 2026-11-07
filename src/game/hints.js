@@ -14,13 +14,16 @@ import { CROPS, OBJECTS, FLORA, HOUSE, WELL_COST, ITEMS, expansionCost, houseNee
 import * as Inv from './inventory.js';
 import * as Flora from './flora.js';
 import { cropFlags } from './beds.js';
+import { GROUPS } from './questRules.js';
 
-// Первые задания учат играть: в них стрелка видна сама. Дальше она включается только по просьбе
+// Первые задания сюжета учат играть: в них стрелка видна сама. Дальше она включается только по просьбе
 // игрока (переключатель в окне задания) и держится до смены задания.
+// q — «вид» задания из questRules.js (views): kind, line, idx, goal — первая невыполненная цель.
 export const HINT_AUTO = 5;
-export const hintAuto = (qi) => qi < HINT_AUTO;
+export const hintAuto = (q) => !!q && q.kind === 'line' && q.line === 'story' && q.idx < HINT_AUTO;
 // Есть ли у задания подсказка на карте (у «Достигни 5 уровня» её нет)
-export const hasHint = (q) => !!q && !!HINT_STEPS[q.goal.ev || q.goal.state];
+export const hasHint = (q) => !!q && !!q.goal && !!stepsFor(q.goal);
+const stepsFor = (g) => HINT_STEPS[g.ev === 'mine' && g.key === 'boulder' ? 'boulder' : g.ev === 'sell' && g.group === 'fish' ? 'sellFish' : g.ev || g.state];
 
 // Цель задания (goal.ev или goal.state) → шаги по порядку. Подсказка — первый шаг, для которого
 // нашлась цель: «собери урожай» — к созревшей грядке, нет такой — к грядке, которую надо полить, и т. д.
@@ -35,9 +38,13 @@ export const HINT_STEPS = {
   chop: ['tree'],
   stump: ['stump', 'tree'],
   mine: ['rock'],
+  boulder: ['boulder'],
   pick: ['fruit'],
   mow: ['grass'],
+  sow: ['sow', 'tree'],
   sell: ['market', 'ripe', 'thirsty', 'empty', 'wait'],
+  earn: ['market', 'ripe', 'thirsty', 'empty', 'wait'],
+  sellFish: ['market', 'pond'],
   buy: ['shop'],
   expand: ['chunk'],
   well: ['well'],
@@ -55,18 +62,18 @@ const NEED_STEPS = {
 // Иконка в кружке у края экрана
 const ICON = {
   thirsty: 'can', empty: 'seed', dig: 'dig', pond: 'fish', tree: 'axe', stump: 'axe', rock: 'pick',
-  boulder: 'pick', grass: 'hay', well: 'build', house: 'house', chunk: 'lock',
+  boulder: 'pick', grass: 'hay', well: 'build', house: 'house', chunk: 'lock', sow: 'seed',
 };
 
-// q — текущее задание (QUESTS), done — его уже можно сдать;
+// q — задание (вид из questRules.js), done — его уже можно сдать;
 // s = { st, world, beds, px, py, now } — состояние фермы, клетка призрака и время (мс).
 // prev — прошлая подсказка: пока её цель годится, стрелка не перескакивает к другой, даже если та ближе.
 export function questHint(q, done, s, prev) {
   if (!q) return null;
   if (done) return { step: 'quest', kind: 'ui', ui: 'quest' };
-  const g = q.goal, steps = HINT_STEPS[g.ev || g.state];
+  const g = q.goal, steps = g && stepsFor(g);
   if (!steps) return null;
-  const c = { st: s.st, world: s.world, beds: s.beds, now: s.now, key: g.key || null, prev: prev || null, cache: { px: s.px, py: s.py } };
+  const c = { st: s.st, world: s.world, beds: s.beds, now: s.now, key: g.key || null, group: g.group || null, prev: prev || null, cache: { px: s.px, py: s.py } };
   return first(steps, c, 0);
 }
 
@@ -181,7 +188,7 @@ function need(c, cost, depth) {
     const have = k === 'coins' ? c.st.coins : k === 'gems' ? c.st.gems : Inv.count(c.st, k);
     if (have >= v) continue;
     // ресурсы ищем без ключа задания (монеты — с любой культуры)
-    return NEED_STEPS[k] ? first(NEED_STEPS[k], { ...c, key: null }, depth + 1) : null;
+    return NEED_STEPS[k] ? first(NEED_STEPS[k], { ...c, key: null, group: null }, depth + 1) : null;
   }
   return null;
 }
@@ -212,6 +219,19 @@ const STEP = {
     return ch.get();
   },
 
+  // посадить росток: есть саженец в рюкзаке — к свободной траве (лучше рядом с другими деревьями), нет — к дереву
+  sow: (c) => {
+    if (!Object.keys(c.st.items).some((id) => ITEMS[id] && ITEMS[id].floraOf && c.st.items[id] > 0)) return null;
+    const ch = chooser(c, 'sow', 'tile'), w = c.world;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const i = y * N + x;
+      if (w.tiles[i] !== T.GRASS || w.occ[i] >= 0 || !w.isOpen(x, y)) continue;
+      const d = reach(c, x, y);
+      if (d >= 0) ch.offer(d, x, y, null, ICON.sow);
+    }
+    return ch.get();
+  },
+
   // вода, к которой можно подойти (рыбалка)
   pond: (c) => {
     const ch = chooser(c, 'pond', 'tile'), w = c.world;
@@ -222,8 +242,8 @@ const STEP = {
     return ch.get();
   },
 
-  // дерево (своё — только если диких нет: его жалко рубить)
-  tree: (c) => objects(c, 'tree', isTree, (o) => (o.own ? 40 : 0)),
+  // дерево (своё — только если диких нет: его жалко рубить); с ключом задания — только этот вид
+  tree: (c) => objects(c, 'tree', (o) => isTree(o) && (!c.key || !FLORA[c.key] || o.type === c.key), (o) => (o.own ? 40 : 0)),
   stump: (c) => objects(c, 'stump', (o) => o.type === 'stump'),
   // камень; валун (5 ударов) — если камня рядом нет
   rock: (c) => objects(c, 'rock', (o) => o.type === 'rock' || o.type === 'boulder', (o) => (o.type === 'boulder' ? 6 : 0)),
@@ -235,9 +255,10 @@ const STEP = {
     return !!f && !!f.pick && (!c.key || f.fruit === c.key) && Flora.hasFruit(c.st, o, c.now);
   }, null, (o) => FLORA[o.type].fruit),
 
-  // рынок: есть что продать
+  // рынок: есть что продать (с группой задания — из этой группы: «продай 10 рыб»)
   market: (c) => {
-    for (const [id, n] of Object.entries(c.st.items)) if (n > 0 && ITEMS[id] && ITEMS[id].sell) return { step: 'market', kind: 'ui', ui: 'market' };
+    const G = c.group && GROUPS[c.group];
+    for (const [id, n] of Object.entries(c.st.items)) if (n > 0 && ITEMS[id] && ITEMS[id].sell && (!G || G(id))) return { step: 'market', kind: 'ui', ui: 'market' };
     return null;
   },
   shop: () => ({ step: 'shop', kind: 'ui', ui: 'market' }),
