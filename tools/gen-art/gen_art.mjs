@@ -1,6 +1,6 @@
 // Генерация картинок через Codex CLI по подписке ChatGPT (без ключа API).
 //
-//   node tools/gen-art/gen_art.mjs <jobs.json> [имя ...] [--count N] [--slice] [--dry] [--keep]
+//   node tools/gen-art/gen_art.mjs <jobs.json> [имя ...] [--count N] [--model M] [--slice] [--dry] [--keep]
 //
 // Каждое задание в jobs.json: { name, prompt, refs?, size?, key?, count?, replace? } (см. README.md).
 // Для каждого задания запускается `codex exec` (одна картинка за запуск). Codex рисует встроенным
@@ -27,6 +27,7 @@ const flag = (f) => { const i = argv.indexOf(f); if (i < 0) return false; argv.s
 const opt = (f) => { const i = argv.indexOf(f); if (i < 0) return null; const v = argv[i + 1]; argv.splice(i, 2); return v; };
 const DRY = flag('--dry'), SLICE = flag('--slice'), KEEP = flag('--keep');
 const COUNT = opt('--count');
+const MODEL = opt('--model') || process.env.GEN_ART_MODEL; // модель из ~/.codex/config.toml может не работать со входом ChatGPT
 const [jobsFile, ...only] = argv;
 if (!jobsFile) {
   console.log('node tools/gen-art/gen_art.mjs <jobs.json> [имя ...] [--count N] [--slice] [--dry] [--keep]');
@@ -66,6 +67,7 @@ function listImages(dir, since, out = []) {
 
 function runCodex(prompt, cwd, images, logFile) {
   const args = ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '--cd', cwd];
+  if (MODEL) args.push('--model', MODEL);
   if (images.length) args.push('--image', images.join(','));
   args.push('--', '-'); // промпт из stdin: так в Windows не ломаются кавычки и переносы
   const env = { ...process.env };
@@ -144,3 +146,4 @@ if (SLICE && made.length) {
   spawnSync(PY, [path.join(ROOT, 'tools/slice_art.py'), ...sheets], { stdio: 'inherit', cwd: ROOT });
 }
 console.log(`\nготово картинок: ${made.length}${made.length ? ' → ' + made.map((m) => m + '.png').join(', ') : ''}`);
+if (!DRY && !made.length) process.exit(1);
