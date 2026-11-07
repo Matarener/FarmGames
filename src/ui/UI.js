@@ -743,8 +743,8 @@ export class UI {
     const box = h('div', 'wh-box');
     box.innerHTML = `<div class="wh-wheel" style="transform:rotate(${this._whA || 0}deg)">${this.wheelSvg(S, seg)}` +
       S.map((s, i) => this.wheelPrize(s, i, seg)).join('') + '</div>' +
-      '<svg class="wh-ptr" viewBox="0 0 40 50" aria-hidden="true"><path d="M20 47 L6 17 A15.5 15.5 0 1 1 34 17 Z" fill="#e2483b" stroke="#3d2b1f" stroke-width="3" stroke-linejoin="round"/>' +
-      '<circle cx="20" cy="15.5" r="6" fill="#ffd45a" stroke="#3d2b1f" stroke-width="2"/><circle cx="18" cy="13.5" r="1.8" fill="#fff8d0"/></svg>';
+      '<svg class="wh-ptr" viewBox="0 0 40 56" aria-hidden="true"><path d="M20 53 L6.36 23.25 A15 15 0 1 1 33.64 23.25 Z" fill="#e2483b" stroke="#3d2b1f" stroke-width="3" stroke-linejoin="round"/>' +
+      '<circle cx="20" cy="17" r="6" fill="#ffd45a" stroke="#3d2b1f" stroke-width="2"/><circle cx="18" cy="15" r="1.8" fill="#fff8d0"/></svg>';
     this._whWin = null;
     wrap.appendChild(box);
     const ctl = h('div', 'wh-ctl');
