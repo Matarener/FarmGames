@@ -36,9 +36,12 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 картинки `tree_<вид>` (или `bush_<вид>`), `_young`, при сборе плодов — `_bare`, у дерева — `stump_<вид>`.
 
 Листы в `assets/source`: лист с одной картинкой называется так же, как картинка
-(`tree_apple_bare.png`, `house_3.png`); листы с несколькими — по содержимому (`trees.png`,
-`bushes.png`, `crop_corn.png`, `ui_menu1.png`). Что на каком листе и в каком порядке, записано
+(`tree_apple_bare.png`, `house_3.png`); листы с несколькими — по содержимому (`stumps.png`,
+`well.png`, `ui_menu1.png`). Что на каком листе и в каком порядке, записано
 в `tools/slice_art.py` (SHEETS, SINGLE, CROPS, ICON_SHEETS, …).
+
+Деревья, камни, кусты, каждая стадия урожая (`crop_<культура>_<стадия>.png`) и плитки земли — по одному
+объекту на картинку: на общих листах «пиксели» стиля выходили крупными и в игре было видно ступеньки.
 
 ## Как нарезать
 
@@ -47,12 +50,12 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 ```
 python tools/slice_art.py                   # всё: картинки, manifest.json, иконки, icons.json
 python tools/slice_fog.py                   # облака тумана (дописывает manifest.json)
-python tools/cut_bush_base.py               # срезать земляной блок у кустов (bush_*.webp, на месте)
 
 python tools/slice_art.py tree_apple_bare   # только эти листы (остальное в манифесте не трогается)
 python tools/cut_grass_base.py assets/source/grass_tall_raw.png assets/source/grass_tall.png
 ```
 
 Полная нарезка `slice_art.py` пишет `manifest.json` заново, поэтому после неё всегда запускайте
-`slice_fog.py` и `cut_bush_base.py`. Высокую траву сначала чистит `cut_grass_base.py`
+`slice_fog.py`. `tools/cut_bush_base.py` (срезать земляной блок у кустов) сейчас **не запускать**:
+у новых кустов (2026-11-07) основание оставлено как есть, его, возможно, перерисуют позже. Высокую траву сначала чистит `cut_grass_base.py`
 (`grass_tall_raw.png` → `grass_tall.png`), потом её режет `slice_art.py`.
