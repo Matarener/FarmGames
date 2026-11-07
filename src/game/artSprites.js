@@ -1,5 +1,5 @@
 // Спрайты художника (assets/art, нарезаны tools/slice_art.py). Загружаются за экраном загрузки:
-// игра не открывается, пока не загружены все картинки (графика из кода игроку не показывается).
+// игра не открывается, пока не загружены все картинки, чтобы в игре не было подгрузок.
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
 import { FLORA } from './data.js';
@@ -41,8 +41,8 @@ export async function loadArt(onProgress) {
   const total = list.length + icList.length;
   let done = 0;
   const tick = () => onProgress && onProgress(++done / total);
-  // Одна оборвавшаяся картинка раньше роняла всю загрузку (Promise.all) — и игра оставалась
-  // с графикой из кода. Теперь каждая грузится с повторами, а не загрузившиеся собираются в failed.
+  // Каждая картинка грузится с повторами; не загрузившиеся собираются в failed, и тогда
+  // loadArt падает, а экран загрузки предлагает «Повторить».
   const failed = [];
   const sprites = Promise.all(list.map(async ([name, m]) => {
     try {
@@ -51,7 +51,7 @@ export async function loadArt(onProgress) {
     } catch (e) { failed.push(name); }
     tick();
   }));
-  // иконки интерфейса (ic_<имя>.webp) — тоже ждём, чтобы в интерфейсе не мелькали иконки из кода
+  // иконки интерфейса (ic_<имя>.webp) — тоже ждём, чтобы они не появлялись в интерфейсе с опозданием
   const icons = {};
   const iconsP = Promise.all(icList.map(async (n) => {
     const url = BASE + 'ic_' + n + '.webp?v=' + V;

@@ -1,4 +1,5 @@
-// Точка входа: собираем движок, сцену фермы, интерфейс и Telegram.
+// Точка входа: собираем движок, сцену фермы, интерфейс и Telegram. Пока грузятся картинки
+// художника, виден экран загрузки; игра открывается, когда всё загружено и прогрето.
 
 import { Perf } from './engine/Perf.js';
 import { Game } from './engine/Game.js';
@@ -17,6 +18,9 @@ import { Audio } from './engine/Audio.js';
 // В сборку для игроков (dist, GitHub Pages) его код не попадает: при сборке window.FARM_EDITOR = false.
 const EDITOR = !!window.FARM_EDITOR;
 
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
 /* global __MAP__ */
 // Стартовая карта (assets/map.json, её рисует редактор карты). В сборке она вшита в код (tools/build.mjs),
 // при локальном запуске читается из файла. Файла нет — мир генерируется случайно.
@@ -30,12 +34,7 @@ async function main() {
   const mapP = loadMap();
   const tg = new TelegramBridge();
   tg.init();
-  // звук (настройки в окне «Настройки»)
-  const audio = new Audio();
-  audio.setTheme('menu');
-  const unlock = () => audio.unlock();
-  window.addEventListener('pointerdown', unlock, true);
-  window.addEventListener('keydown', unlock, true);
+  const audio = startAudio();
   const perf = new Perf();
   setSpriteScale(perf.spriteScale);
 
@@ -43,34 +42,105 @@ async function main() {
   // Рисует WebGL (PixiJS). Без WebGL играть нельзя: старая отрисовка Canvas 2D убрана
   // (она осталась в ветке canvas2d), а WebGL есть во всех клиентах Telegram.
   const app = await createPixiApp(canvas, perf, BG);
-  if (!app) { loadingError('Ваше устройство не поддерживает WebGL: без него игра не запустится. Попробуйте обновить Telegram или открыть игру на другом устройстве.'); return; }
+  if (!app) return loadingError('Ваше устройство не поддерживает WebGL: без него игра не запустится. Попробуйте обновить Telegram или открыть игру на другом устройстве.');
+  const bar = loadingBar();
   const renderer = new Renderer(canvas, perf, app);
   const camera = new Camera();
   const ui = new UI(document.getElementById('app'));
   const save = new Save(tg);
   { const fl = save.flush.bind(save); save.flush = () => { const t = performance.now(); fl(); perf.mark('сохранение', performance.now() - t); }; }
-  const fill = document.getElementById('ld-fill'), ltext = document.getElementById('ld-text');
-  // полоса двигается через transform (это анимирует видеокарта — плавно, даже пока JS занят), только вперёд
-  let shown = 0, slowNet = false;
-  const progress = (k) => {
-    if (k <= shown) return; shown = k;
-    fill.style.transform = `scaleX(${k.toFixed(3)})`;
-    ltext.textContent = k < 1 ? `${slowNet ? 'Медленная сеть, догружаем' : 'Загрузка…'} ${Math.round(k * 100)}%` : 'Готово!';
-  };
-  const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  progress(0.05); await nextFrame();
+  bar.set(0.05); await nextFrame();
+
   const farm = new Farm({ renderer, camera, ui, tg, save, perf, audio });
   farm.scene = new PixiScene(farm, app);
-  farm.onArtProgress = (k) => progress(0.08 + k * 0.72);
+  farm.onArtProgress = (k) => bar.set(0.08 + k * 0.72);
   window.__farm = farm; // для тестов в браузере
   ui.bind(farm, farm.icons);
+  const input = setupView(canvas, renderer, camera, farm, ui, perf);
 
+  let map = await mapP;
+  let editorMod = null;
+  if (EDITOR) {
+    editorMod = await import('./editor/MapEditor.js');
+    map = editorMod.startMap(map);
+    save.disabled = true; // редактор не трогает сохранение игры
+  }
+  const saved = EDITOR ? null : await save.load();
+
+  window.addEventListener('pagehide', () => save.flush());
+
+  // Ждём ВСЕ картинки художника, сколько бы это ни заняло: графику из кода игрок видеть не должен.
+  // Не загрузились (нет сети) — экран загрузки с кнопкой «Повторить».
+  // Игровой цикл пока не запускаем: за экраном загрузки кадры никому не нужны и только мешают загрузке.
+  try { await farm.artReady; } catch (e) {
+    bar.stop();
+    loadingError('Не удалось загрузить картинки. Проверьте интернет.', true);
+    return;
+  }
+  bar.stop();
+  // мир собираем, когда картинки уже есть: рост растений и полоски над ними берут размеры спрайтов
+  farm.init(saved, map);
+  if (EDITOR) { /* без приветствий */ }
+  else if (saved && farm.awaySec > 60) ui.toast(`С возвращением! Вас не было ${Math.round(farm.awaySec / 60)} мин, растения подросли.`);
+  else if (!saved) ui.toast('Добро пожаловать на ферму! Нажмите на дерево или камень, чтобы добыть ресурсы.');
+  bar.set(0.85); await nextFrame(); // полоса успевает показаться до тяжёлого шага
+  try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); }
+  await warmUpFrames(farm, perf, (k) => bar.set(0.85 + 0.15 * k));
+
+  // Игровой цикл создаём только теперь: он сам запускается, когда вкладка снова видна,
+  // а до farm.init обновлять ещё нечего.
+  const game = new Game(perf);
+  game.update = (dt) => {
+    const ax = input.keyAxis();
+    if (ax.x || ax.y) camera.panBy(-ax.x * 600 * dt, -ax.y * 600 * dt);
+    camera.update(dt);
+    farm.update(dt);
+  };
+  game.render = () => farm.render();
+  game.isIdle = () => farm.isIdle() && input.pointers.size === 0;
+  game.onPause = () => save.flush();
+  bar.set(1);
+  game.start();
+  perf.restart();
+  await wait(450); // дать полосе доехать до конца
+  document.getElementById('loading').classList.add('hide');
+  if (!ui.panelOpen) audio.setTheme('farm');
+  if (EDITOR) { new editorMod.MapEditor(farm, { input, map }).start(); return; }
+  // начало истории: новое задание показываем сразу
+  if (farm.quests.current && !farm.quests.st.seen) setTimeout(() => ui.questPanel(farm), 700);
+  // счётчик FPS и времени кадра: включается в настройках (или ?debug в адресе)
+  perf.onShowFps = (on) => fpsOverlay(on, farm, perf, canvas);
+  fpsOverlay(perf.showFps || new URLSearchParams(location.search).has('debug'), farm, perf, canvas);
+}
+
+// Звук (настройки в окне «Настройки»). Браузер разрешает звук только после первого касания или клавиши.
+function startAudio() {
+  const audio = new Audio();
+  audio.setTheme('menu');
+  const unlock = () => audio.unlock();
+  window.addEventListener('pointerdown', unlock, true);
+  window.addEventListener('keydown', unlock, true);
+  return audio;
+}
+
+// Камера и ввод: масштаб под экран, поворот телефона, перетаскивание, щипок, тапы
+function setupView(canvas, renderer, camera, farm, ui, perf) {
   const fitZoom = () => {
     // mobile-first: на телефоне ~6.5 клеток по ширине, на больших экранах — крупнее, но не огромно
     const w = renderer.cssW, hgt = renderer.cssH;
     if (w > hgt && hgt < 500) return Math.min(1.7, Math.max(0.8, Math.min(w / (64 * 10), hgt / (32 * 8)))); // горизонтальный телефон
     return Math.min(1.7, Math.max(0.8, Math.min(w / (64 * 6.5), hgt / (32 * 13))));
   };
+  const input = new Input(canvas, {
+    onDown: () => { camera.vx = camera.vy = 0; },
+    onPanStart: () => { camera.dragging = true; ui.closePopup(); },
+    onPan: (dx, dy) => camera.panBy(dx, dy),
+    onPanEnd: (vx, vy) => { camera.dragging = false; camera.fling(vx, vy); },
+    onZoom: (k, x, y) => { camera.zoomAt(k, x, y); ui.closePopup(); },
+    onTap: (x, y) => farm.onTap(x, y),
+    onHover: (x, y) => farm.onHover(x, y),
+  });
+  let lastLand = null;
   const resize = () => {
     renderer.resize();
     input.updateRect();
@@ -83,124 +153,90 @@ async function main() {
     if (lastLand !== null && land !== lastLand) camera.zoom = fitZoom();
     lastLand = land;
   };
-  let lastLand = null;
   perf.onScaleChange = () => renderer.resize();
-
-  const input = new Input(canvas, {
-    onDown: () => { camera.vx = camera.vy = 0; },
-    onPanStart: () => { camera.dragging = true; ui.closePopup(); },
-    onPan: (dx, dy) => camera.panBy(dx, dy),
-    onPanEnd: (vx, vy) => { camera.dragging = false; camera.fling(vx, vy); },
-    onZoom: (k, x, y) => { camera.zoomAt(k, x, y); ui.closePopup(); },
-    onTap: (x, y) => farm.onTap(x, y),
-    onHover: (x, y) => farm.onHover(x, y),
-  });
-
   new ResizeObserver(resize).observe(canvas);
   resize();
   camera.zoom = fitZoom();
-
-  let map = await mapP;
-  let editorMod = null;
-  if (EDITOR) {
-    editorMod = await import('./editor/MapEditor.js');
-    map = editorMod.startMap(map);
-    save.disabled = true; // редактор не трогает сохранение игры
-  }
-  const saved = EDITOR ? null : await save.load();
-
-  const game = new Game(perf);
-  game.update = (dt) => {
-    const ax = input.keyAxis();
-    if (ax.x || ax.y) camera.panBy(-ax.x * 600 * dt, -ax.y * 600 * dt);
-    camera.update(dt);
-    farm.update(dt);
-  };
-  game.render = () => farm.render();
-  game.isIdle = () => farm.isIdle() && input.pointers.size === 0;
-  game.onPause = () => save.flush();
-  window.addEventListener('pagehide', () => save.flush());
-  // Ждём ВСЕ картинки художника, сколько бы это ни заняло: графику из кода игрок видеть не должен.
-  // Раньше через 15 с (или при одной оборвавшейся картинке) игра открывалась со старой графикой из кода.
-  // Если картинки так и не загрузились (нет сети) — экран загрузки с кнопкой «Повторить».
-  // Игровой цикл пока не запускаем: за экраном загрузки кадры никому не нужны и только мешают загрузке.
-  const slow = setTimeout(() => { slowNet = true; if (shown < 0.8) ltext.textContent = `Медленная сеть, догружаем ${Math.round(shown * 100)}%`; }, 12000);
-  try { await farm.artReady; } catch (e) {
-    clearTimeout(slow);
-    loadingError('Не удалось загрузить картинки. Проверьте интернет.');
-    const b = document.createElement('button');
-    b.className = 'ld-retry'; b.textContent = 'Повторить';
-    b.onclick = () => location.reload(); // загруженные картинки уже в кэше браузера — повтор быстрый
-    ltext.after(b);
-    return;
-  }
-  clearTimeout(slow);
-  // мир собираем, когда картинки уже есть: рост растений и полоски над ними берут размеры спрайтов
-  farm.init(saved, map);
-  if (EDITOR) { /* без приветствий */ }
-  else if (saved && farm.awaySec > 60) ui.toast(`С возвращением! Вас не было ${Math.round(farm.awaySec / 60)} мин, растения подросли.`);
-  else if (!saved) ui.toast('Добро пожаловать на ферму! Нажмите на дерево или камень, чтобы добыть ресурсы.');
-  progress(0.85); await nextFrame(); // полоса успевает показаться до тяжёлого шага
-  try { farm.scene.warmup(); } catch (e) { console.warn('warmup', e); }
-  // Разгон: ~2 с кадров с движением камеры ещё за экраном загрузки — движок JS успевает
-  // оптимизировать горячий код, а сборка мусора после загрузки проходит здесь, а не в игре.
-  {
-    const cam = farm.cam, z0 = cam.zoom, x0 = cam.x, y0 = cam.y, gl = farm.scene.app.renderer.gl, px = new Uint8Array(4);
-    const N = 120;
-    for (let i = 0; i < N; i++) {
-      const a = i / N * Math.PI * 2;
-      cam.x = x0 + Math.cos(a) * 260; cam.y = y0 + Math.sin(a) * 160;
-      cam.zoom = z0 * (1 + 0.35 * Math.sin(a * 2));
-      farm.scene.render();
-      if (i % 10 === 9) { try { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); } catch { /* */ } progress(0.85 + 0.15 * (i + 1) / N); await nextFrame(); }
-    }
-    cam.zoom = z0; cam.x = x0; cam.y = y0;
-    // и по факту: если на «Высокой» кадр не укладывается в 60 FPS — тоже «Средняя»
-    if (perf.gfx === 'auto' && perf.renderScale > 1.5) {
-      const t = performance.now();
-      for (let i = 0; i < 10; i++) { cam.x = x0 + i * 3; farm.scene.render(); }
-      try { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); } catch { /* */ }
-      if ((performance.now() - t) / 10 > 15) perf.setGfx('mid');
-      cam.x = x0;
-    }
-    farm.scene.render();
-    await new Promise((r) => setTimeout(r, 300)); // время на сборку мусора
-  }
-  progress(1);
-  game.start();
-  perf.restart();
-  await new Promise((r) => setTimeout(r, 450)); // дать полосе доехать до конца
-  document.getElementById('loading').classList.add('hide'); if (!ui.panelOpen) audio.setTheme('farm');
-  if (EDITOR) { new editorMod.MapEditor(farm, { input, map }).start(); return; }
-  // начало истории: новое задание показываем сразу
-  if (farm.quests.current && !farm.quests.st.seen) setTimeout(() => ui.questPanel(farm), 700);
-  // Счётчик FPS и времени кадра: включается в настройках (или ?debug в адресе)
-  let fpsEl = null, fpsTimer = 0;
-  const debug = new URLSearchParams(location.search).has('debug');
-  const showFps = (on) => {
-    if (!on) { if (fpsEl) fpsEl.remove(); fpsEl = null; clearInterval(fpsTimer); return; }
-    if (fpsEl) return;
-    fpsEl = document.createElement('div');
-    fpsEl.className = 'debug';
-    document.body.appendChild(fpsEl);
-    const paint = () => {
-      const now = (performance.now() - perf._t0) / 1000;
-      const sp = perf.spikes.map((x) => `${x.ms.toFixed(0)} мс ${Math.round(now - x.at)} с назад: ${x.tags}`).join('\n');
-      fpsEl.textContent = `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
-        ` · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}${perf.idle ? " · покой" : ""}` + `\nвызовов отрисовки ${farm.scene.calls} · треугольников ${Math.round(farm.scene.tris)} · холст ${canvas.width}×${canvas.height}` + (sp ? `\nфризы:\n${sp}` : '');
-    };
-    paint(); fpsTimer = setInterval(paint, 500);
-  };
-  perf.onShowFps = showFps;
-  showFps(perf.showFps || debug);
-  window.__farm = farm;
+  return input;
 }
 
-// Экран загрузки остаётся, вместо полосы — текст ошибки
-function loadingError(text) {
+// Разгон: ~2 с кадров с движением камеры ещё за экраном загрузки — движок JS успевает
+// оптимизировать горячий код, текстуры уходят в видеокарту, а сборка мусора после загрузки
+// проходит здесь, а не в игре. onProgress(0..1) двигает полосу загрузки.
+async function warmUpFrames(farm, perf, onProgress) {
+  const cam = farm.cam, scene = farm.scene, z0 = cam.zoom, x0 = cam.x, y0 = cam.y;
+  const gl = scene.app.renderer.gl, px = new Uint8Array(4);
+  // readPixels ждёт, пока видеокарта дорисует, — иначе кадры копятся в очереди и разгон «пустой»
+  const finish = () => { try { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); } catch { /* */ } };
+  const N = 120;
+  for (let i = 0; i < N; i++) {
+    const a = i / N * Math.PI * 2;
+    cam.x = x0 + Math.cos(a) * 260; cam.y = y0 + Math.sin(a) * 160;
+    cam.zoom = z0 * (1 + 0.35 * Math.sin(a * 2));
+    scene.render();
+    if (i % 10 === 9) { finish(); onProgress((i + 1) / N); await nextFrame(); }
+  }
+  cam.zoom = z0; cam.x = x0; cam.y = y0;
+  // и по факту: если на «Высокой» кадр не укладывается в 60 FPS — графика «Средняя»
+  if (perf.gfx === 'auto' && perf.renderScale > 1.5) {
+    const t = performance.now();
+    for (let i = 0; i < 10; i++) { cam.x = x0 + i * 3; scene.render(); }
+    finish();
+    if ((performance.now() - t) / 10 > 15) perf.setGfx('mid');
+    cam.x = x0;
+  }
+  scene.render();
+  await wait(300); // время на сборку мусора
+}
+
+// Полоса загрузки. Двигается через transform (это анимирует видеокарта — плавно, даже пока JS занят),
+// только вперёд. Через 12 с без конца загрузки подпись меняется на «Медленная сеть».
+function loadingBar() {
+  const fill = document.getElementById('ld-fill'), text = document.getElementById('ld-text');
+  let shown = 0, slowNet = false;
+  const label = (k) => `${slowNet ? 'Медленная сеть, догружаем' : 'Загрузка…'} ${Math.round(k * 100)}%`;
+  const slow = setTimeout(() => { slowNet = true; if (shown < 0.8) text.textContent = label(shown); }, 12000);
+  return {
+    set(k) {
+      if (k <= shown) return; shown = k;
+      fill.style.transform = `scaleX(${k.toFixed(3)})`;
+      text.textContent = k < 1 ? label(k) : 'Готово!';
+    },
+    stop() { clearTimeout(slow); },
+  };
+}
+
+// Экран загрузки остаётся, вместо полосы — текст ошибки (и кнопка «Повторить»)
+function loadingError(text, retry) {
   const bar = document.querySelector('#loading .ld-bar'), t = document.getElementById('ld-text');
   if (bar) bar.style.display = 'none';
   if (t) t.textContent = text;
+  if (retry && t) {
+    const b = document.createElement('button');
+    b.className = 'ld-retry'; b.textContent = 'Повторить';
+    b.onclick = () => location.reload(); // загруженные картинки уже в кэше браузера — повтор быстрый
+    t.after(b);
+  }
+}
+
+// Счётчик FPS, времени кадра и фризов (настройки → «Экран» или ?debug в адресе)
+let fpsEl = null, fpsTimer = 0;
+function fpsOverlay(on, farm, perf, canvas) {
+  if (!on) { if (fpsEl) fpsEl.remove(); fpsEl = null; clearInterval(fpsTimer); return; }
+  if (fpsEl) return;
+  fpsEl = document.createElement('div');
+  fpsEl.className = 'debug';
+  document.body.appendChild(fpsEl);
+  const paint = () => {
+    const now = (performance.now() - perf._t0) / 1000;
+    const sp = perf.spikes.map((x) => `${x.ms.toFixed(0)} мс ${Math.round(now - x.at)} с назад: ${x.tags}`).join('\n');
+    fpsEl.textContent =
+      `${perf.fps.toFixed(0)} fps · кадр ${perf.frameMs.toFixed(1)} мс (макс ${perf.frameMax.toFixed(0)})` +
+      ` · ${perf.tier} · x${perf.renderScale}/${devicePixelRatio.toFixed(2)} · цель ${perf.targetFps}${perf.idle ? ' · покой' : ''}` +
+      `\nвызовов отрисовки ${farm.scene.calls} · треугольников ${Math.round(farm.scene.tris)} · холст ${canvas.width}×${canvas.height}` +
+      (sp ? `\nфризы:\n${sp}` : '');
+  };
+  paint(); fpsTimer = setInterval(paint, 500);
 }
 
 main().catch((e) => {

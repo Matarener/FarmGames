@@ -120,7 +120,11 @@ export class PixiScene {
     const world = this.world = new PIXI.Container({ isRenderGroup: true });
     app.stage.addChild(world);
     this.chunks = [];
-    for (let c = 0; c < CHUNKS * CHUNKS; c++) { const cc = new PIXI.Container(); cc.tiles = []; /* одна сетка на кусок — отдельная группа рендера не нужна */ this.chunks.push(cc); world.addChild(cc); }
+    // земля: по контейнеру на участок (одна сетка на кусок — отдельная группа рендера не нужна)
+    for (let c = 0; c < CHUNKS * CHUNKS; c++) {
+      const cc = new PIXI.Container(); cc.tiles = [];
+      this.chunks.push(cc); world.addChild(cc);
+    }
     // туман вокруг карты: одна сетка с плавной прозрачностью, над ней — лес (полупрозрачный, «в дымке»)
     this.fogMesh = null; this.fogForest = new PIXI.Container(); this.fogForest.eventMode = 'none';
     this.fogC = new PIXI.Container(); world.addChild(this.fogC); this.fogC.addChild(this.fogForest);
@@ -558,7 +562,11 @@ export class PixiScene {
     // видимость кусков земли
     const CB = this._cb || (this._cb = this.chunks.map((_, c) => w.chunkBounds(c))); // границы кусков не меняются
     // у крайних кусков в сетке ещё и трава под туманом — запас шире
-    const GB = this._gb || (this._gb = CB.map((b, c) => { const cx = c % CHUNKS, cy = (c / CHUNKS) | 0, edge = !cx || !cy || cx === CHUNKS - 1 || cy === CHUNKS - 1, m = 40 + (edge ? FOG_W * 2 * HW : 0); return { minX: b.minX - m, maxX: b.maxX + m, minY: b.minY - m, maxY: b.maxY + m }; }));
+    const GB = this._gb || (this._gb = CB.map((b, c) => {
+      const cx = c % CHUNKS, cy = (c / CHUNKS) | 0, edge = !cx || !cy || cx === CHUNKS - 1 || cy === CHUNKS - 1;
+      const m = 40 + (edge ? FOG_W * 2 * HW : 0);
+      return { minX: b.minX - m, maxX: b.maxX + m, minY: b.minY - m, maxY: b.maxY + m };
+    }));
     for (let c = 0; c < this.chunks.length; c++) {
       const b = GB[c];
       this.chunks[c].visible = b.maxX > v.minX && b.minX < v.maxX && b.maxY > v.minY && b.minY < v.maxY;

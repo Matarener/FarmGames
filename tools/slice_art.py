@@ -96,7 +96,7 @@ ICON_SHEETS = {
     'ui_menu1': ['more', 'move', 'note', 'gear'],  # меню «Ещё»
     'ui_menu2': ['paw', 'build', 'decor', 'trophy'],
     'ui_food': ['milk', 'bread', 'pie'],  # еда из магазина
-    'ui_bubbles': ['bubble_ready', 'bubble_water'],  # значки над грядками (Farm.js берёт их вместо нарисованных кодом)
+    'ui_bubbles': ['bubble_ready', 'bubble_water'],  # значки над грядками (Farm.applyArt делает из них пузыри)
     # плоды деревьев и кустов
     'ui_flora1': ['acorn', 'birch_bark', 'sakura_petal', 'cherry', 'maple_leaf', 'apple', 'pinecone'],
     'ui_flora2': ['blueberry', 'raspberry', 'rosehip', 'hydrangea', 'lavender', 'rose_petal'],

@@ -1,4 +1,5 @@
-// Сцена фермы: состояние игрока, взаимодействия, рост растений, отрисовка мира.
+// Ферма: состояние игрока, правила взаимодействий (тапы, очередь действий, рост, урожай, рынок)
+// и набор спрайтов из картинок художника. Рисует её PixiScene, интерфейс — UI.
 
 import { toWorld, toGrid } from '../engine/Iso.js';
 import { makeCanvas } from '../engine/Sprite.js';
@@ -13,7 +14,10 @@ import * as Inv from './inventory.js';
 import * as Wild from './wild.js';
 import * as Flora from './flora.js';
 import { BAR_KIND, barTop } from './bars.js';
-import { CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks, ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC } from './data.js';
+import {
+  CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
+  ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC,
+} from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 
