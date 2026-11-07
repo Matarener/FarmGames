@@ -6,3 +6,6 @@ __pycache__/
 Thumbs.db
 *.log
 .history/
+
+# генерация картинок через Codex (tools/gen-art): сырые картинки и логи
+.gen-art/
