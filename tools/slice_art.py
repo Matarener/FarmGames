@@ -104,8 +104,13 @@ ICON_SHEETS = {
     'ui_saplings1': ['sap_oak', 'sap_birch', 'sap_sakura', 'sap_cherry', 'sap_maple', 'sap_apple', 'sap_pine'],
     'ui_hay': ['hay'],  # сено с дикой травы (свечение по краю срезано, контур тоньше)
     'ui_saplings2': ['sap_blueberry', 'sap_raspberry', 'sap_rosehip', 'sap_hydrangea', 'sap_lavender', 'sap_rose'],
+    # стрелка-подсказка к заданию, кольцо под целью, кружок у края экрана (Farm.applyArt → PixiScene.syncHint)
+    'ui_hints': ['hint_arrow', 'hint_ring', 'hint_badge'],
 }
 ICON_PX = 128
+# Иконки не в квадрате 128, а по контуру картинки (без полей), длинная сторона — столько пикселей:
+# игра ставит их по краю картинки (кончик стрелки — её низ) и рисует крупнее обычных иконок
+ICON_TIGHT = {'hint_arrow': 192, 'hint_ring': 256, 'hint_badge': 160}
 
 
 def cut_dark_bg(a):
@@ -143,6 +148,13 @@ def icons(only=None):
             c = a[y0:y1, x0:x1].copy()
             c[lab[y0:y1, x0:x1] != i, 3] = 0
             img = Image.fromarray(c)
+            if name in ICON_TIGHT:
+                k = ICON_TIGHT[name] / max(img.size)
+                img = img.resize((max(1, round(img.width * k)), max(1, round(img.height * k))), Image.LANCZOS)
+                img.save(os.path.join(OUT, 'ic_' + name + '.webp'), 'WEBP', quality=90, method=6)
+                if name not in names: names.append(name)
+                print(f'ic_{name} {img.width}x{img.height}')
+                continue
             k = ICON_PX / max(img.size)
             img = img.resize((max(1, round(img.width * k)), max(1, round(img.height * k))), Image.LANCZOS)
             sq = Image.new('RGBA', (ICON_PX, ICON_PX))

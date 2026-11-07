@@ -132,7 +132,7 @@ function setupView(canvas, renderer, camera, farm, ui, perf) {
     return Math.min(1.7, Math.max(0.8, Math.min(w / (64 * 6.5), hgt / (32 * 13))));
   };
   const input = new Input(canvas, {
-    onDown: () => { camera.vx = camera.vy = 0; },
+    onDown: () => { camera.vx = camera.vy = 0; camera.glide = null; },
     onPanStart: () => { camera.dragging = true; ui.closePopup(); },
     onPan: (dx, dy) => camera.panBy(dx, dy),
     onPanEnd: (vx, vy) => { camera.dragging = false; camera.fling(vx, vy); },
