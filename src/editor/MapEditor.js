@@ -29,6 +29,7 @@ const TOOLS = [
   { id: 'maple', name: 'Клён', obj: 'maple', brush: true },
   { id: 'apple', name: 'Яблоня', obj: 'apple', brush: true },
   { id: 'pine', name: 'Ель', obj: 'pine', brush: true },
+  { id: 'linden', name: 'Липа', obj: 'linden', brush: true },
   { id: 'blueberry', name: 'Голубика', obj: 'blueberry', brush: true },
   { id: 'raspberry', name: 'Малина', obj: 'raspberry', brush: true },
   { id: 'rosehip', name: 'Шиповник', obj: 'rosehip', brush: true },

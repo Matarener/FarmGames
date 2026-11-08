@@ -30,7 +30,7 @@ assets/map.json  стартовая карта (редактор карты)
 | туман | `fog_clouds_<n>`, `fog_strips_<n>`, `fog_wisps_<n>` | |
 | иконка интерфейса | `ic_<имя>` | `ic_coin`, `ic_sap_oak` |
 
-`<вид>` — ключ из `FLORA` в `src/game/data.js` (oak, birch, sakura, cherry, maple, apple, pine,
+`<вид>` — ключ из `FLORA` в `src/game/data.js` (oak, birch, sakura, cherry, maple, apple, pine, linden,
 blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` — ключ из `CROPS`.
 Картинки деревьев и кустов игра находит по этим именам сама: новый вид — это строка в `FLORA` и
 картинки `tree_<вид>` (или `bush_<вид>`), `_young`, при сборе плодов — `_bare`, у дерева — `stump_<вид>`.
