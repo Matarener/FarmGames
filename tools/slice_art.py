@@ -40,7 +40,8 @@ SINGLE = {
     # взрослые деревья, камни, кусты (до 2026-11-07 были листы trees, trees2, rocks, bushes)
     'tree_oak': 62, 'tree_apple': 62, 'tree_sakura': 62, 'tree_pine': 60,
     'tree_cherry_bare': 62,  # вишня цветёт: так она выглядит, пока ягоды отрастают после сбора
-    'tree_maple': 62, 'tree_birch': 60, 'tree_linden': 62,
+    'tree_maple': 62, 'tree_birch': 60,
+    'tree_linden': 54,  # у липы «пятачок» травы меньше кроны: при 62 она выше берёзы
     'boulder': 118, 'rock': 54, 'rock_small': 40, 'boulder_moss': 116,
     'bush_blueberry': 40, 'bush_raspberry': 40, 'bush_rosehip': 40,
     'bush_hydrangea': 40, 'bush_lavender': 40, 'bush_rose': 40,
