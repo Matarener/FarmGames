@@ -50,6 +50,7 @@ export const FLORA = {
   maple:     { name: 'Клён',      kind: 'tree', fruit: 'maple_leaf',   n: [2, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 8, ownSell: 24, grow: 3 * 3600 },
   apple:     { name: 'Яблоня',    kind: 'tree', fruit: 'apple',        n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 18, ownSell: 54, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
   pine:      { name: 'Ель',       kind: 'tree', fruit: 'pinecone',     n: [1, 3], wood: [3, 5], hp: 4, xp: 3, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
+  linden:    { name: 'Липа',      kind: 'tree', fruit: 'linden_blossom', n: [2, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 8, ownSell: 24, grow: 3 * 3600 },
   blueberry: { name: 'Голубика',  kind: 'bush', fruit: 'blueberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 9, ownSell: 27, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
   raspberry: { name: 'Малина',    kind: 'bush', fruit: 'raspberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 8, ownSell: 24, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
   rosehip:   { name: 'Шиповник',  kind: 'bush', fruit: 'rosehip',      n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 5, ownSell: 15, grow: 3600,     pick: true, regrow: 2 * 3600 },
@@ -81,6 +82,7 @@ export const FLORA_GOODS = {
   maple_leaf:   { name: 'Кленовый лист',   sell: 3,          color: '#ef7d22', desc: 'Яркий осенний лист клёна.' },
   apple:        { name: 'Яблоко',          sell: 5, food: 4, color: '#e2392f', desc: 'Сочное яблоко. Можно съесть или продать.' },
   pinecone:     { name: 'Шишка',           sell: 2,          color: '#9a6538', desc: 'Еловая шишка. Пригодится для поделок.' },
+  linden_blossom: { name: 'Липовый цвет',  sell: 4,          color: '#efe08a', desc: 'Душистые соцветия липы. Пригодятся для чая.' },
   blueberry:    { name: 'Голубика',        sell: 3, food: 2, color: '#3f5fc8', desc: 'Горсть голубики. Можно съесть или продать.' },
   raspberry:    { name: 'Малина',          sell: 3, food: 2, color: '#e0335a', desc: 'Сладкая малина. Можно съесть или продать.' },
   rosehip:      { name: 'Шиповник',        sell: 3, food: 1, color: '#e2552f', desc: 'Плоды шиповника. Полезные, но кислые.' },
@@ -136,7 +138,7 @@ export const WILD = {
 // Растут, как свои (FLORA.grow), в один из видов деревьев FLORA (w — вес вида, по умолчанию 1).
 export const WILD_TREES = {
   every: 1800, chance: 0.6, catchUp: 24, max: 12, band: 2, space: 1,
-  w: { oak: 3, birch: 3, pine: 3, maple: 2, sakura: 1, cherry: 1, apple: 1 },
+  w: { oak: 3, birch: 3, pine: 3, maple: 2, linden: 2, sakura: 1, cherry: 1, apple: 1 },
 };
 
 // Туман вокруг карты: ширина полосы (клеток), густота леса под туманом

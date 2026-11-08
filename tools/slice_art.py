@@ -32,6 +32,7 @@ SHEETS = {
     'well': [('well_broken', 41), ('well_fixed', 42)],
     # дикая высокая трава (WILD): 3 варианта, «пятачок» — ромб чуть меньше клетки
     'grass_tall': [('grass_tall_0', -44), ('grass_tall_1', -48), ('grass_tall_2', -48)],
+    'stump_linden': [('stump_linden', -42)],  # пень липы: отдельная картинка (2026-11-08)
 }
 # Листы с одной картинкой: лист называется так же, как картинка. Значение — ширина «пятачка».
 # Каждый объект — на своей картинке: на общих листах «пиксели» стиля выходили крупными (пикселили).
@@ -39,7 +40,7 @@ SINGLE = {
     # взрослые деревья, камни, кусты (до 2026-11-07 были листы trees, trees2, rocks, bushes)
     'tree_oak': 62, 'tree_apple': 62, 'tree_sakura': 62, 'tree_pine': 60,
     'tree_cherry_bare': 62,  # вишня цветёт: так она выглядит, пока ягоды отрастают после сбора
-    'tree_maple': 62, 'tree_birch': 60,
+    'tree_maple': 62, 'tree_birch': 60, 'tree_linden': 62,
     'boulder': 118, 'rock': 54, 'rock_small': 40, 'boulder_moss': 116,
     'bush_blueberry': 40, 'bush_raspberry': 40, 'bush_rosehip': 40,
     'bush_hydrangea': 40, 'bush_lavender': 40, 'bush_rose': 40,
@@ -50,7 +51,7 @@ SINGLE = {
     'bush_hydrangea_bare': 40, 'bush_lavender_bare': 40, 'bush_rose_bare': 40,
     # молодые растения (росток → молодое → взрослое): высота — YOUNG_K от взрослого (YOUNG_OF — от какого)
     'tree_oak_young': 62, 'tree_birch_young': 60, 'tree_sakura_young': 62, 'tree_cherry_young': 62,
-    'tree_maple_young': 62, 'tree_apple_young': 62, 'tree_pine_young': 60,
+    'tree_maple_young': 62, 'tree_apple_young': 62, 'tree_pine_young': 60, 'tree_linden_young': 62,
     'bush_blueberry_young': 40, 'bush_raspberry_young': 40, 'bush_rosehip_young': 40,
     'bush_hydrangea_young': 40, 'bush_lavender_young': 40, 'bush_rose_young': 40,
     # дом по уровням
@@ -104,6 +105,9 @@ ICON_SHEETS = {
     'ui_saplings1': ['sap_oak', 'sap_birch', 'sap_sakura', 'sap_cherry', 'sap_maple', 'sap_apple', 'sap_pine'],
     'ui_hay': ['hay'],  # сено с дикой травы (свечение по краю срезано, контур тоньше)
     'ui_saplings2': ['sap_blueberry', 'sap_raspberry', 'sap_rosehip', 'sap_hydrangea', 'sap_lavender', 'sap_rose'],
+    # липа (2026-11-08): липовый цвет и саженец — по одной иконке на картинку
+    'ui_linden_blossom': ['linden_blossom'],
+    'ui_sap_linden': ['sap_linden'],
     # стрелка-подсказка к заданию, кольцо под целью, кружок у края экрана (Farm.applyArt → PixiScene.syncHint)
     'ui_hints': ['hint_arrow', 'hint_ring', 'hint_badge'],
     # подарки: кнопка в интерфейсе, вкладки окна «Подарки», сундук 7-го дня
