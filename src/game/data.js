@@ -121,6 +121,7 @@ for (const f of Object.values(FLORA)) {
 // w — вес вида при выборе. Кусты появляются ростками и растут, как свои (FLORA.grow), и только
 // у края открытой земли: не дальше band клеток от закрытого участка или тумана.
 // Деревья здесь не появляются: у них своя генерация возле тумана (WILD_TREES).
+// Плодовые и ягодные виды (pick) сами не растут нигде: их саженцы только в магазине (SAPLING_SHOP).
 export const WILD = {
   every: 900, chance: 0.7, catchUp: 96,
   grass: { w: 6, perChunk: 2, max: 20 },
@@ -138,7 +139,7 @@ export const WILD = {
 // Растут, как свои (FLORA.grow), в один из видов деревьев FLORA (w — вес вида, по умолчанию 1).
 export const WILD_TREES = {
   every: 1800, chance: 0.6, catchUp: 24, max: 12, band: 2, space: 1,
-  w: { oak: 3, birch: 3, pine: 3, maple: 2, linden: 2, sakura: 1, cherry: 1, apple: 1 },
+  w: { oak: 3, birch: 3, pine: 3, linden: 3, maple: 2, sakura: 1 },
 };
 
 // Туман вокруг карты: ширина полосы (клеток), густота леса под туманом
@@ -262,7 +263,8 @@ export const SHOP = [];
 // cur — валюта ('coins' или 'gems'), qty — сколько штук в одной покупке
 for (const [k, f] of Object.entries(SHOP_FOOD)) SHOP.push({ tab: 'food', item: k, price: f.price, level: f.level });
 for (const c of Object.values(CROPS)) SHOP.push({ tab: 'seeds', item: seedId(c.key), price: c.seed, level: c.level });
-// Саженцы плодовых деревьев и кустов (FLORA с pick). Окупаются за несколько сборов,
+// Саженцы плодовых деревьев и кустов (FLORA с pick) — только здесь: на карте и в дикой поросли их нет.
+// level — с какого уровня игрока продаётся (до него в магазине серым «с N ур.»). Окупаются за несколько сборов,
 // зато плодоносят без конца; кусты дешевле и растут быстрее, деревья дают больше.
 export const SAPLING_SHOP = {
   rosehip:   { price: 20, level: 2 },

@@ -48,8 +48,8 @@ const TOOLS = [
   { id: 'erase', name: 'Ластик', erase: true, brush: true },
   { id: 'move', name: 'Перенести', move: true },
 ];
-const FOREST = ['oak', 'birch', 'sakura', 'cherry', 'maple', 'pine', 'pine', 'apple', 'rosehip', 'rock'];
-const FOG_FOREST = ['oak', 'birch', 'sakura', 'cherry', 'maple', 'pine', 'pine', 'pine', 'apple', 'rosehip'];
+const FOREST = ['oak', 'birch', 'sakura', 'linden', 'maple', 'pine', 'pine', 'linden', 'lavender', 'rock'];
+const FOG_FOREST = ['oak', 'birch', 'sakura', 'linden', 'maple', 'pine', 'pine', 'pine', 'linden', 'lavender'];
 
 // Какую карту открыть: черновик (несохранённая работа) или файл
 export function startMap(fileMap) {

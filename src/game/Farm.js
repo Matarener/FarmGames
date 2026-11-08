@@ -168,7 +168,8 @@ export class Farm {
       // карту поменяли в редакторе: прогресс (монеты, уровень, участки, рюкзак) остаётся,
       // а деревья, камни, тропинки и постройки — как на новой карте
       const sameMap = (saved.map || null) === (w.mapId || null);
-      if (!sameMap) { delete this.st.paths; delete this.st.pos; delete this.st.movedBeds; delete this.st.fruit; delete this.st.plants; delete this.st.wild; }
+      // свои посадки (st.plants, st.fruit) остаются: место занято — растение вернётся в рюкзак
+      if (!sameMap) { delete this.st.paths; delete this.st.pos; delete this.st.movedBeds; delete this.st.wild; }
       if (saved.objects && saved.v !== 2 && sameMap) w.importObjects(saved.objects);
       if (saved.chunks) for (const c of saved.chunks) w.unlocked[c] = 1;
       // грядки переносили: стартовые клетки — трава, все грядки берём из сохранения
@@ -236,7 +237,8 @@ export class Farm {
     this.ui.update(this);
   }
 
-  // Посаженные игроком растения → объекты на карте (место занято — растение пропадает)
+  // Посаженные игроком растения → объекты на карте (место занято, например карту поменяли, —
+  // растение возвращается в рюкзак: саженцем или выкопанным взрослым)
   restorePlants() {
     const w = this.world, now = Date.now(), keep = [];
     for (const p of this.st.plants || []) {
@@ -244,7 +246,11 @@ export class Farm {
       if (!FLORA[sp]) continue;
       const grown = Flora.plantStage(sp, born, now) >= 2;
       const o = w.isOpen(x, y) && w.add(grown ? sp : 'sapling', x, y);
-      if (!o) continue;
+      if (!o) {
+        Inv.addItem(this.st, grown ? floraOwnId(sp) : floraSeedId(sp), 1);
+        if (this.st.fruit) delete this.st.fruit[x + ',' + y];
+        continue;
+      }
       o.own = 1; o.tree = sp; o.born = born;
       keep.push(p);
     }
