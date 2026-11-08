@@ -102,4 +102,33 @@ test('травяной край: стороны, скруглённые и вн�
   assert.equal(P.solidPath(w, c0 + 4, r0 + 4), false);
 });
 
+test('переход между видами: вид выше по слою заходит на нижний, нижний на верхний — нет', () => {
+  const w = world(), st = st0({ items: { path: 20, path_sand: 20, path_cobble: 20, path_planks: 5, path_stones: 2 } });
+  const put = (x, y, k) => P.placePath(st, w, k, at(x, y));
+  // песок 3×3, посередине — песок; справа от него (x + 1) — тропинка, снизу по диагонали (x + 1, y + 1) — булыжник
+  for (let yy = 4; yy <= 6; yy++) for (let xx = 4; xx <= 6; xx++) put(xx, yy, 'path_sand');
+  put(6, 5, 'path'); put(6, 6, 'path_cobble');
+  const x = c0 + 5, y = r0 + 5;
+  // тропинка за стороной se (бит 2), булыжник — только по диагонали у вершины s (бит 16 << 2)
+  assert.deepEqual(P.blendKeys(w, x, y), [['path', 4], ['path_cobble', 64]]);
+  assert.deepEqual(P.edgeParts(64), ['corner_s_in']);
+  // у тропинки песок ниже по слою — перехода нет; булыжник заходит на неё снизу (сторона sw)
+  assert.deepEqual(P.blendKeys(w, c0 + 6, r0 + 5), [['path_cobble', 8]]);
+  // у булыжника рядом только нижние — ничего; травяной край — как раньше (трава только снаружи)
+  assert.deepEqual(P.blendKeys(w, c0 + 6, r0 + 6), []);
+  assert.equal(P.edgeKey(w, x, y), 0);
+  // настил — самый верхний: заходит на всех, на него — никто
+  put(5, 4, 'path_planks');
+  assert.deepEqual(P.blendKeys(w, x, y).map(([k]) => k), ['path', 'path_cobble', 'path_planks']);
+  assert.deepEqual(P.blendKeys(w, c0 + 5, r0 + 4), []);
+  // «камни в траве» — не дорожка для переходов (у соседей к ним травяной край)
+  put(4, 5, 'path_stones');
+  assert.deepEqual(P.blendKeys(w, c0 + 4, r0 + 5), []);
+  assert.equal(P.edgeKey(w, x, y) & 1, 1);
+  // у каждого вида, кроме «камней в траве», есть слой, и они разные
+  const layers = Object.values(PATHS).filter((p) => !p.grassy).map((p) => p.layer);
+  assert.equal(new Set(layers).size, layers.length);
+  assert.ok(layers.every((l) => l > 0));
+});
+
 console.log(`\nвсе проверки прошли: ${tests}`);

@@ -84,6 +84,12 @@ export async function loadArt(onProgress) {
   // куски травяного края у дорожек (склеивает Farm.pathEdge): полосы вдоль сторон и углы
   const pathEdge = {};
   for (const name of Object.keys(A)) if (/^path_(edge|corner)_/.test(name)) pathEdge[name.slice(5)] = A[name];
+  // куски перехода между видами дорожек (blend_<вид>_<кусок>): вид выше по слою заходит на соседний
+  const pathBlend = {};
+  for (const name of Object.keys(A)) {
+    const m = /^blend_(.+)_(edge_\w\w|corner_\w_\w+)$/.exec(name);
+    if (m) (pathBlend[m[1]] = pathBlend[m[1]] || {})[m[2]] = A[name];
+  }
   const crops = {};
   for (const name of Object.keys(A)) {
     const m = /^crop_(\w+)_(\d)$/.exec(name);
@@ -108,7 +114,7 @@ export async function loadArt(onProgress) {
     // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%). Не отзеркаливать: плитки
     // бесшовные (tools/grass_tiles.py), у зеркальной край другой — будет шов
     grass: [A.tile_grass, A.tile_grass_2, A.tile_grass_flowers, A.tile_grass_flowers_2],
-    paths, pathEdge,
+    paths, pathEdge, pathBlend,
     // объёмные грядки: [сухая, политая]; рисуются поверх травы
     bed: [A.bed_dry, A.bed_wet],
     // вода: бесшовная текстура на весь пруд, берег рисуется кодом (shore.js)

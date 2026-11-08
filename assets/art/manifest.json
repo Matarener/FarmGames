@@ -940,5 +940,365 @@
   "h": 33,
   "ax": 33.0,
   "ay": 16.5
+ },
+ "blend_path_edge_nw": {
+  "w": 34.25,
+  "h": 18.25,
+  "ax": 32.75,
+  "ay": 16.5
+ },
+ "blend_path_edge_ne": {
+  "w": 39.5,
+  "h": 20.0,
+  "ax": 6.75,
+  "ay": 16.5
+ },
+ "blend_path_edge_se": {
+  "w": 48.0,
+  "h": 24.25,
+  "ax": 15.25,
+  "ay": 7.75
+ },
+ "blend_path_edge_sw": {
+  "w": 46.5,
+  "h": 22.75,
+  "ax": 32.75,
+  "ay": 6.25
+ },
+ "blend_path_corner_n_nw": {
+  "w": 37.25,
+  "h": 18.25,
+  "ax": 32.75,
+  "ay": 16.5
+ },
+ "blend_path_corner_n_ne": {
+  "w": 39.5,
+  "h": 20.0,
+  "ax": 6.75,
+  "ay": 16.5
+ },
+ "blend_path_corner_n_out": {
+  "w": 65.5,
+  "h": 20.0,
+  "ax": 32.75,
+  "ay": 16.5
+ },
+ "blend_path_corner_n_in": {
+  "w": 11.25,
+  "h": 4.25,
+  "ax": 6.75,
+  "ay": 16.5
+ },
+ "blend_path_corner_e_ne": {
+  "w": 39.5,
+  "h": 20.0,
+  "ax": 6.75,
+  "ay": 16.5
+ },
+ "blend_path_corner_e_se": {
+  "w": 48.0,
+  "h": 24.25,
+  "ax": 15.25,
+  "ay": 7.75
+ },
+ "blend_path_corner_e_out": {
+  "w": 48.0,
+  "h": 33.0,
+  "ax": 15.25,
+  "ay": 16.5
+ },
+ "blend_path_corner_e_in": {
+  "w": 23.75,
+  "h": 11.25,
+  "ax": -9.0,
+  "ay": 7.75
+ },
+ "blend_path_corner_s_se": {
+  "w": 48.0,
+  "h": 24.25,
+  "ax": 15.25,
+  "ay": 7.75
+ },
+ "blend_path_corner_s_sw": {
+  "w": 46.5,
+  "h": 22.75,
+  "ax": 32.75,
+  "ay": 6.25
+ },
+ "blend_path_corner_s_out": {
+  "w": 65.5,
+  "h": 24.25,
+  "ax": 32.75,
+  "ay": 7.75
+ },
+ "blend_path_corner_s_in": {
+  "w": 29.0,
+  "h": 11.5,
+  "ax": 15.25,
+  "ay": -5.0
+ },
+ "blend_path_corner_w_sw": {
+  "w": 46.5,
+  "h": 22.75,
+  "ax": 32.75,
+  "ay": 6.25
+ },
+ "blend_path_corner_w_nw": {
+  "w": 34.25,
+  "h": 18.5,
+  "ax": 32.75,
+  "ay": 16.5
+ },
+ "blend_path_corner_w_out": {
+  "w": 46.75,
+  "h": 33.0,
+  "ax": 32.75,
+  "ay": 16.5
+ },
+ "blend_path_corner_w_in": {
+  "w": 13.0,
+  "h": 7.75,
+  "ax": 32.75,
+  "ay": 6.25
+ },
+ "blend_path_cobble_edge_nw": {
+  "w": 34.25,
+  "h": 19.0,
+  "ax": 32.75,
+  "ay": 16.5
+ },
+ "blend_path_cobble_edge_ne": {
+  "w": 39.25,
+  "h": 19.5,
+  "ax": 6.5,
+  "ay": 16.5
+ },
+ "blend_path_cobble_edge_se": {
+  "w": 38.5,
+  "h": 19.25,
+  "ax": 5.75,
+  "ay": 2.75
+ },
+ "blend_path_cobble_edge_sw": {
+  "w": 37.0,
+  "h": 17.5,
+  "ax": 32.75,
+  "ay": 1.0
+ },
+ "blend_path_cobble_corner_n_nw": {
+  "w": 35.5,
+  "h": 19.0,
+  "ax": 32.75,
+  "ay": 16.5
+ },
+ "blend_path_cobble_corner_n_ne": {
+  "w": 39.25,
+  "h": 19.5,
+  "ax": 6.5,
+  "ay": 16.5
+ },
+ "blend_path_cobble_corner_n_out": {
+  "w": 65.5,
+  "h": 19.5,
+  "ax": 32.75,
+  "ay": 16.5
+ },
+ "blend_path_cobble_corner_n_in": {
+  "w": 9.0,
+  "h": 4.25,
+  "ax": 6.25,
+  "ay": 16.5
+ },
+ "blend_path_cobble_corner_e_ne": {
+  "w": 39.25,
+  "h": 19.5,
+  "ax": 6.5,
+  "ay": 16.5
+ },
+ "blend_path_cobble_corner_e_se": {
+  "w": 38.5,
+  "h": 19.25,
+  "ax": 5.75,
+  "ay": 2.75
+ },
+ "blend_path_cobble_corner_e_out": {
+  "w": 39.25,
+  "h": 33.0,
+  "ax": 6.5,
+  "ay": 16.5
+ },
+ "blend_path_cobble_corner_e_in": {
+  "w": 11.75,
+  "h": 5.75,
+  "ax": -21.0,
+  "ay": 2.75
+ },
+ "blend_path_cobble_corner_s_se": {
+  "w": 38.5,
+  "h": 19.25,
+  "ax": 5.75,
+  "ay": 2.75
+ },
+ "blend_path_cobble_corner_s_sw": {
+  "w": 37.25,
+  "h": 17.5,
+  "ax": 32.75,
+  "ay": 1.0
+ },
+ "blend_path_cobble_corner_s_out": {
+  "w": 65.5,
+  "h": 19.25,
+  "ax": 32.75,
+  "ay": 2.75
+ },
+ "blend_path_cobble_corner_s_in": {
+  "w": 8.0,
+  "h": 3.25,
+  "ax": 5.75,
+  "ay": -13.25
+ },
+ "blend_path_cobble_corner_w_sw": {
+  "w": 37.0,
+  "h": 17.75,
+  "ax": 32.75,
+  "ay": 1.25
+ },
+ "blend_path_cobble_corner_w_nw": {
+  "w": 34.25,
+  "h": 19.0,
+  "ax": 32.75,
+  "ay": 16.5
+ },
+ "blend_path_cobble_corner_w_out": {
+  "w": 37.0,
+  "h": 33.0,
+  "ax": 32.75,
+  "ay": 16.5
+ },
+ "blend_path_cobble_corner_w_in": {
+  "w": 3.5,
+  "h": 2.75,
+  "ax": 32.75,
+  "ay": 1.25
+ },
+ "blend_path_planks_edge_nw": {
+  "w": 30.5,
+  "h": 15.25,
+  "ax": 30.5,
+  "ay": 15.25
+ },
+ "blend_path_planks_edge_ne": {
+  "w": 30.5,
+  "h": 15.25,
+  "ax": 0.0,
+  "ay": 15.25
+ },
+ "blend_path_planks_edge_se": {
+  "w": 30.5,
+  "h": 15.25,
+  "ax": 0.0,
+  "ay": 0.0
+ },
+ "blend_path_planks_edge_sw": {
+  "w": 30.5,
+  "h": 15.25,
+  "ax": 30.5,
+  "ay": 0.0
+ },
+ "blend_path_planks_corner_n_nw": {
+  "w": 4.5,
+  "h": 2.25,
+  "ax": 2.25,
+  "ay": 16.5
+ },
+ "blend_path_planks_corner_n_ne": {
+  "w": 4.5,
+  "h": 2.25,
+  "ax": 2.25,
+  "ay": 16.5
+ },
+ "blend_path_planks_corner_n_out": {
+  "w": 4.5,
+  "h": 2.25,
+  "ax": 2.25,
+  "ay": 16.5
+ },
+ "blend_path_planks_corner_n_in": {
+  "w": 4.5,
+  "h": 2.25,
+  "ax": 2.25,
+  "ay": 16.5
+ },
+ "blend_path_planks_corner_e_ne": {
+  "w": 4.25,
+  "h": 2.5,
+  "ax": -28.5,
+  "ay": 1.25
+ },
+ "blend_path_planks_corner_e_se": {
+  "w": 4.25,
+  "h": 2.5,
+  "ax": -28.5,
+  "ay": 1.25
+ },
+ "blend_path_planks_corner_e_out": {
+  "w": 4.25,
+  "h": 2.5,
+  "ax": -28.5,
+  "ay": 1.25
+ },
+ "blend_path_planks_corner_e_in": {
+  "w": 4.25,
+  "h": 2.5,
+  "ax": -28.5,
+  "ay": 1.25
+ },
+ "blend_path_planks_corner_s_se": {
+  "w": 4.5,
+  "h": 2.25,
+  "ax": 2.25,
+  "ay": -14.25
+ },
+ "blend_path_planks_corner_s_sw": {
+  "w": 4.5,
+  "h": 2.25,
+  "ax": 2.25,
+  "ay": -14.25
+ },
+ "blend_path_planks_corner_s_out": {
+  "w": 4.5,
+  "h": 2.25,
+  "ax": 2.25,
+  "ay": -14.25
+ },
+ "blend_path_planks_corner_s_in": {
+  "w": 4.5,
+  "h": 2.25,
+  "ax": 2.25,
+  "ay": -14.25
+ },
+ "blend_path_planks_corner_w_sw": {
+  "w": 4.25,
+  "h": 2.5,
+  "ax": 32.75,
+  "ay": 1.25
+ },
+ "blend_path_planks_corner_w_nw": {
+  "w": 4.25,
+  "h": 2.5,
+  "ax": 32.75,
+  "ay": 1.25
+ },
+ "blend_path_planks_corner_w_out": {
+  "w": 4.25,
+  "h": 2.5,
+  "ax": 32.75,
+  "ay": 1.25
+ },
+ "blend_path_planks_corner_w_in": {
+  "w": 4.25,
+  "h": 2.5,
+  "ax": 32.75,
+  "ay": 1.25
  }
 }

@@ -247,14 +247,16 @@ export const SHOP_FOOD = {
 // Дорожки (раздел «Декор»): покупаются на рынке (цена за одну клетку), ставятся в режиме «Переставить»
 // и убираются обратно в рюкзак своим видом. Ключ — id предмета и вид клетки в сохранении.
 // tile — плитка (assets/art, tools/path_tiles.py), dust — цвет пыли, когда клетку кладут, grassy — дорожка из травы с камнями: у соседних
-// дорожек к ней травяной край, как к обычной траве. Первая — вид по умолчанию: тропинки стартовой
+// дорожек к ней травяной край, как к обычной траве. layer — кто сверху на стыке двух видов: вид выше
+// заходит на соседний неровным краем с тенью (куски blend_<вид>_*, tools/path_tiles.py BLEND), так что
+// между видами нет прямого шва. Песок — самый нижний, настил — сверху. Первая — вид по умолчанию: тропинки стартовой
 // карты и старых сохранений. Порядок не менять: номер вида — индекс в PATH_KEYS (World.pathKind).
 export const PATHS = {
-  path:        { name: 'Тропинка',          tile: 'tile_path',        price: 4,  level: 2, dust: '#d9b98a', desc: 'Тропинка из светлых плоских камней.' },
-  path_sand:   { name: 'Песчаная дорожка',  tile: 'tile_path_sand',   price: 2,  level: 1, dust: '#e6d2a2', desc: 'Утоптанный песок с мелкими камешками.' },
-  path_planks: { name: 'Деревянный настил', tile: 'tile_path_planks', price: 6,  level: 3, dust: '#b98a58', desc: 'Дощатый настил, тёплый и уютный.' },
+  path:        { name: 'Тропинка',          tile: 'tile_path',        price: 4,  level: 2, layer: 2, dust: '#d9b98a', desc: 'Тропинка из светлых плоских камней.' },
+  path_sand:   { name: 'Песчаная дорожка',  tile: 'tile_path_sand',   price: 2,  level: 1, layer: 1, dust: '#e6d2a2', desc: 'Утоптанный песок с мелкими камешками.' },
+  path_planks: { name: 'Деревянный настил', tile: 'tile_path_planks', price: 6,  level: 3, layer: 4, dust: '#b98a58', desc: 'Дощатый настил, тёплый и уютный.' },
   path_stones: { name: 'Камни в траве',     tile: 'tile_path_stones', price: 8,  level: 4, grassy: true, dust: '#a9a594', desc: 'Плоские камни-ступеньки прямо в траве.' },
-  path_cobble: { name: 'Булыжная мостовая', tile: 'tile_path_cobble', price: 12, level: 5, dust: '#9a9a96', desc: 'Мостовая из серого булыжника, как в старой деревне.' },
+  path_cobble: { name: 'Булыжная мостовая', tile: 'tile_path_cobble', price: 12, level: 5, layer: 3, dust: '#9a9a96', desc: 'Мостовая из серого булыжника, как в старой деревне.' },
 };
 export const PATH_KEYS = Object.keys(PATHS);
 export const DEFAULT_PATH = PATH_KEYS[0];
