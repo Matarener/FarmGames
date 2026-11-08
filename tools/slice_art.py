@@ -261,9 +261,10 @@ def tiles(man):
     for name, s in zip(GRASS_TILES, sq):
         out[name] = grass_tiles.render(s, TILE_W + 2, TILE_H + 1, DENSITY)
     # дорожки: бесшовные, по две плитки с общей каймой
+    sq_path = {}
     for name, flat in PATH_TILES.items():
         if not os.path.exists(os.path.join(SRC, name + '.png')): continue
-        sq = path_tiles.build(tile_src(name)[..., :3].astype(np.float64), flat)
+        sq = sq_path[name] = path_tiles.build(tile_src(name)[..., :3].astype(np.float64), flat)
         for k, s in enumerate(sq):
             out[name + ('_2' if k else '')] = grass_tiles.render(s, TILE_W + 2, TILE_H + 1, DENSITY)
     # камни в траве: трава (простые варианты) + камни посередине клетки
@@ -283,6 +284,11 @@ def tiles(man):
     # травяной край дорожек: куски (игра склеивает их по соседям клетки, Farm.pathEdgeOf), обрезаны
     # по непрозрачному; опора — центр клетки, как у плиток (сдвиг куска в плитке — целые пиксели)
     pieces = path_tiles.edge_pieces(out['tile_grass'], sq_grass[0], TILE_W + 2, TILE_H + 1, DENSITY)
+    # переходы между видами дорожек: blend_<вид>_* — вид выше по слою заходит на соседний (Farm.pathEdge)
+    for name, prm in path_tiles.BLEND.items():
+        if name in sq_path:
+            pieces.update(path_tiles.edge_pieces(out[name], sq_path[name][0], TILE_W + 2, TILE_H + 1, DENSITY,
+                                                 prm, 'blend_' + name[len('tile_'):] + '_'))
     for name, img in pieces.items():
         img[..., 3] = np.where(diamond, img[..., 3], 0)
         b = path_tiles.crop(img)
@@ -290,7 +296,7 @@ def tiles(man):
         x0, y0, x1, y1 = b
         save(Image.fromarray(img[y0:y1, x0:x1]), name, (x1 - x0) / DENSITY, (y1 - y0) / DENSITY,
              (TILE_W + 2) / 2 - x0 / DENSITY, (TILE_H + 1) / 2 - y0 / DENSITY, man)
-    print(f'травяной край дорожек: {len(pieces)} кусков')
+    print(f'край дорожек (трава и переходы): {len(pieces)} кусков')
 
 
 def main(only=None):

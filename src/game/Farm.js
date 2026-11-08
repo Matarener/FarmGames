@@ -64,7 +64,7 @@ export class Farm {
   // Картинки художника загружены (artSprites.loadArt): раскладываем их в спрайты игры и иконки
   applyArt(a) {
     Object.assign(this.S, {
-      grass: a.grass, paths: a.paths, pathParts: a.pathEdge, pathEdge: new Map(), bed: a.bed, waterTex: a.waterTex, decor: a.decor,
+      grass: a.grass, paths: a.paths, pathParts: a.pathEdge, pathBlend: a.pathBlend, pathEdge: new Map(), bed: a.bed, waterTex: a.waterTex, decor: a.decor,
       objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, wildGrass: a.wildGrass,
       house: a.house, well: a.well, crops: a.crops, fog: a.fog.clouds.length ? a.fog : null,
     });
@@ -122,24 +122,35 @@ export class Farm {
     return s;
   }
 
-  // Травяной край клетки дорожки (x, y): там, где рядом трава (вода, грядка, «камни в траве»), на дорожку
-  // чуть заходит трава. Травы рядом нет — null.
-  pathEdge(x, y) { return this.pathEdgeOf(Paths.edgeKey(this.world, x, y)); }
+  // Край клетки дорожки (x, y): там, где рядом трава (вода, грядка, «камни в траве»), на дорожку чуть
+  // заходит трава; где рядом дорожка другого вида выше по слою (PATHS.layer) — край этой дорожки.
+  // Ни того ни другого — null.
+  pathEdge(x, y) {
+    const w = this.world;
+    return this.pathEdgeOf(Paths.edgeKey(w, x, y), Paths.blendKeys(w, x, y));
+  }
 
-  // Картинка края для вида окружения key (paths.js edgeKey): нужные куски (tools/path_tiles.py)
-  // склеиваются в одну картинку и запоминаются. Куски не перекрываются — склейка без швов.
-  pathEdgeOf(key) {
-    if (!key) return null;
-    let s = this.S.pathEdge.get(key);
+  // Картинка края: grass — вид окружения травой (paths.js edgeKey), blends — переходы [[вид, ключ], ...]
+  // (paths.js blendKeys). Нужные куски (tools/path_tiles.py) склеиваются в одну картинку и запоминаются:
+  // сначала переходы снизу вверх, сверху трава. Куски одного края не перекрываются — склейка без швов.
+  pathEdgeOf(grass, blends = []) {
+    blends = blends.filter(([, k]) => k);
+    if (!grass && !blends.length) return null;
+    const id = blends.map(([m, k]) => m + k + ',').join('') + grass;
+    let s = this.S.pathEdge.get(id);
     if (!s) {
       const t = this.S.grass[0], k = t.canvas.width / t.w; // клетка 66×33 единицы, пикселей на единицу
       const c = makeCanvas(t.canvas.width, t.canvas.height), g = c.getContext('2d');
-      for (const n of Paths.edgeParts(key)) {
-        const p = this.S.pathParts[n];
-        if (p) g.drawImage(p.canvas, Math.round((t.ax - p.ax) * k), Math.round((t.ay - p.ay) * k));
-      }
-      s = { canvas: c, w: t.w, h: t.h, ax: t.ax, ay: t.ay, name: 'path_edge_' + key };
-      this.S.pathEdge.set(key, s);
+      const draw = (set, key) => {
+        if (set) for (const n of Paths.edgeParts(key)) {
+          const p = set[n];
+          if (p) g.drawImage(p.canvas, Math.round((t.ax - p.ax) * k), Math.round((t.ay - p.ay) * k));
+        }
+      };
+      for (const [m, key] of blends) draw(this.S.pathBlend[m], key);
+      if (grass) draw(this.S.pathParts, grass);
+      s = { canvas: c, w: t.w, h: t.h, ax: t.ax, ay: t.ay, name: 'path_edge_' + id };
+      this.S.pathEdge.set(id, s);
     }
     return s;
   }

@@ -27,6 +27,7 @@ assets/map.json  стартовая карта (редактор карты)
 | дорожки | `tile_path_<вид>`, `tile_path_<вид>_2` (у «Тропинки» — `tile_path`, `tile_path_2`) | `tile_path_cobble` |
 | камни для «камней в траве» | лист `path_stones.png` (6 камней) → `tile_path_stones`, `tile_path_stones_2` | |
 | травяной край дорожек | `path_edge_<сторона>`, `path_corner_<вершина>_<вид>` (делает `tools/path_tiles.py`) | `path_corner_n_out` |
+| переход между видами дорожек | `blend_<вид дорожки>_edge_<сторона>`, `blend_<вид дорожки>_corner_<вершина>_<вид>` (тоже `path_tiles.py`) | `blend_path_cobble_edge_nw` |
 | грядка | `bed_dry`, `bed_wet` | |
 | вода и пруд | `tex_water` (текстура), `pond_<что>` | `pond_lily` |
 | дом, колодец | `house_<уровень>`, `well_broken`, `well_fixed` | |
@@ -54,8 +55,11 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 `tile_path_<вид>.png` две плитки с общей каймой (без отражений: у досок направление и у камней свет должны
 совпадать). «Камни в траве» — трава плюс камни с `path_stones.png` посередине клетки (`PATH_STONES` в
 `slice_art.py`). Травяной край у дорожек — 20 кусков `path_edge_*`/`path_corner_*`, игра склеивает их по
-соседям клетки (`Farm.pathEdgeOf`). Новый вид дорожки: строка в `PATHS`, картинка `tile_path_<вид>.png`,
-строка в `PATH_TILES` (`slice_art.py`) и `python tools/slice_art.py tiles`.
+соседям клетки (`Farm.pathEdgeOf`). На стыке двух видов вид выше по слою (`layer` в `PATHS`) заходит на
+нижний: камни тропинки и булыжника ложатся на соседа целыми камнями с тенью, настил — ровным краем с тенью.
+Это тоже по 20 кусков на вид, `blend_<вид>_*` (`BLEND` в `path_tiles.py`), у песка их нет: он самый нижний.
+Новый вид дорожки: строка в `PATHS` (со своим `layer`), картинка `tile_path_<вид>.png`, строка в `PATH_TILES`
+(`slice_art.py`), если вид заходит на нижние — строка в `BLEND`, и `python tools/slice_art.py tiles`.
 
 Опора кустов — центр ромба, нижний угол которого — низ земляного блока под кустом (иначе куст стоит
 ниже своей клетки).

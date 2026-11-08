@@ -496,7 +496,7 @@ export class PixiScene {
     };
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.WATER) f.waterSprite(x, y); else if (w.tile(x, y) === T.PATH) f.pathEdge(x, y);
     const S = f.S;
-    const GROUND = ['grass', 'paths', 'pathEdge', 'pathParts', 'water'];
+    const GROUND = ['grass', 'paths', 'pathEdge', 'pathParts', 'pathBlend', 'water'];
     this.makeWaterTex(); this.groundAtlas.tex(this.waterT);
     for (const v of S.grass) this.groundAtlas.tex(v);
     for (const p of S.paths) for (const v of p.tiles) this.groundAtlas.tex(v);

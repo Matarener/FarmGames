@@ -84,37 +84,56 @@ export function movePath(st, w, from, to) {
   return k;
 }
 
-// ---------- травяной край (картинки — tools/path_tiles.py, склейка — Farm.pathEdge) ----------
+// ---------- край у дорожки: трава и переходы между видами ----------
+// Картинки — tools/path_tiles.py, склейка — Farm.pathEdge.
 // Стороны ромба клетки и соседи за ними; вершины ромба: две стороны и сосед по диагонали
 const SIDES = [['nw', -1, 0], ['ne', 0, -1], ['se', 1, 0], ['sw', 0, 1]];
 const VERTS = [['n', 'nw', 'ne', -1, -1], ['e', 'ne', 'se', 1, -1], ['s', 'se', 'sw', 1, 1], ['w', 'sw', 'nw', -1, 1]];
 const SIDE_N = { nw: 0, ne: 1, se: 2, sw: 3 };
 
-// Клетка — «твёрдая» дорожка (не трава и не «камни в траве»)
-export function solidPath(w, x, y) {
-  if (!w.inside(x, y)) return false;
+// Вид «твёрдой» дорожки на клетке (не трава и не «камни в траве») или null
+function solidKind(w, x, y) {
+  if (!w.inside(x, y)) return null;
   const i = y * N + x;
-  if (w.tiles[i] !== T.PATH) return false;
-  const p = PATHS[PATH_KEYS[w.pathKind[i]]];
-  return !(p && p.grassy);
+  if (w.tiles[i] !== T.PATH) return null;
+  const k = PATH_KEYS[w.pathKind[i]] || DEFAULT_PATH;
+  return PATHS[k].grassy ? null : k;
 }
+export const solidPath = (w, x, y) => !!solidKind(w, x, y);
 
-// Вид окружения клетки дорожки (x, y) для травяного края: биты 0–3 — трава за сторонами nw, ne, se, sw,
-// биты 4–7 — трава только по диагонали у вершин n, e, s, w (обе стороны у вершины — дорожки).
-// 0 — травы рядом нет (или клетка — не «твёрдая» дорожка).
-export function edgeKey(w, x, y) {
-  if (!solidPath(w, x, y)) return 0;
+// Вид окружения клетки (x, y) для края из соседей, у которых is(x, y): биты 0–3 — такой сосед за
+// сторонами nw, ne, se, sw, биты 4–7 — только по диагонали у вершин n, e, s, w (у вершины обе стороны — не такие)
+function keyOf(x, y, is) {
   let key = 0;
-  SIDES.forEach(([, dx, dy], n) => { if (!solidPath(w, x + dx, y + dy)) key |= 1 << n; });
+  SIDES.forEach(([, dx, dy], n) => { if (is(x + dx, y + dy)) key |= 1 << n; });
   VERTS.forEach(([, a, b, dx, dy], n) => {
-    const ga = key & (1 << SIDE_N[a]), gb = key & (1 << SIDE_N[b]);
-    if (!ga && !gb && !solidPath(w, x + dx, y + dy)) key |= 16 << n;
+    if (!(key & (1 << SIDE_N[a])) && !(key & (1 << SIDE_N[b])) && is(x + dx, y + dy)) key |= 16 << n;
   });
   return key;
 }
 
-// Куски края для вида окружения key: со стороны травы — полоса вдоль стороны; в каждом углу — трава
-// с одной стороны, с другой, с обеих (скруглённый угол) или только по диагонали (внутренний угол)
+// Травяной край: трава — всё, что не «твёрдая» дорожка. 0 — травы рядом нет (или клетка — не дорожка)
+export function edgeKey(w, x, y) {
+  if (!solidPath(w, x, y)) return 0;
+  return keyOf(x, y, (i, j) => !solidPath(w, i, j));
+}
+
+// Переходы между видами: соседние дорожки вида выше по слою (PATHS.layer) заходят на клетку краем.
+// → [[вид, ключ], ...] от нижнего слоя к верхнему (так их и рисовать), пусто — переходов нет
+export function blendKeys(w, x, y) {
+  const own = solidKind(w, x, y);
+  if (!own) return [];
+  const up = new Set();
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const k = solidKind(w, x + dx, y + dy);
+    if (k && (PATHS[k].layer || 0) > (PATHS[own].layer || 0)) up.add(k);
+  }
+  return [...up].sort((a, b) => PATHS[a].layer - PATHS[b].layer)
+    .map((k) => [k, keyOf(x, y, (i, j) => solidKind(w, i, j) === k)]);
+}
+
+// Куски края для вида окружения key: со стороны соседа — полоса вдоль стороны; в каждом углу — сосед
+// с одной стороны, с другой, с обеих (внешний угол) или только по диагонали (внутренний угол)
 export function edgeParts(key) {
   const parts = [];
   const g = (s) => key & (1 << SIDE_N[s]);
