@@ -1,16 +1,19 @@
 // Режим перестановки: свои объекты (дом, починенный колодец, пустые грядки, тропинки,
 // посаженные игроком деревья и кусты, потом декор) можно переносить по открытой земле.
 // Деревья, камни, пруд и прочее «чужое» не двигается.
-// Тропинки и свои растения можно убрать в рюкзак («В рюкзак»), а нажатием на пустую траву —
+// Дорожки и свои растения можно убрать в рюкзак («В рюкзак»), а нажатием на пустую траву —
 // поставить обратно из рюкзака.
+// «Кладём дорожку» (pave, кнопка «Поставить» у дорожки в рюкзаке и на рынке): каждое нажатие на траву
+// кладёт клетку выбранной дорожки, нажатие на дорожку другого вида меняет её (старая — в рюкзак).
 //
 // Как работает: нажали на объект — он выбран; нажали на клетку — там появляется
 // предпросмотр (зелёный — можно, красный — нельзя и почему); «Поставить» или
 // повторное нажатие на ту же клетку переносит объект.
 
-import { OBJECTS, FLORA, ITEMS } from './data.js';
+import { OBJECTS, FLORA, ITEMS, PATHS } from './data.js';
 import * as Flora from './flora.js';
 import * as Inv from './inventory.js';
+import * as Paths from './paths.js';
 import { N, T } from './World.js';
 import { toWorld } from '../engine/Iso.js';
 
@@ -25,13 +28,14 @@ export class Mover {
     this.active = false;
     this.sel = null;   // { kind: 'obj'|'bed', o?, b?, name, w, h, gx, gy }
     this.to = null;    // { gx, gy, ok, why }
+    this.brush = null; // id дорожки в режиме «Кладём дорожку»
   }
 
   enter() {
     const f = this.f;
     if (this.active) return;
     this.active = true;
-    this.sel = null; this.to = null;
+    this.sel = null; this.to = null; this.brush = null;
     f.player.queue.length = 0; // очередь дел отменяется: объекты могут переехать
     f.ui.closePopup(); f.ui.closePanel();
     f.stopPlanting(); // плашка посадки и плашка перестановки занимают одно место
@@ -41,13 +45,19 @@ export class Mover {
   exit() {
     if (!this.active) return;
     this.active = false;
-    this.sel = null; this.to = null;
+    this.sel = null; this.to = null; this.brush = null;
     this.f.ui.moveBar(null);
   }
 
   hint(msg, bad) {
     const s = this.sel, t = this.to;
     let text = msg;
+    if (this.brush) {
+      const it = ITEMS[this.brush], n = Inv.count(this.f.st, this.brush);
+      if (!text) text = `Кладём: ${it.name.toLowerCase()} (есть ${n}). Нажимайте на траву или на другую дорожку`;
+      this.f.ui.moveBar({ text, bad: !!bad, canPlace: false, selected: true, canStore: false, brush: true });
+      return;
+    }
     if (!text) {
       if (!s) text = 'Нажмите на то, что передвинуть или убрать в рюкзак. Пустая трава — поставить из рюкзака';
       else if (!t) text = s.store ? `${s.name}: нажмите на клетку, куда поставить, или «В рюкзак»` : `${s.name}: нажмите на клетку, куда поставить`;
@@ -95,7 +105,8 @@ export class Mover {
     if (t === T.WATER) return { why: 'Пруд передвинуть нельзя' };
     if (t === T.PATH) {
       if (this.busy({ x: gx, y: gy })) return { why: 'Призрачок сейчас работает здесь, подождите' };
-      return { sel: { kind: 'path', store: true, name: 'Тропинка', w: 1, h: 1, gx, gy } };
+      const path = Paths.kindAt(w, w.idx(gx, gy));
+      return { sel: { kind: 'path', path, store: true, name: PATHS[path].name, w: 1, h: 1, gx, gy } };
     }
     if (t === T.SOIL) {
       const b = f.bedAt(w.idx(gx, gy));
@@ -106,7 +117,7 @@ export class Mover {
       if (this.busy({ x: gx, y: gy })) return { why: 'Призрачок сейчас работает с этой грядкой, подождите' };
       return { sel: { kind: 'bed', b, name: 'Грядка', w: 1, h: 1, gx, gy } };
     }
-    return { empty: true, why: 'Здесь пусто. Нажмите на дом, колодец, грядку, тропинку или своё растение' };
+    return { empty: true, why: 'Здесь пусто. Нажмите на дом, колодец, грядку, дорожку или своё растение' };
   }
 
   // Текущее действие призрачка касается этого места?
@@ -130,7 +141,7 @@ export class Mover {
       const i = w.idx(x, y), t = w.tiles[i];
       if (s.kind === 'obj' && own(x, y)) continue;
       if (t === T.WATER) return { ok: false, why: 'Сюда нельзя: здесь вода' };
-      if (t === T.PATH) return { ok: false, why: 'Сюда нельзя: здесь тропинка' };
+      if (t === T.PATH) return { ok: false, why: 'Сюда нельзя: здесь дорожка' };
       if (t === T.SOIL) return { ok: false, why: 'Сюда нельзя: здесь уже грядка' };
       const o = w.occ[i] >= 0 ? w.objects[w.occ[i]] : null;
       if (o && o !== s.o) return { ok: false, why: `Сюда нельзя: мешает ${((OBJECTS[o.type] || {}).name || 'объект').toLowerCase()}` };
@@ -173,6 +184,7 @@ export class Mover {
 
   // ---------- нажатия ----------
   tap(gx, gy, wx, wy, sx, sy) {
+    if (this.brush) return this.putFromBag(this.brush, gx, gy);
     const s = this.sel;
     if (!s) {
       const r = this.identify(gx, gy, wx, wy);
@@ -195,8 +207,17 @@ export class Mover {
   }
 
   cancel() {
-    this.sel = null; this.to = null;
+    this.sel = null; this.to = null; this.brush = null;
     this.hint();
+  }
+
+  // «Кладём дорожку»: включить режим перестановки и класть клетки дорожки id нажатиями на траву
+  pave(id) {
+    if (!Paths.isPathItem(id) || !Inv.count(this.f.st, id)) return false;
+    this.enter();
+    this.sel = null; this.to = null; this.brush = id;
+    this.hint();
+    return true;
   }
 
   place() {
@@ -212,12 +233,12 @@ export class Mover {
       if (!s.plant) { f.st.pos = f.st.pos || {}; f.st.pos[s.o.type] = [t.gx, t.gy]; }
       f.burst(s.o.wx, s.o.wy - 6, '#e8d9a8', 14);
     } else if (s.kind === 'path') {
-      // клетка тропинки переезжает, на старом месте — обычная трава
-      w.tiles[w.idx(s.gx, s.gy)] = T.GRASS;
-      w.tiles[w.idx(t.gx, t.gy)] = T.PATH;
-      this.savePaths();
+      // клетка дорожки переезжает (вид тот же), на старом месте — обычная трава
+      const k = Paths.movePath(f.st, w, w.idx(s.gx, s.gy), w.idx(t.gx, t.gy));
+      if (!k) { this.cancel(); return false; }
+      f.groundV++;
       toWorld(t.gx + 0.5, t.gy + 0.5, tmp);
-      f.burst(tmp.x, tmp.y, '#d9b98a', 8);
+      f.burst(tmp.x, tmp.y, PATHS[k].dust, 8);
     } else {
       const from = s.b, ni = w.idx(t.gx, t.gy);
       w.tiles[from.i] = T.GRASS;
@@ -236,13 +257,6 @@ export class Mover {
     return true;
   }
 
-  savePaths() {
-    const f = this.f, w = f.world;
-    f.st.paths = [];
-    for (let i = 0; i < w.tiles.length; i++) if (w.tiles[i] === T.PATH) f.st.paths.push(i);
-    f.groundV++;
-  }
-
   // ---------- рюкзак ----------
   // «В рюкзак»: выбранная тропинка или своё растение уходит предметом в рюкзак
   store() {
@@ -251,13 +265,13 @@ export class Mover {
     let items;
     if (s.kind === 'path') {
       if (w.tile(s.gx, s.gy) !== T.PATH) { this.cancel(); return false; }
-      if (!Inv.addItem(f.st, 'path', 1)) { this.fail('Рюкзак полон'); return false; }
-      w.tiles[w.idx(s.gx, s.gy)] = T.GRASS;
-      this.savePaths();
+      const k = Paths.storePath(f.st, w, w.idx(s.gx, s.gy));
+      if (!k) { this.fail('Рюкзак полон'); return false; }
+      f.groundV++;
       toWorld(s.gx + 0.5, s.gy + 0.5, tmp);
-      items = [{ id: 'path', n: 1 }];
+      items = [{ id: k, n: 1 }];
       f.dropFx({ wx: tmp.x, wy: tmp.y }, items);
-      f.burst(tmp.x, tmp.y, '#d9b98a', 8);
+      f.burst(tmp.x, tmp.y, PATHS[k].dust, 8);
     } else {
       const o = s.o;
       if (w.objects[o.id] !== o) { this.cancel(); return false; }
@@ -275,7 +289,7 @@ export class Mover {
     return true;
   }
 
-  // Что из рюкзака можно поставить в этом режиме: тропинки (и потом декор) и свои выкопанные растения
+  // Что из рюкзака можно поставить в этом режиме: дорожки (и потом другой декор) и свои выкопанные растения
   stock() {
     const st = this.f.st, out = [];
     for (const it of Object.values(ITEMS)) {
@@ -290,26 +304,38 @@ export class Mover {
     const f = this.f, list = this.stock();
     this.f.ui.popup(sx, sy, {
       title: 'Поставить из рюкзака', wide: true,
-      items: list.map(({ it, n }) => ({ icon: it.icon, label: it.name, sub: `есть: ${n}`, onClick: () => this.putFromBag(it.key, gx, gy) })),
+      // дорожку кладём и дальше: следующие нажатия на траву — тоже она
+      items: list.map(({ it, n }) => ({ icon: it.icon, label: it.name, sub: `есть: ${n}`, onClick: () => { if (this.putFromBag(it.key, gx, gy) && it.place === 'path' && Inv.count(f.st, it.key)) { this.brush = it.key; this.hint(); } } })),
     });
     f.sfx('pop');
   }
 
   putFromBag(id, gx, gy) {
     const f = this.f, w = f.world, it = ITEMS[id];
-    if (!it || !Inv.count(f.st, id)) return false;
-    // проверка — как при переносе одной клетки из ниоткуда
-    const save = this.sel;
-    this.sel = { kind: it.place === 'path' ? 'path' : 'obj', w: 1, h: 1, gx: -9, gy: -9 };
-    const c = this.check(gx, gy);
-    this.sel = save;
-    if (!c.ok) return this.fail(c.why);
+    if (!it || !Inv.count(f.st, id)) { this.brush = null; this.hint(); return false; }
     toWorld(gx + 0.5, gy + 0.5, tmp);
+    // дорожка на дорожку другого вида: меняем (старая — в рюкзак)
+    const was = it.place === 'path' && w.inside(gx, gy) && w.isOpen(gx, gy) ? Paths.kindAt(w, w.idx(gx, gy)) : null;
+    if (was === id) return this.fail(`Здесь уже ${it.name.toLowerCase()}`);
+    if (!was) {
+      // проверка — как при переносе одной клетки из ниоткуда
+      const save = this.sel;
+      this.sel = { kind: it.place === 'path' ? 'path' : 'obj', w: 1, h: 1, gx: -9, gy: -9 };
+      const c = this.check(gx, gy);
+      this.sel = save;
+      if (!c.ok) return this.fail(c.why);
+    }
     if (it.place === 'path') {
-      Inv.takeItem(f.st, id, 1);
-      w.tiles[w.idx(gx, gy)] = T.PATH;
-      this.savePaths();
-      f.burst(tmp.x, tmp.y, '#d9b98a', 8);
+      if (!Paths.placePath(f.st, w, id, w.idx(gx, gy))) return this.fail('Не получается');
+      f.groundV++;
+      if (was) f.dropFx({ wx: tmp.x, wy: tmp.y }, [{ id: was, n: 1 }]);
+      f.burst(tmp.x, tmp.y, PATHS[id].dust, 8);
+      f.sfx('dig');
+      const n = Inv.count(f.st, id);
+      if (this.brush && !n) this.brush = null;
+      this.hint(this.brush ? null : n ? `${it.name}: поставлено` : `${it.name}: больше нет. Купите ещё на рынке, раздел «Декор»`);
+      f.changed();
+      return true;
     } else {
       const o = f.plantOwn(it.floraOf, gx, gy, true);
       if (!o) return false;

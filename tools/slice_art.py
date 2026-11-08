@@ -10,6 +10,7 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 import grass_tiles
+import path_tiles
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 SRC = os.path.join(ROOT, 'assets', 'source')
@@ -83,8 +84,14 @@ BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), None, None]}
 WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)
 # плитки земли: каждая — своя картинка с одним ромбом. Трава собирается бесшовной из двух картинок
 # (tile_grass.png, tile_grass_flowers.png) в 4 варианта; отзеркаливать их в игре нельзя
-TILES = ['tile_path']
 GRASS_TILES = ['tile_grass', 'tile_grass_2', 'tile_grass_flowers', 'tile_grass_flowers_2']
+# Дорожки (виды — PATHS в src/game/data.js): каждая картинка-ромб → две бесшовные плитки <имя>, <имя>_2
+# (tools/path_tiles.py). flat — насколько убирать крупные перепады света (больше — меньше убирает).
+PATH_TILES = {'tile_path': 4, 'tile_path_sand': 4, 'tile_path_planks': 3, 'tile_path_cobble': 4}
+# «Камни в траве»: камни с листа path_stones.png (по порядку) на траве. (камень, u, v, ширина в мире):
+# середина камня в осях клетки (u — к соседу gx+1, v — к gy+1), камни не доходят до краёв клетки
+PATH_STONES = {'tile_path_stones': [(0, 0.297, 0.641, 19), (1, 0.719, 0.406, 17)],
+               'tile_path_stones_2': [(2, 0.297, 0.391, 17), (3, 0.781, 0.406, 15), (5, 0.406, 0.844, 10)]}
 
 
 # Иконки интерфейса: листы на тёмном фоне со свечением (не прозрачные) — фон срезаем по контуру.
@@ -249,16 +256,41 @@ def tiles(man):
     diamond = (np.abs(xx + 0.5 - TW / 2) / (TW / 2) + np.abs(yy + 0.5 - TH / 2) / (TH / 2)) <= 1.0
     out = {}
     # трава — бесшовная (tools/grass_tiles.py): у всех вариантов одинаковая кайма, любые две рядом стыкуются
-    sq = grass_tiles.build(tile_src('tile_grass')[..., :3].astype(np.float64),
-                           tile_src('tile_grass_flowers')[..., :3].astype(np.float64))
+    sq_grass = sq = grass_tiles.build(tile_src('tile_grass')[..., :3].astype(np.float64),
+                                      tile_src('tile_grass_flowers')[..., :3].astype(np.float64))
     for name, s in zip(GRASS_TILES, sq):
         out[name] = grass_tiles.render(s, TILE_W + 2, TILE_H + 1, DENSITY)
-    for name in TILES:
-        out[name] = np.array(Image.fromarray(tile_src(name)).resize((TW, TH), Image.LANCZOS))
+    # дорожки: бесшовные, по две плитки с общей каймой
+    for name, flat in PATH_TILES.items():
+        if not os.path.exists(os.path.join(SRC, name + '.png')): continue
+        sq = path_tiles.build(tile_src(name)[..., :3].astype(np.float64), flat)
+        for k, s in enumerate(sq):
+            out[name + ('_2' if k else '')] = grass_tiles.render(s, TILE_W + 2, TILE_H + 1, DENSITY)
+    # камни в траве: трава (простые варианты) + камни посередине клетки
+    if os.path.exists(os.path.join(SRC, 'path_stones.png')):
+        a = load('path_stones')
+        boxes, lab = components(a, 6)
+        stones = []
+        for y0, y1, x0, x1, i in boxes:
+            c = a[y0:y1, x0:x1].copy(); c[lab[y0:y1, x0:x1] != i, 3] = 0
+            stones.append(c)
+        for (name, layout), g in zip(PATH_STONES.items(), ('tile_grass', 'tile_grass_2')):
+            out[name] = path_tiles.stones_tile(out[g], stones, layout, DENSITY)
     for name, img in out.items():
         img[..., 3] = np.where(diamond, 255, 0)
         save(Image.fromarray(img), name, TILE_W + 2, TILE_H + 1, (TILE_W + 2) / 2, (TILE_H + 1) / 2, man)
         print(f'{name:14s} tile')
+    # травяной край дорожек: куски (игра склеивает их по соседям клетки, Farm.pathEdgeOf), обрезаны
+    # по непрозрачному; опора — центр клетки, как у плиток (сдвиг куска в плитке — целые пиксели)
+    pieces = path_tiles.edge_pieces(out['tile_grass'], sq_grass[0], TILE_W + 2, TILE_H + 1, DENSITY)
+    for name, img in pieces.items():
+        img[..., 3] = np.where(diamond, img[..., 3], 0)
+        b = path_tiles.crop(img)
+        if not b: continue
+        x0, y0, x1, y1 = b
+        save(Image.fromarray(img[y0:y1, x0:x1]), name, (x1 - x0) / DENSITY, (y1 - y0) / DENSITY,
+             (TILE_W + 2) / 2 - x0 / DENSITY, (TILE_H + 1) / 2 - y0 / DENSITY, man)
+    print(f'травяной край дорожек: {len(pieces)} кусков')
 
 
 def main(only=None):

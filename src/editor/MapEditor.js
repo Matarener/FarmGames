@@ -9,7 +9,7 @@
 // из этого файла вместо случайной генерации. Несохранённая работа держится в черновике браузера.
 
 import { World, mapText, N, CHUNK, CHUNKS, T, START_CHUNK, FOG_TREES, FOG_W } from '../game/World.js';
-import { OBJECTS } from '../game/data.js';
+import { OBJECTS, PATHS, PATH_KEYS } from '../game/data.js';
 import { toGrid, toWorld } from '../engine/Iso.js';
 
 const DRAFT = 'farm.editor.draft';
@@ -18,7 +18,8 @@ const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
 const TOOLS = [
   { group: 'Земля' },
   { id: 'grass', name: 'Трава', tile: T.GRASS, brush: true },
-  { id: 'path', name: 'Тропинка', tile: T.PATH, brush: true },
+  // дорожки — все виды из PATHS (data.js): «Тропинка», песчаная, настил, …
+  ...PATH_KEYS.map((k, n) => ({ id: k, name: PATHS[k].name, tile: T.PATH, path: n, brush: true })),
   { id: 'water', name: 'Вода', tile: T.WATER, brush: true },
   { id: 'soil', name: 'Грядка', tile: T.SOIL, brush: true },
   { group: 'Природа' },
@@ -215,7 +216,7 @@ export class MapEditor {
       return;
     }
     if (t.obj === 'fogforest') { if (!drag) this.status('«Лес в тумане» рисуется за краем карты, в полосе тумана', true); return; }
-    if (t.tile !== undefined) { for (const [x, y] of this.cells(gx, gy)) this.setTile(x, y, t.tile); return; }
+    if (t.tile !== undefined) { for (const [x, y] of this.cells(gx, gy)) this.setTile(x, y, t.tile, t.path || 0); return; }
     if (t.erase) { for (const [x, y] of this.cells(gx, gy)) this.erase(x, y); return; }
     if (t.player) return this.setPlayer(gx, gy);
     if (t.move) return this.moveTap(gx, gy);
@@ -234,13 +235,14 @@ export class MapEditor {
     }
   }
 
-  setTile(x, y, t) {
+  setTile(x, y, t, kind = 0) {
     const f = this.f, w = f.world, i = w.idx(x, y), was = w.tiles[i];
-    if (was === t) return;
+    if (was === t && (t !== T.PATH || w.pathKind[i] === kind)) return;
     if (w.occ[i] >= 0) return; // под объектом земля не меняется — сначала ластик
     const [px, py] = w.playerStart;
     if (t === T.WATER && x === px && y === py) { this.status('Здесь стоит призрачок: в воду его не поставить', true); return; }
     w.tiles[i] = t;
+    w.pathKind[i] = t === T.PATH ? kind : 0;
     if (was === T.SOIL) f.beds.delete(i);
     if (t === T.SOIL) f.bedAt(i);
     if (was === T.WATER || t === T.WATER) this.dirtyDecor = true;
@@ -488,7 +490,7 @@ export class MapEditor {
     let s = null;
     try {
       if (tool.tile === T.GRASS) s = S.grass[0];
-      else if (tool.tile === T.PATH) s = S.path[0];
+      else if (tool.tile === T.PATH) s = S.paths[tool.path || 0].tiles[0];
       else if (tool.tile === T.SOIL) s = S.bed[0];
       else if (tool.obj && tool.obj !== 'forest' && tool.obj !== 'fogforest') s = f.objSprite({ type: tool.obj, id: 0 });
       else if (tool.obj === 'forest' || tool.obj === 'fogforest') s = f.objSprite({ type: 'pine', id: 1 });

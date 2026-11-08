@@ -533,7 +533,7 @@ export class UI {
     t.classList.toggle('bad', st.bad);
     $('#mb-place').disabled = !st.canPlace;
     $('#mb-cancel').hidden = !st.selected;
-    $('#mb-place').hidden = !st.selected;
+    $('#mb-place').hidden = !st.selected || !!st.brush; // «Кладём дорожку»: клетка кладётся сразу по нажатию
     $('#mb-store').hidden = !st.canStore;
   }
 
@@ -660,7 +660,7 @@ export class UI {
     const S = this.dv || (this.dv = { tab: 'all', sel: null, n: 10 });
     this.openPanel('devitems', 'Выдать предметы', (body, card) => {
       const st = f.st, all = Dev.grantable();
-      const tabs = h('div', 'inv-tabs');
+      const tabs = h('div', 'inv-tabs wrap');
       for (const t of INV_TABS) {
         if (t.key !== 'all' && !all.some((it) => it.tabs.includes(t.key))) continue;
         const b = h('button', 'inv-tab' + (S.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
@@ -1028,7 +1028,7 @@ export class UI {
 
   marketBuy(f, body, card, M) {
     const st = f.st;
-    const tabs = h('div', 'inv-tabs c5');
+    const tabs = h('div', 'inv-tabs c6');
     for (const t of SHOP_TABS) {
       const b = h('button', 'inv-tab' + (M.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
       b.onclick = () => { if (M.tab !== t.key) { M.tab = t.key; M.sel = null; this.sfx('tap'); this.refreshPanel(); } };
@@ -1063,7 +1063,14 @@ export class UI {
       const acts = h('div', 'ii-a');
       const b = h('button', 'btn-s gold', `Купить ${q * pack} шт. · ${q * o.price} ${this.ic(cur)}`);
       b.disabled = st[curKey] < q * o.price; b.onclick = () => f.buy(o, q);
-      acts.appendChild(b); row.appendChild(acts);
+      acts.appendChild(b);
+      // купленную дорожку — сразу класть: окно закрывается, включается «Кладём дорожку»
+      if (it.place === 'path' && have) {
+        const p = h('button', 'btn-s', 'Поставить');
+        p.onclick = () => { this.closePanel(); f.mover.pave(it.key); };
+        acts.appendChild(p);
+      }
+      row.appendChild(acts);
       box.appendChild(row);
     }
     card.appendChild(box);
@@ -1101,7 +1108,7 @@ export class UI {
       const full = st.energy >= f.maxEnergy;
       body.appendChild(h('div', 'inv-en', `${this.ic('energy')}<b>${st.energy}/${f.maxEnergy}</b><span>${full ? 'энергия полная' : '+1 через ' + fmtClock(f.energyLeftSec())}</span>`));
 
-      const tabs = h('div', 'inv-tabs');
+      const tabs = h('div', 'inv-tabs wrap');
       for (const t of INV_TABS) {
         const b = h('button', 'inv-tab' + (S.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
         b.onclick = () => {
@@ -1124,7 +1131,8 @@ export class UI {
 
       const list = Inv.listItems(st, S.tab, S.sort);
       if (!list.length) {
-        body.appendChild(h('div', 'pn-empty', S.tab === 'build' ? 'Постройки появятся в магазине.' : 'Здесь пока пусто.'));
+        const empty = { build: 'Постройки появятся в магазине.', decor: 'Дорожки и другой декор продаются на рынке, раздел «Декор».' };
+        body.appendChild(h('div', 'pn-empty', empty[S.tab] || 'Здесь пока пусто.'));
       } else {
         const g = h('div', 'inv-grid');
         for (const it of list) {
@@ -1286,6 +1294,12 @@ export class UI {
         this.closePanel();
         if (it.seedOf) f.pickCrop(it.seedOf, null); else f.pickSow(it.floraOf, !!it.grown);
       };
+      acts.appendChild(b);
+    }
+    // дорожки: «Поставить» закрывает рюкзак и включает «Кладём дорожку» (нажимай на траву)
+    if (it.place === 'path' && n > 0) {
+      const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
+      b.onclick = () => { this.closePanel(); f.mover.pave(it.key); };
       acts.appendChild(b);
     }
     if (acts.children.length) box.appendChild(acts);

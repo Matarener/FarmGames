@@ -23,7 +23,10 @@ assets/map.json  стартовая карта (редактор карты)
 | камень / валун | `rock`, `rock_small` / `boulder`, `boulder_moss` | |
 | дикая высокая трава | `grass_tall_<n>` | `grass_tall_0` |
 | урожай на грядке | `crop_<культура>_<стадия 0–3>` | `crop_carrot_3` |
-| плитки земли | `tile_grass`, `tile_grass_2`, `tile_grass_flowers`, `tile_grass_flowers_2`, `tile_path` | |
+| плитки земли | `tile_grass`, `tile_grass_2`, `tile_grass_flowers`, `tile_grass_flowers_2` | |
+| дорожки | `tile_path_<вид>`, `tile_path_<вид>_2` (у «Тропинки» — `tile_path`, `tile_path_2`) | `tile_path_cobble` |
+| камни для «камней в траве» | лист `path_stones.png` (6 камней) → `tile_path_stones`, `tile_path_stones_2` | |
+| травяной край дорожек | `path_edge_<сторона>`, `path_corner_<вершина>_<вид>` (делает `tools/path_tiles.py`) | `path_corner_n_out` |
 | грядка | `bed_dry`, `bed_wet` | |
 | вода и пруд | `tex_water` (текстура), `pond_<что>` | `pond_lily` |
 | дом, колодец | `house_<уровень>`, `well_broken`, `well_fixed` | |
@@ -46,6 +49,13 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 Трава бесшовная: `tools/grass_tiles.py` собирает из `tile_grass.png` и `tile_grass_flowers.png` четыре
 плитки с одинаковой каймой у краёв (любые две рядом стыкуются), цветы с второй картинки накладываются
 поверх. Поэтому плитки травы в игре не отзеркаливаются: у зеркальной другой край, будет шов.
+
+Дорожки (виды — `PATHS` в `src/game/data.js`) тоже бесшовные: `tools/path_tiles.py` делает из картинки-ромба
+`tile_path_<вид>.png` две плитки с общей каймой (без отражений: у досок направление и у камней свет должны
+совпадать). «Камни в траве» — трава плюс камни с `path_stones.png` посередине клетки (`PATH_STONES` в
+`slice_art.py`). Травяной край у дорожек — 20 кусков `path_edge_*`/`path_corner_*`, игра склеивает их по
+соседям клетки (`Farm.pathEdgeOf`). Новый вид дорожки: строка в `PATHS`, картинка `tile_path_<вид>.png`,
+строка в `PATH_TILES` (`slice_art.py`) и `python tools/slice_art.py tiles`.
 
 Опора кустов — центр ромба, нижний угол которого — низ земляного блока под кустом (иначе куст стоит
 ниже своей клетки).

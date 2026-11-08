@@ -2,7 +2,7 @@
 // игра не открывается, пока не загружены все картинки, чтобы в игре не было подгрузок.
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
-import { FLORA } from './data.js';
+import { FLORA, PATHS, PATH_KEYS } from './data.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
@@ -24,12 +24,6 @@ function iconOf(s) {
   g.imageSmoothingQuality = 'high';
   g.drawImage(s.canvas, (64 - w) / 2, (64 - h) / 2, w, h);
   return c.toDataURL();
-}
-
-function flipped(s) {
-  const c = makeCanvas(s.canvas.width, s.canvas.height), g = c.getContext('2d');
-  g.translate(c.width, 0); g.scale(-1, 1); g.drawImage(s.canvas, 0, 0);
-  return { canvas: c, w: s.w, h: s.h, ax: s.w - s.ax, ay: s.ay };
 }
 
 export async function loadArt(onProgress) {
@@ -81,7 +75,15 @@ export async function loadArt(onProgress) {
       if (!icons['sap_' + type]) floraIcons['sap_' + type] = ic;
     } catch (e) { /* */ }
   }
-  try { floraIcons.path = iconOf(A.tile_path); } catch (e) { /* */ }
+  // дорожки (data.js PATHS): две бесшовные плитки на вид (tools/path_tiles.py), иконка в рюкзаке — сама плитка
+  const paths = PATH_KEYS.map((k) => {
+    const p = PATHS[k], t = A[p.tile] || A.tile_path;
+    return { key: k, grassy: !!p.grassy, tiles: [t, A[p.tile + '_2'] || t] };
+  });
+  for (const p of paths) try { floraIcons[p.key] = iconOf(p.tiles[0]); } catch (e) { /* */ }
+  // куски травяного края у дорожек (склеивает Farm.pathEdge): полосы вдоль сторон и углы
+  const pathEdge = {};
+  for (const name of Object.keys(A)) if (/^path_(edge|corner)_/.test(name)) pathEdge[name.slice(5)] = A[name];
   const crops = {};
   for (const name of Object.keys(A)) {
     const m = /^crop_(\w+)_(\d)$/.exec(name);
@@ -106,7 +108,7 @@ export async function loadArt(onProgress) {
     // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%). Не отзеркаливать: плитки
     // бесшовные (tools/grass_tiles.py), у зеркальной край другой — будет шов
     grass: [A.tile_grass, A.tile_grass_2, A.tile_grass_flowers, A.tile_grass_flowers_2],
-    path: [A.tile_path, flipped(A.tile_path)],
+    paths, pathEdge,
     // объёмные грядки: [сухая, политая]; рисуются поверх травы
     bed: [A.bed_dry, A.bed_wet],
     // вода: бесшовная текстура на весь пруд, берег рисуется кодом (shore.js)

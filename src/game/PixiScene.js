@@ -87,6 +87,14 @@ class Atlases {
     return t;
   }
 
+  // поместится ли картинка w×h в текущий лист (без нового листа)
+  fits(w, h) {
+    const p = this.list[this.list.length - 1];
+    if (!p) return true;
+    const y = p.x + w + PAD > ATLAS ? p.y + p.rowH + PAD : p.y;
+    return y + h + PAD <= ATLAS;
+  }
+
   // новые спрайты попадают в видеопамять раз за кадр
   flush(perf) { for (const p of this.dirty) { p.source.update(); perf && perf.mark('текстура в видеокарту'); } this.dirty.clear(); }
 }
@@ -201,12 +209,18 @@ export class PixiScene {
     const f = this.f, w = f.world, S = f.S;
     this.makeWaterTex();
     const per = this.chunks.map(() => []);
+    const edges = this.chunks.map(() => []); // травяной край дорожек — поверх всей земли куска
     for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
       const i = gy * N + gx, t = w.tiles[i];
       const cx = (gx - gy) * HW, cy = (gx + gy + 1) * HH;
       let s, bed = null;
       if (t === T.GRASS) s = S.grass[w.variant[i]];
-      else if (t === T.PATH) s = S.path[(gx + gy) & 1];
+      else if (t === T.PATH) {
+        // дорожка своего вида (две бесшовные плитки вперемешку), там, где рядом трава, — край из травы
+        s = (S.paths[w.pathKind[i]] || S.paths[0]).tiles[w.variant[i] & 1];
+        const e = f.pathEdge(gx, gy);
+        if (e) edges[w.chunkOf(gx, gy)].push(e, cx, cy);
+      }
       else if (t === T.WATER) {
         // вода — общей текстурой по координатам карты, поверх — берег (у клеток посреди пруда его нет)
         const ws = f.waterSprite(gx, gy);
@@ -235,7 +249,7 @@ export class PixiScene {
       const s = S.grass[h < 0.6 ? 0 : h < 0.85 ? 1 : h < 0.93 ? 3 : 2];
       per[cl(gy) * CHUNKS + cl(gx)].push(s, (gx - gy) * HW, (gx + gy + 1) * HH);
     }
-    for (let c = 0; c < per.length; c++) this.chunkMesh(this.chunks[c], per[c]);
+    for (let c = 0; c < per.length; c++) { if (edges[c].length) per[c].push(...edges[c]); this.chunkMesh(this.chunks[c], per[c]); }
     this.groundAtlas.flush();
     if (!this.fogMesh) this.makeFog();
   }
@@ -480,11 +494,22 @@ export class PixiScene {
       if (s instanceof Map) { for (const v of s.values()) add(v, dim); return; }
       if (Array.isArray(s) || typeof s === 'object') for (const v of Object.values(s)) add(v, dim);
     };
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.WATER) f.waterSprite(x, y);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.WATER) f.waterSprite(x, y); else if (w.tile(x, y) === T.PATH) f.pathEdge(x, y);
     const S = f.S;
-    const GROUND = ['grass', 'path', 'water'];
+    const GROUND = ['grass', 'paths', 'pathEdge', 'pathParts', 'water'];
     this.makeWaterTex(); this.groundAtlas.tex(this.waterT);
-    for (const k of GROUND) for (const v of (S[k] instanceof Map ? S[k].values() : S[k] || [])) this.groundAtlas.tex(v);
+    for (const v of S.grass) this.groundAtlas.tex(v);
+    for (const p of S.paths) for (const v of p.tiles) this.groundAtlas.tex(v);
+    // травяной край: какой есть на карте, и самые частые (прямые дорожки, углы, концы) — если в листе
+    // атласа есть место (второй лист — лишние 16 МБ видеопамяти)
+    for (const v of S.pathEdge.values()) this.groundAtlas.tex(v);
+    for (const v of S.water.values()) this.groundAtlas.tex(v);
+    for (let key = 1; key < 16; key++) {
+      const e = f.pathEdgeOf(key);
+      if (!e || this.groundAtlas.map.get(e.canvas)) continue;
+      if (!this.groundAtlas.fits(e.canvas.width, e.canvas.height)) break;
+      this.groundAtlas.tex(e);
+    }
     for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k) && k !== 'waterTex') add(v, k !== 'bubble' && k !== 'fog' && k !== 'hint');
     for (const o of w.objects || []) { if (!o) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
     for (const arr of Object.values(S.objArt)) for (const t of arr) for (const id of [0, 1, 3]) { const st = S.stumpOf(t, id); if (st) { this.atlas.tex(st); this.atlas.tex(dimSprite(st)); } }
@@ -938,7 +963,7 @@ export class PixiScene {
       }
       if (s.kind === 'obj') { toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp); this.put(this.moverGhost, f.objSprite(s.o), tmp.x, tmp.y); }
       else {
-        const sp = s.kind === 'path' ? f.S.path[0] : f.S.bed[0];
+        const sp = s.kind === 'path' ? (f.S.paths.find((p) => p.key === s.path) || f.S.paths[0]).tiles[0] : f.S.bed[0];
         toWorld(t.gx + 0.5, t.gy + 0.5, tmp); this.put(this.moverGhost, sp, tmp.x, tmp.y);
       }
     }

@@ -190,12 +190,13 @@ export const INV_TABS = [
   { key: 'all',    name: 'Все',         icon: 'bag' },
   { key: 'tools',  name: 'Инструменты', icon: 'axe' },
   { key: 'build',  name: 'Постройки',   icon: 'build' },
+  { key: 'decor',  name: 'Декор',       icon: 'decor' },
   { key: 'plants', name: 'Растения',    icon: 'seed' },
   { key: 'food',   name: 'Еда',         icon: 'food' },
   { key: 'res',    name: 'Ресурсы',     icon: 'wood' },
 ];
 
-// Разделы на вкладке «Продать» рынка (инструменты и постройки не продаются)
+// Разделы на вкладке «Продать» рынка (инструменты, постройки и декор не продаются)
 export const SELL_TABS = ['all', 'plants', 'food', 'res'];
 
 // Инструменты есть всегда, их не считают и не продают
@@ -243,8 +244,25 @@ export const SHOP_FOOD = {
   bread: { name: 'Хлеб',    food: 10, price: 18, level: 2, desc: 'Тёплый хлеб из пекарни.' },
   pie:   { name: 'Пирожок', food: 18, price: 35, level: 4, desc: 'Пирожок с яблоками, очень сытный.' },
 };
-// Постройки и декор, убранные в рюкзак в режиме перестановки (place — как ставится обратно)
-ITEMS.path = { key: 'path', name: 'Тропинка', icon: 'path', tabs: ['build'], place: 'path', desc: 'Клетка тропинки. Поставить: «Ещё» → «Переставить», затем нажмите на свободную траву.' };
+// Дорожки (раздел «Декор»): покупаются на рынке (цена за одну клетку), ставятся в режиме «Переставить»
+// и убираются обратно в рюкзак своим видом. Ключ — id предмета и вид клетки в сохранении.
+// tile — плитка (assets/art, tools/path_tiles.py), dust — цвет пыли, когда клетку кладут, grassy — дорожка из травы с камнями: у соседних
+// дорожек к ней травяной край, как к обычной траве. Первая — вид по умолчанию: тропинки стартовой
+// карты и старых сохранений. Порядок не менять: номер вида — индекс в PATH_KEYS (World.pathKind).
+export const PATHS = {
+  path:        { name: 'Тропинка',          tile: 'tile_path',        price: 4,  level: 2, dust: '#d9b98a', desc: 'Тропинка из светлых плоских камней.' },
+  path_sand:   { name: 'Песчаная дорожка',  tile: 'tile_path_sand',   price: 2,  level: 1, dust: '#e6d2a2', desc: 'Утоптанный песок с мелкими камешками.' },
+  path_planks: { name: 'Деревянный настил', tile: 'tile_path_planks', price: 6,  level: 3, dust: '#b98a58', desc: 'Дощатый настил, тёплый и уютный.' },
+  path_stones: { name: 'Камни в траве',     tile: 'tile_path_stones', price: 8,  level: 4, grassy: true, dust: '#a9a594', desc: 'Плоские камни-ступеньки прямо в траве.' },
+  path_cobble: { name: 'Булыжная мостовая', tile: 'tile_path_cobble', price: 12, level: 5, dust: '#9a9a96', desc: 'Мостовая из серого булыжника, как в старой деревне.' },
+};
+export const PATH_KEYS = Object.keys(PATHS);
+export const DEFAULT_PATH = PATH_KEYS[0];
+// Декор и постройки, убранные в рюкзак в режиме перестановки (place — как ставится обратно)
+for (const [k, p] of Object.entries(PATHS)) ITEMS[k] = {
+  key: k, name: p.name, icon: k, tabs: ['decor'], place: 'path', pathOf: k,
+  desc: `${p.desc} Одна клетка дорожки: нажмите «Поставить» и выбирайте клетки на траве (или «Ещё» → «Переставить»).`,
+};
 for (const [k, f] of Object.entries(SHOP_FOOD)) ITEMS[k] = { key: k, name: f.name, icon: k, food: f.food, tabs: ['food'], desc: f.desc + ' Восстанавливает энергию.' };
 // порядок «по умолчанию»: как в таблице (инструменты, урожай, рыба, семена, ресурсы)
 let _ord = 0;
@@ -257,6 +275,7 @@ export const SHOP_TABS = [
   { key: 'trees', name: 'Саженцы',   icon: 'sap_apple' },
   { key: 'res',   name: 'Ресурсы',   icon: 'wood' },
   { key: 'build', name: 'Постройки', icon: 'build' },
+  { key: 'decor', name: 'Декор',     icon: 'decor' },
 ];
 // Товары: item — id из ITEMS, price — цена одной покупки, level — с какого уровня можно купить
 export const SHOP = [];
@@ -274,6 +293,8 @@ export const SAPLING_SHOP = {
   apple:     { price: 75, level: 6 },
 };
 for (const [sp, o] of Object.entries(SAPLING_SHOP)) if (FLORA[sp] && FLORA[sp].pick) SHOP.push({ tab: 'trees', item: floraSeedId(sp), price: o.price, level: o.level });
+// Декор: дорожки, от дешёвых к дорогим
+for (const [k, p] of Object.entries(PATHS).sort((a, b) => a[1].price - b[1].price)) SHOP.push({ tab: 'decor', item: k, price: p.price, level: p.level });
 SHOP.push({ tab: 'res', item: 'stone', price: 4 });
 SHOP.push({ tab: 'res', item: 'wood', price: 1, cur: 'gems', qty: 10 });
 SHOP.push({ tab: 'res', item: 'ore', price: 1, cur: 'gems', qty: 3 });
