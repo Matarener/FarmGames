@@ -12,7 +12,8 @@ import { WILD, WILD_TREES, FLORA, CROPS, seedId } from './data.js';
 import { addItem } from './inventory.js';
 import { N, CHUNK, CHUNKS, T } from './World.js';
 
-const BUSHES = Object.values(FLORA).filter((f) => f.kind === 'bush').map((f) => f.key);
+// Плодовые и ягодные (FLORA pick) сами не растут: их саженцы только в магазине (SAPLING_SHOP)
+const BUSHES = Object.values(FLORA).filter((f) => f.kind === 'bush' && !f.pick).map((f) => f.key);
 
 export const groupOf = (kind) => kind === 'grass' ? 'grass' : FLORA[kind] && FLORA[kind].kind === 'tree' ? 'tree' : 'bush';
 
@@ -105,7 +106,7 @@ export function wildTick(st, world, { now, rng, blocked, reach, place }) {
 
 // ---------- Деревья у тумана ----------
 
-const TREES = Object.values(FLORA).filter((f) => f.kind === 'tree').map((f) => f.key);
+const TREES = Object.values(FLORA).filter((f) => f.kind === 'tree' && !f.pick).map((f) => f.key);
 
 // Клетка у границы тумана: не дальше band от края карты
 export const nearFog = (x, y) => Math.min(x, y, N - 1 - x, N - 1 - y) < WILD_TREES.band;

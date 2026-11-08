@@ -259,7 +259,7 @@ export class World {
       const d = this.fogDepth(x, y);
       if (d < 1 || !this.fogBack(x, y)) continue;
       const r = rnd(), k = rnd();
-      if (r < (FOG.forest[d - 1] || 0)) this.addFogTree(k < 0.2 ? 'oak' : k < 0.3 ? 'birch' : k < 0.4 ? 'sakura' : k < 0.48 ? 'cherry' : k < 0.56 ? 'maple' : k < 0.86 ? 'pine' : k < 0.92 ? 'apple' : 'rosehip', x, y);
+      if (r < (FOG.forest[d - 1] || 0)) this.addFogTree(k < 0.2 ? 'oak' : k < 0.3 ? 'birch' : k < 0.4 ? 'sakura' : k < 0.48 ? 'linden' : k < 0.56 ? 'maple' : k < 0.86 ? 'pine' : k < 0.92 ? 'linden' : 'lavender', x, y);
     }
   }
 
