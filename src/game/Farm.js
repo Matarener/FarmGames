@@ -17,6 +17,7 @@ import * as Wild from './wild.js';
 import * as Flora from './flora.js';
 import * as Beds from './beds.js';
 import * as Plant from './planting.js';
+import * as Paths from './paths.js';
 import * as Hints from './hints.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
@@ -63,7 +64,7 @@ export class Farm {
   // Картинки художника загружены (artSprites.loadArt): раскладываем их в спрайты игры и иконки
   applyArt(a) {
     Object.assign(this.S, {
-      grass: a.grass, path: a.path, bed: a.bed, waterTex: a.waterTex, decor: a.decor,
+      grass: a.grass, paths: a.paths, pathParts: a.pathEdge, pathEdge: new Map(), bed: a.bed, waterTex: a.waterTex, decor: a.decor,
       objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, wildGrass: a.wildGrass,
       house: a.house, well: a.well, crops: a.crops, fog: a.fog.clouds.length ? a.fog : null,
     });
@@ -121,6 +122,28 @@ export class Farm {
     return s;
   }
 
+  // Травяной край клетки дорожки (x, y): там, где рядом трава (вода, грядка, «камни в траве»), на дорожку
+  // чуть заходит трава. Травы рядом нет — null.
+  pathEdge(x, y) { return this.pathEdgeOf(Paths.edgeKey(this.world, x, y)); }
+
+  // Картинка края для вида окружения key (paths.js edgeKey): нужные куски (tools/path_tiles.py)
+  // склеиваются в одну картинку и запоминаются. Куски не перекрываются — склейка без швов.
+  pathEdgeOf(key) {
+    if (!key) return null;
+    let s = this.S.pathEdge.get(key);
+    if (!s) {
+      const t = this.S.grass[0], k = t.canvas.width / t.w; // клетка 66×33 единицы, пикселей на единицу
+      const c = makeCanvas(t.canvas.width, t.canvas.height), g = c.getContext('2d');
+      for (const n of Paths.edgeParts(key)) {
+        const p = this.S.pathParts[n];
+        if (p) g.drawImage(p.canvas, Math.round((t.ax - p.ax) * k), Math.round((t.ay - p.ay) * k));
+      }
+      s = { canvas: c, w: t.w, h: t.h, ax: t.ax, ay: t.ay, name: 'path_edge_' + key };
+      this.S.pathEdge.set(key, s);
+    }
+    return s;
+  }
+
   // Картинка объекта на карте (у камней, пней и деревьев вариант выбирается по id)
   objSprite(o) {
     const S = this.S;
@@ -169,16 +192,14 @@ export class Farm {
       // а деревья, камни, тропинки и постройки — как на новой карте
       const sameMap = (saved.map || null) === (w.mapId || null);
       // свои посадки (st.plants, st.fruit) остаются: место занято — растение вернётся в рюкзак
-      if (!sameMap) { delete this.st.paths; delete this.st.pos; delete this.st.movedBeds; delete this.st.wild; }
+      // свои дорожки тоже остаются (их покупают): место занято — дорожка вернётся в рюкзак
+      if (!sameMap) { delete this.st.pos; delete this.st.movedBeds; delete this.st.wild; }
       if (saved.objects && saved.v !== 2 && sameMap) w.importObjects(saved.objects);
       if (saved.chunks) for (const c of saved.chunks) w.unlocked[c] = 1;
       // грядки переносили: стартовые клетки — трава, все грядки берём из сохранения
       if (this.st.movedBeds) for (const i of w.startBeds) w.tiles[i] = T.GRASS;
-      // тропинки переставляли: берём их из сохранения
-      if (this.st.paths) {
-        for (let i = 0; i < w.tiles.length; i++) if (w.tiles[i] === T.PATH) w.tiles[i] = T.GRASS;
-        for (const i of this.st.paths) if (w.tiles[i] === T.GRASS && w.occ[i] < 0) w.tiles[i] = T.PATH;
-      }
+      // дорожки ставили, убирали или переносили: берём их из сохранения (старые — все «Тропинка»)
+      Paths.restorePaths(this.st, w);
       for (const [i, crop, p, wt] of saved.beds || []) {
         if (!sameMap && w.tiles[i] !== T.SOIL && (w.tiles[i] !== T.GRASS || w.occ[i] >= 0)) continue; // на новой карте здесь вода/дерево
         w.tiles[i] = T.SOIL;

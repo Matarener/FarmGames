@@ -3,7 +3,7 @@
 // в сохранение пишется только разница.
 
 import { mulberry32, hash2 } from '../engine/Sprite.js';
-import { OBJECTS, FLORA, FLORA_GROUPS, floraByGroup, FOG } from './data.js';
+import { OBJECTS, FLORA, FLORA_GROUPS, floraByGroup, FOG, PATH_KEYS } from './data.js';
 import { toWorld } from '../engine/Iso.js';
 
 export const CHUNK = 10;
@@ -39,6 +39,7 @@ export class World {
   constructor(seed, map) {
     this.seed = seed >>> 0;
     this.tiles = new Uint8Array(N * N);
+    this.pathKind = new Uint8Array(N * N); // вид дорожки на клетке T.PATH: номер в PATH_KEYS (paths.js)
     this.variant = new Uint8Array(N * N);
     this.occ = new Int32Array(N * N).fill(-1);
     this.objects = [];   // индекс = id, удалённые → null
@@ -52,6 +53,7 @@ export class World {
 
   // ---------- Карта из редактора ----------
   // Формат: { v: 1, n: 50, tiles: [50 строк по 50 цифр T], objects: [[тип, x, y], ...], well: [x, y], player: [x, y] }
+  // Дорожки: цифра 3 — дорожка по умолчанию (PATH_KEYS[0]), 4, 5, … — следующие виды из PATHS (data.js).
   // Грядки — клетки T.SOIL (стартовые), колодец — отдельно (он всегда после genCount, как в генерации).
   loadMap(m) {
     this.mapId = mapId(m);
@@ -66,7 +68,8 @@ export class World {
       const r = rows[y] || '';
       for (let x = 0; x < N; x++) {
         const t = +r[x] || 0, i = y * N + x;
-        this.tiles[i] = t <= 3 ? t : 0;
+        if (t >= T.PATH && t < T.PATH + PATH_KEYS.length) { this.tiles[i] = T.PATH; this.pathKind[i] = t - T.PATH; }
+        else this.tiles[i] = t < T.PATH ? t : 0;
         if (t === T.SOIL) this.startBeds.push(i);
       }
     }
@@ -84,7 +87,11 @@ export class World {
   // Текущий мир → карта для редактора (пни сохраняются как то дерево, из которого выросли)
   toMap() {
     const tiles = [];
-    for (let y = 0; y < N; y++) { let r = ''; for (let x = 0; x < N; x++) r += this.tiles[y * N + x]; tiles.push(r); }
+    for (let y = 0; y < N; y++) {
+      let r = '';
+      for (let x = 0; x < N; x++) { const i = y * N + x, t = this.tiles[i]; r += t === T.PATH ? T.PATH + this.pathKind[i] : t; }
+      tiles.push(r);
+    }
     const objects = [];
     let well = null;
     for (const o of this.objects) {
