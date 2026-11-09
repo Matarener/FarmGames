@@ -59,13 +59,14 @@ CROP_STAGE_W = {'cabbage': [17.6, 29.65, 47.13, 56.7]}
 # (крона; у травы и пней — во всей картинке), ('h', высота) — от верха до опоры. В мировых единицах.
 # Опора — середина низа ствола или стеблей (foot_of), мягкую тень под растением рисует add_shadow.
 NOBASE = {
-    # взрослые деревья (у вишни с ягодами и без — своя картинка), без плодов, молодые
-    'tree_oak': ('w', 97.8), 'tree_apple': ('w', 90.2), 'tree_sakura': ('w', 94.5), 'tree_pine': ('w', 58.2),
-    'tree_cherry': ('w', 90.8), 'tree_cherry_bare': ('w', 95.2), 'tree_maple': ('w', 94.0), 'tree_birch': ('w', 97.8),
-    'tree_linden': ('h', 122.3), 'tree_apple_bare': ('w', 87.5), 'tree_sakura_bare': ('w', 90.0),
-    'tree_oak_young': ('w', 47.8), 'tree_birch_young': ('w', 58.5), 'tree_sakura_young': ('w', 42.8),
-    'tree_cherry_young': ('w', 47.2), 'tree_maple_young': ('w', 52.2), 'tree_apple_young': ('w', 45.5),
-    'tree_pine_young': ('w', 26.2), 'tree_linden_young': ('h', 77.2),  # липа по высоте: не выше берёзы
+    # деревья — по высоте (от верха до опоры), чтобы рост шёл по породам: ель > дуб > липа > берёза >
+    # клён > вишня > яблоня > сакура. Взрослое с плодами и без — одной высоты, молодое — 0.6 взрослого.
+    'tree_pine': ('h', 120), 'tree_oak': ('h', 106), 'tree_linden': ('h', 100), 'tree_birch': ('h', 96),
+    'tree_maple': ('h', 90), 'tree_cherry': ('h', 86), 'tree_cherry_bare': ('h', 86),
+    'tree_apple': ('h', 82), 'tree_apple_bare': ('h', 82), 'tree_sakura': ('h', 80), 'tree_sakura_bare': ('h', 80),
+    'tree_pine_young': ('h', 72), 'tree_oak_young': ('h', 64), 'tree_linden_young': ('h', 60),
+    'tree_birch_young': ('h', 58), 'tree_maple_young': ('h', 54), 'tree_cherry_young': ('h', 52),
+    'tree_apple_young': ('h', 49), 'tree_sakura_young': ('h', 48),
     # кусты: с плодами, без, молодые
     'bush_blueberry': ('w', 58.8), 'bush_raspberry': ('w', 56.5), 'bush_rosehip': ('w', 57.8),
     'bush_hydrangea': ('w', 58.5), 'bush_lavender': ('w', 53.2), 'bush_rose': ('w', 58.5),
