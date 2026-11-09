@@ -29,7 +29,8 @@ assets/map.json  стартовая карта (редактор карты)
 | травяной край дорожек | `path_edge_<сторона>`, `path_corner_<вершина>_<вид>` (делает `tools/path_tiles.py`) | `path_corner_n_out` |
 | переход между видами дорожек | `blend_<вид дорожки>_edge_<сторона>`, `blend_<вид дорожки>_corner_<вершина>_<вид>` (тоже `path_tiles.py`) | `blend_path_cobble_edge_nw` |
 | грядка | `bed_dry`, `bed_wet` | |
-| вода и пруд | `tex_water` (текстура), `pond_<что>` | `pond_lily` |
+| пруд целиком (одна картинка на пруд) | `pond_<вид>` (делает `tools/pond_art.py`) | `pond_round`, `pond_island` |
+| камыши и кувшинки у прудов | `pond_<что>` | `pond_lily`, `pond_cattail` |
 | дом, колодец | `house_<уровень>`, `well_broken`, `well_fixed` | |
 | туман | `fog_clouds_<n>`, `fog_strips_<n>`, `fog_wisps_<n>` | |
 | иконка интерфейса | `ic_<имя>` | `ic_coin`, `ic_sap_oak` |
@@ -61,6 +62,15 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 Новый вид дорожки: строка в `PATHS` (со своим `layer`), картинка `tile_path_<вид>.png`, строка в `PATH_TILES`
 (`slice_art.py`), если вид заходит на нижние — строка в `BLEND`, и `python tools/slice_art.py tiles`.
 
+Пруды (виды — `PONDS` в `src/game/data.js`: форма клетками, камыши и камни у берега) — по одной картинке на
+пруд, её собирает `tools/pond_art.py`: вода — текстура художника `assets/source/tex_water.png`, трава вокруг —
+та же бесшовная трава, что у плиток земли, кувшинки и листья — `pond_lily`, `pond_leaves` (`FLOATS` в
+`pond_art.py`). Вода чуть ниже земли: у дальнего берега земляная стенка с тенью, у ближнего — пена.
+Опора картинки — середина прямоугольника клеток пруда. Новый вид пруда: строка в `PONDS`, строка в `FLOATS`
+и `python tools/pond_art.py <вид>` (`--preview` — ещё и картинки для проверки в `.pond-art/`: пруд на траве
+с сеткой клеток и точками камышей). Нарисованную художником картинку пруда можно положить вместо собранной:
+`assets/source/pond_<вид>.png` той же формы и с той же опорой.
+
 Опора кустов — центр ромба, нижний угол которого — низ земляного блока под кустом (иначе куст стоит
 ниже своей клетки).
 
@@ -71,6 +81,7 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 ```
 python tools/slice_art.py                   # всё: картинки, manifest.json, иконки, icons.json
 python tools/slice_fog.py                   # облака тумана (дописывает manifest.json)
+python tools/pond_art.py                    # пруды (дописывает manifest.json)
 
 python tools/slice_art.py tree_apple_bare   # только эти листы (остальное в манифесте не трогается)
 python tools/slice_art.py tiles             # только плитки земли
@@ -78,6 +89,6 @@ python tools/cut_grass_base.py assets/source/grass_tall_raw.png assets/source/gr
 ```
 
 Полная нарезка `slice_art.py` пишет `manifest.json` заново, поэтому после неё всегда запускайте
-`slice_fog.py`. `tools/cut_bush_base.py` (срезать земляной блок у кустов) сейчас **не запускать**:
+`slice_fog.py` и `pond_art.py`. `tools/cut_bush_base.py` (срезать земляной блок у кустов) сейчас **не запускать**:
 у новых кустов (2026-11-07) основание оставлено как есть, его, возможно, перерисуют позже. Высокую траву сначала чистит `cut_grass_base.py`
 (`grass_tall_raw.png` → `grass_tall.png`), потом её режет `slice_art.py`.
