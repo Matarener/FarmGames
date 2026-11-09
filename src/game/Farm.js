@@ -27,10 +27,11 @@ import * as Ponds from './ponds.js';
 import * as Well from './well.js';
 import * as Hints from './hints.js';
 import * as Chop from './chop.js';
+import * as Fish from './fishRules.js';
 import { plural } from './questRules.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
-  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, PATHS, SPRINKLERS, WELL_ITEM, BED_ITEM, floraSeedId, floraOwnId, seedId, WELL_COST,
+  CROPS, FISH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, PATHS, SPRINKLERS, WELL_ITEM, BED_ITEM, floraSeedId, floraOwnId, seedId, WELL_COST,
   ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC,
 } from './data.js';
 
@@ -815,11 +816,20 @@ export class Farm {
   pondPopup(o, gx, gy, sx, sy) {
     const c = Ponds.shoreCell(this.world, o, gx, gy);
     if (!c) return this.toast('К этому пруду не подойти');
-    const { x, y } = c;
-    this.ui.popup(sx, sy, { title: OBJECTS[o.type].name, items: [
+    const { x, y } = c, b = this.bites();
+    this.ui.popup(sx, sy, { title: OBJECTS[o.type].name, text: this.bitesText(b), items: [
       { icon: 'water', label: 'Набрать воды', sub: `${this.st.can}/${this.canMax}`, disabled: this.st.can >= this.canMax, onClick: () => this.queue({ kind: 'fill', x, y }) },
-      { icon: 'fish', label: 'Рыбачить', sub: `⚡ ${ENERGY.fish}`, onClick: () => this.queue({ kind: 'fish', x, y }) },
+      { icon: 'fish', label: 'Рыбачить', sub: `⚡ ${ENERGY.fish}`, disabled: !b.n, onClick: () => this.queue({ kind: 'fish', x, y }) },
     ] });
+  }
+
+  // Клёв (fishRules.js): сколько поклёвок в запасе и когда следующая
+  bites() { return Fish.bitesView(this.st, this.quests.ctx().now); }
+
+  bitesText(b = this.bites()) {
+    const wait = b.next ? fmtTime((b.next - this.quests.ctx().now) / 1000) : '';
+    if (!b.n) return `Клёв кончился, следующая поклёвка через ${wait}`;
+    return `Клёв: ${b.n} из ${b.max}` + (wait ? `, следующая поклёвка через ${wait}` : '');
   }
 
   wellPopup(o, sx, sy) {
@@ -1182,7 +1192,16 @@ export class Farm {
       case 'fill':
         if (st.can >= this.canMax) { this.toast('Лейка уже полная'); return false; }
         return w.isWater(a.x, a.y) || this.isWell(a.x, a.y);
-      case 'fish': return w.isWater(a.x, a.y);
+      case 'fish': {
+        if (!w.isWater(a.x, a.y)) return false;
+        const b = this.bites();
+        if (b.n) return true;
+        // клёв кончился: остальные забросы из очереди тоже не начнутся — убираем их, чтобы не повторять тост
+        this.toast(this.bitesText(b), 'warn');
+        const q = this.player.queue;
+        for (let i = q.length - 1; i >= 0; i--) if (q[i].kind === 'fish') q.splice(i, 1);
+        return false;
+      }
     }
     return true;
   }
@@ -1284,13 +1303,13 @@ export class Farm {
         return false;
       }
       case 'fish': {
+        if (!this.bites().n) { this.toast(this.bitesText(), 'warn'); return false; }
         if (!this.spend(ENERGY.fish)) return false;
+        const r = Fish.cast(st, this.quests.ctx());
         toWorld(a.x + 0.5, a.y + 0.5, tmp);
         this.burst(tmp.x, tmp.y - 2, '#bfe6ff', 10);
-        if (Math.random() > FISH_CATCH) { this.float(tmp.x, tmp.y - 20, 'Сорвалась!', null); this.sfx('splash'); this.changed(); return false; }
-        const list = Object.values(FISH), total = list.reduce((s, f) => s + f.chance, 0);
-        let r = Math.random() * total, fish = list[0];
-        for (const f of list) { if ((r -= f.chance) < 0) { fish = f; break; } }
+        if (!r.fish) { this.float(tmp.x, tmp.y - 20, 'Сорвалась!', null); this.sfx('splash'); this.changed(); return false; }
+        const fish = FISH[r.fish];
         const got = this.addItem(fish.key, 1);
         if (!got) return false;
         this.float(tmp.x, tmp.y - 22, `+1 ${fish.name}`, fish.key);

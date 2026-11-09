@@ -257,7 +257,7 @@ test('house upgrade: needs chunks and resources, takes time, then the new level'
 });
 
 test('house upgrade speed-up costs gems by time left', () => {
-  const st = fresh({ house: 3, gems: 100, items: { wood: 999, stone: 999, ore: 99 }, coins: 9999, energy: 0 });
+  const st = fresh({ house: 3, gems: 100, items: { wood: 999, stone: 999, ore: 99 }, coins: 99999, energy: 0 });
   assert.ok(H.startHouseUp(st, 99, T0));
   assert.equal(H.speedHouseUp(fresh({ gems: 0, houseUp: { to: 4, end: T0 + 1e6 } }), T0), null);
   const left = HOUSE[4].time, gems = Math.ceil(left / GEM_SPEEDUP_SEC);

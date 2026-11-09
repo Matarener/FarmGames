@@ -5,8 +5,8 @@
 //   2) тупики — где дом или новый участок стоят, потому что ресурс взять негде (кроме кристаллов);
 //   3) плавность — сколько игровых часов и дней уходит на каждый шаг (участок, дом, уровень).
 //
-//   node tools/balance-sim.mjs                      — отчёт по всем профилям игроков (сейчас)
-//   node tools/balance-sim.mjs --proposal           — то же с предложенными правками (PATCHES и PACE ниже)
+//   node tools/balance-sim.mjs                      — отчёт по всем профилям игроков на числах игры
+//   PACE='{"xp":[30,2],"exp":[80,2]}' node tools/balance-sim.mjs — примерить другие числа темпа (см. PACE ниже)
 //   node tools/balance-sim.mjs --seeds 10 --days 150 --profile normal --log
 //   node tools/balance-sim.mjs --json out.json      — сырые данные для графиков
 //
@@ -28,6 +28,7 @@ import * as Gift from '../src/game/giftRules.js';
 import * as Wheel from '../src/game/wheelRules.js';
 import * as Ord from '../src/game/orderRules.js';
 import * as Ach from '../src/game/achRules.js';
+import * as Fish from '../src/game/fishRules.js';
 import { QUEST_TZ } from '../src/game/questData.js';
 import { ORDERS } from '../src/game/orderData.js';
 import { WHEEL } from '../src/game/wheelData.js';
@@ -39,57 +40,32 @@ const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf('--' + k); return i < 0 ? d : argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : true; };
 const OPT = {
   seeds: +arg('seeds', 8), days: +arg('days', 150), profile: arg('profile', 'all'),
-  proposal: !!arg('proposal', false), fix: String(arg('fix', '')), log: !!arg('log', false), trace: !!arg('trace', false), json: arg('json', null), compare: !!arg('compare', false),
+  log: !!arg('log', false), trace: !!arg('trace', false), json: arg('json', null), compare: !!arg('compare', false),
 };
 
-// ---------------- Предложенные правки (--proposal) ----------------
-// Меняют таблицы в памяти: так видно «как было» и «как станет» на одном и том же боте.
-// Функции (стоимость участка, опыт до уровня) подменяются через SIM_FN.
+// ---------------- Примерка других чисел темпа ----------------
+// Бот играет на числах игры (data.js, buildData.js). Чтобы примерить другие, не меняя игру, задайте их в PACE (JSON):
+//   xp: [a, b] — опыт до следующего уровня a·L^b;  exp: [k, p] — монеты за n-й участок k·n^p;
+//   house: [монеты за дом 2, 3, 4, 5];  crops: { corn: [семена, продажа, опыт] … };
+//   goods: { strawberry_cake: цена продажи … } (товары мастерских);  beds: { …BEDS.limit }
+// Например: PACE='{"xp":[20,2],"exp":[40,2],"house":[50,1200,6000,25000]}' — вариант «~3 недели» из отчёта 9 ноября.
 const SIM_FN = { expansionCost: D.expansionCost, xpToNext: D.xpToNext };
-// --fix fish,arb,ore,pace (или --proposal = все сразу)
-export const PATCHES = {
-  // 1) Рыбалка: клёв кончается (FISHING.bites поклёвок, одна новая раз в FISHING.regen секунд),
-  //    рыба даёт меньше энергии, чем стоит заброс; уха перестаёт быть «энергией из ничего».
-  fish() {
-    FISHING.on = true;
-    FISH.fish_carp.food = 1; FISH.fish_perch.food = 1; FISH.fish_gold.food = 3;
-    CRAFT_GOODS.fish_soup.food = 10;
-  },
-  // 2) Жернов из купленного камня приносил +25%: камень на рынке дороже, жернов чуть дешевле
-  arb() {
-    D.SHOP.find((o) => o.item === 'stone').price = 5;
-    CRAFT_GOODS.millstone.sell = 55;
-  },
-  // 3) Руда: меньше риск, что на дом 4–5 её не хватит
-  ore() {
-    OBJECTS.boulder.ore = [2, 3];
-    HOUSE[4].cost.ore = 15;
-  },
-  // 4) Темп: см. отчёт. Для подбора параметры можно задать в PACE='{"xp":[a,b],...}' (JSON)
-  pace() {
-    const P = { ...PACE, ...(process.env.PACE ? JSON.parse(process.env.PACE) : {}) };
-    const [a, b] = P.xp;
-    SIM_FN.xpToNext = (L) => Math.round(a * Math.pow(L, b));
-    for (const [k, [seed, sell, xp]] of Object.entries(P.crops || {})) Object.assign(CROPS[k], { seed, sell, xp });
-    for (const [k, sell] of Object.entries(P.goods || {})) CRAFT_GOODS[k].sell = sell;
-    (P.house || []).forEach((c, i) => { if (c && HOUSE[i + 2]) HOUSE[i + 2].cost.coins = c; });
-    // монеты за участок: k·n^p (n — номер покупки), но не меньше, чем сейчас (40·1.3^(n−1)) на первых участках
-    const [k, pw] = P.exp;
-    SIM_FN.expansionCost = (n) => ({ wood: r5(15 + 3.5 * (n - 1)), stone: r5(6 + 1.5 * (n - 1)), coins: r5(k * Math.pow(n, pw)) });
-    if (P.beds) Object.assign(D.BEDS.limit, P.beds);
-  },
-};
-// Предложение по темпу (--fix pace): опыт до уровня a·L^b, культуры [семена, продажа, опыт], блюда, дом (монеты 2…5 ур.),
-// участки: монеты k·n^p
-const PACE = {
-  xp: [30, 2],
-  crops: { corn: [20, 55, 9], sunflower: [25, 68, 11], pumpkin: [35, 90, 14], strawberry: [45, 115, 18], cotton: [55, 140, 22] },
-  goods: { pumpkin_porridge: 115, strawberry_cake: 420 },
-  house: [50, 2500, 12000, 50000],
-  exp: [80, 2],
-};
-// Рыбалка с клёвом (только в --proposal): сколько поклёвок в запасе и как быстро прибывают
-const FISHING = { on: false, bites: 10, regen: 6 * 60 };
+const PACE = process.env.PACE ? JSON.parse(process.env.PACE) : null;
+if (PACE) {
+  if (PACE.xp) { const [a, b] = PACE.xp; SIM_FN.xpToNext = (L) => Math.round(a * Math.pow(L, b)); }
+  // ITEMS и SHOP собраны из таблиц при загрузке data.js — цены в них меняем тоже, иначе рынок продаёт по старым
+  for (const [k, [seed, sell, xp]] of Object.entries(PACE.crops || {})) {
+    Object.assign(CROPS[k], { seed, sell, xp });
+    ITEMS[k].sell = sell;
+    const shop = D.SHOP.find((o) => o.item === D.seedId(k));
+    if (shop) shop.price = seed;
+  }
+  for (const [k, sell] of Object.entries(PACE.goods || {})) { CRAFT_GOODS[k].sell = sell; ITEMS[k].sell = sell; }
+  (PACE.house || []).forEach((c, i) => { if (c && HOUSE[i + 2]) HOUSE[i + 2].cost.coins = c; });
+  if (PACE.exp) { const [k, pw] = PACE.exp; SIM_FN.expansionCost = (n) => ({ ...D.expansionCost(n), coins: r5(k * Math.pow(n, pw)) }); }
+  if (PACE.beds) Object.assign(D.BEDS.limit, PACE.beds);
+}
+const FISHING = D.FISHING;
 
 const r5 = (v) => Math.max(5, Math.round(v / 5) * 5);
 const avg = ([a, b]) => (a + b) / 2;
@@ -151,11 +127,11 @@ export function scanLoops() {
   const list = Object.values(FISH), tot = list.reduce((s, f) => s + f.chance, 0);
   const per = (k) => list.reduce((s, f) => s + (f.chance / tot) * (f[k] || 0), 0) * D.FISH_CATCH;
   const fE = per('food') / ENERGY.fish, fC = per('sell') / ENERGY.fish, fX = per('xp') / ENERGY.fish;
-  const gate = FISHING.on ? `клёв: ${FISHING.bites} поклёвок, +1 раз в ${FISHING.regen / 60} мин` : 'нет: рыбачить можно без остановки';
-  add(fE >= 1 || (!FISHING.on && fC > cheapShop.c) ? 'КРИТИЧНО' : 'ok', 'Рыбалка',
+  const gate = FISHING ? `клёв: ${FISHING.bites} поклёвок, +1 раз в ${FISHING.regen / 60} мин` : 'нет: рыбачить можно без остановки';
+  add(fE >= 1 || (!FISHING && fC > cheapShop.c) ? 'КРИТИЧНО' : 'ok', 'Рыбалка',
     `заброс = ${ENERGY.fish} эн. → в среднем ${fE.toFixed(2)} энергии едой, ${fC.toFixed(1)} монет, ${fX.toFixed(2)} опыта. Ограничение: ${gate}. ` +
     (fE >= 1 ? 'Съел рыбу — энергии больше, чем потратил: вечный двигатель (монеты, опыт → уровни → кристаллы). ' : '') +
-    (!FISHING.on && fC > cheapShop.c ? `Даже без еды: 1 энергия на рынке стоит ${cheapShop.c.toFixed(2)} мон. (${ITEMS[cheapShop.k].name}), а рыба приносит ${fC.toFixed(1)} мон. на 1 энергию.` : ''));
+    (!FISHING && fC > cheapShop.c ? `Даже без еды: 1 энергия на рынке стоит ${cheapShop.c.toFixed(2)} мон. (${ITEMS[cheapShop.k].name}), а рыба приносит ${fC.toFixed(1)} мон. на 1 энергию.` : ''));
 
   // --- урожай на еду ---
   for (const c of Object.values(CROPS)) {
@@ -176,7 +152,7 @@ export function scanLoops() {
     const inE = Object.entries(r.need).reduce((s, [id, n]) => s + n * embodied(id), 0);
     const inC = Object.entries(r.need).reduce((s, [id, n]) => s + n * (ITEMS[id] && ITEMS[id].sell || 0), 0);
     const gain = g.food * r.n - inE;
-    add(gain > 0 && FISH[Object.keys(r.need)[0]] && !FISHING.on ? 'ВАЖНО' : gain > 4 ? 'инфо' : 'ok', `Кухня: ${g.name}`,
+    add(gain > 0 && FISH[Object.keys(r.need)[0]] && !FISHING ? 'ВАЖНО' : gain > 4 ? 'инфо' : 'ok', `Кухня: ${g.name}`,
       `сырьё ≈ ${inE.toFixed(1)} эн. и ${inC} мон. → ${g.food * r.n} эн. (${gain >= 0 ? '+' : ''}${gain.toFixed(1)} эн. за ${r.time / 60} мин кухни)`);
   }
   // --- рынок: купить и продать ---
@@ -217,7 +193,7 @@ export function scanLoops() {
     `за монеты ${WHEEL.coins.join('/')} (в день ${WHEEL.coins.length}), за кристаллы ${WHEEL.gems} — без ограничения, но в минус по кристаллам (${ev('gems').toFixed(2)} назад)`);
   // --- заказы ---
   add('ok', 'Доска заказов', `платит ${ORDERS.pay}× цены рынка + опыт; товары (урожай, рыба, плоды) на рынке не купить — перепродажи нет. ` +
-    (!FISHING.on ? 'Но рыба в заказах — ещё один выход для бесконечной рыбалки.' : ''));
+    (!FISHING ? 'Но рыба в заказах — ещё один выход для бесконечной рыбалки.' : ''));
   // --- животные ---
   for (const a of Object.values(ANIMALS)) {
     const prod = ITEMS[a.product].sell * a.n, feedR = Object.values(RECIPES).find((r) => r.item === a.feed);
@@ -248,7 +224,6 @@ class Sim {
     this.orchard = [];  // плодовые: { sp, born, fruitAt }
     this.animals = [];  // { sp, stage, f, t, r }
     this.decor = 0;
-    this.bites = FISHING.bites; this.biteAt = T0;
     this.played = 0;    // мс в игре
     this.mile = {};     // веха → { day, h }
     this.block = {};    // «чего не хватало» → минут в игре
@@ -744,20 +719,11 @@ class Sim {
   // ---------- рыбалка ----------
   fishOnce() {
     const st = this.st;
-    if (FISHING.on) { this.tickBites(); if (this.bites <= 0) return false; }
+    if (!Fish.bitesView(st, this.now).n) return false; // клёв кончился
     if (!this.spend(ENERGY.fish)) return false;
-    if (FISHING.on) this.bites--;
-    if (this.rng() > D.FISH_CATCH) return true;
-    const list = Object.values(FISH), tot = list.reduce((s, f) => s + f.chance, 0);
-    let r = this.rng() * tot, fish = list[0];
-    for (const f of list) if ((r -= f.chance) < 0) { fish = f; break; }
-    Inv.addItem(st, fish.key, 1); this.ev('fish', fish.key); this.addXp(fish.xp);
+    const r = Fish.cast(st, { now: this.now, rng: this.rng });
+    if (r.fish) { Inv.addItem(st, r.fish, 1); this.ev('fish', r.fish); this.addXp(FISH[r.fish].xp); }
     return true;
-  }
-  tickBites() {
-    if (this.bites >= FISHING.bites) { this.biteAt = this.now; return; }
-    const g = Math.floor((this.now - this.biteAt) / (FISHING.regen * SEC));
-    if (g > 0) { this.bites = Math.min(FISHING.bites, this.bites + g); this.biteAt += g * FISHING.regen * SEC; }
   }
 
   // ---------- расчистка ----------
@@ -1015,7 +981,7 @@ function stepsTable(sims, keys) {
 function report() {
   const L = [];
   const p = (s = '') => L.push(s);
-  p(`# Баланс: ${FIXES.length ? 'с правками ' + FIXES.join(', ') : 'как сейчас'}  (карт-прогонов на профиль: ${OPT.seeds}, до ${OPT.days} дней)`);
+  p(`# Баланс: ${PACE ? 'числа игры + PACE ' + JSON.stringify(PACE) : 'числа игры'}  (карт-прогонов на профиль: ${OPT.seeds}, до ${OPT.days} дней)`);
   p();
   p('## 1. Петли и абузы (по таблицам)');
   const { out } = scanLoops();
@@ -1080,6 +1046,4 @@ function report() {
   return L.join('\n');
 }
 
-const FIXES = OPT.proposal ? Object.keys(PATCHES) : OPT.fix ? OPT.fix.split(',') : [];
-for (const k of FIXES) PATCHES[k]();
 console.log(report());
