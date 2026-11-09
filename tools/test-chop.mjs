@@ -4,7 +4,7 @@ import * as Chop from '../src/game/chop.js';
 import * as Flora from '../src/game/flora.js';
 import { Player } from '../src/game/Player.js';
 import { World, N, START_CHUNK, CHUNK, CHUNKS } from '../src/game/World.js';
-import { OBJECTS, FLORA, QUEUE_MAX } from '../src/game/data.js';
+import { OBJECTS, FLORA, QUEUE_MAX, floraSeedId, floraOwnId } from '../src/game/data.js';
 
 let tests = 0;
 const test = (name, fn) => { fn(); tests++; console.log('ok', name); };
@@ -106,6 +106,17 @@ test('удары — только рубка и камни (трава срыв�
   assert.equal(Chop.isHit({ kind: 'mow', obj: o }), false);
   assert.equal(Chop.isHit({ kind: 'walk', x: 1, y: 1 }), false);
   assert.equal(OBJECTS.grass.action, 'mow');
+});
+
+test('саженец плодового дерева: первые плоды — как только выросло; выкопанное взрослое — через regrow', () => {
+  const T0 = 1_000_000_000_000, f = FLORA.persimmon, o = { gx: 5, gy: 6, type: 'persimmon' };
+  const st = { items: { [floraSeedId('persimmon')]: 1, [floraOwnId('persimmon')]: 1 } };
+  assert.ok(Flora.sow(st, 'persimmon', 5, 6, T0));
+  assert.equal(Flora.fruitLeft(st, o, T0), f.grow);
+  assert.equal(Flora.hasFruit(st, o, T0 + f.grow * 1000 - 1000), false);
+  assert.equal(Flora.hasFruit(st, o, T0 + f.grow * 1000), true);
+  assert.ok(Flora.sowGrown(st, 'persimmon', 7, 6, T0));
+  assert.equal(Flora.fruitLeft(st, { gx: 7, gy: 6, type: 'persimmon' }, T0), f.regrow);
 });
 
 console.log(`\n${tests} проверок пройдено`);
