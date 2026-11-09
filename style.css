@@ -606,7 +606,8 @@ body[data-side="2"] .debug { top: calc(var(--safe-t) + 248px); }
 .mb-btns .btn-s.mb-rot { flex: 0 0 46px; padding: 0; }
 .mb-btns .btn-s.mb-rot .ic { width: 26px; height: 26px; margin: 0; }
 body.moving .hud-bottom { display: none; }
-body.moving .toast { bottom: calc(var(--safe-b) + 112px); }
+/* над плашкой перестановки или посадки (её высота — --bar-h, UI.js), с зазором 8 px */
+body.moving .toast, body.planting .toast { bottom: calc(var(--safe-b) + 18px + var(--bar-h, 104px)); }
 .move-bar.shake { animation: mb-shake .32s; }
 @keyframes mb-shake { 20% { transform: translateX(calc(-50% - 6px)); } 45% { transform: translateX(calc(-50% + 5px)); } 70% { transform: translateX(calc(-50% - 3px)); } }
 

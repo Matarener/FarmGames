@@ -82,6 +82,15 @@ export class UI {
     $('#btn-center').onclick = () => { farm.player.worldPos(this._p = this._p || {}); farm.cam.centerOn(this._p.x, this._p.y - 20); };
     $('#energy-pill').onclick = () => this.bagPanel(farm);
     $('#btn-more').onclick = () => this.toggleMore();
+    // плашка перестановки или посадки внизу: сообщения встают над ней, какой бы высоты она ни была
+    // (текст в две-три строки на узком экране) — её высота в --bar-h
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => {
+        const h = Math.max($('#move-bar').offsetHeight, $('#plant-bar').offsetHeight);
+        if (h) document.body.style.setProperty('--bar-h', h + 'px');
+      });
+      ro.observe($('#move-bar')); ro.observe($('#plant-bar'));
+    }
     $('#mb-done').onclick = () => farm.mover.exit();
     $('#mb-cancel').onclick = () => farm.mover.cancel();
     $('#mb-place').onclick = () => farm.mover.place();
