@@ -1,0 +1,78 @@
+[
+  {
+    "name": "gate_marsh_broken",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/gate_marsh.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nEdit the reference image: keep this exact object, the same size, position, isometric angle, colors and art style, but make it ruined and abandoned: the lantern tower has fallen over sideways and lies tilted across the causeway, two posts snapped, the glass panes broken, the lantern dark and empty with no light at all, thick moss and hanging weeds all over it, two fallen willow trunks with bare branches lying across it, some causeway logs missing, the water murky.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "gate_oasis_broken",
+    "replace": true,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/gate_oasis.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nEdit the reference image: keep this exact object, the same size, position, isometric angle, colors and art style, but make it ruined and abandoned: the arches are cracked and half buried in a big pile of sand, one arch partly collapsed with fallen stone blocks, the channel on top broken in the middle and completely dry, the lion spout dry and chipped, the basin dry and full of sand, many mosaic tiles missing, a dry tumbleweed.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "gate_frost_broken",
+    "replace": true,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/gate_frost.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nEdit the reference image: keep this exact object, the same size, position, isometric angle, colors and art style, but make it ruined and abandoned: the whole gatehouse is frozen inside a thick wall of pale blue ice with big icicles, the double gate is closed and covered with frost, the lanterns are dark and frozen, a big snow drift piled against the gate.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "gate_isles_broken",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/gate_isles.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nEdit the reference image: keep this exact object, the same size, position, isometric angle, colors and art style, but make it ruined and abandoned: the balloon has crashed: the torn deflated envelope lies in big folds across the platform, the basket lies broken on its side, ropes are tangled everywhere, some platform planks are broken, the burner is cold.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "gate_marsh_up",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/gate_marsh_broken.png",
+      "assets/source/house_up_3.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nEdit the first reference image: keep this exact ruined object, the same size, position, isometric angle, colors and art style, and show it under repair: light wooden scaffolding with a ladder around it in the style of the second reference image (use the second reference only for the scaffolding style, ignore its house and grass), a few fresh planks and a small toolbox at its foot, half of the damage already fixed: the tower stands upright again, propped by the scaffolding and ropes, the causeway has fresh new logs, the fallen willows are gone, but the glass panes are still missing and the lantern is dark.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "gate_oasis_up",
+    "replace": true,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/gate_oasis_broken.png",
+      "assets/source/house_up_3.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nEdit the first reference image: keep this exact ruined object, the same size, position, isometric angle, colors and art style, and show it under repair: light wooden scaffolding with a ladder around it in the style of the second reference image (use the second reference only for the scaffolding style, ignore its house and grass), a few fresh planks and a small toolbox at its foot, half of the damage already fixed: most of the sand is dug away, the broken arch is being rebuilt with fresh pale stone blocks, the channel is patched but still dry, a small stack of new turquoise tiles lies nearby.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "gate_frost_up",
+    "replace": true,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/gate_frost_broken.png",
+      "assets/source/house_up_3.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nEdit the first reference image: keep this exact ruined object, the same size, position, isometric angle, colors and art style, and show it under repair: light wooden scaffolding with a ladder around it in the style of the second reference image (use the second reference only for the scaffolding style, ignore its house and grass), a few fresh planks and a small toolbox at its foot, half of the damage already fixed: most of the ice is chipped away and ice chunks lie around, the gate is still closed and frosty, the lanterns are dark and empty, a pickaxe leans against the wall.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "gate_isles_up",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/gate_isles_broken.png",
+      "assets/source/house_up_3.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nEdit the first reference image: keep this exact ruined object, the same size, position, isometric angle, colors and art style, and show it under repair: light wooden scaffolding with a ladder around it in the style of the second reference image (use the second reference only for the scaffolding style, ignore its house and grass), a few fresh planks and a small toolbox at its foot, half of the damage already fixed: the basket is fixed and stands upright on the repaired platform, the envelope is being patched and lies half-spread over the scaffolding, the ropes are neatly coiled, the balloon is not inflated yet.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  }
+]

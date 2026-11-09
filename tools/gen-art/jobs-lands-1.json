@@ -1,0 +1,205 @@
+[
+  {
+    "name": "gate_marsh",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/well.png",
+      "assets/source/decor_stone_lamp.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA landmark that guards the passage to a magical night swamp: one tall wooden lantern tower (a small swamp lighthouse) standing at the far end of a short causeway of round logs laid over a small patch of dark teal bog water.\nThe causeway points at the viewer: it runs diagonally along the isometric grid from the lower-right front of the image to the tower at the upper-left back.\nThe tower: four sturdy mossy wooden posts with cross braces and a little ladder, a square lantern room on top with small glass panes and a pointed dark shingle roof with a tiny finial.\nThe lantern is LIT: warm yellow-green light (#E8F27A) glows inside the glass panes. A rope railing on short posts along the causeway, a few cattails and two lily pads at the water edge.\nColors: deep indigo shadows (#2B2F5E), teal water (#2FA9A0), moss green (#4E7A4A), weathered grey-brown wood. Footprint about 2 by 2 isometric tiles; the tower is about two and a half times as tall as it is wide.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nThe light stays inside the glass: no glow halo, no light rays. No grass, no lawn, no ground around the small water patch, no shadow. One object, centered, filling most of the image, with an empty margin around it.",
+    "count": 2
+  },
+  {
+    "name": "gate_oasis",
+    "replace": true,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/well.png",
+      "assets/source/decor_stone_lamp.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA landmark that guards the passage to a sunny desert oasis: one old sandstone aqueduct section with two tall arches on sturdy square pillars, decorated with bands of turquoise mosaic tiles.\nThe aqueduct runs diagonally along the isometric grid from the upper-right to the lower-left of the image, so we see its long side and can look through the arches.\nA stone water channel runs along the top and ends at the lower-left in a carved stone lion-head spout; clear turquoise water flows along the channel and pours from the lion's mouth in a thin stream into a small round stone basin at the foot of the pillar.\nA few soft sand drifts at the base of the pillars, one small terracotta jar beside the basin.\nColors: warm sand (#E9C27A), terracotta (#C8693F), turquoise (#2EC4C0), soft lilac shadows (#9C7BB8). Footprint about 3 by 1 isometric tiles.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it.",
+    "count": 2
+  },
+  {
+    "name": "gate_frost",
+    "replace": true,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/well.png",
+      "assets/source/decor_stone_lamp.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA landmark that guards the passage to a snowy northern valley: one log gatehouse with two short square log towers under small shingle roofs covered with thick snow, joined by a wooden archway with a wide double plank gate between them.\nThe gate wall runs diagonally along the isometric grid from the upper-left to the lower-right of the image, and the gate faces the viewer's lower-left.\nThe gate is OPEN: both doors swung inward, a snowy path is visible through it. Two iron lanterns with warm orange light (#FFB347) inside the glass hang on both sides of the gate. Short icicles along the eaves, a little snow at the foot of the towers.\nColors: white snow (#F4F8FC) with cool blue shadows (#9DB7D8), dark spruce-green trim (#2F5D50), honey-brown logs. Footprint about 2 by 2 isometric tiles.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nThe light stays inside the glass: no glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it.",
+    "count": 2
+  },
+  {
+    "name": "gate_isles",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/well.png",
+      "assets/source/decor_stone_lamp.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA landmark that guards the passage to floating sky islands: one hot-air balloon, fully inflated, floating low just above a small square wooden landing platform and tied to it with ropes.\nA round envelope with pastel vertical stripes in peach (#FFC8A8), lavender (#C9B6F2), mint (#A8E6CF) and cream, with two small sewn patches; a wicker basket with a small brass burner and a few sandbags hanging on its sides.\nThe platform is seen in isometric view (a diamond shape twice as wide as it is tall) on four short stilts, with short wooden posts at its corners where the ropes are tied, and a tiny pennant flag on one post. A small puff of white cloud at one platform corner.\nFootprint about 2 by 2 isometric tiles; the balloon is about twice as tall as the platform is wide.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_marsh_willow",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/tree_pine.png",
+      "assets/source/tree_linden.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA weeping willow from a magical night swamp: a short gnarled dark trunk with a few roots, long drooping curtains of thin branches with narrow blue-green leaves (#2F7F6A and #4E7A4A, deep indigo #2B2F5E in the shade), and many small round pale yellow-green catkins (#E8F27A) hanging along the branches like tiny lanterns. The catkins are painted bright, but without any glow halo. About as tall as the reference spruce, the crown wider than the trunk is tall.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_marsh_reeds",
+    "replace": true,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/boulder_moss.png",
+      "assets/source/pond_decor.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA dense clump of tall swamp cattails and reeds growing from a small mossy tussock: brown velvet cattail heads, long thin blue-green blades (#2F7F6A, #4E7A4A), a few tiny pale yellow-green fireflies (#E8F27A) sitting on the blade tips like little dots, without any glow halo.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_marsh_log",
+    "replace": true,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/boulder_moss.png",
+      "assets/source/pond_decor.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA fallen old mossy log lying on the ground diagonally along the isometric grid, covered with soft green moss, with a cluster of small round-capped mushrooms growing on it: their caps are bright teal (#2FA9A0) and pale yellow-green (#E8F27A) with light dots, painted bright, without any glow halo. A few broken twigs.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_marsh_lilies",
+    "replace": true,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/boulder_moss.png",
+      "assets/source/pond_decor.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA small irregular patch of still dark indigo-teal bog water (#2B2F5E, #2FA9A0) lying flat, seen in isometric view (twice as wide as it is deep), with three round lily pads, two pale moon-lily flowers with silvery-white and pale yellow petals, and a few short reeds at one edge. A flat, low object.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo. No grass or lawn around the water, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_oasis_palm",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/tree_pine.png",
+      "assets/source/tree_linden.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA date palm from a sunny desert oasis: a tall, slightly curved ringed trunk, a crown of long arching feathery green fronds (#3E8E3A, #6BAB06), heavy clusters of orange-brown dates hanging under the crown, warm sunlit colors with soft lilac shadows (#9C7BB8). Taller than the reference spruce.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_oasis_dune",
+    "replace": true,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/boulder_moss.png",
+      "assets/source/pond_decor.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA low sand dune mound with soft curved wind ripples, warm golden sand (#E9C27A) with soft lilac shadows (#9C7BB8), a few dry grass tufts and a tiny pebble on top. A low wide mound lying on the ground, about twice as wide as it is tall.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo. No grass or lawn around the sand, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_oasis_jars",
+    "replace": true,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/well.png",
+      "assets/source/decor_stone_lamp.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA group of three terracotta clay jars (#C8693F) with painted turquoise (#2EC4C0) stripes and zigzags: one tall amphora and one round jar standing, one smaller jar lying tipped over on its side, a coil of rope around the tall jar's neck, a little sand at their feet.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_oasis_cactus",
+    "replace": true,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/boulder_moss.png",
+      "assets/source/pond_decor.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA desert plant group growing from a small mound of golden sand: a tall columnar cactus with two upturned arms, a small round barrel cactus with a little orange-yellow flower on top, and a spiky blue-green agave beside them. Soft lilac shadows (#9C7BB8).\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_frost_spruce",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/tree_pine.png",
+      "assets/source/tree_linden.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA snow-covered spruce from a snowy northern valley: a tall narrow cone of dark blue-green spruce branches (#2F5D50) with thick soft caps of white snow (#F4F8FC) and cool blue shadows (#9DB7D8) lying on every tier, a short brown trunk at the bottom. About as tall as the reference spruce.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_frost_rowan",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/tree_pine.png",
+      "assets/source/tree_linden.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA small rowan tree in winter: a slender grey-brown trunk, bare twisting branches with a few last yellow-orange leaves, many heavy clusters of bright red rowan berries, soft white snow (#F4F8FC, blue shadows #9DB7D8) lying along the branches. Shorter than the reference spruce.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_frost_drift",
+    "replace": true,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/boulder_moss.png",
+      "assets/source/pond_decor.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA big soft snow drift: a low rounded snowy mound of pure white snow (#F4F8FC) with cool blue shadows (#9DB7D8), the top of an old wooden fence post and two dry grass stalks sticking out of it. A low wide mound lying on the ground, about twice as wide as it is tall.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo. No grass or lawn around the snow, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_frost_sled",
+    "replace": true,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/well.png",
+      "assets/source/decor_stone_lamp.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nAn abandoned old wooden sled lying on the ground diagonally along the isometric grid, with curved wooden runners, loaded with a small bundle of firewood tied with rope, covered with a thin layer of snow (#F4F8FC, blue shadows #9DB7D8), a red knitted scarf hanging off one side.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_isles_cloud",
+    "replace": true,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/boulder_moss.png",
+      "assets/source/pond_decor.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA low fluffy cloud bank resting on the ground like a soft cushion: big round white puffs with soft lavender (#C9B6F2) and peach (#FFC8A8) shading underneath. A low wide object, about twice as wide as it is tall.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_isles_kite_tree",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/tree_pine.png",
+      "assets/source/tree_linden.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA small round airy tree from floating sky islands: a slender pale trunk and a light rounded crown of mint-green leaves (#A8E6CF, #6FCF97) with a few tiny white blossoms; a diamond-shaped kite in peach (#FFC8A8) and lavender (#C9B6F2) is caught in the crown, its long ribbon tail with little bows tangled in the branches. Shorter than the reference spruce.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_isles_island",
+    "replace": true,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/boulder_moss.png",
+      "assets/source/pond_decor.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA small floating sky island: an upside-down cone of lavender-grey rock (#C9B6F2) and brown earth hanging in the air, a flat top of mint-green grass (#A8E6CF) with one small round tree and a tiny white cottage with a peach roof (#FFC8A8), a thin waterfall falling off one edge and dissolving into a little white cloud below the island.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  },
+  {
+    "name": "biome_isles_pinwheel",
+    "replace": true,
+    "size": "1024x1536",
+    "refs": [
+      "assets/source/well.png",
+      "assets/source/decor_stone_lamp.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights.\nA tall wooden pole with a big wind pinwheel (whirligig) on top: six curved blades in peach (#FFC8A8), lavender (#C9B6F2) and mint (#A8E6CF), a little tail vane, colorful ribbons fluttering from the pole and a small brass wind bell. The pole is perfectly vertical and stands in a small pile of stones.\nSeen in the same isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally), lit from the top-left.\nNo glow halo, no light rays. No grass, no lawn, no ground patch, no shadow. One object, centered, filling most of the image, with an empty margin around it."
+  }
+]
