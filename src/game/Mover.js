@@ -1,8 +1,10 @@
 // Режим перестановки: свои объекты (дом, починенный колодец, пустые грядки, тропинки,
-// посаженные игроком деревья и кусты, потом декор) можно переносить по открытой земле.
+// посаженные игроком деревья и кусты, свои постройки — поливалки, потом декор) можно переносить по открытой земле.
 // Деревья, камни, пруд и прочее «чужое» не двигается.
-// Дорожки и свои растения можно убрать в рюкзак («В рюкзак»), а нажатием на пустую траву —
+// Дорожки, свои растения и постройки можно убрать в рюкзак («В рюкзак»), а нажатием на пустую траву —
 // поставить обратно из рюкзака.
+// «Ставим постройку» (place, кнопка «Поставить» у постройки в рюкзаке): постройка из рюкзака выбрана, как
+// будто её переносят; нажатие на клетку показывает предпросмотр, второе нажатие или «Поставить» — ставит.
 // «Кладём дорожку» (pave, кнопка «Поставить» у дорожки в рюкзаке и на рынке): каждое нажатие на траву
 // кладёт клетку выбранной дорожки, нажатие на дорожку другого вида меняет её (старая — в рюкзак).
 //
@@ -14,7 +16,8 @@ import { OBJECTS, FLORA, ITEMS, PATHS } from './data.js';
 import * as Flora from './flora.js';
 import * as Inv from './inventory.js';
 import * as Paths from './paths.js';
-import { N, T } from './World.js';
+import * as Placed from './placed.js';
+import { N, T, objCells } from './World.js';
 import { toWorld } from '../engine/Iso.js';
 
 const tmp = { x: 0, y: 0 };
@@ -26,7 +29,7 @@ export class Mover {
   constructor(farm) {
     this.f = farm;
     this.active = false;
-    this.sel = null;   // { kind: 'obj'|'bed', o?, b?, name, w, h, gx, gy }
+    this.sel = null;   // { kind: 'obj'|'bed'|'path'|'bag', o?, b?, id? (предмет из рюкзака), name, w, h, gx, gy, cells? }
     this.to = null;    // { gx, gy, ok, why }
     this.brush = null; // id дорожки в режиме «Кладём дорожку»
   }
@@ -85,6 +88,11 @@ export class Mover {
     }
     if (o) {
       if (!w.isOpen(o.gx, o.gy)) return { why: 'Этот участок ещё не открыт' };
+      if (o.placed) {
+        if (this.busy({ obj: o })) return { why: 'Призрачок сейчас работает здесь, подождите' };
+        const def = OBJECTS[o.type];
+        return { sel: { kind: 'obj', o, placed: true, store: true, name: def.name, w: o.w, h: o.h, gx: o.gx, gy: o.gy, cells: objCells(def) } };
+      }
       if (o.own) {
         if (this.busy({ obj: o })) return { why: 'Призрачок сейчас работает здесь, подождите' };
         const name = o.type === 'sapling' ? `Росток (${FLORA[o.tree].name.toLowerCase()})` : FLORA[o.type].name;
@@ -117,7 +125,7 @@ export class Mover {
       if (this.busy({ x: gx, y: gy })) return { why: 'Призрачок сейчас работает с этой грядкой, подождите' };
       return { sel: { kind: 'bed', b, name: 'Грядка', w: 1, h: 1, gx, gy } };
     }
-    return { empty: true, why: 'Здесь пусто. Нажмите на дом, колодец, грядку, дорожку или своё растение' };
+    return { empty: true, why: 'Здесь пусто. Нажмите на дом, колодец, грядку, дорожку, поливалку или своё растение' };
   }
 
   // Текущее действие призрачка касается этого места?
@@ -132,31 +140,43 @@ export class Mover {
   check(gx, gy) {
     const f = this.f, w = f.world, s = this.sel, p = f.player;
     if (gx === s.gx && gy === s.gy) return { ok: false, why: 'Объект уже стоит здесь' };
-    const own = (x, y) => x >= s.gx && x < s.gx + s.w && y >= s.gy && y < s.gy + s.h;
+    const solid = s.kind === 'obj' || s.kind === 'bag'; // объект на клетках (не дорожка и не грядка)
+    const own = this.cellSet(s.gx, s.gy);
     const a = p.current && p.current.kind !== 'walk' ? p.current : null;
     const next = p.path && p.path[0];
-    for (let y = gy; y < gy + s.h; y++) for (let x = gx; x < gx + s.w; x++) {
+    for (const [dx, dy] of objCells(s)) {
+      const x = gx + dx, y = gy + dy;
       if (!w.inside(x, y)) return { ok: false, why: 'Сюда нельзя: это край фермы' };
       if (!w.isOpen(x, y)) return { ok: false, why: 'Сюда нельзя: участок ещё не открыт' };
       const i = w.idx(x, y), t = w.tiles[i];
-      if (s.kind === 'obj' && own(x, y)) continue;
+      if (s.kind === 'obj' && own.has(i)) continue;
       if (t === T.WATER) return { ok: false, why: 'Сюда нельзя: здесь вода' };
       if (t === T.PATH) return { ok: false, why: 'Сюда нельзя: здесь дорожка' };
       if (t === T.SOIL) return { ok: false, why: 'Сюда нельзя: здесь уже грядка' };
       const o = w.occ[i] >= 0 ? w.objects[w.occ[i]] : null;
       if (o && o !== s.o) return { ok: false, why: `Сюда нельзя: мешает ${((OBJECTS[o.type] || {}).name || 'объект').toLowerCase()}` };
-      if (s.kind === 'obj' && ((x === p.tx && y === p.ty) || (next && x === next[0] && y === next[1]))) return { ok: false, why: 'Сюда нельзя: здесь стоит призрачок' };
+      if (solid && ((x === p.tx && y === p.ty) || (next && x === next[0] && y === next[1]))) return { ok: false, why: 'Сюда нельзя: здесь стоит призрачок' };
       if (a && !a.obj && a.x === x && a.y === y) return { ok: false, why: 'Сюда нельзя: призрачок здесь работает' };
     }
-    if (s.kind === 'obj' && this.cutsOff(gx, gy)) return { ok: false, why: 'Сюда нельзя: так закроется проход' };
+    if (solid && this.cutsOff(gx, gy)) return { ok: false, why: 'Сюда нельзя: так закроется проход' };
+    // правила самой постройки (например, не хватает материалов) — placed.js
+    if (s.kind === 'bag') { const why = Placed.placeWhy(f.st, w, s.id, gx, gy, { now: Date.now() }); if (why) return { ok: false, why }; }
     return { ok: true };
+  }
+
+  // Клетки выбранного объекта, если его левый верхний угол — (gx, gy): номера клеток (за краем карты — без них)
+  cellSet(gx, gy) {
+    const w = this.f.world, out = new Set();
+    for (const [dx, dy] of objCells(this.sel)) if (w.inside(gx + dx, gy + dy)) out.add(w.idx(gx + dx, gy + dy));
+    return out;
   }
 
   // Не отрежет ли постройка часть открытой земли от призрачка
   cutsOff(gx, gy) {
     const f = this.f, w = f.world, s = this.sel, p = f.player;
-    const inNew = (x, y) => x >= gx && x < gx + s.w && y >= gy && y < gy + s.h;
-    const inOld = (x, y) => x >= s.gx && x < s.gx + s.w && y >= s.gy && y < s.gy + s.h;
+    const nw = this.cellSet(gx, gy), old = this.cellSet(s.gx, s.gy);
+    const inNew = (x, y) => nw.has(w.idx(x, y));
+    const inOld = (x, y) => old.has(w.idx(x, y));
     const count = (walk) => {
       const seen = new Uint8Array(N * N), st = [[p.tx, p.ty]];
       seen[w.idx(p.tx, p.ty)] = 1;
@@ -179,7 +199,7 @@ export class Mover {
     });
     // старое место освобождается (+площадь), новое занимается (−площадь);
     // ставим из рюкзака (старого места нет) — земли честно становится меньше на площадь
-    return after < before - (s.gx < 0 ? s.w * s.h : 0);
+    return after < before - (s.gx < 0 ? nw.size : 0);
   }
 
   // ---------- нажатия ----------
@@ -195,7 +215,7 @@ export class Mover {
       return this.hint();
     }
     // нажали на сам выбранный объект без цели — снять выбор
-    const own = gx >= s.gx && gx < s.gx + s.w && gy >= s.gy && gy < s.gy + s.h;
+    const own = s.kind !== 'bag' && this.f.world.inside(gx, gy) && this.cellSet(s.gx, s.gy).has(this.f.world.idx(gx, gy));
     if (own && !this.to) { this.cancel(); return; }
     // большой объект: нажатая клетка — его середина
     const tx = gx - ((s.w - 1) >> 1), ty = gy - ((s.h - 1) >> 1);
@@ -227,10 +247,12 @@ export class Mover {
     const c = this.check(t.gx, t.gy);
     if (!c.ok) { t.ok = false; t.why = c.why; this.fail(c.why); return false; }
     if (s.kind === 'bed' && s.b.crop) { this.fail('На грядке уже растёт урожай'); this.cancel(); return false; }
+    if (s.kind === 'bag') return this.placeFromBag(t.gx, t.gy);
     if (s.kind === 'obj') {
       if (s.plant) Flora.moveOwn(f.st, s.o, t.gx, t.gy);
+      if (s.placed) Placed.moveObj(f.st, s.o, t.gx, t.gy);
       w.moveObject(s.o, t.gx, t.gy);
-      if (!s.plant) { f.st.pos = f.st.pos || {}; f.st.pos[s.o.type] = [t.gx, t.gy]; }
+      if (!s.plant && !s.placed) { f.st.pos = f.st.pos || {}; f.st.pos[s.o.type] = [t.gx, t.gy]; }
       f.burst(s.o.wx, s.o.wy - 6, '#e8d9a8', 14);
     } else if (s.kind === 'path') {
       // клетка дорожки переезжает (вид тот же), на старом месте — обычная трава
@@ -272,6 +294,14 @@ export class Mover {
       items = [{ id: k, n: 1 }];
       f.dropFx({ wx: tmp.x, wy: tmp.y }, items);
       f.burst(tmp.x, tmp.y, PATHS[k].dust, 8);
+    } else if (s.placed) {
+      const o = s.o;
+      if (w.objects[o.id] !== o) { this.cancel(); return false; }
+      if (this.busy({ obj: o })) { this.fail('Призрачок сейчас работает здесь, подождите'); return false; }
+      const r = Placed.storeObj(f.st, w, o, { now: Date.now() });
+      if (r.why) { this.fail(r.why); return false; }
+      f.dropFx(o, [{ id: r.id, n: 1 }]);
+      f.burst(o.wx, o.wy - 4, '#e8d9a8', 10);
     } else {
       const o = s.o;
       if (w.objects[o.id] !== o) { this.cancel(); return false; }
@@ -313,6 +343,8 @@ export class Mover {
   putFromBag(id, gx, gy) {
     const f = this.f, w = f.world, it = ITEMS[id];
     if (!it || !Inv.count(f.st, id)) { this.brush = null; this.hint(); return false; }
+    // постройка: сначала предпросмотр на этой клетке (у поливалки видно, что она польёт), потом «Поставить»
+    if (it.place === 'obj') return this.takeFromBag(id, gx, gy);
     toWorld(gx + 0.5, gy + 0.5, tmp);
     // дорожка на дорожку другого вида: меняем (старая — в рюкзак)
     const was = it.place === 'path' && w.inside(gx, gy) && w.isOpen(gx, gy) ? Paths.kindAt(w, w.idx(gx, gy)) : null;
@@ -343,6 +375,41 @@ export class Mover {
     }
     f.sfx('dig');
     this.hint(`${it.name}: поставлено`);
+    f.changed();
+    return true;
+  }
+
+  // «Ставим постройку»: предмет id из рюкзака выбран, как будто его переносят (kind 'bag'). Нажатие на клетку —
+  // предпросмотр, второе нажатие или «Поставить» — ставит. gx, gy — сразу показать предпросмотр здесь.
+  takeFromBag(id, gx, gy) {
+    const f = this.f, type = Placed.objOf(id), it = ITEMS[id];
+    if (!type || !Inv.count(f.st, id)) return false;
+    if (!this.active) this.enter();
+    const def = OBJECTS[type];
+    this.brush = null; this.to = null;
+    this.sel = { kind: 'bag', id, name: it.name, w: def.w || 1, h: def.h || 1, gx: -9, gy: -9, cells: objCells(def) };
+    if (gx != null) {
+      const tx = gx - ((this.sel.w - 1) >> 1), ty = gy - ((this.sel.h - 1) >> 1), c = this.check(tx, ty);
+      this.to = { gx: tx, gy: ty, ok: c.ok, why: c.why };
+    }
+    f.sfx('pop');
+    this.hint();
+    return true;
+  }
+
+  // Поставить выбранную из рюкзака постройку на (gx, gy) (проверено check). Есть ещё такие — выбор остаётся.
+  placeFromBag(gx, gy) {
+    const f = this.f, w = f.world, s = this.sel;
+    const r = Placed.placeObj(f.st, w, s.id, gx, gy, { now: Date.now() });
+    if (r.why) { this.to.ok = false; this.to.why = r.why; this.fail(r.why); return false; }
+    const o = r.o;
+    f.burst(o.wx, o.wy - 6, '#e8d9a8', 14);
+    f.sfx('dig');
+    f.placedFx(o);
+    const n = Inv.count(f.st, s.id);
+    this.to = null;
+    if (n) this.hint(`${s.name}: поставлено. Есть ещё ${n} — нажмите на клетку, куда поставить`);
+    else { this.sel = null; this.hint(`${s.name}: поставлено`); }
     f.changed();
     return true;
   }

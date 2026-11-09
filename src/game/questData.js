@@ -6,7 +6,8 @@
 //   who    — 'ghost' говорит призрачок, 'note' — записка бабушки Марфы
 //   goal   — { ev, key?, group?, n } — счётчик событий игры (Farm → quests.emit):
 //            harvest, plant, water, fish, chop, stump, mine, dig, mow, pick, sow, sell, earn (монеты с рынка),
-//            buy, expand. key — точный ключ (культура, рыба, вид дерева), group — группа ключей (GROUPS в questRules.js)
+//            buy, expand, place (свою постройку из рюкзака: key — её тип).
+//            key — точный ключ (культура, рыба, вид дерева), group — группа ключей (GROUPS в questRules.js)
 //            { state, n } — значение из состояния: house (уровень дома), well (колодец), level (уровень игрока)
 //   goals  — несколько целей сразу: [{ ...goal, task }]
 //   reward — { coins, gems, xp, items: { id: n } }; xp по умолчанию QUEST_XP
@@ -115,6 +116,15 @@ export const QUESTS = {
       id: 'garden.beet', title: 'Свекольник', who: 'note', level: 3,
       text: '«Свёклу сажай поглубже и поливай почаще: тогда она сладкая, как мёд. Из неё выйдет отличный борщ! Бабушка Марфа»',
       task: 'Собери 5 свёклы', goal: { ev: 'harvest', key: 'beet', n: 5 }, reward: { coins: 40 },
+    },
+    {
+      id: 'garden.sprinkler', title: 'Сам себе дождик', who: 'note', level: 3,
+      text: '«Бегать с лейкой к каждой грядке — так и спину сорвать недолго. На рынке продают поливалки: поставь её рядом с грядками, и они будут поливаться сами, даже пока тебя нет. Бабушка Марфа»',
+      goals: [
+        { ev: 'buy', group: 'sprinkler', n: 1, task: 'Купи на рынке поливалку (раздел «Постройки»)' },
+        { ev: 'place', group: 'sprinkler', n: 1, task: 'Поставь её рядом с грядками' },
+      ],
+      reward: { coins: 30 },
     },
     {
       id: 'garden.cabbage', title: 'Капустные кочаны', who: 'ghost', level: 4,
