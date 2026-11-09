@@ -11,6 +11,7 @@ import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Gifts } from './gifts.js';
 import { Wheel } from './wheel.js';
+import { Achievements } from './achievements.js';
 import { Orders } from './orders.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
@@ -43,6 +44,7 @@ export class Farm {
     this.quests = new Quests(this);
     this.gifts = new Gifts(this);
     this.wheel = new Wheel(this);
+    this.ach = new Achievements(this);
     this.orders = new Orders(this);
     // Режим тестера (окно «Настройки»): монеты, кристаллы, предметы, энергия и проверка заданий —
     // сдвиг часов заданий и событие. Включается ?debug в адресе или нажатиями по строке версии.
@@ -405,7 +407,7 @@ export class Farm {
     };
   }
 
-  changed() { this.syncBars(); this.quests.check(); this.syncHint(); this.ui.update(this); this.save.schedule(() => this.serialize()); }
+  changed() { this.syncBars(); this.quests.check(); this.ach.check(); this.syncHint(); this.ui.update(this); this.save.schedule(() => this.serialize()); }
 
   // Подсказка к заданию (hints.js): куда показать стрелку. Считается после каждого действия и раз
   // в секунду; this.hint — цель или null, hintV растёт, когда цель сменилась (сцена начинает новый прыжок).
@@ -1019,7 +1021,8 @@ export class Farm {
         const o = this.plantOwn(a.species, a.x, a.y, a.grown);
         if (!o) return false;
         this.burst(o.wx, o.wy, '#7ccf4f', 8);
-        this.quests.emit('sow', a.species);
+        // своё взрослое растение из рюкзака пересадили — это не посадка ростка (задания и «Лесник» не считают)
+        this.quests.emit(a.grown ? 'replant' : 'sow', a.species);
         this.sfx('plant');
         this.addXp(1);
         this.changed();
@@ -1239,6 +1242,7 @@ export class Farm {
       this.floraTick(now); t = pf.part('растения', t);
       this.wildTick(now); t = pf.part('поросль', t);
       this.quests.tick(); t = pf.part('задания', t);
+      this.ach.tick(); t = pf.part('достижения', t);
       this.orders.tick(); t = pf.part('заказы', t);
       this.syncHint(); t = pf.part('подсказка', t);
       this.ui.tick(this); t = pf.part('интерфейс', t);

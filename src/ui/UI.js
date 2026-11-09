@@ -9,6 +9,7 @@ import * as R from '../game/questRules.js';
 import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ, MAX_PINS } from '../game/questData.js';
 import { GIFT_TABS, DAILY_GIFT } from '../game/giftData.js';
 import { WHEEL } from '../game/wheelData.js';
+import { ACH_GROUPS, ACH_MEDALS } from '../game/achData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 import * as Dev from '../game/devRules.js';
@@ -132,6 +133,7 @@ export class UI {
     const pct = Math.min(100, (st.xp / xpToNext(st.level)) * 100).toFixed(1) + '%';
     if (this.last.xp !== pct) { this.last.xp = pct; $('#hud-xp').style.width = pct; }
     this.questCards(f);
+    this.moreBadge(f);
     this.marketBadge(f);
     this.giftTick(f, false);
     this.wheelTick(f, false);
@@ -447,6 +449,7 @@ export class UI {
       () => this.housePanel(f),
       () => this.giftPanel(f),
       () => this.wheelPanel(f),
+      () => this.achPanel(f),
       () => this.settingsPanel(f),
       () => { this.closePanel(); this.toggleMore(true); },
       () => { this.toggleMore(false); this.popup(this.root.clientWidth / 2, this.root.clientHeight / 2, { title: 'Дуб', text: 'Срубить', cost: { wood: 1 }, items: [{ icon: 'axe', label: 'Срубить', sub: '1', onClick() {} }] }); },
@@ -512,11 +515,11 @@ export class UI {
       { label: 'Дом', icon: 'house', open: () => this.housePanel(f) },
       { label: 'Подарки', icon: 'gift', open: () => this.giftPanel(f, 'daily'), dot: f.gifts.available() > 0 },
       { label: 'Колесо', icon: 'wheel', open: () => this.wheelPanel(f), dot: f.wheel.freeLeft() > 0 },
+      { label: 'Достижения', icon: 'trophy', open: () => this.achPanel(f), dot: f.ach.available() > 0 },
       { label: 'Настройки', icon: 'gear', open: () => this.settingsPanel(f) },
       { label: 'Животные', icon: 'paw', soon: true },
       { label: 'Мастерская', icon: 'build', soon: true },
       { label: 'Декор', icon: 'decor', soon: true },
-      { label: 'Достижения', icon: 'trophy', soon: true },
     ];
   }
 
@@ -730,7 +733,7 @@ export class UI {
   // Проверка заданий без ожидания настоящих дат (режим тестера или ?debug в адресе)
   devQuests(f, body) {
     const d = f.dev, now = f.quests.ctx().now;
-    body.appendChild(h('div', 'pn-sub', 'Проверка заданий, подарков, колеса и заказов'));
+    body.appendChild(h('div', 'pn-sub', 'Проверка заданий, подарков, колеса, заказов и достижений'));
     body.appendChild(h('div', 'pn-text', `Время заданий: ${new Date(now + QUEST_TZ * 3600e3).toISOString().slice(0, 16).replace('T', ' ')} МСК` +
       `${d.shift ? ` (сдвиг ${Math.round(d.shift / 3600e3)} ч)` : ''} · событие: ${d.event ? EVENT_NAME(d.event) : 'по датам'}`));
     const row = h('div', 'gfx-row');
@@ -741,6 +744,7 @@ export class UI {
     btn('Событие', () => { const i = EVENTS.findIndex((e) => e.id === d.event); f.setDev({ event: i + 1 < EVENTS.length ? EVENTS[i + 1].id : null }); });
     btn('Подарки заново', () => f.gifts.devReset());
     btn('Колесо заново', () => f.wheel.devReset());
+    btn('Достижения заново', () => f.ach.devReset());
     btn('Заказы заново', () => f.orders.devReset());
     body.appendChild(row);
   }
@@ -958,6 +962,70 @@ export class UI {
     this.sfx(r.reward.big ? 'level' : 'coin');
     f.player.celebrate();
     this.update(f);
+  }
+
+  // ---------- Достижения ----------
+  // Кружок на кнопке «Ещё»: сколько достижений ждут, чтобы забрали награду (других кнопок у них нет)
+  moreBadge(f) {
+    const n = f.ach.available();
+    if (this.last.moreN === n) return;
+    this.last.moreN = n;
+    const b = $('#more-badge');
+    if (b) { b.hidden = !n; b.textContent = n; }
+  }
+
+  achTier(v, medal) {
+    this.toast(`Достижение «${v.name}»: ${ACH_MEDALS[medal - 1]} медаль!`, 'good');
+  }
+
+  // Окно «Достижения»: сверху — сколько медалей получено (и «Забрать всё», если наград несколько),
+  // ниже — достижения по разделам. В строке: медаль (цвет — забранная ступень), звёзды ступеней,
+  // цель ступени с полоской (взятой, пока её награду не забрали, иначе следующей), справа — награда и «Забрать».
+  achPanel(f) { this.openPanel('ach', 'Достижения', (body) => this.achBody(f, body)); }
+
+  achBody(f, body) {
+    const vs = f.ach.views(), S = f.ach.summary(vs);
+    const top = h('div', 'ach-sum', `${this.ic('trophy', 'ic')}<div class="ach-sum-t"><b>Медали: ${S.got} из ${S.total}</b>` +
+      `<div class="qc-bar"><i style="width:${(S.got / S.total) * 100}%"></i></div></div>`);
+    if (S.can > 1) {
+      const b = h('button', 'btn-s gold', `Забрать всё (${S.can})`);
+      b.onclick = () => this.achClaim(f, null);
+      top.appendChild(b);
+    }
+    body.appendChild(top);
+    for (const g of ACH_GROUPS) {
+      const list = vs.filter((v) => v.group === g.key);
+      if (!list.length) continue;
+      body.appendChild(h('div', 'pn-sub', g.name));
+      for (const v of list) body.appendChild(this.achRow(f, v));
+    }
+  }
+
+  achRow(f, v) {
+    const stars = Array.from({ length: v.tiers }, (_, i) => `<s class="${i < v.got ? 'on' : i < v.reached ? 'can' : ''}">★</s>`).join('');
+    const bar = v.complete ? '<div class="ach-max">Все медали получены!</div>' :
+      `<div class="qc-row"><div class="qc-bar"><i style="width:${v.frac * 100}%"></i></div><span class="qc-n">${v.can ? '✓' : `${fmtNum(v.p)}/${fmtNum(v.n)}`}</span></div>`;
+    const row = h('div', 'ql-row ach-row' + (v.can ? ' done' : '') + (v.complete ? ' max' : ''),
+      `<div class="ach-ic t${v.medal}">${this.ic(v.icon, 'ic')}</div>` +
+      `<div class="ql-t"><i>${v.name}<span class="ach-st">${stars}</span></i>` +
+      `${v.complete ? '' : `<b>${v.task.replace(/(\d+) /g, '$1 ')}</b>`}${bar}</div>`);
+    if (v.reward) {
+      const side = h('div', 'ach-side', `<div class="ach-rw">${this.rewardHtml(v.reward).replace(/ (?=<img)/g, ' ')}</div>`);
+      if (v.can) {
+        const b = h('button', 'btn-s gold ql-get', 'Забрать');
+        b.onclick = () => this.achClaim(f, v.id);
+        side.appendChild(b);
+      }
+      row.appendChild(side);
+    }
+    return row;
+  }
+
+  achClaim(f, id) {
+    const r = f.ach.claim(id);
+    if (!r) return;
+    this.toast(`${id ? `«${r.view.name}»: ` : ''}+${this.rewardHtml(r.reward)}`, 'good');
+    this.refreshPanel();
   }
 
   housePanel(f) {
