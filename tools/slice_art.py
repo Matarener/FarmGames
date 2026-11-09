@@ -60,6 +60,14 @@ SINGLE = {
     'house_1': -132, 'house_2': -132, 'house_3': -132, 'house_4': -132, 'house_5': -132,
 }
 SHEETS.update({name: [(name, w)] for name, w in SINGLE.items()})
+# Постройки без «пятачка» травы (поливалки): одна на картинку, масштаб — по высоте в мире; опора — середина
+# клетки: по x — середина нижней части (столбик, ножки), по y — на lift единиц выше самого низа
+# (у треноги задняя ножка стоит выше передних: середина клетки — между ними).
+PROPS = {
+    'sprinkler_drip': {'h': 30, 'lift': 3},
+    'sprinkler_spin': {'h': 38, 'lift': 4},
+    'sprinkler_rain': {'h': 46, 'lift': 6},
+}
 # молодое растение по высоте взрослого: по умолчанию — <имя без _young>
 YOUNG_OF = {'tree_cherry_young': 'tree_cherry_bare'}  # молодая вишня — по цветущей
 # Урожай: каждая стадия (0–3) — своя картинка crop_<культура>_<стадия>.png. Растения заполняют
@@ -340,6 +348,22 @@ def main(only=None):
             # опора — центр ромба основания (низ минус четверть ширины)
             save(img, name, W, H, bx * k, (by - bw / 4) * k, man)
             print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
+
+    for name, pr in PROPS.items():
+        if only and name not in only: continue
+        if not os.path.exists(os.path.join(SRC, name + '.png')): continue
+        a = load(name)
+        (y0, y1, x0, x1, i), = components(a, 1)[0]
+        crop = a[y0:y1, x0:x1].copy()
+        m = crop[..., 3] > 128
+        ys = np.where(m.any(1))[0]
+        low = m[int(ys[-1] - (ys[-1] - ys[0]) * 0.15):]  # нижние 15%: на чём стоит
+        xs = np.where(low.any(0))[0]
+        k = pr['h'] / (y1 - y0)  # мир/пиксель
+        W, H = (x1 - x0) * k, (y1 - y0) * k
+        img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
+        save(img, name, W, H, (xs[0] + xs[-1]) / 2 * k, ys[-1] * k - pr['lift'], man)
+        print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
 
     # Грядки: объёмный ромб (верх + бортик). Ширина — по краям картинки, центр ромба —
     # строка самой левой точки (левый угол верхней грани).
