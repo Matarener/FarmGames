@@ -1502,7 +1502,8 @@ export class UI {
       const own = it.blueprint && BR.owned(st, it.blueprint); // здание уже есть — чертёж больше не нужен
       const c = h('button', 'mk-cell' + (locked ? ' locked' : '') + (M.sel === o.item ? ' sel' : ''),
         `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${locked ? this.ic('lock', 'mk-lock') : ''}${o.qty > 1 ? `<b>×${o.qty}</b>` : ''}</i>` +
-        `<span>${locked ? (o.level === Infinity ? 'всё' : `с ${o.level} ур.`) : own ? 'построено' : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
+        (own ? '<span class="mk-own">✓ есть</span>' // «построено» не помещалось под клеткой на узком экране
+          : `<span>${locked ? (o.level === Infinity ? 'всё' : `с ${o.level} ур.`) : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`));
       c.title = it.name;
       c.onclick = () => this.pick(M, o.item);
       g.appendChild(c);
