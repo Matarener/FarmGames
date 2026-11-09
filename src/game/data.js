@@ -303,7 +303,7 @@ for (const f of Object.values(FLORA)) ITEMS[floraOwnId(f.key)] = {
   key: floraOwnId(f.key), name: f.name + (f.kind === 'tree' ? ' (взрослое)' : ' (взрослый куст)'), icon: floraOwnId(f.key), tabs: ['plants'], floraOf: f.key, grown: true, sell: f.ownSell,
   desc: `Ваше выкопанное растение. Посадите на свободную траву — встанет сразу взрослым` + (f.pick ? `, первые плоды через ${fmtMin(f.regrow)}` : '') + '. Можно и в режиме «Переставить».',
 };
-// Еда из магазина: её не выращивают и не продают, зато она даёт больше энергии
+// Еда из магазина: её не выращивают, зато она даёт больше энергии. Не продаётся — кроме молока (sell): его даёт своя корова
 export const SHOP_FOOD = {
   milk:  { name: 'Молоко',  food: 6,  price: 10, level: 1, sell: 8, desc: 'Свежее молоко из деревни, а от своей коровы — парное.' },
   bread: { name: 'Хлеб',    food: 10, price: 18, level: 2, desc: 'Тёплый хлеб из пекарни.' },
