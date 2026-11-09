@@ -46,6 +46,7 @@ export const HINT_STEPS = {
   earn: ['market', 'ripe', 'thirsty', 'empty', 'wait'],
   sellFish: ['market', 'pond'],
   buy: ['shop'],
+  place: ['place'],
   expand: ['chunk'],
   well: ['well'],
   house: ['house'],
@@ -267,6 +268,12 @@ const STEP = {
     return null;
   },
   shop: () => ({ step: 'shop', kind: 'ui', ui: 'market' }),
+  // поставить свою постройку: она есть в рюкзаке — к рюкзаку («Поставить» в карточке), нет — на рынок
+  place: (c) => {
+    const G = c.group && GROUPS[c.group];
+    const has = Object.entries(c.st.items).some(([id, n]) => n > 0 && ITEMS[id] && ITEMS[id].place === 'obj' && (c.key ? id === c.key : !G || G(id)));
+    return { step: 'place', kind: 'ui', ui: has ? 'bag' : 'market' };
+  },
 
   // бабушкин колодец: сначала то, чего не хватает на починку
   well: (c, depth) => {

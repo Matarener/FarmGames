@@ -2,7 +2,7 @@
 // игра не открывается, пока не загружены все картинки, чтобы в игре не было подгрузок.
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
-import { FLORA, PATHS, PATH_KEYS, PONDS, POND_DECOR, pondDecorId } from './data.js';
+import { FLORA, PATHS, PATH_KEYS, PONDS, POND_DECOR, pondDecorId, SPRINKLERS } from './data.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
@@ -84,6 +84,14 @@ export async function loadArt(onProgress) {
     return { key: k, grassy: !!p.grassy, tiles: [t, A[p.tile + '_2'] || t] };
   });
   for (const p of paths) try { floraIcons[p.key] = iconOf(p.tiles[0]); } catch (e) { /* */ }
+  // поливалки (data.js SPRINKLERS): картинка по ключу вида, иконка на рынке и в рюкзаке — сама поливалка
+  // (если художник не нарисовал отдельную ic_<вид>)
+  const sprinkler = {};
+  for (const k of Object.keys(SPRINKLERS)) {
+    if (!A[k]) continue;
+    sprinkler[k] = A[k];
+    if (!icons[k]) try { floraIcons[k] = iconOf(A[k]); } catch (e) { /* */ }
+  }
   // пруды (data.js PONDS): одна картинка на пруд (tools/pond_art.py), иконка в рюкзаке и на рынке — сам пруд
   const ponds = {};
   for (const k of Object.keys(PONDS)) {
@@ -117,7 +125,7 @@ export async function loadArt(onProgress) {
   // дикая высокая трава: grass_tall_0, grass_tall_1, ...
   const wildGrass = Object.keys(A).filter((n) => /^grass_tall_\d+$/.test(n)).sort().map((n) => A[n]);
   return {
-    wildGrass, fog, obj, crops, icons, flora, floraIcons, ponds,
+    wildGrass, fog, obj, crops, icons, flora, floraIcons, ponds, sprinkler,
     sprouts: { tree: A.sprout_tree, bush: A.sprout_bush }, // ростки посаженных растений
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {

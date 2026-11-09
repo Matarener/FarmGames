@@ -1269,8 +1269,8 @@ export class UI {
       b.disabled = st[curKey] < q * o.price; b.onclick = () => f.buy(o, q);
       acts.appendChild(b);
       // купленную дорожку — сразу класть: окно закрывается, включается «Кладём дорожку»;
-      // пруд и украшение пруда — ставить: выбраны в «Переставить», нажатие на клетку — предпросмотр
-      if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor') && have) {
+      // пруд, украшение пруда, постройку (поливалку) — ставить: выбраны в «Переставить», нажатие на клетку — предпросмотр
+      if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && have) {
         const p = h('button', 'btn-s', 'Поставить');
         p.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
         acts.appendChild(p);
@@ -1319,7 +1319,7 @@ export class UI {
       });
       const list = Inv.listItems(st, S.tab, S.sort);
       if (!list.length) {
-        const empty = { build: 'Постройки появятся в магазине.', decor: 'Дорожки, пруды и другой декор продаются на рынке, раздел «Декор».' };
+        const empty = { build: 'Поливалки и другие постройки продаются на рынке, раздел «Постройки».', decor: 'Дорожки, пруды и другой декор продаются на рынке, раздел «Декор».' };
         L.list.appendChild(h('div', 'pn-empty', empty[S.tab] || 'Здесь пока пусто.'));
       } else {
         const g = h('div', 'inv-grid');
@@ -1485,8 +1485,8 @@ export class UI {
       acts.appendChild(b);
     }
     // дорожки: «Поставить» закрывает рюкзак и включает «Кладём дорожку» (нажимай на траву);
-    // пруды и украшения прудов — выбирают клетку с предпросмотром (Mover.takeFromBag)
-    if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor') && n > 0) {
+    // пруды, украшения прудов и постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
+    if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
       b.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
       acts.appendChild(b);

@@ -5,6 +5,7 @@ import * as PIXI from '../vendor/pixi.min.mjs';
 import { toWorld, HW, HH } from '../engine/Iso.js';
 import { dimSprite, hash2 } from '../engine/Sprite.js';
 import { N, CHUNK, CHUNKS, T, FOG_W, objCells } from './World.js';
+import { areaCells } from './sprinklers.js';
 import { HOUSE, FOG, OBJECTS } from './data.js';
 import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop, primeBarTop } from './bars.js';
 
@@ -152,6 +153,8 @@ export class PixiScene {
     this.decorC = new PIXI.Container(); world.addChild(this.decorC); // плоский декор (сейчас не используется)
     this.bedsC = new PIXI.Container({ sortableChildren: true, isRenderGroup: true }); world.addChild(this.bedsC);
     this.border = new PIXI.Graphics(); world.addChild(this.border);
+    // клетки, которые поливает поливалка (под растениями и объектами, над землёй)
+    this.areaG = new PIXI.Graphics(); this.areaG.visible = false; world.addChild(this.areaG); this.areaKey = '';
     this.objC = new PIXI.Container({ sortableChildren: true }); world.addChild(this.objC);
     this.over = new PIXI.Container(); world.addChild(this.over);
     this.border2 = new PIXI.Graphics(this.border.context); this.border2.alpha = 0.45; this.over.addChild(this.border2);
@@ -728,6 +731,7 @@ export class PixiScene {
     this.syncQueue();
     this.syncHint();
     this.syncMover(outline);
+    this.syncArea();
     this.syncFx();
     this.syncFloaters();
     P.part('растения и значки', tp);
@@ -960,6 +964,27 @@ export class PixiScene {
         const sp = s.kind === 'path' ? (f.S.paths.find((p) => p.key === s.path) || f.S.paths[0]).tiles[0] : f.S.bed[0];
         toWorld(t.gx + 0.5, t.gy + 0.5, tmp); this.put(this.moverGhost, sp, tmp.x, tmp.y);
       }
+    }
+  }
+
+  // Клетки полива поливалки (Farm.sprinklerArea): голубые ромбы; там, куда её ставят нельзя, — тусклее.
+  // Перерисовываются, только когда поливалка или её место сменились; угасание — прозрачностью.
+  syncArea() {
+    const f = this.f, a = f.sprinklerArea(), G = this.areaG;
+    G.visible = !!a;
+    if (!a) { this.areaKey = ''; return; }
+    G.alpha = a.k;
+    const key = `${a.kind},${a.x},${a.y},${a.bad}`;
+    if (key === this.areaKey) return;
+    this.areaKey = key;
+    const w = f.world, g = G.clear();
+    for (const [x, y] of areaCells(a.kind, a.x, a.y)) {
+      if (!w.inside(x, y) || !w.isOpen(x, y)) continue;
+      toWorld(x + 0.5, y + 0.5, tmp);
+      const bed = w.tile(x, y) === T.SOIL;
+      g.poly([tmp.x, tmp.y - HH + 1.5, tmp.x + HW - 3, tmp.y, tmp.x, tmp.y + HH - 1.5, tmp.x - HW + 3, tmp.y])
+        .fill({ color: 0x4fb6ff, alpha: a.bad ? 0.12 : bed ? 0.4 : 0.24 })
+        .stroke({ width: 1.5, color: 0xa8e0ff, alpha: a.bad ? 0.35 : 0.8 });
     }
   }
 
