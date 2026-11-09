@@ -58,9 +58,11 @@ SINGLE = {
     'bush_hydrangea_young': 40, 'bush_lavender_young': 40, 'bush_rose_young': 40,
     # дом по уровням
     'house_1': -132, 'house_2': -132, 'house_3': -132, 'house_4': -132, 'house_5': -132,
-    # здания с крафтом (2×2, как дом) и стройка — леса, одни на все здания (src/game/buildData.js)
+    # здания с крафтом (2×2, как дом; src/game/buildData.js)
     'building_kitchen': -132, 'building_carpentry': -132, 'building_forge': -132, 'building_stonecutter': -132,
-    'construction_site': -132,
+    # стройка каждого здания (оно же в лесах) и дом в лесах, пока идёт улучшение до этого уровня
+    'site_kitchen': -132, 'site_carpentry': -132, 'site_forge': -132, 'site_stonecutter': -132,
+    'house_up_2': -132, 'house_up_3': -132, 'house_up_4': -132, 'house_up_5': -132,
 }
 SHEETS.update({name: [(name, w)] for name, w in SINGLE.items()})
 # Постройки без «пятачка» травы (поливалки): одна на картинку, масштаб — по высоте в мире; опора — середина
