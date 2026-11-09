@@ -8,8 +8,9 @@
 // Сохранение пишет assets/map.json прямо в папку проекта (через tools/serve.mjs). Игра берёт карту
 // из этого файла вместо случайной генерации. Несохранённая работа держится в черновике браузера.
 
-import { World, mapText, N, CHUNK, CHUNKS, T, START_CHUNK, FOG_TREES, FOG_W } from '../game/World.js';
-import { OBJECTS, PATHS, PATH_KEYS } from '../game/data.js';
+import { World, mapText, objCells, N, CHUNK, CHUNKS, T, START_CHUNK, FOG_TREES, FOG_W } from '../game/World.js';
+import { OBJECTS, PATHS, PATH_KEYS, PONDS, POND_DECOR } from '../game/data.js';
+import { decorIndex } from '../game/ponds.js';
 import { toGrid, toWorld } from '../engine/Iso.js';
 
 const DRAFT = 'farm.editor.draft';
@@ -20,8 +21,12 @@ const TOOLS = [
   { id: 'grass', name: 'Трава', tile: T.GRASS, brush: true },
   // дорожки — все виды из PATHS (data.js): «Тропинка», песчаная, настил, …
   ...PATH_KEYS.map((k, n) => ({ id: k, name: PATHS[k].name, tile: T.PATH, path: n, brush: true })),
-  { id: 'water', name: 'Вода', tile: T.WATER, brush: true },
   { id: 'soil', name: 'Грядка', tile: T.SOIL, brush: true },
+  // пруды — объекты по форме из PONDS (data.js): одна картинка на пруд, камыши у берега — сами
+  { group: 'Пруды' },
+  ...Object.keys(PONDS).map((k) => ({ id: k, name: PONDS[k].name, obj: k, pond: true })),
+  // украшения прудов — только на воду пруда (на клетку одно); ластик снимает украшение, потом сам пруд
+  ...Object.entries(POND_DECOR).map(([t, d]) => ({ id: 'decor_' + t, name: d.name, pondDecor: t, brush: true })),
   { group: 'Природа' },
   { id: 'oak', name: 'Дуб', obj: 'oak', brush: true },
   { id: 'birch', name: 'Берёза', obj: 'birch', brush: true },
@@ -227,6 +232,7 @@ export class MapEditor {
       }
       return;
     }
+    if (t.pondDecor) { for (const [x, y] of this.cells(gx, gy)) this.putDecor(t.pondDecor, x, y, drag || this.size > 1); return; }
     if (t.obj) {
       if (t.brush) { for (const [x, y] of this.cells(gx, gy)) this.place(t.obj, x, y, drag || this.size > 1); return; }
       // большой объект: нажатая клетка — его середина
@@ -239,24 +245,25 @@ export class MapEditor {
     const f = this.f, w = f.world, i = w.idx(x, y), was = w.tiles[i];
     if (was === t && (t !== T.PATH || w.pathKind[i] === kind)) return;
     if (w.occ[i] >= 0) return; // под объектом земля не меняется — сначала ластик
-    const [px, py] = w.playerStart;
-    if (t === T.WATER && x === px && y === py) { this.status('Здесь стоит призрачок: в воду его не поставить', true); return; }
     w.tiles[i] = t;
     w.pathKind[i] = t === T.PATH ? kind : 0;
     if (was === T.SOIL) f.beds.delete(i);
     if (t === T.SOIL) f.bedAt(i);
-    if (was === T.WATER || t === T.WATER) this.dirtyDecor = true;
     f.groundV++;
     this._changed = true;
   }
 
-  why(type, gx, gy) {
-    const w = this.f.world, def = OBJECTS[type], ow = def.w || 1, oh = def.h || 1;
-    for (let y = gy; y < gy + oh; y++) for (let x = gx; x < gx + ow; x++) {
+  // ignore — сам переносимый объект (его клетки свободны)
+  why(type, gx, gy, ignore) {
+    const w = this.f.world, def = OBJECTS[type], [px, py] = w.playerStart;
+    for (const [dx, dy] of objCells(def)) {
+      const x = gx + dx, y = gy + dy;
       if (!w.inside(x, y)) return 'за краем карты';
       const i = w.idx(x, y);
-      if (w.occ[i] >= 0) return `мешает ${(OBJECTS[w.objects[w.occ[i]].type].name || 'объект').toLowerCase()}`;
+      const o = w.occ[i] >= 0 ? w.objects[w.occ[i]] : null;
+      if (o && o !== ignore) return `мешает ${(OBJECTS[o.type].name || 'объект').toLowerCase()}`;
       if (w.tiles[i] !== T.GRASS) return 'объекты ставятся только на траву';
+      if (def.pond && x === px && y === py) return 'здесь стоит призрачок';
     }
     return null;
   }
@@ -273,13 +280,28 @@ export class MapEditor {
     const o = w.add(type, gx, gy);
     if (o && type === 'well') { w.well = o; w.wellPos = [gx, gy]; }
     if (o) this._changed = true;
+    if (o && def.pond) { o.decor = PONDS[type].decor.map((d) => d.slice()); this.dirtyDecor = true; } // камыш и камни, как у прудов карты
     return o;
+  }
+
+  // украшение пруда на клетку воды (другое украшение на ней — заменяется)
+  putDecor(type, x, y, quiet) {
+    const w = this.f.world, o = w.pondAt(x, y);
+    if (!o || !w.isWater(x, y)) { if (!quiet) this.status(`${POND_DECOR[type].name}: только на воду пруда`, true); return; }
+    const i = decorIndex(o, x - o.gx, y - o.gy);
+    if (i >= 0 && o.decor[i][0] === type) return;
+    if (i >= 0) o.decor[i][0] = type; else o.decor.push([type, x - o.gx, y - o.gy]);
+    this._changed = true; this.dirtyDecor = true;
   }
 
   erase(x, y) {
     const f = this.f, w = f.world, o = w.objectAt(x, y);
+    // на воде пруда с украшением — сначала снимается украшение
+    const di = o && OBJECTS[o.type].pond ? decorIndex(o, x - o.gx, y - o.gy) : -1;
+    if (di >= 0) { o.decor.splice(di, 1); this._changed = true; this.dirtyDecor = true; return; }
     if (o) {
       if (o === w.well) w.well = null;
+      if (OBJECTS[o.type].pond) this.dirtyDecor = true;
       w.remove(o);
       if (this.sel === o) this.sel = null;
       this._changed = true;
@@ -290,7 +312,7 @@ export class MapEditor {
 
   setPlayer(gx, gy) {
     const f = this.f, w = f.world, i = w.idx(gx, gy);
-    if (w.tiles[i] === T.WATER || w.occ[i] >= 0) return this.status('Призрачок встаёт только на свободную землю', true);
+    if (w.occ[i] >= 0) return this.status('Призрачок встаёт только на свободную землю', true);
     if (w.chunkOf(gx, gy) !== START_CHUNK) this.status('Внимание: старт вне стартового участка (жёлтая рамка) — там закрыто', true);
     w.playerStart = [gx, gy];
     const p = f.player; p.x = gx + 0.5; p.y = gy + 0.5; p.path = [];
@@ -308,11 +330,11 @@ export class MapEditor {
     const o = this.sel, tx = gx - ((o.w - 1) >> 1), ty = gy - ((o.h - 1) >> 1);
     if (o.gx === tx && o.gy === ty) { this.sel = null; return this.status('Выбор снят'); }
     // проверяем место, не считая сам объект
-    w.lift(o);
-    const bad = this.why(o.type, tx, ty);
-    w.put(o, bad ? o.gx : tx, bad ? o.gy : ty);
+    const bad = this.why(o.type, tx, ty, o);
     if (bad) return this.status(`Сюда нельзя: ${bad}`, true);
+    w.moveObject(o, tx, ty);
     if (o === w.well) w.wellPos = [tx, ty];
+    if (OBJECTS[o.type].pond) this.dirtyDecor = true;
     this._changed = true;
     this.sel = null;
     this.status('Перенесено');
@@ -363,7 +385,7 @@ export class MapEditor {
     if (!w.well) out.push('нет колодца');
     else if (w.chunkOf(w.well.gx, w.well.gy) !== START_CHUNK) out.push('колодец вне стартового участка');
     const [px, py] = w.playerStart, pi = w.idx(px, py);
-    if (w.tiles[pi] === T.WATER || w.occ[pi] >= 0) out.push('призрачок стоит в воде или в объекте');
+    if (w.occ[pi] >= 0) out.push('призрачок стоит в пруду или в объекте');
     if (w.chunkOf(px, py) !== START_CHUNK) out.push('старт призрачка вне стартового участка');
     let soil = 0;
     for (let i = 0; i < w.tiles.length; i++) if (w.tiles[i] === T.SOIL && w.chunkOf(i % N, (i / N) | 0) === START_CHUNK) soil++;
@@ -449,7 +471,7 @@ export class MapEditor {
     const [px, py] = w.playerStart;
     outline(px, py, 0x7fd8ff, 0.95, 2.5);
     // выбранный для переноса объект
-    if (this.sel) for (let y = this.sel.gy; y < this.sel.gy + this.sel.h; y++) for (let x = this.sel.gx; x < this.sel.gx + this.sel.w; x++) outline(x, y, 0xffe066, 0.6 + 0.4 * Math.sin(f.time * 6), 2.5);
+    if (this.sel) for (const [dx, dy] of objCells(OBJECTS[this.sel.type])) outline(this.sel.gx + dx, this.sel.gy + dy, 0xffe066, 0.6 + 0.4 * Math.sin(f.time * 6), 2.5);
     // кисть под курсором
     const h = f.hover;
     if (h && w.fogDepth(h.x, h.y) >= 1 && w.fogDepth(h.x, h.y) <= FOG_W) {
@@ -460,7 +482,7 @@ export class MapEditor {
       const t = this.tool;
       let list;
       if (t.brush) list = this.cells(h.x, h.y);
-      else if (t.obj) { const d = OBJECTS[t.obj], ow = d.w || 1, oh = d.h || 1, x0 = h.x - ((ow - 1) >> 1), y0 = h.y - ((oh - 1) >> 1); list = []; for (let y = y0; y < y0 + oh; y++) for (let x = x0; x < x0 + ow; x++) list.push([x, y]); }
+      else if (t.obj) { const d = OBJECTS[t.obj], x0 = h.x - (((d.w || 1) - 1) >> 1), y0 = h.y - (((d.h || 1) - 1) >> 1); list = objCells(d).map(([dx, dy]) => [x0 + dx, y0 + dy]); }
       else list = [[h.x, h.y]];
       const color = t.erase ? 0xff6a50 : 0x8ff06a;
       for (const [x, y] of list) outline(x, y, color, 0.9, 2);
@@ -492,13 +514,13 @@ export class MapEditor {
       if (tool.tile === T.GRASS) s = S.grass[0];
       else if (tool.tile === T.PATH) s = S.paths[tool.path || 0].tiles[0];
       else if (tool.tile === T.SOIL) s = S.bed[0];
+      else if (tool.pondDecor) s = S.decor[tool.pondDecor];
       else if (tool.obj && tool.obj !== 'forest' && tool.obj !== 'fogforest') s = f.objSprite({ type: tool.obj, id: 0 });
       else if (tool.obj === 'forest' || tool.obj === 'fogforest') s = f.objSprite({ type: 'pine', id: 1 });
     } catch { s = null; }
     const c = document.createElement('canvas'); c.width = c.height = 64;
     const g = c.getContext('2d');
-    if (tool.tile === T.WATER) { g.fillStyle = '#4fa8d8'; g.beginPath(); g.moveTo(32, 16); g.lineTo(62, 32); g.lineTo(32, 48); g.lineTo(2, 32); g.fill(); }
-    else if (s && s.canvas) {
+    if (s && s.canvas) {
       try {
         const k = Math.min(60 / s.w, 60 / s.h);
         g.drawImage(s.canvas, 32 - s.w * k / 2, 62 - s.h * k, s.w * k, s.h * k);

@@ -6,3 +6,5 @@ __pycache__/
 Thumbs.db
 *.log
 .history/
+# картинки для проверки прудов (python tools/pond_art.py --preview)
+.pond-art/

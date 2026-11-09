@@ -241,7 +241,7 @@ const STEP = {
   pond: (c) => {
     const ch = chooser(c, 'pond', 'tile'), w = c.world;
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      if (w.tiles[y * N + x] !== T.WATER || !w.isOpen(x, y)) continue;
+      if (!w.isWater(x, y) || !w.isOpen(x, y)) continue;
       ch.offer(reach(c, x, y), x, y, null, ICON.pond);
     }
     return ch.get();
