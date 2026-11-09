@@ -1831,9 +1831,12 @@ function sortOffers(offers, sort, level) {
   return offers.map((o, i) => ({ o, i, lock: o.level > level ? 1 : 0 }))
     .sort((a, b) => a.lock - b.lock || by(a.o, b.o) || a.i - b.i).map((x) => x.o);
 }
+// Короткое число: 12 345 → «12.3k», 250 000 → «250k», 1 500 000 → «1.5M». Округляется вниз, как у
+// кошелька (99 999 — «99.9k», а не «100.0k»; 999 999 — «999k», а не «1000k»), «.0» не пишется.
 function fmtNum(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M';
-  return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n);
+  const cut = (v, d) => String(Math.floor(v * 10 ** d) / 10 ** d);
+  if (n >= 1e6) return cut(n / 1e6, n >= 1e7 ? 0 : 1) + 'M';
+  return n >= 10000 ? cut(n / 1000, n >= 100000 ? 0 : 1) + 'k' : String(n);
 }
 // сколько осталось: «5 ч 12 мин», «2 д 3 ч», «7 мин»
 function fmtLeft(ms) {
