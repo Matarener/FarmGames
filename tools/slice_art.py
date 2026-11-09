@@ -67,6 +67,19 @@ PROPS = {
     'sprinkler_drip': {'h': 32, 'lift': 4},
     'sprinkler_spin': {'h': 40, 'lift': 4},
     'sprinkler_rain': {'h': 56, 'lift': 5},
+    # декор (DECOR в src/game/data.js); _back — вид сзади (положения поворота 2 и 3).
+    # foot: вещь на ножках по концам (лавочки, столик со стульями) — опора посередине между самыми нижними
+    # точками левого и правого краёв картинки (ножки на концах вещи), а не у нижнего края.
+    'decor_lantern': {'h': 26, 'lift': 3},
+    'decor_bench': {'h': 20, 'foot': True},
+    'decor_table': {'h': 22, 'lift': 4},
+    'decor_lamp': {'h': 74, 'lift': 4},
+    'decor_hook_lamp': {'h': 58, 'lift': 4},
+    'decor_hook_lamp_back': {'h': 58, 'lift': 4},
+    'decor_park_bench': {'h': 32, 'foot': True},
+    'decor_park_bench_back': {'h': 32, 'foot': True},
+    'decor_stone_lamp': {'h': 40, 'lift': 5},
+    'decor_table_set': {'h': 30, 'foot': True},
 }
 # молодое растение по высоте взрослого: по умолчанию — <имя без _young>
 YOUNG_OF = {'tree_cherry_young': 'tree_cherry_bare'}  # молодая вишня — по цветущей
@@ -362,7 +375,17 @@ def main(only=None):
         k = pr['h'] / (y1 - y0)  # мир/пиксель
         W, H = (x1 - x0) * k, (y1 - y0) * k
         img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
-        save(img, name, W, H, (xs[0] + xs[-1]) / 2 * k, ys[-1] * k - pr['lift'], man)
+        ax, ay = (xs[0] + xs[-1]) / 2 * k, ys[-1] * k - pr.get('lift', 0)
+        if pr.get('foot'):
+            cols = np.where(m.any(0))[0]
+            n = max(1, int(len(cols) * 0.12))
+            def low(cs):
+                lows = [np.where(m[:, c])[0][-1] for c in cs]
+                j = int(np.argmax(lows))
+                return cs[j], lows[j]
+            (lx, ly), (rx, ry) = low(cols[:n]), low(cols[-n:])
+            ax, ay = (lx + rx) / 2 * k, (ly + ry) / 2 * k - pr.get('lift', 0)
+        save(img, name, W, H, ax, ay, man)
         print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
 
     # Грядки: объёмный ромб (верх + бортик). Ширина — по краям картинки, центр ромба —

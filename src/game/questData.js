@@ -225,6 +225,15 @@ export const QUESTS = {
       task: 'Улучши дом до 2 уровня', goal: { state: 'house', n: 2 }, reward: { gems: 2, coins: 30 },
     },
     {
+      id: 'build.cozy', title: 'Уютный уголок', who: 'ghost', level: 2,
+      text: 'Хочу местечко, где можно посидеть вечером: лавочку у дорожки и фонарик рядом. На рынке есть целый раздел «Декор»!',
+      goals: [
+        { ev: 'buy', group: 'decor', n: 2, task: 'Купи 2 вещи в разделе «Декор» (лавочку, фонарь, столик или забор)' },
+        { ev: 'place', group: 'decor', n: 2, task: 'Поставь их на ферме' },
+      ],
+      reward: { coins: 40 },
+    },
+    {
       id: 'build.space', title: 'Простор', who: 'ghost',
       text: 'Ферма растёт! За туманом ещё столько земли.',
       task: 'Открой ещё 2 участка', goal: { ev: 'expand', n: 2 }, reward: { coins: 60 },

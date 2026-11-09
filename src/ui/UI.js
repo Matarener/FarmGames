@@ -2,7 +2,7 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS, STORE_GROUPS } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
 import * as Plant from '../game/planting.js';
 import * as R from '../game/questRules.js';
@@ -74,6 +74,8 @@ export class UI {
     $('#mb-cancel').onclick = () => farm.mover.cancel();
     $('#mb-place').onclick = () => farm.mover.place();
     $('#mb-store').onclick = () => farm.mover.store();
+    $('#mb-rot').onclick = () => farm.mover.rotate();
+    $('#mb-all').onclick = () => this.storeAllPanel(farm);
     $('#pb-pick').onclick = () => {
       const P = farm.planting;
       if (!P || P.dig) return;
@@ -413,8 +415,9 @@ export class UI {
 
   // ---------- Окна ----------
   // music: false — музыка фермы не сменяется на музыку меню (короткие окна выбора у грядки)
-  openPanel(kind, title, build, { music = true } = {}) {
-    if (this.farm && this.farm.mover && this.farm.mover.active) this.farm.mover.exit();
+  // keepMove — режим «Переставить» не выключается (окно «Убрать всё» открыто из него)
+  openPanel(kind, title, build, { music = true, keepMove = false } = {}) {
+    if (!keepMove && this.farm && this.farm.mover && this.farm.mover.active) this.farm.mover.exit();
     const p = this.panelEl;
     p.dataset.kind = kind;
     this._build = build;
@@ -451,6 +454,7 @@ export class UI {
       () => this.wheelPanel(f),
       () => this.achPanel(f),
       () => this.settingsPanel(f),
+      () => this.storeAllPanel(f),
       () => { this.closePanel(); this.toggleMore(true); },
       () => { this.toggleMore(false); this.popup(this.root.clientWidth / 2, this.root.clientHeight / 2, { title: 'Дуб', text: 'Срубить', cost: { wood: 1 }, items: [{ icon: 'axe', label: 'Срубить', sub: '1', onClick() {} }] }); },
     ];
@@ -465,7 +469,7 @@ export class UI {
     } finally {
       this.closePanel(); this.closePopup(); this.toggleMore(false);
       Q.seen = seen; // окно задания сюжета помечает его прочитанным — возвращаем как было
-      this.qp = this.mk = this.inv = this.pl = this.gp = null; // вкладки и выбор в окнах — по умолчанию
+      this.qp = this.mk = this.inv = this.pl = this.gp = this.sa = null; // вкладки и выбор в окнах — по умолчанию
       this._openT = -1;
       void this.root.offsetHeight; // окна закрылись ещё без анимации
       this.root.classList.remove('warming');
@@ -556,6 +560,36 @@ export class UI {
     $('#mb-cancel').hidden = !st.selected;
     $('#mb-place').hidden = !st.selected || !!st.brush; // «Кладём дорожку»: клетка кладётся сразу по нажатию
     $('#mb-store').hidden = !st.canStore;
+    $('#mb-rot').hidden = !st.canRotate;
+    $('#mb-all').hidden = !st.canStoreAll;
+  }
+
+  // «Убрать всё»: галочки — что убрать с карты в рюкзак (storeAll.js), сколько чего; режим «Переставить» остаётся
+  storeAllPanel(f) {
+    const S = this.sa || (this.sa = { on: Object.fromEntries(STORE_GROUPS.map((g) => [g.key, !g.off])) });
+    this.openPanel('storeall', 'Убрать в рюкзак', (body) => {
+      const plan = f.mover.storeAllPlan();
+      body.appendChild(h('div', 'sa-note', 'Отмеченное уйдёт в рюкзак. Поставить обратно можно здесь же, в «Переставить»: нажмите на пустую траву.'));
+      let total = 0;
+      const groups = [];
+      for (const g of STORE_GROUPS) {
+        const n = plan[g.key], on = S.on[g.key] && n > 0;
+        if (on) { total += n; groups.push(g.key); }
+        const row = h('div', 'set-row tog sa-row' + (n ? '' : ' off'), `${this.ic(g.icon)}<span class="sa-t"><span>${g.name}</span><small>${g.sub}</small></span><b>${n}</b>`);
+        const b = h('button', 'switch' + (on ? ' on' : ''), '<i></i>');
+        b.setAttribute('role', 'switch'); b.setAttribute('aria-checked', on);
+        b.disabled = !n;
+        b.onclick = () => { S.on[g.key] = !on; this.sfx('tap'); this.refreshPanel(); };
+        row.appendChild(b);
+        body.appendChild(row);
+      }
+      if (f.mover.storeAllNoWater(groups)) body.appendChild(h('div', 'sa-warn', 'Колодец ещё не починен: без прудов воду для лейки набрать будет негде, пока не поставите пруд обратно.'));
+      body.appendChild(h('div', 'sa-stay', 'Останутся на месте: дом, колодец, грядки и дикие растения.'));
+      const go = h('button', 'btn-main sa-go', total ? `Убрать в рюкзак (${total})` : 'Нечего убирать');
+      go.disabled = !total;
+      go.onclick = () => { this.closePanel(); f.mover.storeAll(groups); };
+      body.appendChild(go);
+    }, { keepMove: true });
   }
 
   moveBarShake() {
@@ -1272,7 +1306,7 @@ export class UI {
       // пруд, украшение пруда, постройку (поливалку) — ставить: выбраны в «Переставить», нажатие на клетку — предпросмотр
       if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && have) {
         const p = h('button', 'btn-s', 'Поставить');
-        p.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
+        p.onclick = () => { this.closePanel(); f.mover.use(it.key); };
         acts.appendChild(p);
       }
       row.appendChild(acts);
@@ -1488,7 +1522,7 @@ export class UI {
     // пруды, украшения прудов и постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
     if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
-      b.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
+      b.onclick = () => { this.closePanel(); f.mover.use(it.key); };
       acts.appendChild(b);
     }
     if (acts.children.length) box.appendChild(acts);

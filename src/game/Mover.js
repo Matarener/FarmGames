@@ -10,18 +10,24 @@
 // выбирает его (перенести на другую клетку воды или убрать в рюкзак), на воду без украшения — сам пруд.
 // «Кладём дорожку» (pave, кнопка «Поставить» у дорожки в рюкзаке и на рынке): каждое нажатие на траву
 // кладёт клетку выбранной дорожки, нажатие на дорожку другого вида меняет её (старая — в рюкзак).
+// Заборы ставятся так же («Ставим забор»): секция на каждое нажатие, соседние секции соединяются сами.
+// Декор с поворотом (data.js DECOR, rot > 1): у выбранного — кнопка «Повернуть» (rotate): на месте, если
+// повёрнутый помещается, иначе — предпросмотр, куда поставить повёрнутым. Из рюкзака — тоже.
+// «Убрать всё» (storeAllPlan / storeAll, правила — storeAll.js): всё своё с карты — в рюкзак, кроме дома,
+// колодца и грядок.
 //
 // Как работает: нажали на объект — он выбран; нажали на клетку — там появляется
 // предпросмотр (зелёный — можно, красный — нельзя и почему); «Поставить» или
 // повторное нажатие на ту же клетку переносит объект.
 
 import { OBJECTS, FLORA, ITEMS, PATHS, pondDecorId } from './data.js';
+import * as StoreAll from './storeAll.js';
 import * as Flora from './flora.js';
 import * as Inv from './inventory.js';
 import * as Paths from './paths.js';
 import * as Placed from './placed.js';
 import * as Ponds from './ponds.js';
-import { N, T, objCells } from './World.js';
+import { N, T, objCells, normRot } from './World.js';
 import { toWorld } from '../engine/Iso.js';
 
 const tmp = { x: 0, y: 0 };
@@ -35,7 +41,8 @@ export class Mover {
     this.active = false;
     this.sel = null;   // { kind: 'obj'|'bed'|'path'|'bag', o?, b?, id? (предмет из рюкзака), name, w, h, gx, gy, cells? }
     this.to = null;    // { gx, gy, ok, why }
-    this.brush = null; // id дорожки в режиме «Кладём дорожку»
+    this.brush = null; // id дорожки или забора в режиме «Кладём дорожку» / «Ставим забор»
+    this.lastRot = {}; // id предмета → в каком положении его ставили из рюкзака в последний раз
   }
 
   enter() {
@@ -61,7 +68,8 @@ export class Mover {
     let text = msg;
     if (this.brush) {
       const it = ITEMS[this.brush], n = Inv.count(this.f.st, this.brush);
-      if (!text) text = `Кладём: ${it.name.toLowerCase()} (есть ${n}). Нажимайте на траву или на другую дорожку`;
+      if (!text) text = it.place === 'path' ? `Кладём: ${it.name.toLowerCase()} (есть ${n}). Нажимайте на траву или на другую дорожку`
+        : `Ставим: ${it.name.toLowerCase()} (есть ${n}). Нажимайте на траву или на другой забор`;
       this.f.ui.moveBar({ text, bad: !!bad, canPlace: false, selected: true, canStore: false, brush: true });
       return;
     }
@@ -71,7 +79,7 @@ export class Mover {
       else if (t.ok) text = `${s.name}: сюда можно. Нажмите «Поставить»`;
       else { text = t.why; bad = true; }
     }
-    this.f.ui.moveBar({ text, bad: !!bad, canPlace: !!(t && t.ok), selected: !!s, canStore: !!(s && s.store) });
+    this.f.ui.moveBar({ text, bad: !!bad, canPlace: !!(t && t.ok), selected: !!s, canStore: !!(s && s.store), canRotate: !!(s && s.canRot), canStoreAll: !s });
   }
 
   // причина показывается в панели внизу (красным, панель вздрагивает)
@@ -95,7 +103,7 @@ export class Mover {
       if (o.placed) {
         if (this.busy({ obj: o })) return { why: 'Призрачок сейчас работает здесь, подождите' };
         const def = OBJECTS[o.type];
-        return { sel: { kind: 'obj', o, placed: true, store: true, name: def.name, w: o.w, h: o.h, gx: o.gx, gy: o.gy, cells: objCells(def) } };
+        return { sel: { kind: 'obj', o, placed: true, store: true, name: def.name, w: o.w, h: o.h, gx: o.gx, gy: o.gy, cells: objCells(def, o.rot), rot: o.rot || 0, canRot: Placed.rotCount(o.type) > 1 } };
       }
       if (Ponds.isPond(o)) {
         // на клетке украшение (камыш, рогоз, камни) — выбирается оно: перенести на воду или в рюкзак
@@ -139,7 +147,7 @@ export class Mover {
       if (this.busy({ x: gx, y: gy })) return { why: 'Призрачок сейчас работает с этой грядкой, подождите' };
       return { sel: { kind: 'bed', b, name: 'Грядка', w: 1, h: 1, gx, gy } };
     }
-    return { empty: true, why: 'Здесь пусто. Нажмите на дом, колодец, грядку, дорожку, пруд, поливалку или своё растение' };
+    return { empty: true, why: 'Здесь пусто. Нажмите на дом, колодец, грядку, дорожку, пруд, поливалку, декор или своё растение' };
   }
 
   // Призрачок рыбачит или набирает воду в этом пруду (или идёт туда)?
@@ -161,9 +169,9 @@ export class Mover {
   check(gx, gy) {
     const f = this.f, w = f.world, s = this.sel, p = f.player;
     if (s.decor) return this.checkDecor(gx, gy);
-    if (gx === s.gx && gy === s.gy) return { ok: false, why: 'Объект уже стоит здесь' };
+    if (gx === s.gx && gy === s.gy && (!s.o || (s.o.rot || 0) === (s.rot || 0))) return { ok: false, why: 'Объект уже стоит здесь' };
     const solid = s.kind === 'obj' || s.kind === 'bag'; // объект на клетках (не дорожка и не грядка)
-    const own = this.cellSet(s.gx, s.gy);
+    const own = this.cellSet(s.gx, s.gy, this.curCells());
     const a = p.current && p.current.kind !== 'walk' ? p.current : null;
     const next = p.path && p.path[0];
     for (const [dx, dy] of objCells(s)) {
@@ -182,7 +190,7 @@ export class Mover {
     }
     if (solid && this.cutsOff(gx, gy)) return { ok: false, why: 'Сюда нельзя: так закроется проход' };
     // правила самой постройки (например, не хватает материалов) — placed.js
-    if (s.kind === 'bag' && Placed.objOf(s.id)) { const why = Placed.placeWhy(f.st, w, s.id, gx, gy, { now: Date.now() }); if (why) return { ok: false, why }; }
+    if (s.kind === 'bag' && Placed.objOf(s.id)) { const why = Placed.placeWhy(f.st, w, s.id, gx, gy, { now: Date.now() }, s.rot); if (why) return { ok: false, why }; }
     return { ok: true };
   }
 
@@ -195,17 +203,24 @@ export class Mover {
     return { ok: false, why: why[c.why] };
   }
 
-  // Клетки выбранного объекта, если его левый верхний угол — (gx, gy): номера клеток (за краем карты — без них)
-  cellSet(gx, gy) {
+  // Клетки выбранного объекта, если его левый верхний угол — (gx, gy): номера клеток (за краем карты — без них).
+  // cells — какая фигура (по умолчанию — как он встанет: с новым поворотом)
+  cellSet(gx, gy, cells = objCells(this.sel)) {
     const w = this.f.world, out = new Set();
-    for (const [dx, dy] of objCells(this.sel)) if (w.inside(gx + dx, gy + dy)) out.add(w.idx(gx + dx, gy + dy));
+    for (const [dx, dy] of cells) if (w.inside(gx + dx, gy + dy)) out.add(w.idx(gx + dx, gy + dy));
     return out;
+  }
+
+  // Клетки, которые выбранный объект занимает сейчас (его могли повернуть, но ещё не переставить)
+  curCells() {
+    const s = this.sel;
+    return s && s.o && OBJECTS[s.o.type] && !s.decor ? objCells(OBJECTS[s.o.type], s.o.rot) : objCells(s);
   }
 
   // Не отрежет ли постройка часть открытой земли от призрачка
   cutsOff(gx, gy) {
     const f = this.f, w = f.world, s = this.sel, p = f.player;
-    const nw = this.cellSet(gx, gy), old = this.cellSet(s.gx, s.gy);
+    const nw = this.cellSet(gx, gy), old = this.cellSet(s.gx, s.gy, this.curCells());
     const inNew = (x, y) => nw.has(w.idx(x, y));
     const inOld = (x, y) => old.has(w.idx(x, y));
     const count = (walk) => {
@@ -248,7 +263,7 @@ export class Mover {
     // большой объект: нажатая клетка — его середина
     const tx = gx - ((s.w - 1) >> 1), ty = gy - ((s.h - 1) >> 1);
     // нажали на сам выбранный объект без цели — снять выбор (большой пруд по краю — сдвиг на клетку)
-    const own = s.kind !== 'bag' && this.f.world.inside(gx, gy) && this.cellSet(s.gx, s.gy).has(this.f.world.idx(gx, gy));
+    const own = s.kind !== 'bag' && this.f.world.inside(gx, gy) && this.cellSet(s.gx, s.gy, this.curCells()).has(this.f.world.idx(gx, gy));
     if (own && !this.to && (!s.pond || (tx === s.gx && ty === s.gy))) { this.cancel(); return; }
     if (this.to && this.to.gx === tx && this.to.gy === ty && this.to.ok) return this.place();
     const c = this.check(tx, ty);
@@ -262,9 +277,16 @@ export class Mover {
     this.hint();
   }
 
-  // «Кладём дорожку»: включить режим перестановки и класть клетки дорожки id нажатиями на траву
+  // «Поставить» у предмета в рюкзаке или на рынке: дорожка и забор — «кистью» (pave), остальное — с предпросмотром
+  use(id) {
+    const it = ITEMS[id];
+    return it && (it.place === 'path' || it.brush) ? this.pave(id) : this.takeFromBag(id);
+  }
+
+  // «Кладём дорожку» / «Ставим забор»: включить режим перестановки и ставить предмет id нажатиями на траву
   pave(id) {
-    if (!Paths.isPathItem(id) || !Inv.count(this.f.st, id)) return false;
+    const it = ITEMS[id];
+    if (!(Paths.isPathItem(id) || (it && it.brush && Placed.objOf(id))) || !Inv.count(this.f.st, id)) return false;
     this.enter();
     this.sel = null; this.to = null; this.brush = id;
     this.hint();
@@ -288,8 +310,8 @@ export class Mover {
       f.pondFx(s.o);
     } else if (s.kind === 'obj') {
       if (s.plant) Flora.moveOwn(f.st, s.o, t.gx, t.gy);
-      if (s.placed) Placed.moveObj(f.st, s.o, t.gx, t.gy);
-      w.moveObject(s.o, t.gx, t.gy);
+      if (s.placed) Placed.moveObj(f.st, s.o, t.gx, t.gy, s.rot);
+      w.moveObject(s.o, t.gx, t.gy, s.placed ? s.rot : s.o.rot);
       if (!s.plant && !s.placed) { f.st.pos = f.st.pos || {}; f.st.pos[s.o.type] = [t.gx, t.gy]; }
       f.burst(s.o.wx, s.o.wy - 6, '#e8d9a8', 14);
     } else if (s.kind === 'path') {
@@ -387,7 +409,7 @@ export class Mover {
     this.f.ui.popup(sx, sy, {
       title: 'Поставить из рюкзака', wide: true,
       // дорожку кладём и дальше: следующие нажатия на траву — тоже она
-      items: list.map(({ it, n }) => ({ icon: it.icon, label: it.name, sub: `есть: ${n}`, onClick: () => { if (this.putFromBag(it.key, gx, gy) && it.place === 'path' && Inv.count(f.st, it.key)) { this.brush = it.key; this.hint(); } } })),
+      items: list.map(({ it, n }) => ({ icon: it.icon, label: it.name, sub: `есть: ${n}`, onClick: () => { if (this.putFromBag(it.key, gx, gy) && (it.place === 'path' || it.brush) && Inv.count(f.st, it.key)) { this.brush = it.key; this.hint(); } } })),
     });
     f.sfx('pop');
   }
@@ -395,6 +417,7 @@ export class Mover {
   putFromBag(id, gx, gy) {
     const f = this.f, w = f.world, it = ITEMS[id];
     if (!it || !Inv.count(f.st, id)) { this.brush = null; this.hint(); return false; }
+    if (it.brush && Placed.objOf(id)) return this.putFence(id, gx, gy);
     // пруд, украшение пруда, постройка: сначала предпросмотр на этой клетке (видно, как встанет), потом «Поставить»
     if (it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') return this.takeFromBag(id, gx, gy);
     toWorld(gx + 0.5, gy + 0.5, tmp);
@@ -441,6 +464,7 @@ export class Mover {
     const def = decor ? {} : OBJECTS[type || id];
     this.brush = null; this.to = null;
     this.sel = { kind: 'bag', id, decor, name: it.name, w: def.w || 1, h: def.h || 1, gx: -9, gy: -9, cells: objCells(def) };
+    if (type && Placed.rotCount(type) > 1) { this.sel.canRot = true; this.setRot(this.sel, def, this.lastRot[id] || 0); }
     if (gx != null) {
       const tx = gx - ((this.sel.w - 1) >> 1), ty = gy - ((this.sel.h - 1) >> 1), c = this.check(tx, ty);
       this.to = { gx: tx, gy: ty, ok: c.ok, why: c.why };
@@ -455,7 +479,7 @@ export class Mover {
   placeFromBag(gx, gy) {
     const f = this.f, w = f.world, s = this.sel;
     if (Placed.objOf(s.id)) {
-      const r = Placed.placeObj(f.st, w, s.id, gx, gy, { now: Date.now() });
+      const r = Placed.placeObj(f.st, w, s.id, gx, gy, { now: Date.now() }, s.rot);
       if (r.why) { this.to.ok = false; this.to.why = r.why; this.fail(r.why); return false; }
       const o = r.o;
       f.burst(o.wx, o.wy - 6, '#e8d9a8', 14);
@@ -472,5 +496,107 @@ export class Mover {
     else { this.sel = null; this.hint(`${s.name}: поставлено`); }
     f.changed();
     return true;
+  }
+
+  // ---------- поворот ----------
+  // Положение поворота rot у выбора s (объект типа с описанием def): клетки и размеры — как он встанет
+  setRot(s, def, rot) {
+    s.rot = normRot(def, rot);
+    s.cells = objCells(def, s.rot);
+    s.w = (s.rot & 1 ? def.h : def.w) || 1; s.h = (s.rot & 1 ? def.w : def.h) || 1;
+  }
+
+  // «Повернуть»: следующее положение. Вещь на карте без выбранного места поворачивается сразу, если повёрнутая
+  // помещается там же; иначе — предпросмотр на её месте (красный, с причиной): нажмите, куда поставить повёрнутой.
+  // Из рюкзака и с выбранным местом — поворачивается предпросмотр.
+  rotate() {
+    const f = this.f, w = f.world, s = this.sel;
+    if (!s || !s.canRot) return false;
+    const type = s.o ? s.o.type : Placed.objOf(s.id), def = OBJECTS[type];
+    this.setRot(s, def, (s.rot || 0) + 1);
+    if (s.kind === 'bag') this.lastRot[s.id] = s.rot;
+    f.sfx('pop');
+    if (this.to) {
+      // повернули обратно, как стоит, а предпросмотр — на своём же месте: выбора места больше нет
+      if (s.kind === 'obj' && this.to.gx === s.gx && this.to.gy === s.gy && (s.o.rot || 0) === s.rot) this.to = null;
+      else { const c = this.check(this.to.gx, this.to.gy); Object.assign(this.to, { ok: c.ok, why: c.why }); }
+      return this.hint(), true;
+    }
+    if (s.kind !== 'obj') return this.hint(), true;
+    const o = s.o;
+    if ((o.rot || 0) === s.rot) return this.hint(), true; // повернули обратно, как стоит
+    const c = this.check(s.gx, s.gy);
+    if (!c.ok) {
+      this.to = { gx: s.gx, gy: s.gy, ok: false, why: `Здесь не повернуть: ${c.why.replace(/^Сюда нельзя: /, '')}. Нажмите, куда поставить повёрнутым` };
+      return this.hint(), true;
+    }
+    if (w.objects[o.id] !== o) { this.cancel(); return false; }
+    Placed.moveObj(f.st, o, s.gx, s.gy, s.rot);
+    w.moveObject(o, s.gx, s.gy, s.rot);
+    s.w = o.w; s.h = o.h;
+    f.burst(o.wx, o.wy - 6, '#e8d9a8', 8);
+    this.hint(`${s.name}: повёрнуто. Ещё раз — «Повернуть», или нажмите, куда передвинуть`);
+    f.changed();
+    return true;
+  }
+
+  // ---------- заборы ----------
+  // «Ставим забор»: секция забора id на клетку (gx, gy) сразу, без предпросмотра. На другом заборе — меняем
+  // (старая секция — в рюкзак).
+  putFence(id, gx, gy) {
+    const f = this.f, w = f.world, it = ITEMS[id], ctx = { now: Date.now() };
+    const was = w.inside(gx, gy) && w.isOpen(gx, gy) ? w.objectAt(gx, gy) : null;
+    let back = null;
+    if (was && was.placed && OBJECTS[was.type].fence) {
+      if (was.type === id) return this.fail(`Здесь уже ${it.name.toLowerCase()}`);
+      if (this.busy({ obj: was })) return this.fail('Призрачок сейчас работает здесь, подождите');
+      const r = Placed.storeObj(f.st, w, was, ctx);
+      if (r.why) return this.fail(r.why);
+      back = r.id;
+    } else {
+      const save = this.sel;
+      this.sel = { kind: 'bag', id, name: it.name, w: 1, h: 1, gx: -9, gy: -9, cells: objCells(OBJECTS[id]) };
+      const c = this.check(gx, gy);
+      this.sel = save;
+      if (!c.ok) return this.fail(c.why);
+    }
+    const r = Placed.placeObj(f.st, w, id, gx, gy, ctx);
+    if (r.why) return this.fail(r.why);
+    const o = r.o;
+    if (back) f.dropFx(o, [{ id: back, n: 1 }]);
+    f.burst(o.wx, o.wy - 4, '#e8d9a8', 8);
+    f.placedFx(o);
+    f.sfx('dig');
+    const n = Inv.count(f.st, id);
+    if (this.brush && !n) this.brush = null;
+    this.hint(this.brush ? null : n ? `${it.name}: поставлено` : `${it.name}: больше нет. Купите ещё на рынке, раздел «Декор»`);
+    f.changed();
+    return true;
+  }
+
+  // ---------- «Убрать всё» ----------
+  // Сколько чего уберётся (по группам storeAll.js): то, у чего сейчас работает призрачок, не считается
+  storeAllPlan() { return StoreAll.plan(this.f.world, (q) => this.skip(q)); }
+
+  // Колодец не починен, а все пруды уйдут в рюкзак: воды для лейки не останется (предупреждение в окне)
+  storeAllNoWater(groups) { return StoreAll.leavesNoWater(this.f.st, this.f.world, groups, (q) => this.skip(q)); }
+
+  // Призрачок занят этим объектом или клеткой (или рыбачит в этом пруду)
+  skip(q) { return q.obj ? (Ponds.isPond(q.obj) ? this.busyPond(q.obj) : this.busy(q)) : this.busy(q); }
+
+  // Убрать в рюкзак всё своё из групп groups (['decor', 'paths', …]). → { n, left } — сколько убрано и осталось
+  storeAll(groups) {
+    const f = this.f, w = f.world;
+    const r = StoreAll.storeAll(f.st, w, groups, { now: Date.now(), rng: Math.random, skip: (q) => this.skip(q) });
+    this.sel = null; this.to = null; this.brush = null;
+    if (!r.n) { this.hint(r.left ? 'Ничего не убрано: призрачок там работает, подождите' : 'Убирать нечего', !!r.left); return r; }
+    if (r.paths) f.groundV++;
+    const p = f.player;
+    p.worldPos(tmp);
+    f.dropFx({ wx: tmp.x, wy: tmp.y - 10 }, r.items.slice(0, 5));
+    f.sfx('dig');
+    this.hint(`В рюкзаке: ${StoreAll.summary(r.by)}` + (r.left ? `. Осталось ${r.left}: там работает призрачок` : '. Пустая трава — поставить обратно'));
+    f.changed();
+    return r;
   }
 }

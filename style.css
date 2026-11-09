@@ -563,7 +563,19 @@ body[data-side="2"] .debug { top: calc(var(--safe-t) + 248px); }
 .mb-btns .btn-s { flex: 1; min-width: 0; padding: 0 6px; justify-content: center; min-height: 40px; font-size: 13px; }
 .mb-btns .btn-s[hidden] { display: none; }
 .mb-btns .btn-s.done { background: linear-gradient(#9be06a, #5fb03a); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.mb-btns .btn-s.mb-rot { flex: 0 0 46px; padding: 0; }
+.mb-btns .btn-s.mb-rot .ic { width: 26px; height: 26px; margin: 0; }
 body.moving .hud-bottom { display: none; }
+/* окно «Убрать всё» (из «Переставить») */
+.sa-note { font-size: 13px; color: #6b5442; margin: 0 0 4px; line-height: 1.35; }
+.set-row.tog.sa-row { grid-template-columns: 30px 1fr auto auto; }
+.sa-row .ic { width: 28px; height: 28px; object-fit: contain; }
+.sa-t { display: flex; flex-direction: column; min-width: 0; font-weight: 700; }
+.sa-t small { font-size: 11.5px; font-weight: 500; color: #8a6a50; line-height: 1.25; margin-top: 1px; }
+.sa-row b { min-width: 2ch; text-align: right; font-size: 15px; color: var(--ink); }
+.sa-warn { margin: 10px 0 0; font-size: 12.5px; font-weight: 700; color: #c0392b; line-height: 1.35; }
+.sa-stay { margin: 10px 0 0; font-size: 12px; color: #8a6a50; }
+.sa-go { width: 100%; margin-top: 12px; }
 body.moving .toast { bottom: calc(var(--safe-b) + 112px); }
 .move-bar.shake { animation: mb-shake .32s; }
 @keyframes mb-shake { 20% { transform: translateX(calc(-50% - 6px)); } 45% { transform: translateX(calc(-50% + 5px)); } 70% { transform: translateX(calc(-50% - 3px)); } }

@@ -20,13 +20,26 @@ const tmp = { x: 0, y: 0 };
 
 // Клетки, которые занимает объект с описанием def (OBJECTS): [[dx, dy], ...] от левого верхнего угла.
 // Без def.cells — весь прямоугольник w × h; def.cells — фигура (например, пруд без углов).
-const RECTS = new Map();
-export function objCells(def) {
+// rot — положение поворота (декор, data.js DECOR): в нечётных фигура отражена — gx и gy меняются местами.
+const RECTS = new Map(), FLIPPED = new WeakMap();
+export function objCells(def, rot) {
+  if (rot & 1) {
+    const base = objCells(def);
+    let r = FLIPPED.get(base);
+    if (!r) { r = base.map(([x, y]) => [y, x]); FLIPPED.set(base, r); }
+    return r;
+  }
   if (def && def.cells) return def.cells;
   const w = (def && def.w) || 1, h = (def && def.h) || 1, k = w * 64 + h;
   let r = RECTS.get(k);
   if (!r) { r = []; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) r.push([x, y]); RECTS.set(k, r); }
   return r;
+}
+
+// Положение поворота rot, приведённое к тем, что есть у объекта def (def.rot — сколько их: 1, 2 или 4)
+export function normRot(def, rot) {
+  const n = (def && def.rot) || 1;
+  return n > 1 ? (((rot | 0) % n) + n) % n : 0;
 }
 
 // Украшение пруда вида k на клетке воды (dx, dy): точка (в клетках от угла пруда), где оно стоит.
@@ -169,14 +182,17 @@ export class World {
     return this.tiles[i] !== T.WATER && this.occ[i] < 0;
   }
 
-  add(type, gx, gy) {
+  // rot — положение поворота (декор): в нечётных ширина и высота меняются местами
+  add(type, gx, gy, rot = 0) {
     const def = OBJECTS[type];
-    const w = def.w || 1, h = def.h || 1, cells = objCells(def);
+    rot = normRot(def, rot);
+    const w = (rot & 1 ? def.h : def.w) || 1, h = (rot & 1 ? def.w : def.h) || 1, cells = objCells(def, rot);
     for (const [dx, dy] of cells) {
       const x = gx + dx, y = gy + dy;
       if (!this.inside(x, y) || this.occ[y * N + x] >= 0 || this.tiles[y * N + x] !== T.GRASS) return null;
     }
     const o = { id: this.objects.length, type, gx, gy, w, h, hp: def.hp || 0, state: 0, shake: 0 };
+    if (rot) o.rot = rot;
     toWorld(gx + w / 2, gy + h / 2, tmp);
     o.wx = tmp.x; o.wy = tmp.y;
     o.depth = gx + w / 2 + gy + h / 2;
@@ -409,7 +425,7 @@ export class World {
 
   // Снять объект с карты (клетки свободны) и поставить обратно — для загрузки сохранения
   lift(o) {
-    for (const [dx, dy] of objCells(OBJECTS[o.type])) {
+    for (const [dx, dy] of objCells(OBJECTS[o.type], o.rot)) {
       const i = (o.gy + dy) * N + o.gx + dx;
       if (this.occ[i] === o.id) this.occ[i] = -1;
     }
@@ -417,20 +433,25 @@ export class World {
 
   put(o, gx, gy) { this.moveObject(o, gx, gy); }
 
-  // Перенос своей постройки (дом, колодец) на другие клетки; проверки — в Mover
-  moveObject(o, gx, gy) {
+  // Перенос своей постройки (дом, колодец) на другие клетки; проверки — в Mover.
+  // rot — новое положение поворота (декор; по умолчанию — прежнее)
+  moveObject(o, gx, gy, rot = o.rot) {
     this.lift(o);
+    const def = OBJECTS[o.type];
+    rot = normRot(def, rot);
+    if (rot) o.rot = rot; else delete o.rot;
+    o.w = (rot & 1 ? def.h : def.w) || 1; o.h = (rot & 1 ? def.w : def.h) || 1;
     o.gx = gx; o.gy = gy;
     toWorld(gx + o.w / 2, gy + o.h / 2, tmp);
     o.wx = tmp.x; o.wy = tmp.y;
     o.depth = gx + o.w / 2 + gy + o.h / 2;
-    for (const [dx, dy] of objCells(OBJECTS[o.type])) this.occ[(gy + dy) * N + gx + dx] = o.id;
+    for (const [dx, dy] of objCells(def, rot)) this.occ[(gy + dy) * N + gx + dx] = o.id;
     this.version++;
   }
 
   // Можно ли поставить объект сюда при загрузке (вся площадь — свободная трава открытой земли)
   freeFor(o, gx, gy) {
-    for (const [dx, dy] of objCells(OBJECTS[o.type])) {
+    for (const [dx, dy] of objCells(OBJECTS[o.type], o.rot)) {
       const x = gx + dx, y = gy + dy;
       if (!this.isOpen(x, y) || this.tiles[y * N + x] !== T.GRASS) return false;
       const i = this.occ[y * N + x];

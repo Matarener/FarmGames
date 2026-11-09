@@ -323,6 +323,58 @@ for (const [k, s] of Object.entries(SPRINKLERS)) {
     desc: `${s.desc} Грядки рядом поливаются сами, даже когда игра закрыта. Ставится на траву: «Поставить» (или «Ещё» → «Переставить»).`,
   };
 }
+// Декор (раздел «Декор»): фонари, лавочки, столики — свои вещи на траве (placed.js), как поливалки.
+// Ключ — тип объекта, id предмета и имя картинки (assets/art). w × h — клетки в положении 0 (по умолчанию 1 × 1).
+// rot — сколько положений у поворота («Повернуть» в «Переставить»): 1 — симметричная вещь, не поворачивается;
+// 2 — спереди и сзади одинакова: положение 1 — зеркало картинки; 4 — ещё и вид сзади (картинка <ключ>_back),
+// положение 2 — он, 3 — его зеркало. В нечётных положениях у вещи не 1 × 1 ширина и высота меняются местами
+// (зеркало изометрии — это перестановка осей gx и gy). Картинка в положении 0: длинная сторона — вдоль gx
+// (на экране от левого верхнего угла к правому нижнему), лицом к зрителю — к соседу gy + 1 (вниз-влево).
+export const DECOR = {
+  decor_lantern:    { name: 'Садовый фонарик',     price: 20,  level: 2, rot: 1, desc: 'Маленький фонарик на колышке, светит у дорожки.' },
+  decor_bench:      { name: 'Лавочка',             price: 30,  level: 2, rot: 2, desc: 'Простая деревянная лавочка без спинки.' },
+  decor_table:      { name: 'Круглый столик',      price: 40,  level: 3, rot: 1, desc: 'Круглый садовый столик на одной ножке.' },
+  decor_lamp:       { name: 'Уличный фонарь',      price: 60,  level: 4, rot: 1, desc: 'Высокий чугунный фонарь, как на старой улице.' },
+  decor_hook_lamp:  { name: 'Фонарь на крюке',     price: 90,  level: 5, rot: 4, desc: 'Деревянный столбик с фонарём на изогнутом крюке.' },
+  decor_park_bench: { name: 'Скамейка со спинкой', price: 100, level: 5, rot: 4, w: 2, desc: 'Длинная скамейка со спинкой, на ней поместятся двое.' },
+  decor_stone_lamp: { name: 'Каменный фонарь',     price: 120, level: 6, rot: 1, desc: 'Каменный садовый фонарь, хорош рядом с сакурой.' },
+  decor_table_set:  { name: 'Столик со стульями',  price: 150, level: 7, rot: 2, w: 2, desc: 'Квадратный столик и два стула: можно пить чай в саду.' },
+};
+// Заборы (раздел «Декор»): секция на клетку травы, цена — за секцию. Ставятся нажатиями по клеткам, как дорожки
+// (Mover.pave), соседние секции (и разных видов) соединяются сами: у клетки столбик и пролёты на полклетки к соседям-заборам
+// (картинки <ключ>_post и <ключ>_span, Farm.fenceSprite). Не поворачиваются.
+export const FENCES = {
+  fence_wattle: { name: 'Плетень',         price: 3, level: 2, desc: 'Плетёный забор из ивовых прутьев.' },
+  fence_picket: { name: 'Штакетник',       price: 5, level: 3, desc: 'Белый деревянный штакетник.' },
+  fence_stone:  { name: 'Каменная ограда', price: 8, level: 5, desc: 'Низкая ограда из камней.' },
+};
+for (const [k, d] of Object.entries(DECOR)) {
+  d.key = k;
+  OBJECTS[k] = { name: d.name, static: true, item: k, deco: k, w: d.w || 1, h: d.h || 1, rot: d.rot || 1 };
+  ITEMS[k] = {
+    key: k, name: d.name, icon: k, tabs: ['decor'], place: 'obj', objOf: k,
+    desc: `${d.desc} Ставится на траву: «Поставить» (или «Ещё» → «Переставить»)` + (d.rot > 1 ? ', там же — «Повернуть».' : '.'),
+  };
+}
+for (const [k, d] of Object.entries(FENCES)) {
+  d.key = k;
+  OBJECTS[k] = { name: d.name, static: true, item: k, fence: k };
+  ITEMS[k] = {
+    key: k, name: d.name, icon: k, tabs: ['decor'], place: 'obj', objOf: k, brush: true,
+    desc: `${d.desc} Одна секция: нажмите «Поставить» и выбирайте клетки на траве, соседние секции соединятся сами.`,
+  };
+}
+// «Убрать всё» (кнопка в «Переставить», storeAll.js): что можно убрать с карты в рюкзак разом — галочки в окне.
+// Дом, колодец, грядки и дикие растения остаются. off — галочка по умолчанию снята (ростки в рюкзаке начнут расти
+// заново). n — как сказать «сколько» (1, 2–4, 5+) в итоге: «В рюкзаке: 15 дорожек, 1 пруд».
+export const STORE_GROUPS = [
+  { key: 'decor',   name: 'Декор и заборы',        sub: 'Фонари, лавочки, столики, секции заборов', icon: 'decor', n: ['вещь декора', 'вещи декора', 'вещей декора'] },
+  { key: 'paths',   name: 'Дорожки',               sub: 'Все клетки, вид сохраняется', icon: 'path', n: ['дорожка', 'дорожки', 'дорожек'] },
+  { key: 'ponds',   name: 'Пруды',                 sub: 'Вместе с камышом, рогозом и камнями', icon: 'pond_small', n: ['пруд', 'пруда', 'прудов'] },
+  { key: 'plants',  name: 'Свои деревья и кусты',  sub: 'Висящие плоды сразу соберутся в рюкзак', icon: 'own_apple', n: ['растение', 'растения', 'растений'] },
+  { key: 'build',   name: 'Постройки',             sub: 'Поливалки и другие свои постройки', icon: 'sprinkler_drip', n: ['постройка', 'постройки', 'построек'] },
+  { key: 'sprouts', name: 'Растущие ростки',       sub: 'Вернутся саженцами и начнут расти заново', icon: 'sap_oak', off: true, n: ['росток', 'ростка', 'ростков'] },
+];
 // пруды: ставятся в режиме «Переставить» (нажмите на траву, где ему быть, — появится, как он встанет)
 for (const [k, p] of Object.entries(PONDS)) ITEMS[k] = {
   key: k, name: p.name, icon: k, tabs: ['decor'], place: 'pond', pondOf: k,
@@ -369,6 +421,8 @@ for (const [k, s] of Object.entries(SPRINKLERS)) SHOP.push({ tab: 'build', item:
 // украшения для прудов и пруды, тоже от дешёвых к дорогим
 for (const [t, d] of Object.entries(POND_DECOR).sort((a, b) => a[1].price - b[1].price)) SHOP.push({ tab: 'decor', item: pondDecorId(t), price: d.price, level: d.level });
 for (const [k, p] of Object.entries(PONDS).sort((a, b) => a[1].price - b[1].price)) SHOP.push({ tab: 'decor', item: k, price: p.price, level: p.level });
+// фонари, лавочки, столики и заборы (цена забора — за секцию)
+for (const [k, d] of Object.entries({ ...FENCES, ...DECOR })) SHOP.push({ tab: 'decor', item: k, price: d.price, level: d.level });
 SHOP.push({ tab: 'res', item: 'stone', price: 4 });
 SHOP.push({ tab: 'res', item: 'wood', price: 1, cur: 'gems', qty: 10 });
 SHOP.push({ tab: 'res', item: 'ore', price: 1, cur: 'gems', qty: 3 });

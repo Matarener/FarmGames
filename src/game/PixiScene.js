@@ -490,7 +490,7 @@ export class PixiScene {
       if (!this.groundAtlas.fits(e.canvas.width, e.canvas.height)) break;
       this.groundAtlas.tex(e);
     }
-    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k)) add(v, k !== 'bubble' && k !== 'fog' && k !== 'hint');
+    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k)) add(v, k !== 'bubble' && k !== 'fog' && k !== 'hint' && k !== 'deco' && k !== 'fence'); // декор только на открытой земле
     for (const o of w.objects || []) { if (!o || OBJECTS[o.type].flat) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
     for (const arr of Object.values(S.objArt)) for (const t of arr) for (const id of [0, 1, 3]) { const st = S.stumpOf(t, id); if (st) { this.atlas.tex(st); this.atlas.tex(dimSprite(st)); } }
     for (const im of Object.values(f.iconImg)) if (im.complete && im.naturalWidth) this.iconTex(im);
@@ -942,7 +942,7 @@ export class PixiScene {
     if (this.moverHi.visible) { this.put(this.moverHi, f.objSprite(s.o), s.o.wx, s.o.wy); this.moverHi.alpha = 0.12 + 0.18 * pulse; }
     // клетки объекта (у постройки из рюкзака своего места на карте ещё нет)
     if (s && s.kind !== 'bag') {
-      for (const [dx, dy] of objCells(s)) {
+      for (const [dx, dy] of m.curCells()) {
         toWorld(s.gx + dx + 0.5, s.gy + dy + 0.5, tmp);
         g.poly([tmp.x, tmp.y - HH + 1, tmp.x + HW - 2, tmp.y, tmp.x, tmp.y + HH - 1, tmp.x - HW + 2, tmp.y]).stroke({ width: 2.5, color: 0xffe65a, alpha: pulse });
       }
@@ -957,7 +957,9 @@ export class PixiScene {
       if (s.kind === 'obj' || s.kind === 'bag' || s.kind === 'decor') {
         if (s.decor) f.decorPoint(t.gx, t.gy, tmp); // украшение пруда: у берега — ближе к земле
         else toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp);
-        const sp = s.kind === 'obj' ? f.objSprite(s.o) : f.placeSprite(s.id);
+        // своя постройка — как встанет: в новом положении поворота, забор — с соседями на новом месте
+        const sp = s.kind === 'obj' ? (s.placed ? f.objSprite({ type: s.o.type, id: s.o.id, gx: t.gx, gy: t.gy, rot: s.rot, self: s.o, preview: true }) : f.objSprite(s.o))
+          : f.placeSprite(s.id, s.rot, t.gx, t.gy);
         this.moverGhost.visible = !!sp;
         if (sp) this.put(this.moverGhost, sp, tmp.x, tmp.y);
       } else {
