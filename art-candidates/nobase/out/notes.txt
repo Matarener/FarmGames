@@ -30,13 +30,21 @@ bush_hydrangea: bush_hydrangea__2.png — OK. (__1: bright red outline segment b
 bush_hydrangea_bare: bush_hydrangea_bare__1.png — OK.
 bush_hydrangea_young: bush_hydrangea_young__1.png — OK.
 bush_lavender: bush_lavender__1.png — OK.
-bush_lavender_bare: (pending retry) __1, __2: small magenta specks in gaps between stems.
+bush_lavender_bare: bush_lavender_bare__2.png — FAIL (least bad of 3): __1/__2 small magenta specks in gaps between stems; __3 leaves keyed semi-transparent. Needs a magenta despill.
 bush_lavender_young: bush_lavender_young__1.png — OK.
-bush_raspberry: (pending retry) __1, __2: leaves keyed semi-transparent (~20% of the interior), whitish fringe.
+bush_raspberry: bush_raspberry__1.png — FAIL (all 3): leaves keyed semi-transparent (~20-24% of the interior), whitish fringe on light backgrounds. Shape/berries are right; needs different keying.
 bush_raspberry_bare: bush_raspberry_bare__1.png — OK.
-bush_raspberry_young: (pending retry) __1: leaves keyed semi-transparent.
-bush_rose_bare: (pending retry) __1: leaves keyed semi-transparent.
+bush_raspberry_young: (pending retry) __1, __2: leaves keyed semi-transparent.
+bush_rose_bare: bush_rose_bare__2.png — OK. (__1: leaves keyed semi-transparent.)
 bush_rose_young: bush_rose_young__1.png — OK.
-bush_rosehip: (pending retry) __1: small unkeyed cyan bits between the branches.
-bush_rosehip_bare: (pending retry) __1: leaves keyed semi-transparent.
+bush_rosehip: (pending retry) __1, __2: small unkeyed cyan bits between the branches.
+bush_rosehip_bare: bush_rosehip_bare__2.png — OK. (__1: leaves keyed semi-transparent.)
 bush_rosehip_young: bush_rosehip_young__1.png — OK.
+stump_birch: stump_birch__1.png — OK.
+stump_pine: (pending retry) __1: magenta fringe between the pine needles.
+stump_oak_moss: (pending retry) __1: moss/bark keyed semi-transparent, white fringe; hole through the stump.
+stump_apple: stump_apple__1.png — OK (apple on the ground removed as asked).
+stump_sakura: stump_sakura__1.png — OK.
+stump_cherry: stump_cherry__1.png — OK.
+stump_maple: (pending retry) __1: the red/orange maple leaf sprigs beside the stump (in reference) are missing.
+stump_linden: stump_linden__1.png — OK.
