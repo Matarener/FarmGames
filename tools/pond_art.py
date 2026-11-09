@@ -239,6 +239,9 @@ def main(args):
         else:
             img, g = render(key, p, 7 + i)
         SA.save(Image.fromarray(img), key, g[0], g[1], g[2], g[3], man)
+        # рамка непрозрачной части (пиксели): по ней иконка пруда в рюкзаке и на рынке (artSprites.iconOf)
+        ys, xs = np.nonzero(img[..., 3] > 8)
+        man[key]['icon'] = [int(xs.min()), int(ys.min()), int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)]
         print(f'{key:12s} {img.shape[1]}x{img.shape[0]}' + (' (нарисованная)' if os.path.exists(drawn) else ''))
         if pv: preview(key, p, img, g, os.path.join(ROOT, '.pond-art', key + '.png'))
     with open(os.path.join(OUT, 'manifest.json'), 'w') as f:

@@ -18,11 +18,13 @@ const OBJ = {
 for (const [k, f] of Object.entries(FLORA)) OBJ[k] = [f.kind + '_' + k];
 
 // Иконка саженца: само растение в квадрате 64×64
+// s.icon — [x, y, w, h]: только эта часть картинки (у прудов — без пустых полей вокруг)
 function iconOf(s) {
-  const c = makeCanvas(64, 64), g = c.getContext('2d'), k = Math.min(60 / s.canvas.width, 60 / s.canvas.height);
-  const w = s.canvas.width * k, h = s.canvas.height * k;
+  const [x, y, sw, sh] = s.icon || [0, 0, s.canvas.width, s.canvas.height];
+  const c = makeCanvas(64, 64), g = c.getContext('2d'), k = Math.min(60 / sw, 60 / sh);
+  const w = sw * k, h = sh * k;
   g.imageSmoothingQuality = 'high';
-  g.drawImage(s.canvas, (64 - w) / 2, (64 - h) / 2, w, h);
+  g.drawImage(s.canvas, x, y, sw, sh, (64 - w) / 2, (64 - h) / 2, w, h);
   return c.toDataURL();
 }
 
@@ -42,6 +44,7 @@ export async function loadArt(onProgress) {
     try {
       const img = await loadImageRetry(BASE + name + '.webp?v=' + V);
       A[name] = { canvas: img, w: m.w, h: m.h, ax: m.ax, ay: m.ay, name };
+      if (m.icon) A[name].icon = m.icon;
     } catch (e) { failed.push(name); }
     tick();
   }));
