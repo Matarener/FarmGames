@@ -11,6 +11,7 @@ import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Gifts } from './gifts.js';
 import { Wheel } from './wheel.js';
+import { Orders } from './orders.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
 import * as Wild from './wild.js';
@@ -42,6 +43,7 @@ export class Farm {
     this.quests = new Quests(this);
     this.gifts = new Gifts(this);
     this.wheel = new Wheel(this);
+    this.orders = new Orders(this);
     // Режим тестера (окно «Настройки»): монеты, кристаллы, предметы, энергия и проверка заданий —
     // сдвиг часов заданий и событие. Включается ?debug в адресе или нажатиями по строке версии.
     this.urlDebug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
@@ -1237,6 +1239,7 @@ export class Farm {
       this.floraTick(now); t = pf.part('растения', t);
       this.wildTick(now); t = pf.part('поросль', t);
       this.quests.tick(); t = pf.part('задания', t);
+      this.orders.tick(); t = pf.part('заказы', t);
       this.syncHint(); t = pf.part('подсказка', t);
       this.ui.tick(this); t = pf.part('интерфейс', t);
     }
