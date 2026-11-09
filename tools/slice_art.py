@@ -36,6 +36,11 @@ SINGLE = {
     'boulder': 118, 'rock': 54, 'rock_small': 40, 'boulder_moss': 116,
     # дом по уровням
     'house_1': -132, 'house_2': -132, 'house_3': -132, 'house_4': -132, 'house_5': -132,
+    # здания с крафтом (2×2, как дом; src/game/buildData.js)
+    'building_kitchen': -132, 'building_carpentry': -132, 'building_forge': -132, 'building_stonecutter': -132,
+    # стройка каждого здания (оно же в лесах) и дом в лесах, пока идёт улучшение до этого уровня
+    'site_kitchen': -132, 'site_carpentry': -132, 'site_forge': -132, 'site_stonecutter': -132,
+    'house_up_2': -132, 'house_up_3': -132, 'house_up_4': -132, 'house_up_5': -132,
 }
 SHEETS.update({name: [(name, w)] for name, w in SINGLE.items()})
 # Постройки без «пятачка» травы (поливалки): одна на картинку, масштаб — по высоте в мире; опора — середина
@@ -80,6 +85,13 @@ NOBASE = {
     'tree_pine_young': ('h', 66), 'tree_oak_young': ('h', 64), 'tree_linden_young': ('h', 60),
     'tree_birch_young': ('h', 58), 'tree_maple_young': ('h', 54), 'tree_cherry_young': ('h', 52),
     'tree_apple_young': ('h', 49), 'tree_sakura_young': ('h', 48),
+    # плодовые деревья из магазина (2026-11-09) — в ряду плодовых: груша > черёмуха > вишня > хурма > слива >
+    # абрикос (крона низкая и широкая). Черёмуха без плодов — в цвету.
+    'tree_pear': ('h', 90), 'tree_pear_bare': ('h', 90), 'tree_bird_cherry': ('h', 88), 'tree_bird_cherry_bare': ('h', 88),
+    'tree_persimmon': ('h', 84), 'tree_persimmon_bare': ('h', 84), 'tree_plum': ('h', 80), 'tree_plum_bare': ('h', 80),
+    'tree_apricot': ('h', 70), 'tree_apricot_bare': ('h', 70),
+    'tree_pear_young': ('h', 54), 'tree_bird_cherry_young': ('h', 53), 'tree_persimmon_young': ('h', 50),
+    'tree_plum_young': ('h', 48), 'tree_apricot_young': ('h', 42),
     # кусты: с плодами, без, молодые
     'bush_blueberry': ('w', 58.8), 'bush_raspberry': ('w', 56.5), 'bush_rosehip': ('w', 57.8),
     'bush_hydrangea': ('w', 58.5), 'bush_lavender': ('w', 53.2), 'bush_rose': ('w', 58.5),
@@ -92,6 +104,9 @@ NOBASE = {
     'stump_oak': ('w', 38), 'stump_birch': ('w', 27), 'stump_pine': ('w', 31), 'stump_oak_moss': ('w', 38),
     'stump_apple': ('w', 31), 'stump_sakura': ('w', 31), 'stump_cherry': ('w', 31), 'stump_maple': ('w', 31),
     'stump_linden': ('w', 31),
+    # пни новых плодовых: их пни выше и без широких веток с цветами по бокам — чуть уже, чтобы ствол был как у яблони
+    'stump_bird_cherry': ('w', 25), 'stump_plum': ('w', 28), 'stump_pear': ('w', 26), 'stump_apricot': ('w', 28),
+    'stump_persimmon': ('w', 28),
     # дикая высокая трава (до 2026-11-09 — лист grass_tall из трёх)
     'grass_tall_0': ('w', 42), 'grass_tall_1': ('w', 46), 'grass_tall_2': ('w', 46), 'grass_tall_3': ('w', 38),
 }
@@ -149,11 +164,22 @@ ICON_SHEETS = {
     # липа (2026-11-08): липовый цвет и саженец — по одной иконке на картинку
     'ui_linden_blossom': ['linden_blossom'],
     'ui_sap_linden': ['sap_linden'],
+    # плодовые деревья из магазина (2026-11-09): плод и саженец — по одной иконке на картинку
+    'ui_bird_cherry': ['bird_cherry'], 'ui_sap_bird_cherry': ['sap_bird_cherry'],
+    'ui_plum': ['plum'], 'ui_sap_plum': ['sap_plum'],
+    'ui_pear': ['pear'], 'ui_sap_pear': ['sap_pear'],
+    'ui_apricot': ['apricot'], 'ui_sap_apricot': ['sap_apricot'],
+    'ui_persimmon': ['persimmon'], 'ui_sap_persimmon': ['sap_persimmon'],
     # стрелка-подсказка к заданию, кольцо под целью, кружок у края экрана (Farm.applyArt → PixiScene.syncHint)
     'ui_hints': ['hint_arrow', 'hint_ring', 'hint_badge'],
     # подарки: кнопка в интерфейсе, вкладки окна «Подарки», сундук 7-го дня
     'ui_gifts': ['gift', 'calendar', 'friends', 'invite', 'event', 'chest'],
-    'ui_wheel': ['wheel'],  # колесо фортуны: кнопка в интерфейсе и пункт «Ещё» (само колесо в окне рисуется кодом)
+    'ui_wheel': ['wheel'],
+    # здания с крафтом: блюда кухни, значок чертежа, товары мастерских (src/game/buildData.js CRAFT_GOODS)
+    'ui_dishes1': ['carrot_salad', 'linden_tea', 'fish_soup', 'raspberry_jam'],
+    'ui_dishes2': ['borscht', 'pumpkin_porridge', 'strawberry_cake', 'blueprint'],
+    'ui_craft1': ['planks', 'birch_box', 'acorn_toy', 'pine_wreath', 'crate'],
+    'ui_craft2': ['iron_ingot', 'nails', 'horseshoe', 'stone_block', 'millstone'],  # колесо фортуны: кнопка в интерфейсе и пункт «Ещё» (само колесо в окне рисуется кодом)
     'ui_rotate': ['rotate'],  # «Повернуть» в «Переставить» (декор)
 }
 ICON_PX = 128

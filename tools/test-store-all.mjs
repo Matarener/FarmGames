@@ -203,13 +203,14 @@ test('storeAll: убранное ставится обратно теми же �
   assert.ok(Flora.sowGrown(st, 'apple', x0 + 6, y0 + 4, NOW));
 });
 
-test('грядка и колодец: предметы в «Постройках», не продаются и не в магазине', () => {
+test('грядка и колодец: предметы в «Постройках», не продаются; грядка — на рынке, колодца там нет', () => {
   for (const id of [BED_ITEM, WELL_ITEM]) {
     assert.deepEqual(ITEMS[id].tabs, ['build']);
     assert.ok(!ITEMS[id].sell, id);
-    assert.ok(!SHOP.some((o) => o.item === id), id);
     assert.ok(Number.isFinite(ITEMS[id].order), id);
   }
+  assert.ok(!SHOP.some((o) => o.item === WELL_ITEM));
+  assert.ok(SHOP.find((o) => o.item === BED_ITEM).bed, 'цена и предел грядки — beds.js');
   assert.equal(ITEMS[BED_ITEM].place, 'bed');
   assert.equal(ITEMS[WELL_ITEM].place, 'well');
 });

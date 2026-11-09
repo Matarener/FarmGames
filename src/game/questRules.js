@@ -1,5 +1,6 @@
 // Правила заданий: чистые функции над состоянием фермы st (без DOM, звуков, Date.now и Math.random).
-// Время, часовой пояс и случайность приходят снаружи: ctx = { now (мс), tz (часов от UTC), rng, force? }.
+// Время, часовой пояс и случайность приходят снаружи: ctx = { now (мс), tz (часов от UTC), rng, force?, stats? }.
+// stats — то, что знает только мир (для целей { state }): { beds, bedsAll } — грядок на ферме и всего.
 // Потом эти же функции выполнит сервер. Тосты, звуки и опыт делает Farm по возвращённым событиям:
 //   { type: 'done', view }               — задание выполнено (можно забрать награду)
 //   { type: 'credit', what, reward }     — период или событие кончились: несобранные награды начислены
@@ -107,9 +108,11 @@ export function lineState(st, key) {
   return { line: L, status: 'end' };
 }
 
-function goalView(st, g, n0, all) {
+// { state } — значение из состояния st (house, well, level) или из ctx.stats: то, что знает только мир
+// (beds — грядок на ферме, bedsAll — всех своих грядок: на ферме и в рюкзаке)
+function goalView(st, g, n0, all, ctx) {
   let p;
-  if (g.state) p = st[g.state] || 0;
+  if (g.state) p = (ctx && ctx.stats && g.state in ctx.stats ? ctx.stats[g.state] : st[g.state]) || 0;
   else {
     p = n0 || 0;
     if (all) { const L = life(st); p = Math.max(p, L[g.key ? g.ev + ':' + g.key : g.ev] || 0); }
@@ -125,21 +128,21 @@ function makeView(base, goals, claimed) {
 
 const withXp = (r, xp) => (r.xp != null ? r : { ...r, xp });
 
-function questView(st, q, prog, base) {
-  const goals = goalsOf(q).map((g, i) => ({ ...goalView(st, g, prog && prog[i], q.life), task: g.task || q.task }));
+function questView(st, q, prog, base, ctx) {
+  const goals = goalsOf(q).map((g, i) => ({ ...goalView(st, g, prog && prog[i], q.life, ctx), task: g.task || q.task }));
   return makeView({ id: q.id, title: q.title, who: q.who || null, text: q.text || null, task: q.task || goals.map((g) => g.task).join(', '), reward: withXp(q.reward, QUEST_XP), ...base }, goals);
 }
 
-function lineView(st, ls) {
+function lineView(st, ls, ctx) {
   const { q, idx, line } = ls;
-  return questView(st, q, questState(st).prog[q.id], { kind: 'line', line: line.key, idx, icon: line.key === 'story' ? (q.who === 'note' ? 'note' : 'star') : line.icon });
+  return questView(st, q, questState(st).prog[q.id], { kind: 'line', line: line.key, idx, icon: line.key === 'story' ? (q.who === 'note' ? 'note' : 'star') : line.icon }, ctx);
 }
 
 // Все ветки для окна: состояние и задание (view), если открыто
-export function lineRows(st) {
+export function lineRows(st, ctx) {
   return LINES.map((L) => {
     const ls = lineState(st, L.key);
-    return { ...ls, view: ls.status === 'open' ? lineView(st, ls) : null };
+    return { ...ls, view: ls.status === 'open' ? lineView(st, ls, ctx) : null };
   });
 }
 
@@ -300,7 +303,7 @@ export function eventRows(st, ctx) {
 
 export function views(st, ctx) {
   const out = [];
-  for (const r of lineRows(st)) if (r.view) out.push(r.view);
+  for (const r of lineRows(st, ctx)) if (r.view) out.push(r.view);
   if (st.level >= PERIODIC_LEVEL) {
     for (const kind of Object.keys(PERIODS)) out.push(...periodViews(st, kind));
     for (const e of eventRows(st, ctx)) { if (e.cur) out.push(e.cur); out.push(e.prize); }
@@ -368,7 +371,7 @@ export function onEvent(st, ev, key, n, ctx) {
     const p = prog[q.id] || (prog[q.id] = []);
     p[i] = Math.min(g.n, (p[i] || 0) + n);
   });
-  for (const r of lineRows(st)) if (r.status === 'open') count(r.q, Q.prog);
+  for (const r of lineRows(st, ctx)) if (r.status === 'open') count(r.q, Q.prog);
   if (st.level >= PERIODIC_LEVEL) {
     for (const kind of Object.keys(PERIODS)) {
       const P = Q.per[kind];

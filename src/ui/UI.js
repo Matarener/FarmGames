@@ -2,8 +2,9 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS, STORE_ALL } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, BED_ITEM, BEDS, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS, STORE_ALL } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
+import * as Beds from '../game/beds.js';
 import * as Plant from '../game/planting.js';
 import * as R from '../game/questRules.js';
 import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ, MAX_PINS } from '../game/questData.js';
@@ -13,6 +14,9 @@ import { ACH_GROUPS, ACH_MEDALS } from '../game/achData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 import * as Dev from '../game/devRules.js';
+import { BUILDINGS, RECIPES, bldId } from '../game/buildData.js';
+import * as BR from '../game/buildRules.js';
+import * as HR from '../game/houseRules.js';
 import { Mover } from '../game/Mover.js';
 
 // версия сборки (tools/build.mjs); при локальном запуске — «локально»
@@ -22,7 +26,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const RES_NAMES = { wood: 'Дерево', stone: 'Камень', ore: 'Руда', coins: 'Монеты', gems: 'Кристаллы' };
 // кнопки, к которым может показать стрелка-подсказка (UI.hint)
-const HINT_EL = { quest: '#btn-quests', market: '#btn-market', dig: '#btn-dig', bag: '#btn-bag' };
+const HINT_EL = { quest: '#btn-quests', market: '#btn-market', beds: '#btn-beds', bag: '#btn-bag' };
 // вкладки окна «Задания»: периодические появляются с PERIODIC_LEVEL, «Событие» — пока оно идёт
 const QTABS = [
   { key: 'main', name: 'Основные', icon: 'star' },
@@ -79,10 +83,10 @@ export class UI {
     $('#mb-all').onclick = () => this.storeAllPanel(farm);
     $('#pb-pick').onclick = () => {
       const P = farm.planting;
-      if (!P || P.dig) return;
+      if (!P) return;
       if (P.species) this.sowPanel(farm, null, null); else this.plantPanel(farm, null);
     };
-    $('#btn-dig').onclick = () => farm.pickDig();
+    $('#btn-beds').onclick = () => farm.pickBeds();
     $('#pb-x').onclick = () => farm.stopPlanting();
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && farm.mover.active) farm.mover.exit(); });
   }
@@ -138,6 +142,7 @@ export class UI {
     this.questCards(f);
     this.moreBadge(f);
     this.marketBadge(f);
+    this.bedsBadge(f);
     this.giftTick(f, false);
     this.wheelTick(f, false);
     this.tick(f);
@@ -155,6 +160,8 @@ export class UI {
     this.giftTick(f, true);
     this.wheelTick(f, true);
     if (this.popupEl.classList.contains('show') && this._popupTick) this._popupTick();
+    if (this.panelOpen && this.panelEl.dataset.kind === 'craft') this.craftTick(f);
+    if (this.panelOpen && this.panelEl.dataset.kind === 'house') this.houseTick(f);
   }
 
   toast(msg, kind) {
@@ -292,7 +299,7 @@ export class UI {
   }
 
   questLines(f, body, S) {
-    for (const r of R.lineRows(f.st)) {
+    for (const r of R.lineRows(f.st, f.quests.ctx())) {
       const L = r.line;
       if (r.view) { body.appendChild(this.questRow(f, S, r.view, L.key === 'story' ? `${L.name} · ${r.view.title}` : L.name)); continue; }
       const sub = r.status === 'lock' ? `Откроется после задания «${r.after.title}»` :
@@ -451,6 +458,7 @@ export class UI {
       () => firstQuest && this.questPanel(f, { id: firstQuest.id }),
       () => this.plantPanel(f, null),
       () => this.housePanel(f),
+      () => this.craftPanel(f, 'kitchen'),
       () => this.giftPanel(f),
       () => this.wheelPanel(f),
       () => this.achPanel(f),
@@ -470,7 +478,7 @@ export class UI {
     } finally {
       this.closePanel(); this.closePopup(); this.toggleMore(false);
       Q.seen = seen; // окно задания сюжета помечает его прочитанным — возвращаем как было
-      this.qp = this.mk = this.inv = this.pl = this.gp = this.sa = null; // вкладки и выбор в окнах — по умолчанию
+      this.qp = this.mk = this.inv = this.pl = this.gp = this.sa = this.cr = null; // вкладки и выбор в окнах — по умолчанию
       this._openT = -1;
       void this.root.offsetHeight; // окна закрылись ещё без анимации
       this.root.classList.remove('warming');
@@ -1083,26 +1091,164 @@ export class UI {
     this.refreshPanel();
   }
 
+  // Окно дома: что даёт уровень и улучшение. Улучшение идёт по времени (houseRules.js): пока дом в лесах,
+  // здесь полоска, сколько осталось, и «Достроить сейчас» за кристаллы (время идёт — houseTick).
   housePanel(f) {
     this.openPanel('house', 'Дом фермера', (body) => {
-      const lvl = f.st.house, cur = HOUSE[lvl], next = HOUSE[lvl + 1];
+      const st = f.st, now = Date.now(), up = HR.houseUp(st), lvl = st.house, cur = HOUSE[lvl], next = HOUSE[up ? up.to : lvl + 1];
+      this._houseUp = up ? up.to : 0;
       body.appendChild(h('div', 'pn-hero', `${this.ic('house', 'ic big')}<div><b>${lvl} уровень</b><span>Главное здание: от него зависят энергия, лейка и размер фермы.</span></div>`));
       const row = (label, a, b) => `<div class="stat"><span>${label}</span><b>${a}${b != null ? ` <i>→ ${b}</i>` : ''}</b></div>`;
       body.appendChild(h('div', 'stats',
         row('Энергия', cur.energy, next && next.energy) +
         row('Лейка, поливов', cur.can, next && next.can) +
         row('Участков земли', cur.chunks, next && next.chunks)));
-      if (next) {
+      if (up) {
+        const left = HR.houseUpLeft(st, now), gems = BR.gemsFor(left);
+        body.appendChild(h('div', 'pn-sub', `Идёт улучшение до ${up.to} уровня`));
+        body.appendChild(h('div', 'hu-prog', `<div class="cr-bar"><u style="width:${(HR.houseUpPart(st, now) * 100).toFixed(1)}%"></u></div><span>Осталось <b class="hu-left">${leftText(left)}</b></span>`));
+        const b = h('button', 'btn-main hu-speed', `Достроить сейчас · <span>${gems} ${this.ic('gem', 'ic-s')}</span>`);
+        b.dataset.g = gems;
+        b.disabled = st.gems < gems;
+        b.onclick = () => f.builds.speedHouse();
+        body.appendChild(b);
+      } else if (next) {
         body.appendChild(h('div', 'pn-sub', 'Улучшение'));
         body.appendChild(h('div', 'pp-cost', this.costHtml(next.cost, f)));
         const need = houseNeedChunks(lvl), have = f.world.unlockedCount();
         if (have < need) body.appendChild(h('div', 'pn-text', `Сначала откройте новый участок земли (участков: ${have} из ${need}).`));
+        else if (next.time) body.appendChild(h('div', 'pn-text', `Стройка займёт ${fmtShort(next.time)}: всё это время дом будет в лесах.`));
         const b = h('button', 'btn-main', `Улучшить до ${lvl + 1} уровня`);
         b.disabled = !f.canPay(next.cost) || have < need;
         b.onclick = () => { if (f.upgradeHouse()) this.refreshPanel(); };
         body.appendChild(b);
       } else body.appendChild(h('div', 'pn-text', 'Дом улучшен до максимума!'));
     });
+  }
+
+  // Раз в секунду, пока открыто окно дома: время улучшения идёт; кончилось — окно пересобирается
+  houseTick(f) {
+    const up = HR.houseUp(f.st);
+    if ((up ? up.to : 0) !== this._houseUp) return this.refreshPanel();
+    if (!up) return;
+    const now = Date.now(), el = this.panelEl, left = HR.houseUpLeft(f.st, now);
+    const bar = el.querySelector('.hu-prog u'), t = el.querySelector('.hu-left'), sp = el.querySelector('.hu-speed');
+    if (bar) bar.style.width = (HR.houseUpPart(f.st, now) * 100).toFixed(1) + '%';
+    if (t) t.textContent = leftText(left);
+    if (sp) {
+      const gems = BR.gemsFor(left);
+      if (sp.dataset.g !== String(gems)) { sp.dataset.g = gems; sp.querySelector('span').innerHTML = `${gems} ${this.ic('gem', 'ic-s')}`; }
+      sp.disabled = f.st.gems < gems;
+    }
+  }
+
+  // ---------- Здание с крафтом: очередь и рецепты ----------
+  // Сверху — очередь (готовое, что делается, что ждёт, свободные места), под ней — рецепты сеткой.
+  // Выбранный рецепт — карточка снизу: что уйдёт и кнопка. Время в очереди идёт каждую секунду
+  // (craftTick); товар доделался — окно пересобирается.
+  craftPanel(f, k) {
+    const b = BUILDINGS[k];
+    if (!this.cr || this.cr.k !== k) this.cr = { k, sel: null };
+    const S = this.cr;
+    this.openPanel('craft', b.name, (body, card) => {
+      const st = f.st, now = Date.now(), v = BR.queueView(st, k, now);
+      S.key = this.craftKey(f, k, now);
+      body.appendChild(h('div', 'pn-hero', `${this.ic(bldId(k), 'ic big')}<div><span>${b.desc}</span></div>`));
+      body.appendChild(h('div', 'pn-sub', `Очередь · ${v.jobs.length} из ${b.slots}`));
+      const q = h('div', 'cr-queue');
+      for (let i = 0; i < b.slots; i++) q.appendChild(this.craftSlot(f, k, v.jobs[i]));
+      body.appendChild(q);
+      if (v.ready) {
+        const c = h('button', 'btn-main', `Забрать готовое: ${v.ready}`);
+        c.onclick = () => f.builds.collect(k);
+        body.appendChild(c);
+      }
+      body.appendChild(h('div', 'pn-sub', 'Рецепты'));
+      const g = h('div', 'mk-grid');
+      for (const { r, open, block } of BR.recipesOf(st, k, now)) {
+        const it = ITEMS[r.item];
+        const c = h('button', 'mk-cell' + (open ? '' : ' locked') + (open && block ? ' poor' : '') + (S.sel === r.key ? ' sel' : ''),
+          `<i>${this.ic(it.icon, 'ic')}${open ? '' : this.ic('lock', 'mk-lock')}${r.n > 1 ? `<b>×${r.n}</b>` : ''}</i>` +
+          `<span>${open ? fmtShort(r.time) : `с ${r.level} ур.`}</span>`);
+        c.title = it.name;
+        c.onclick = () => { S.sel = S.sel === r.key ? null : r.key; this.sfx('tap'); this.refreshPanel(); };
+        g.appendChild(c);
+      }
+      body.appendChild(g);
+      const r = S.sel && RECIPES[S.sel];
+      if (r && r.at === k) card.appendChild(this.recipeCard(f, k, r, now));
+      else S.sel = null;
+    });
+  }
+
+  // Место в очереди: j — товар (BR.queueView) или пусто
+  craftSlot(f, k, j) {
+    if (!j) return h('div', 'cr-slot empty', '<i></i><span>свободно</span>');
+    const it = ITEMS[j.r.item];
+    const s = h('div', 'cr-slot' + (j.done ? ' done' : j.running ? ' run' : ' wait'),
+      `<i>${this.ic(it.icon, 'ic')}${j.r.n > 1 ? `<b>×${j.r.n}</b>` : ''}${j.done ? '<em>✓</em>' : ''}</i>`);
+    s.title = it.name;
+    if (j.done) s.appendChild(h('span', '', 'готово'));
+    else if (j.running) {
+      s.appendChild(h('div', 'cr-bar', `<u style="width:${(j.k * 100).toFixed(1)}%"></u>`));
+      s.appendChild(h('span', 'cr-left', leftText(j.left)));
+      const gems = BR.gemsFor(j.left), sp = h('button', 'btn-s cr-speed', `${gems} ${this.ic('gem', 'ic-s')}`);
+      sp.title = 'Доделать сейчас';
+      sp.disabled = f.st.gems < gems; sp.onclick = () => f.builds.speedCraft(k);
+      s.appendChild(sp);
+    } else {
+      s.appendChild(h('span', 'cr-left', `ждёт · ${fmtShort(j.r.time)}`));
+      const x = h('button', 'cr-x', '✕');
+      x.title = 'Отменить: продукты вернутся в рюкзак';
+      x.onclick = () => f.builds.cancel(k, j.idx);
+      s.appendChild(x);
+    }
+    return s;
+  }
+
+  // Карточка рецепта: что получится, что уйдёт, кнопка «Приготовить · 2 мин»
+  recipeCard(f, k, r, now) {
+    const b = BUILDINGS[k], it = ITEMS[r.item], st = f.st, block = BR.craftBlock(st, k, r.key, now);
+    const facts = [
+      `${fmtShort(r.time)}`,
+      it.food && `+${it.food} ${this.ic('energy')}`,
+      it.sell && `${it.sell} ${this.ic('coin')} за шт.`,
+      Inv.count(st, it.key) && `в рюкзаке ${fmtNum(Inv.count(st, it.key))}`,
+    ].filter(Boolean).join(' · ');
+    const box = h('div', 'inv-info ui-layer',
+      `<div class="ii-ic">${this.ic(it.icon, 'ic big')}</div>` +
+      `<div class="ii-t"><b>${it.name}${r.n > 1 ? ` ×${r.n}` : ''}</b><span>${it.desc}</span><span class="ii-f">${facts}</span></div>`);
+    const x = h('button', 'ii-x', '✕'); x.onclick = () => { this.cr.sel = null; this.refreshPanel(); };
+    box.appendChild(x);
+    box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(r.need, f)));
+    if (st.level < r.level) { box.appendChild(h('div', 'ii-note', `Откроется с ${r.level} уровня.`)); return box; }
+    if (block && !/^Не хватает/.test(block)) box.appendChild(h('div', 'ii-note', block));
+    const acts = h('div', 'ii-a');
+    const go = h('button', 'btn-s gold', `${b.verb} · ${fmtShort(r.time)}`);
+    go.disabled = !!block; go.onclick = () => f.builds.craft(k, r.key);
+    acts.appendChild(go);
+    box.appendChild(acts);
+    return box;
+  }
+
+  // Что в очереди здания (вид каждого места): сменилось — окно пересобирается
+  craftKey(f, k, now) {
+    return BR.queueView(f.st, k, now).jobs.map((j) => (j.done ? 'd' : j.running ? 'r' : 'w') + j.id).join(',') + '|' + (BR.isBuilt(f.st, k, now) ? 1 : 0);
+  }
+
+  // Раз в секунду, пока открыто окно здания: время и полоска у того, что делается сейчас
+  craftTick(f) {
+    const S = this.cr;
+    if (!S) return;
+    const now = Date.now();
+    if (this.craftKey(f, S.k, now) !== S.key) return this.refreshPanel();
+    const j = BR.queueView(f.st, S.k, now).jobs.find((x) => x.running), el = this.panelEl.querySelector('.cr-slot.run');
+    if (!j || !el) return;
+    el.querySelector('.cr-bar u').style.width = (j.k * 100).toFixed(1) + '%';
+    el.querySelector('.cr-left').textContent = leftText(j.left);
+    const gems = BR.gemsFor(j.left), sp = el.querySelector('.cr-speed');
+    if (sp.dataset.g !== String(gems)) { sp.dataset.g = gems; sp.innerHTML = `${gems} ${this.ic('gem', 'ic-s')}`; }
+    sp.disabled = f.st.gems < gems;
   }
 
   // ---------- Окно «разделы слева, предметы справа» (рюкзак, рынок, выдача тестера) ----------
@@ -1154,9 +1300,12 @@ export class UI {
 
   // ---------- Рынок: «Заказы», «Купить» и «Продать» ----------
   // mode — сразу этот раздел (иначе тот, что был открыт в прошлый раз)
-  marketPanel(f, mode) {
+  // mode — сразу этот режим ('orders' | 'buy' | 'sell'); item — сразу этот товар на «Купить» (кнопка «Грядки»)
+  marketPanel(f, mode, item) {
     const M = this.mk || (this.mk = { mode: 'sell', tab: 'seeds', sel: null });
     if (mode && mode !== M.mode) { M.mode = mode; M.sel = null; }
+    const o = item && SHOP.find((x) => x.item === item);
+    if (o) { M.mode = 'buy'; M.tab = o.tab; M.sel = item; M.skip = null; }
     this.openPanel('market', 'Рынок', (body, card) => {
       const seg = h('div', 'mk-seg n3'), ready = f.orders.ready();
       for (const [k, name] of [['orders', 'Заказы'], ['buy', 'Купить'], ['sell', 'Продать']]) {
@@ -1169,6 +1318,15 @@ export class UI {
       else if (M.mode === 'sell') this.marketSell(f, body, M);
       else this.marketBuy(f, body, M);
     });
+  }
+
+  // Цифра на кнопке «Грядки»: сколько грядок ждёт в рюкзаке (нет — кнопка ведёт на рынок)
+  bedsBadge(f) {
+    const n = Inv.count(f.st, BED_ITEM);
+    if (this.last.bedsBag === n) return;
+    this.last.bedsBag = n;
+    const b = $('#beds-badge');
+    b.hidden = !n; b.textContent = n > 99 ? '99+' : n;
   }
 
   // Цифра на кнопке «Рынок»: сколько заказов можно сдать прямо сейчас
@@ -1293,14 +1451,18 @@ export class UI {
       onTab: (k) => { M.tab = k; M.sel = null; },
       sort: { val: M.bsort, set: (v) => { M.bsort = v; }, cheap: true },
     });
-    const offers = sortOffers(SHOP.filter((o) => o.tab === M.tab), M.bsort, st.level);
+    // грядка: цена растёт с каждой, предел — по уровню (beds.js); закрыта предел, как товар «с N ур.»
+    const bed = SHOP.some((o) => o.bed && o.tab === M.tab) ? Beds.bedOffer(st, f.bedCounts().bedsAll) : null;
+    const live = (o) => (o.bed ? { ...o, price: bed.price, level: bed.can ? 1 : bed.level || Infinity } : o);
+    const offers = sortOffers(SHOP.filter((o) => o.tab === M.tab).map(live), M.bsort, st.level);
     if (!offers.length) { L.list.appendChild(h('div', 'pn-empty', 'Скоро здесь появятся товары.')); return; }
     const g = h('div', 'mk-grid');
     for (const o of offers) {
       const it = ITEMS[o.item], locked = o.level > st.level, cur = o.cur === 'gems' ? 'gem' : 'coin';
+      const own = it.blueprint && BR.owned(st, it.blueprint); // здание уже есть — чертёж больше не нужен
       const c = h('button', 'mk-cell' + (locked ? ' locked' : '') + (M.sel === o.item ? ' sel' : ''),
         `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${locked ? this.ic('lock', 'mk-lock') : ''}${o.qty > 1 ? `<b>×${o.qty}</b>` : ''}</i>` +
-        `<span>${locked ? `с ${o.level} ур.` : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
+        `<span>${locked ? (o.level === Infinity ? 'всё' : `с ${o.level} ур.`) : own ? 'построено' : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
       c.title = it.name;
       c.onclick = () => this.pick(M, o.item);
       g.appendChild(c);
@@ -1310,23 +1472,30 @@ export class UI {
     if (!o) { M.sel = null; return; }
     const it = ITEMS[o.item], have = Inv.count(st, it.key), pack = o.qty || 1;
     const curKey = o.cur || 'coins', cur = curKey === 'gems' ? 'gem' : 'coin';
-    const per = pack > 1 ? `${o.price} ${this.ic(cur)} за ${pack} шт.` : `${o.price} ${this.ic(cur)} за шт.`;
-    const box = this.mkCard(it, `${per}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${it.floraOf && FLORA[it.floraOf].pick ? ` · плоды: ${ITEMS[FLORA[it.floraOf].fruit].name.toLowerCase()} по ${ITEMS[FLORA[it.floraOf].fruit].sell} ${this.ic('coin')}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
-    if (o.level > st.level) box.appendChild(h('div', 'ii-note', `Откроется с ${o.level} уровня.`));
-    else {
-      const max = Math.min(99, Math.floor(st[curKey] / o.price));
-      const Q = this.buyQty || (this.buyQty = {});
-      const q = Q[o.item] = Math.max(1, Math.min(Math.max(1, max), Q[o.item] || 1));
-      const row = h('div', 'ii-sell');
-      if (max > 1) row.appendChild(this.stepper(q, max, (v) => { Q[o.item] = v; this.refreshPanel(); }));
-      const acts = h('div', 'ii-a');
-      const b = h('button', 'btn-s gold', `Купить ${q * pack} шт. · ${q * o.price} ${this.ic(cur)}`);
-      b.disabled = st[curKey] < q * o.price; b.onclick = () => f.buy(o, q);
-      acts.appendChild(b);
-      // купленную дорожку — сразу класть: окно закрывается, включается «Кладём дорожку»;
+    const per = it.blueprint ? `${o.price} ${this.ic(cur)} · стройка ${fmtShort(BUILDINGS[it.blueprint].time)}`
+      : pack > 1 ? `${o.price} ${this.ic(cur)} за ${pack} шт.` : `${o.price} ${this.ic(cur)} за шт.`;
+    const box = this.mkCard(it, `${per}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${it.floraOf && FLORA[it.floraOf].pick ? ` · плоды: ${ITEMS[FLORA[it.floraOf].fruit].name.toLowerCase()} по ${ITEMS[FLORA[it.floraOf].fruit].sell} ${this.ic('coin')}` : ''}${o.bed ? ` · грядок ${bed.owned} из ${Math.max(bed.owned, bed.limit)}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
+    if (o.bed) box.appendChild(h('div', 'ii-note', this.bedNote(bed, st.level)));
+    const locked = o.level > st.level;
+    if (locked && !o.bed) box.appendChild(h('div', 'ii-note', `Откроется с ${o.level} уровня.`));
+    else if (!locked && it.blueprint) this.blueprintBuy(f, box, o, it);
+    // грядки упёрлись в предел: купить нельзя, а поставить те, что в рюкзаке, — можно
+    if (!it.blueprint && (!locked || (o.bed && have))) {
+      const row = h('div', 'ii-sell'), acts = h('div', 'ii-a');
+      if (!locked) {
+        // грядку — по одной: следующая уже дороже
+        const max = o.bed ? Math.min(1, Math.floor(st[curKey] / o.price)) : Math.min(99, Math.floor(st[curKey] / o.price));
+        const Q = this.buyQty || (this.buyQty = {});
+        const q = Q[o.item] = Math.max(1, Math.min(Math.max(1, max), Q[o.item] || 1));
+        if (max > 1) row.appendChild(this.stepper(q, max, (v) => { Q[o.item] = v; this.refreshPanel(); }));
+        const b = h('button', 'btn-s gold', `Купить ${q * pack} шт. · ${q * o.price} ${this.ic(cur)}`);
+        b.disabled = st[curKey] < q * o.price; b.onclick = () => f.buy(o, q);
+        acts.appendChild(b);
+      }
+      // купленную дорожку (и грядку) — сразу класть: окно закрывается, включается «Кладём дорожку»;
       // пруд, украшение пруда, постройку (поливалку) — ставить: выбраны в «Переставить», нажатие на клетку — предпросмотр
       if (Mover.placeable(it) && have) {
-        const p = h('button', 'btn-s', 'Поставить');
+        const p = h('button', locked ? 'btn-s gold' : 'btn-s', 'Поставить');
         p.onclick = () => { this.closePanel(); f.mover.useItem(it.key); };
         acts.appendChild(p);
       }
@@ -1335,6 +1504,39 @@ export class UI {
     }
     L.info(box);
   }
+  // Строка про предел грядок в карточке грядки на рынке
+  bedNote(b, level) {
+    if (!b.can) return b.level ? `Грядок уже ${b.owned}: столько можно на ${level} уровне. Следующую можно купить с ${b.level} уровня.`
+      : `Грядок уже ${b.owned}: больше не бывает.`;
+    const max = BEDS.limit.max, more = b.limit - b.owned;
+    return `Ещё можно купить ${more} ${R.plural(more, ['грядку', 'грядки', 'грядок'])}${b.limit < max ? `, с уровнем предел растёт до ${max}` : ''}. Каждая следующая дороже.`;
+  }
+
+  // Чертёж здания на рынке: материалы на стройку; купить можно один, пока здания нет на ферме.
+  // Чертёж в рюкзаке — «Построить» (выбрать место, Mover.takeFromBag)
+  blueprintBuy(f, box, o, it) {
+    const k = it.blueprint, st = f.st, block = BR.blueprintBlock(st, k);
+    box.appendChild(h('div', 'ii-note', 'Материалы на стройку:'));
+    box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(BUILDINGS[k].cost, f)));
+    if (block && !Inv.count(st, it.key)) box.appendChild(h('div', 'ii-note', block.why + '.'));
+    const acts = h('div', 'ii-a');
+    if (!block) {
+      const b = h('button', 'btn-s gold', `Купить чертёж · ${o.price} ${this.ic(o.cur === 'gems' ? 'gem' : 'coin')}`);
+      b.disabled = st[o.cur || 'coins'] < o.price; b.onclick = () => f.buy(o, 1);
+      acts.appendChild(b);
+    }
+    if (Inv.count(st, it.key)) acts.appendChild(this.buildBtn(f, it));
+    if (acts.children.length) box.appendChild(acts);
+  }
+
+  // «Построить» у чертежа: хватает материалов — окно закрывается, выбираем место для стройки
+  buildBtn(f, it) {
+    const b = h('button', 'btn-s gold', `${this.ic('build')} Построить`), why = BR.buildBlock(f.st, it.blueprint);
+    b.disabled = !!why;
+    b.onclick = () => { this.closePanel(); f.mover.takeFromBag(it.key); };
+    return b;
+  }
+
   // карточка выбранного товара на рынке (снизу окна)
   mkCard(it, facts, M) {
     const box = h('div', 'inv-info ui-layer',
@@ -1476,18 +1678,7 @@ export class UI {
   plantBar(f) {
     const P = f.planting, on = !!P, body = document.body;
     if (body.classList.contains('planting') !== on) { body.classList.toggle('planting', on); $('#plant-bar').hidden = !on; this._safe = null; }
-    body.classList.toggle('digging', !!(P && P.dig));
     if (!on) { this.last.pb = null; return; }
-    if (P.dig) {
-      // режим «Копаем грядки»: менять нечего, только ✕
-      const key = `dig:${f.st.energy}:${this.icons.dig ? 1 : 0}`;
-      if (this.last.pb === key) return;
-      this.last.pb = key;
-      $('#pb-ic').src = this.icons.dig || '';
-      $('#pb-name').textContent = 'Копаем грядки';
-      $('#pb-sub').innerHTML = `${ENERGY.dig} ${this.ic('energy', 'ic-s')} за грядку · нажимай на траву`;
-      return;
-    }
     if (P.species) {
       // саженец или своё растение на свободную траву
       const fl = FLORA[P.species], id = (P.grown ? floraOwnId : floraSeedId)(P.species), it = ITEMS[id], n = Inv.count(f.st, id);
@@ -1539,9 +1730,13 @@ export class UI {
       };
       acts.appendChild(b);
     }
+    // чертёж здания: что нужно на стройку и «Построить»;
     // дорожки: «Поставить» закрывает рюкзак и включает «Кладём дорожку» (нажимай на траву);
     // пруды, украшения прудов и постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
-    if (Mover.placeable(it) && n > 0) {
+    if (it.blueprint && n > 0) {
+      box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(BUILDINGS[it.blueprint].cost, f)));
+      acts.appendChild(this.buildBtn(f, it));
+    } else if (Mover.placeable(it) && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
       b.onclick = () => { this.closePanel(); f.mover.useItem(it.key); };
       acts.appendChild(b);
@@ -1600,3 +1795,5 @@ function fmtDay(t) { const d = new Date(t + QUEST_TZ * 3600e3); return `${d.getU
 // до нового покупателя: «4:32», дольше часа — «1 ч 5 мин»
 function fmtWait(ms) { return ms >= 3600e3 ? fmtLeft(ms) : fmtClock(Math.ceil(ms / 1000)); }
 function fmtClock(s) { s = Math.max(0, s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
+// сколько осталось сделать (секунды): до часа — «4:05», дольше — «1 ч 10 мин»
+function leftText(sec) { return sec < 3600 ? fmtClock(Math.ceil(sec)) : fmtLeft(sec * 1000); }

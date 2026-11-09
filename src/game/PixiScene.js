@@ -6,7 +6,7 @@ import { toWorld, HW, HH } from '../engine/Iso.js';
 import { dimSprite, hash2 } from '../engine/Sprite.js';
 import { N, CHUNK, CHUNKS, T, FOG_W, objCells } from './World.js';
 import { areaCells } from './sprinklers.js';
-import { HOUSE, FOG, OBJECTS } from './data.js';
+import { HOUSE, FOG, OBJECTS, BED_ITEM } from './data.js';
 import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop, primeBarTop } from './bars.js';
 
 const tmp = { x: 0, y: 0 };
@@ -709,6 +709,15 @@ export class PixiScene {
       if (bu.visible) this.put(bu, bs, b.wx, b.wy - 26 + bob);
     });
     this.crops.forEach((e) => { const b = e.b; if (f.beds.get(b.i) === b) return; e.destroy(); this.crops.delete(b); const bu = this.bub.get(b); if (bu) { bu.destroy(); this.bub.delete(b); } });
+    // пузыри «готово» над зданиями с крафтом (Farm.syncBars → f.bldBub: x, y по 2 числа)
+    const BB = f.bldBub || [], BP = this.bldBub || (this.bldBub = []);
+    for (let i = 0; i * 2 < BB.length; i++) {
+      let bu = BP[i];
+      if (!bu) { bu = BP[i] = new PIXI.Sprite(); this.bubbles.addChild(bu); }
+      bu.visible = r.visible(BB[i * 2] - 16, BB[i * 2 + 1] - 30, 32, 32);
+      if (bu.visible) this.put(bu, S.bubble.ready, BB[i * 2], BB[i * 2 + 1] + bob);
+    }
+    for (let i = BB.length / 2; i < BP.length; i++) BP[i].visible = false;
 
     this.syncBars();
 
@@ -786,7 +795,9 @@ export class PixiScene {
     const f = this.f, h = f.hint, HS = f.S.hint, cam = f.cam, p = f.player, t = f.time;
     const dt = Math.min(0.1, Math.max(0, t - (this._hT ?? t))); this._hT = t;
     if (p.state !== 'idle' || p.queue.length) this._hBusy = t;
-    const want = !!h && h.kind !== 'ui' && !!HS && !f.mover.active && !f.editor && !f.benching && t - (this._hBusy ?? -9) > HINT_WAIT;
+    // в «Переставить» стрелки нет; когда ставим грядки из рюкзака — есть (трава у грядок по заданию)
+    const moving = f.mover.active && f.mover.brush !== BED_ITEM;
+    const want = !!h && h.kind !== 'ui' && !!HS && !moving && !f.editor && !f.benching && t - (this._hBusy ?? -9) > HINT_WAIT;
     // новая цель или подсказка снова появилась — сразу прыжок
     if (this._hV !== f.hintV || (want && !this._hWant)) { this._hV = f.hintV; this._hop0 = t; }
     this._hWant = want;

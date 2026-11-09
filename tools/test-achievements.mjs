@@ -22,6 +22,7 @@ test('table: ids, groups, tiers, rewards, icons', () => {
   const py = fs.readFileSync(new URL('./slice_art.py', import.meta.url), 'utf8');
   const sheets = py.slice(py.indexOf('ICON_SHEETS = {'), py.indexOf('ICON_PX'));
   const icons = new Set([...sheets.matchAll(/'([a-z_0-9]+)'/g)].map((m) => m[1]));
+  icons.add('bed'); // иконка грядки — из самой картинки грядки (artSprites.js)
   for (const a of ACH) {
     assert.ok(groups.has(a.group), a.id);
     assert.ok(icons.has(a.icon), `${a.id}: нет иконки ${a.icon}`);
@@ -169,12 +170,26 @@ test('quest counter: claims count, bonuses do not', () => {
 test('tiers raised after claim: no double reward', () => {
   const st = fresh();
   A.check(st, ctx);
-  ev(st, 'dig', null, 5);
-  A.claim(st, 'dig', ctx);
-  st.ach.got.dig = 3; // как будто ступени в таблице подняли
-  const d = v(st, 'dig');
-  assert.equal(d.can, 0); assert.equal(d.n, 60); assert.deepEqual(d.reward, ACH_REWARDS[3]);
-  assert.equal(A.claim(st, 'dig', ctx), null);
+  ev(st, 'mow', null, 10);
+  A.claim(st, 'mow', ctx);
+  st.ach.got.mow = 3; // как будто ступени в таблице подняли
+  const d = v(st, 'mow');
+  assert.equal(d.can, 0); assert.equal(d.n, 750); assert.deepEqual(d.reward, ACH_REWARDS[3]);
+  assert.equal(A.claim(st, 'mow', ctx), null);
+});
+
+test('Огородник: считаются все свои грядки, медали «Землекопа» остаются', () => {
+  const st = fresh(), c = { chunks: 1, bedsAll: 4 };
+  A.check(st, c);
+  assert.equal(v(st, 'dig', c).reached, 1);
+  assert.ok(A.claim(st, 'dig', c));
+  // старое сохранение: «Землекоп» забран до 3 ступени (копали 30 раз), а грядок 10 — медали те же, награды не повторяются
+  st.ach.got.dig = 3;
+  const d = v(st, 'dig', { chunks: 1, bedsAll: 10 });
+  assert.equal(d.got, 3); assert.equal(d.can, 0); assert.equal(d.n, 20); assert.deepEqual(d.reward, ACH_REWARDS[3]);
+  assert.equal(A.claim(st, 'dig', { chunks: 1, bedsAll: 10 }), null);
+  assert.equal(v(st, 'dig', { chunks: 1, bedsAll: 20 }).can, 1);
+  assert.equal(v(st, 'dig', { chunks: 1 }).p, 0, 'без мира — ноль');
 });
 
 console.log(`\n${tests} tests passed`);

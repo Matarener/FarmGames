@@ -35,10 +35,13 @@ assets/map.json  стартовая карта (редактор карты)
 | поливалка | `<ключ из SPRINKLERS>` (иконка на рынке и в рюкзаке — сама картинка) | `sprinkler_spin` |
 | декор (фонари, лавочки, столики) | `<ключ из DECOR>`, вид сзади — `<ключ>_back` (иконка — сама картинка) | `decor_park_bench`, `decor_park_bench_back` |
 | забор | `<ключ из FENCES>_post` (столбик), `<ключ>_span` (пролёт на полклетки, делает `tools/fence_art.py`) | `fence_picket_post` |
+| здание с крафтом, стройка | `building_<ключ из BUILDINGS>` (иконка — само здание), `site_<ключ>` — оно же в лесах | `building_forge`, `site_forge` |
+| дом в лесах (идёт улучшение) | `house_up_<уровень, до которого улучшают>` | `house_up_3` |
 | туман | `fog_clouds_<n>`, `fog_strips_<n>`, `fog_wisps_<n>` | |
 | иконка интерфейса | `ic_<имя>` | `ic_coin`, `ic_sap_oak` |
 
 `<вид>` — ключ из `FLORA` в `src/game/data.js` (oak, birch, sakura, cherry, maple, apple, pine, linden,
+bird_cherry, plum, pear, apricot, persimmon,
 blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` — ключ из `CROPS`.
 Картинки деревьев и кустов игра находит по этим именам сама: новый вид — это строка в `FLORA` и
 картинки `tree_<вид>` (или `bush_<вид>`), `_young`, при сборе плодов — `_bare`, у дерева — `stump_<вид>`.

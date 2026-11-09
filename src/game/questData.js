@@ -6,11 +6,14 @@
 //   who    — 'ghost' говорит призрачок, 'note' — записка бабушки Марфы
 //   goal   — { ev, key?, group?, n } — счётчик событий игры (Farm → quests.emit):
 //            harvest, plant, water, fish, chop, stump, mine, dig, mow, pick, sow, sell, earn (монеты с рынка),
-//            buy, expand, order (сдан заказ с доски на рынке), place (свою постройку из рюкзака: key — её тип).
+//            buy, expand, order (сдан заказ с доски на рынке), place (свою постройку из рюкзака: key — её тип),
+//            build (стройка здания кончилась: key — здание), craft (забрали товар из здания: key — товар).
 //            key — точный ключ (культура, рыба, вид дерева), group — группа ключей (GROUPS в questRules.js)
-//            { state, n } — значение из состояния: house (уровень дома), well (колодец), level (уровень игрока)
+//            { state, n } — значение из состояния: house (уровень дома), well (колодец), level (уровень игрока),
+//            beds (грядок на ферме), bedsAll (всех своих грядок: на ферме и в рюкзаке) — их даёт мир (ctx.stats)
 //   goals  — несколько целей сразу: [{ ...goal, task }]
-//   reward — { coins, gems, xp, items: { id: n } }; xp по умолчанию QUEST_XP
+//   reward — { coins, gems, xp, items: { id: n } }; xp по умолчанию QUEST_XP. Грядки (items.bed) даются и сверх
+//            предела по уровню (BEDS в data.js)
 //   level  — задание откроется с этого уровня игрока
 //   life   — засчитывать и то, что игрок сделал до задания (первые задания сюжета: деревья могли кончиться раньше)
 
@@ -30,6 +33,7 @@ export const LINES = [
   { key: 'fishing', name: 'Рыбалка', icon: 'fish', after: 'story.fishing' },
   { key: 'forest', name: 'Лес и сад', icon: 'axe', after: 'story.wood' },
   { key: 'build', name: 'Стройка', icon: 'house', after: 'story.well' },
+  { key: 'craft', name: 'Мастерские', icon: 'build', after: 'story.well' },
   { key: 'trade', name: 'Торговля', icon: 'market', after: 'garden.first' },
 ];
 
@@ -99,13 +103,17 @@ export const QUESTS = {
   garden: [
     {
       id: 'garden.beds', title: 'Новые грядки', who: 'ghost',
-      text: 'Двух грядок маловато. Вскопаю ещё, пусть ферма будет большой!',
-      task: 'Вскопай 2 грядки', goal: { ev: 'dig', n: 2 }, reward: { coins: 15 },
+      text: 'Двух грядок маловато. На рынке продают готовые грядки: куплю ещё парочку, пусть ферма будет большой!',
+      goals: [
+        { state: 'bedsAll', n: 4, task: 'Купи 2 грядки на рынке (раздел «Постройки»)' },
+        { state: 'beds', n: 4, task: 'Поставь их: пусть на ферме будет 4 грядки' },
+      ],
+      reward: { coins: 20 },
     },
     {
       id: 'garden.first', title: 'Первый урожай', who: 'ghost',
       text: 'Грядки зазеленели! Если поливать их вовремя, урожай будет быстрее.',
-      task: 'Собери 5 урожаев', goal: { ev: 'harvest', n: 5 }, reward: { gems: 1, coins: 10 },
+      task: 'Собери 5 урожаев', goal: { ev: 'harvest', n: 5 }, reward: { gems: 1, coins: 10, items: { bed: 1 } },
     },
     {
       id: 'garden.bread', title: 'Бабушкин хлеб', who: 'ghost', level: 2,
@@ -133,8 +141,8 @@ export const QUESTS = {
     },
     {
       id: 'garden.bigbeds', title: 'Большой огород', who: 'note', level: 4,
-      text: '«Чем больше грядок, тем больше урожай. Только не забывай их поливать! Бабушка Марфа»',
-      task: 'Вскопай ещё 4 грядки', goal: { ev: 'dig', n: 4 }, reward: { coins: 50 },
+      text: '«Чем больше грядок, тем больше урожай. Грядки продают на рынке. Только не забывай их поливать! Бабушка Марфа»',
+      task: 'Пусть на ферме будет 10 грядок', goal: { state: 'beds', n: 10 }, reward: { coins: 30, items: { bed: 2 } },
     },
     {
       id: 'garden.tomato', title: 'Томатный сок', who: 'ghost', level: 5,
@@ -145,6 +153,11 @@ export const QUESTS = {
       id: 'garden.corn', title: 'Кукурузное поле', who: 'note', level: 7,
       text: '«Кукуруза вырастает выше забора. Когда-то в ней прятался весь соседский выводок цыплят! Бабушка Марфа»',
       task: 'Собери 10 кукурузы', goal: { ev: 'harvest', key: 'corn', n: 10 }, reward: { coins: 150, gems: 2 },
+    },
+    {
+      id: 'garden.field', title: 'Целое поле', who: 'note', level: 9,
+      text: '«Когда-то за домом грядки тянулись до самого леса. Вот бы снова увидеть такое поле! Бабушка Марфа»',
+      task: 'Пусть на ферме будет 20 грядок', goal: { state: 'beds', n: 20 }, reward: { gems: 2, items: { bed: 3 } },
     },
   ],
 
@@ -252,6 +265,56 @@ export const QUESTS = {
       id: 'build.house5', title: 'Бабушкина усадьба', who: 'note',
       text: '«Я и не мечтала, что наш домик снова станет таким красивым. Ты молодец, призрачок! Бабушка Марфа»',
       task: 'Улучши дом до 5 уровня', goal: { state: 'house', n: 5 }, reward: { gems: 5 },
+    },
+  ],
+
+  // здания с крафтом (buildData.js): чертёж с рынка → стройка → первые товары
+  craft: [
+    {
+      id: 'craft.kitchen', title: 'Бабушкина кухня', who: 'note', level: 3,
+      text: '«Без печки ферма — не ферма. Купи на рынке чертёж кухни, запаси дерева и камня и поставь её во дворе: из урожая там выходят блюда, от которых сил куда больше, чем от сырой морковки. Бабушка Марфа»',
+      goals: [
+        { ev: 'buy', key: 'bp_kitchen', n: 1, task: 'Купи чертёж кухни (рынок, раздел «Постройки»)' },
+        { ev: 'build', key: 'kitchen', n: 1, task: 'Построй кухню' },
+      ],
+      reward: { coins: 40 },
+    },
+    {
+      id: 'craft.salad', title: 'Морковный салат', who: 'ghost', level: 3,
+      text: 'Кухня готова! Первым делом — морковный салат: тёртая морковка с зеленью, и сил сразу прибавится.',
+      task: 'Приготовь 2 морковных салата', goal: { ev: 'craft', key: 'carrot_salad', n: 2 }, reward: { coins: 30 },
+    },
+    {
+      id: 'craft.carpentry', title: 'Столярка', who: 'note', level: 4,
+      text: '«Доски сами себя не напилят. Поставь столярную мастерскую: доски пригодятся для кузницы и новых построек. Бабушка Марфа»',
+      goals: [
+        { ev: 'build', key: 'carpentry', n: 1, task: 'Построй столярную мастерскую' },
+        { ev: 'craft', key: 'planks', n: 4, task: 'Напили 4 доски' },
+      ],
+      reward: { gems: 2 },
+    },
+    {
+      id: 'craft.forge', title: 'Кузнечное дело', who: 'ghost', level: 5,
+      text: 'Руды накопилась целая куча! В кузнице из неё выйдут слитки, а из слитков — гвозди.',
+      goals: [
+        { ev: 'build', key: 'forge', n: 1, task: 'Построй кузницу' },
+        { ev: 'craft', key: 'nails', n: 8, task: 'Выкуй 8 гвоздей' },
+      ],
+      reward: { gems: 3 },
+    },
+    {
+      id: 'craft.borscht', title: 'Бабушкин борщ', who: 'note', level: 5,
+      text: '«Помнишь, я писала про свёклу? Вот мой рецепт: две свёклы, кочан капусты и помидор. Вари на кухне, пока не запахнет на всю ферму. Бабушка Марфа»',
+      task: 'Свари борщ', goal: { ev: 'craft', key: 'borscht', n: 1 }, reward: { coins: 60 },
+    },
+    {
+      id: 'craft.stonecutter', title: 'Каменных дел мастер', who: 'ghost', level: 6,
+      text: 'Камней на ферме — хоть отбавляй. В камнерезной из них выйдут ровные блоки и мостовая для дорожек!',
+      goals: [
+        { ev: 'build', key: 'stonecutter', n: 1, task: 'Построй камнерезную мастерскую' },
+        { ev: 'craft', key: 'stone_block', n: 2, task: 'Вытеши 2 каменных блока' },
+      ],
+      reward: { gems: 3 },
     },
   ],
 

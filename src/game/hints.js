@@ -4,17 +4,19 @@
 //
 // Цель (подсказка):
 //   { step, kind: 'obj', obj, x, y, icon }  — объект на карте: дерево, камень, пень, колодец, дом
-//   { step, kind: 'tile', x, y, icon }      — клетка: грядка, вода, трава под новую грядку
+//   { step, kind: 'tile', x, y, icon }      — клетка: грядка, вода, трава под новую грядку из рюкзака
 //   { step, kind: 'chunk', c, x, y, icon }  — закрытый участок (x, y — его середина)
-//   { step, kind: 'ui', ui }                — кнопка: 'quest' (забрать награду), 'market', 'dig' (лопата), 'bag' (рюкзак)
+//   { step, kind: 'ui', ui }                — кнопка: 'quest' (забрать награду), 'market', 'beds' (грядки), 'bag' (рюкзак)
 // step — шаг из HINT_STEPS, icon — иконка для кружка у края экрана, когда цель за экраном.
 
 import { N, CHUNK, CHUNKS, T } from './World.js';
-import { CROPS, OBJECTS, FLORA, HOUSE, WELL_COST, ITEMS, expansionCost, houseNeedChunks } from './data.js';
+import { CROPS, OBJECTS, FLORA, HOUSE, WELL_COST, ITEMS, BED_ITEM, expansionCost, houseNeedChunks } from './data.js';
 import * as Inv from './inventory.js';
 import * as Flora from './flora.js';
 import { cropFlags } from './beds.js';
 import { GROUPS } from './questRules.js';
+import { BUILDINGS, RECIPES, bpId } from './buildData.js';
+import * as BR from './buildRules.js';
 
 // Первые задания сюжета учат играть: в них стрелка видна сама. Дальше она включается только по просьбе
 // игрока (переключатель в окне задания) и держится до смены задания.
@@ -29,11 +31,13 @@ const stepsFor = (g) => HINT_STEPS[g.ev === 'mine' && g.key === 'boulder' ? 'bou
 // нашлась цель: «собери урожай» — к созревшей грядке, нет такой — к грядке, которую надо полить, и т. д.
 // wait — нужная культура уже растёт: подсказки нет, пока не созреет (дальше по списку не идём).
 // free — созревшая грядка с другой культурой (собрать, чтобы освободить место).
+// bed — новая грядка (есть в рюкзаке — поставить, нет — купить), buyBed — купить грядку.
 export const HINT_STEPS = {
-  harvest: ['ripe', 'thirsty', 'empty', 'wait', 'free', 'dig'],
-  plant: ['empty', 'free', 'dig'],
-  water: ['thirsty', 'empty', 'free', 'dig'],
-  dig: ['dig'],
+  harvest: ['ripe', 'thirsty', 'empty', 'wait', 'free', 'bed'],
+  plant: ['empty', 'free', 'bed'],
+  water: ['thirsty', 'empty', 'free', 'bed'],
+  beds: ['bed'],
+  bedsAll: ['buyBed'],
   fish: ['pond'],
   chop: ['tree'],
   stump: ['stump', 'tree'],
@@ -47,10 +51,22 @@ export const HINT_STEPS = {
   sellFish: ['market', 'pond'],
   buy: ['shop'],
   place: ['place'],
+  build: ['building'],
+  craft: ['workshop'],
   expand: ['chunk'],
   well: ['well'],
   house: ['house'],
 };
+
+// Здание, где делают товар item (нет здания — сначала построить его; убрано в рюкзак — к рюкзаку)
+function madeAt(c, item, depth) {
+  const r = item && Object.values(RECIPES).find((x) => x.item === item);
+  if (!r || depth > 2) return null;
+  if (!BR.isBuilt(c.st, r.at, c.now)) return STEP.building({ ...c, key: r.at }, depth + 1);
+  const o = c.world.objects.find((x) => x && x.type === r.at);
+  if (!o) return { step: 'workshop', kind: 'ui', ui: 'bag' };
+  return { step: 'workshop', kind: 'obj', obj: o, x: o.gx, y: o.gy, icon: 'build' };
+}
 
 // Не хватает на починку, участок или дом → где это добыть
 const NEED_STEPS = {
@@ -62,14 +78,14 @@ const NEED_STEPS = {
 
 // Иконка в кружке у края экрана
 const ICON = {
-  thirsty: 'can', empty: 'seed', dig: 'dig', pond: 'fish', tree: 'axe', stump: 'axe', rock: 'pick',
+  thirsty: 'can', empty: 'seed', bed: 'bed', pond: 'fish', tree: 'axe', stump: 'axe', rock: 'pick',
   boulder: 'pick', grass: 'hay', well: 'build', house: 'house', chunk: 'lock', sow: 'seed',
 };
 
 // q — задание (вид из questRules.js), done — его уже можно сдать;
 // s = { st, world, beds, px, py, now, mode } — состояние фермы, клетка призрака, время (мс) и режим посадки
-// ('dig' | 'sow' | 'crop' | null). Трава под грядку или росток — цель, только когда включён нужный режим;
-// без него стрелка у кнопки, которая его включает: лопата или рюкзак.
+// ('bed' — ставим грядки из рюкзака | 'sow' | 'crop' | null). Трава под грядку или росток — цель, только когда
+// включён нужный режим; без него стрелка у кнопки, которая его включает: «Грядки» или рюкзак.
 // prev — прошлая подсказка: пока её цель годится, стрелка не перескакивает к другой, даже если та ближе.
 export function questHint(q, done, s, prev) {
   if (!q) return null;
@@ -78,7 +94,7 @@ export function questHint(q, done, s, prev) {
   if (!steps) return null;
   const c = { st: s.st, world: s.world, beds: s.beds, now: s.now, key: g.key || null, group: g.group || null, prev: prev || null, cache: { px: s.px, py: s.py } };
   const h = first(steps, c, 0);
-  if (h && h.step === 'dig' && s.mode !== 'dig') return { step: 'dig', kind: 'ui', ui: 'dig' };
+  if (h && h.step === 'bed' && h.kind === 'tile' && s.mode !== 'bed') return { step: 'bed', kind: 'ui', ui: 'beds' };
   if (h && h.step === 'sow' && s.mode !== 'sow') return { step: 'sow', kind: 'ui', ui: 'bag' };
   return h;
 }
@@ -210,9 +226,11 @@ const STEP = {
     return null;
   },
 
-  // трава под новую грядку: лучше рядом с другими грядками
-  dig: (c) => {
-    const ch = chooser(c, 'dig', 'tile'), w = c.world;
+  // новая грядка. Есть в рюкзаке — трава под неё, лучше рядом с другими грядками (без режима расстановки —
+  // кнопка «Грядки», questHint); нет — кнопка «Грядки»: она открывает рынок сразу на грядке
+  bed: (c) => {
+    if (!(Inv.count(c.st, BED_ITEM) > 0)) return { step: 'bed', kind: 'ui', ui: 'beds' };
+    const ch = chooser(c, 'bed', 'tile'), w = c.world;
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
       const i = y * N + x;
       if (w.tiles[i] !== T.GRASS || w.occ[i] >= 0 || !w.isOpen(x, y)) continue;
@@ -220,7 +238,7 @@ const STEP = {
       if (d < 0) continue;
       const bed = (x > 0 && w.tiles[i - 1] === T.SOIL) || (x < N - 1 && w.tiles[i + 1] === T.SOIL) ||
         (y > 0 && w.tiles[i - N] === T.SOIL) || (y < N - 1 && w.tiles[i + N] === T.SOIL);
-      ch.offer(d + (bed ? 0 : 8), x, y, null, ICON.dig);
+      ch.offer(d + (bed ? 0 : 8), x, y, null, ICON.bed);
     }
     return ch.get();
   },
@@ -268,12 +286,28 @@ const STEP = {
     return null;
   },
   shop: () => ({ step: 'shop', kind: 'ui', ui: 'market' }),
+  // купить грядку: кнопка «Грядки» открывает рынок на грядке, если в рюкзаке их нет (иначе она их ставит — тогда рынок)
+  buyBed: (c) => ({ step: 'buyBed', kind: 'ui', ui: Inv.count(c.st, BED_ITEM) > 0 ? 'market' : 'beds' }),
   // поставить свою постройку: она есть в рюкзаке — к рюкзаку («Поставить» в карточке), нет — на рынок
   place: (c) => {
     const G = c.group && GROUPS[c.group];
     const has = Object.entries(c.st.items).some(([id, n]) => n > 0 && ITEMS[id] && ITEMS[id].place === 'obj' && (c.key ? id === c.key : !G || G(id)));
     return { step: 'place', kind: 'ui', ui: has ? 'bag' : 'market' };
   },
+
+  // построить здание (ключ задания — какое): нет чертежа — на рынок; не хватает материалов — где их добыть
+  // (доски и гвозди — в мастерской, которая их делает); всё есть — к рюкзаку («Построить»); строится — ждём
+  building: (c, depth) => {
+    const k = c.key, st = c.st;
+    if (!k || !BUILDINGS[k] || depth > 2) return null;
+    if (BR.owned(st, k)) return BR.isBuilt(st, k, c.now) ? null : WAIT;
+    if (!Inv.count(st, bpId(k))) return { step: 'building', kind: 'ui', ui: 'market' };
+    const lack = BR.missing(st, BUILDINGS[k].cost)[0];
+    if (lack) return need(c, { [lack.id]: lack.need }, depth) || madeAt(c, lack.id, depth + 1);
+    return { step: 'building', kind: 'ui', ui: 'bag' };
+  },
+  // сделать товар (ключ — товар): к зданию, где его делают
+  workshop: (c, depth) => madeAt(c, c.key, depth),
 
   // бабушкин колодец: сначала то, чего не хватает на починку
   well: (c, depth) => {
@@ -282,9 +316,11 @@ const STEP = {
     return need(c, WELL_COST, depth) || { step: 'well', kind: 'obj', obj: o, x: o.gx, y: o.gy, icon: ICON.well };
   },
 
-  // улучшить дом: нужен новый участок, потом ресурсы, потом сам дом (нажать — откроется окно дома)
+  // улучшить дом: нужен новый участок, потом ресурсы, потом сам дом (нажать — откроется окно дома);
+  // дом уже в лесах — ждём
   house: (c, depth) => {
     const st = c.st, w = c.world;
+    if (st.houseUp) return WAIT;
     if (!HOUSE[st.house + 1] || depth > 2) return null;
     if (w.unlockedCount() < houseNeedChunks(st.house)) return STEP.chunk(c, depth + 1);
     const lack = need(c, HOUSE[st.house + 1].cost, depth);

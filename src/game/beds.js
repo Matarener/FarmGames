@@ -1,7 +1,7 @@
-// Правила грядок: чистые функции над грядкой { crop, p — секунд роста, w — сколько раз полита }.
-// Без звуков, картинок и Date.now — их же потом сможет выполнять сервер.
+// Правила грядок: чистые функции над грядкой { crop, p — секунд роста, w — сколько раз полита },
+// покупка грядок и грядка в рюкзаке. Без звуков, картинок и Date.now — их же потом сможет выполнять сервер.
 
-import { CROPS, BED_ITEM } from './data.js';
+import { CROPS, BED_ITEM, BEDS } from './data.js';
 import * as Inv from './inventory.js';
 import { N, T } from './World.js';
 
@@ -62,4 +62,56 @@ export function placeBed(st, w, i) {
   w.tiles[i] = T.SOIL;
   st.movedBeds = true;
   return true;
+}
+
+// ---------- Покупка грядок ----------
+// Грядки не копают, а покупают на рынке (и получают за задания). Цена и предел — таблица BEDS (data.js).
+// owned — сколько своих грядок уже есть: на ферме (countBeds) и в рюкзаке (ownedBeds).
+
+// Грядок на ферме: клетки-грядки карты
+export function countBeds(w) {
+  let n = 0;
+  for (let i = 0; i < w.tiles.length; i++) if (w.tiles[i] === T.SOIL) n++;
+  return n;
+}
+
+// Все свои грядки: на ферме и в рюкзаке
+export const ownedBeds = (st, onFarm) => onFarm + Inv.count(st, BED_ITEM);
+
+// Сколько грядок можно иметь, чтобы купить ещё (предел по уровню)
+export function bedLimit(level) {
+  const L = BEDS.limit;
+  return Math.min(L.max, L.base + L.perLevel * Math.max(1, level || 1));
+}
+
+// Цена следующей грядки, когда грядок уже owned
+export function bedPrice(owned) {
+  const n = owned + 1, P = BEDS.price;
+  for (const [upTo, price] of P) if (n <= upTo) return price;
+  return P[P.length - 1][1];
+}
+
+// С какого уровня можно купить следующую грядку (0 — больше не купить: предел BEDS.limit.max)
+export function bedLevel(owned) {
+  const L = BEDS.limit;
+  if (owned >= L.max) return 0;
+  return Math.max(1, Math.floor((owned - L.base) / L.perLevel) + 1);
+}
+
+// Грядка на рынке сейчас: { price, owned, limit, level — с какого уровня следующая (0 — предел), can — можно купить
+// (уровень позволяет; монеты проверяет buyBed) }
+export function bedOffer(st, owned) {
+  const limit = bedLimit(st.level);
+  return { price: bedPrice(owned), owned, limit, level: owned < limit ? st.level : bedLevel(owned), can: owned < limit };
+}
+
+// Купить одну грядку в рюкзак. → { id, n: 1, cost, cur: 'coins' } (как Inv.buyItem) или { limit: уровень (0 — предел) }
+// или { poor: 'coins' }
+export function buyBed(st, owned) {
+  const o = bedOffer(st, owned);
+  if (!o.can) return { limit: o.level };
+  if (st.coins < o.price) return { poor: 'coins' };
+  if (!Inv.addItem(st, BED_ITEM, 1)) return null;
+  st.coins -= o.price;
+  return { id: BED_ITEM, n: 1, cost: o.price, cur: 'coins' };
 }

@@ -11,7 +11,7 @@ export class Achievements {
   }
 
   // То, что знает только мир: сколько участков открыто
-  ctx() { const w = this.farm.world; return { chunks: w ? w.unlockedCount() : 0 }; }
+  ctx() { const f = this.farm, w = f.world; return { chunks: w ? w.unlockedCount() : 0, bedsAll: w ? f.bedCounts().bedsAll : 0 }; }
 
   views() { return A.views(this.farm.st, this.ctx()); }
 
