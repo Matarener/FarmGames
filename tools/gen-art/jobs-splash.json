@@ -1,0 +1,24 @@
+[
+  {
+    "name": "splash_portrait",
+    "scene": true,
+    "size": "1024x1536",
+    "count": 2,
+    "refs": [
+      "tools/gen-art/refs/splash_ref_game.jpg",
+      "tools/gen-art/refs/splash_ref_ghost.jpg"
+    ],
+    "prompt": "A beautiful full-screen loading splash illustration for a cozy mobile farm game about a little cute ghost who runs a farm. Vertical portrait composition. Art style exactly like the first reference image (a screenshot of the game itself): soft painted cartoon look, smooth clean dark-brown outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights, lush and cheerful, cozy storybook mood.\n\nScene: a sunny summer morning on a small cozy farm clearing in the middle of a lush forest, seen from a slightly elevated three-quarter view. The hero, in the middle of the picture: the little cute white ghost from the second reference image (soft round white body with a wavy flowing tail, big shiny dark eyes, pink blush cheeks, a happy open smile, a yellow woven straw hat with a red band), painted in the same smooth style as the first reference, floating happily a little above the ground with a soft shadow under it and a few tiny golden sparkles around it. Just behind the ghost: the cozy wooden log cabin from the game with a brown shingle roof, a stone chimney with a thin curl of smoke, small blue windows and flowers by the door; a sandy stone path leading to it; an old round stone well with a little wooden bucket; a small pond with pink water lilies, lily pads and cattails; two small garden beds with carrots, cabbages and orange pumpkins; a few sunflowers and a short wooden fence. Around the clearing, framing it: tall green spruces, round leafy oaks, a white birch, a red-orange autumn maple, a pink blossoming sakura, blue hydrangea bushes, lavender, roses and mossy grey boulders.\n\nLayout for a phone screen (the app draws text on top of the picture): the top quarter is open soft blue sky with a few fluffy white clouds and warm sunbeams, calm and uncluttered, with treetops only at the very sides. The bottom fifth is a calm, slightly darker foreground of soft green grass with a few flowers and small pumpkins, low detail. Keep the ghost and the house inside the central 60 percent of the width: the left and right edges show only trees and foliage, because the sides get cropped on narrow phones."
+  },
+  {
+    "name": "splash_landscape",
+    "scene": true,
+    "size": "1536x1024",
+    "count": 2,
+    "refs": [
+      "tools/gen-art/refs/splash_ref_game.jpg",
+      "tools/gen-art/refs/splash_ref_ghost.jpg"
+    ],
+    "prompt": "A beautiful full-screen loading splash illustration for a cozy mobile farm game about a little cute ghost who runs a farm. Wide horizontal landscape composition. Art style exactly like the first reference image (a screenshot of the game itself): soft painted cartoon look, smooth clean dark-brown outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights, lush and cheerful, cozy storybook mood.\n\nScene: a sunny summer morning on a small cozy farm clearing in the middle of a lush forest, seen from a slightly elevated three-quarter view. The hero, slightly left of the center: the little cute white ghost from the second reference image (soft round white body with a wavy flowing tail, big shiny dark eyes, pink blush cheeks, a happy open smile, a yellow woven straw hat with a red band), painted in the same smooth style as the first reference, floating happily a little above the ground with a soft shadow under it and a few tiny golden sparkles around it. Right of the ghost: the cozy wooden log cabin from the game with a brown shingle roof, a stone chimney with a thin curl of smoke, small blue windows and flowers by the door; a sandy stone path leading to it; an old round stone well with a little wooden bucket; a small pond with pink water lilies, lily pads and cattails; two small garden beds with carrots, cabbages and orange pumpkins; a few sunflowers and a short wooden fence. Around the clearing, framing it: tall green spruces, round leafy oaks, a white birch, a red-orange autumn maple, a pink blossoming sakura, blue hydrangea bushes, lavender, roses and mossy grey boulders.\n\nLayout for a wide screen (the app draws text on top of the picture): the top fifth is soft blue sky with a few fluffy white clouds between the treetops, calm and uncluttered in the middle. The bottom fifth is a calm, slightly darker foreground of soft green grass with a few flowers and small pumpkins, low detail. Keep the ghost and the house inside the central band between 22 and 78 percent of the height, because the top and bottom get cropped on very wide phone screens."
+  }
+]
