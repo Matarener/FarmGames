@@ -219,7 +219,7 @@ export const WILD_TREES = {
 export const FOG = { width: 4, forest: [0.6, 0.55, 0.45, 0], color: 0xe4ecee };
 
 // Стоимость энергии за удар/действие
-export const ENERGY = { chop: 1, mine: 1, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1, pick: 1, sow: 0, mow: 0 };
+export const ENERGY = { chop: 1, mine: 1, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1, pick: 1, sow: 0, mow: 1 };
 // Очередь дел призрачка: сколько дел можно поставить, кроме того, что он делает сейчас
 // (удары по одному дереву или камню — одно дело)
 export const QUEUE_MAX = 20;
