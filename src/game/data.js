@@ -335,7 +335,7 @@ export const DECOR = {
   decor_bench:      { name: 'Лавочка',             price: 30,  level: 2, rot: 2, desc: 'Простая деревянная лавочка без спинки.' },
   decor_table:      { name: 'Круглый столик',      price: 40,  level: 3, rot: 1, desc: 'Круглый садовый столик на одной ножке.' },
   decor_lamp:       { name: 'Уличный фонарь',      price: 60,  level: 4, rot: 1, desc: 'Высокий чугунный фонарь, как на старой улице.' },
-  decor_hook_lamp:  { name: 'Фонарь на крюке',     price: 90,  level: 5, rot: 4, desc: 'Деревянный столбик с фонарём на изогнутом крюке.' },
+  decor_hook_lamp:  { name: 'Фонарь на крюке',     price: 90,  level: 5, rot: 2, desc: 'Деревянный столбик с фонарём на изогнутом крюке.' },
   decor_park_bench: { name: 'Скамейка со спинкой', price: 100, level: 5, rot: 4, w: 2, desc: 'Длинная скамейка со спинкой, на ней поместятся двое.' },
   decor_stone_lamp: { name: 'Каменный фонарь',     price: 120, level: 6, rot: 1, desc: 'Каменный садовый фонарь, хорош рядом с сакурой.' },
   decor_table_set:  { name: 'Столик со стульями',  price: 150, level: 7, rot: 2, w: 2, desc: 'Квадратный столик и два стула: можно пить чай в саду.' },

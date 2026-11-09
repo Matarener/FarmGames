@@ -6,7 +6,11 @@
 
 assets/source/<вид>_post.png  — столбик в изометрии на прозрачном фоне (как другие постройки);
 assets/source/<вид>_panel.png — пролёт забора спереди, плоско (без перспективы), на прозрачном фоне, повторяется
-                                 по горизонтали без шва (правый край продолжает левый).
+                                 по горизонтали (правый край продолжает левый): cut — какой кусок длинного пролёта
+                                 взять (от середины кола до середины следующего, у каменной — так, чтобы в каждом
+                                 ряду хотя бы с одной стороны шва был стык камней).
+Обе картинки можно нарисовать одним листом assets/source/<вид>.png (так их нарисовал Codex): сверху длинный
+пролёт спереди, снизу столбик — скрипт сам разрежет его на две.
 Результат: assets/art/<вид>_post.webp и <вид>_span.webp + записи в manifest.json.
 Пролёт лежит от середины клетки (опора картинки) к соседу gx + 1: на экране на 16 единиц вправо и на 8 вниз.
 Изометрия не меняет вертикали, поэтому плоский пролёт просто скашивается: низ — по линии земли, высота — H.
@@ -21,12 +25,28 @@ from slice_art import load, components, save, OUT, SRC, DENSITY, ROOT
 # вид: высота столбика и пролёта (единицы мира), насколько опора столбика выше его нижней точки,
 # cut — какую часть пролёта по ширине брать (доли: одна повторяющаяся часть узора)
 FENCES = {
-    'fence_wattle': {'post_h': 24, 'post_lift': 2, 'panel_h': 17},
-    'fence_picket': {'post_h': 25, 'post_lift': 2, 'panel_h': 19},
-    'fence_stone': {'post_h': 17, 'post_lift': 3, 'panel_h': 12},
+    'fence_wattle': {'post_h': 26, 'post_lift': 2, 'panel_h': 17, 'cut': (0.2131, 0.4041)},  # один пролёт между кольями
+    'fence_picket': {'post_h': 25, 'post_lift': 2, 'panel_h': 19, 'cut': (0.2120, 0.4053)},  # две доски
+    'fence_stone': {'post_h': 19, 'post_lift': 3, 'panel_h': 13, 'cut': (0.5550, 0.7510)},
 }
 HALF = (16, 8)  # пролёт на полклетки: от середины клетки к середине её стороны (единицы мира)
 SS = 3  # во сколько раз крупнее считать скос (потом — уменьшение с хорошим сглаживанием)
+
+
+def parts(kind):
+    """Картинки вида: {'post': …, 'panel': …} — из <вид>_post.png и <вид>_panel.png или из одного листа <вид>.png
+    (сверху пролёт, снизу столбик). None — картинок нет."""
+    if os.path.exists(os.path.join(SRC, kind + '_post.png')) and os.path.exists(os.path.join(SRC, kind + '_panel.png')):
+        return {'post': load(kind + '_post'), 'panel': load(kind + '_panel')}
+    if not os.path.exists(os.path.join(SRC, kind + '.png')): return None
+    a = load(kind)
+    boxes, lab = components(a, 2)
+    out = {}
+    for (y0, y1, x0, x1, i), part in zip(sorted(boxes, key=lambda b: b[0]), ('panel', 'post')):
+        c = a[y0:y1, x0:x1].copy()
+        c[lab[y0:y1, x0:x1] != i, 3] = 0
+        out[part] = c
+    return out
 
 
 def crop_alpha(a):
@@ -35,8 +55,7 @@ def crop_alpha(a):
     return a[ys[0]:ys[-1] + 1, xs[0]:xs[-1] + 1]
 
 
-def post(kind, cfg, man):
-    a = load(kind + '_post')
+def post(kind, a, cfg, man):
     (y0, y1, x0, x1, i), = components(a, 1)[0]
     crop = a[y0:y1, x0:x1].copy()
     m = crop[..., 3] > 128
@@ -50,8 +69,8 @@ def post(kind, cfg, man):
     return img
 
 
-def span(kind, cfg, man):
-    a = crop_alpha(load(kind + '_panel'))
+def span(kind, a, cfg, man):
+    a = crop_alpha(a)
     c0, c1 = cfg.get('cut', (0, 1))
     a = a[:, int(a.shape[1] * c0):int(round(a.shape[1] * c1))]
     hp, wp = a.shape[:2]
@@ -108,11 +127,12 @@ def main(args):
     with open(os.path.join(OUT, 'manifest.json')) as f: man = json.load(f)
     for kind, cfg in FENCES.items():
         if only and kind not in only: continue
-        if not (os.path.exists(os.path.join(SRC, kind + '_post.png')) and os.path.exists(os.path.join(SRC, kind + '_panel.png'))):
-            print(kind, ': нет картинок', kind + '_post.png /', kind + '_panel.png')
+        pt = parts(kind)
+        if not pt:
+            print(kind, ': нет картинок', kind + '.png или', kind + '_post.png /', kind + '_panel.png')
             continue
-        post(kind, cfg, man)
-        span(kind, cfg, man)
+        post(kind, pt['post'], cfg, man)
+        span(kind, pt['panel'], cfg, man)
         print(kind, 'ok')
     with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
         json.dump(man, f, indent=1)
