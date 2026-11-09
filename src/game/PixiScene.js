@@ -490,7 +490,7 @@ export class PixiScene {
       if (!this.groundAtlas.fits(e.canvas.width, e.canvas.height)) break;
       this.groundAtlas.tex(e);
     }
-    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k)) add(v, k !== 'bubble' && k !== 'fog' && k !== 'hint' && k !== 'deco' && k !== 'fence'); // декор только на открытой земле
+    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k)) add(v, k !== 'bubble' && k !== 'fog' && k !== 'hint' && k !== 'deco' && k !== 'fence' && k !== 'animal'); // декор и животные только на открытой земле
     for (const o of w.objects || []) { if (!o || OBJECTS[o.type].flat) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
     for (const arr of Object.values(S.objArt)) for (const t of arr) for (const id of [0, 1, 3]) { const st = S.stumpOf(t, id); if (st) { this.atlas.tex(st); this.atlas.tex(dimSprite(st)); } }
     for (const im of Object.values(f.iconImg)) if (im.complete && im.naturalWidth) this.iconTex(im);
@@ -654,13 +654,15 @@ export class PixiScene {
       }
       if (!w.isOpen(o.gx, o.gy)) s = dimSprite(s);
       const sh = o.shake > 0 ? Math.sin(f.time * 70) * 2.2 * (o.shake / 0.25) : 0;
+      // прыжок животного (animals.js HOP = 0,35 с): вверх на 5 единиц и обратно
+      const hop = o.hop > 0 ? -Math.sin((1 - o.hop / 0.35) * Math.PI) * 5 : 0;
       const fade = f.occludes(o, s, F);
       o.fade = (o.fade || 0) + (fade - (o.fade || 0)) * 0.3;
       if (o.fade < 0.02) o.fade = 0;
       if (fade && F[0].hit) playerHidden = true;
       const al = o.fade ? 1 - 0.62 * o.fade : 1;
       if (e.alpha !== al) e.alpha = al;
-      this.put(e, s, o.wx + sh, o.wy);
+      this.put(e, s, o.wx + sh, o.wy + hop);
       const z = Z(o.depth, o.wy);
       if (e.zIndex !== z) e.zIndex = z;
     };
@@ -718,6 +720,15 @@ export class PixiScene {
       if (bu.visible) this.put(bu, S.bubble.ready, BB[i * 2], BB[i * 2 + 1] + bob);
     }
     for (let i = BB.length / 2; i < BP.length; i++) BP[i].visible = false;
+    // пузыри над животными: корм, которого они ждут, или готовый продукт (Farm.syncBars → f.aniBub: x, y, картинка)
+    const AB = f.aniBub || [], AP = this.aniBub || (this.aniBub = []);
+    for (let i = 0; i * 3 < AB.length; i++) {
+      let bu = AP[i];
+      if (!bu) { bu = AP[i] = new PIXI.Sprite(); this.bubbles.addChild(bu); }
+      bu.visible = r.visible(AB[i * 3] - 16, AB[i * 3 + 1] - 30, 32, 32);
+      if (bu.visible) this.put(bu, AB[i * 3 + 2], AB[i * 3], AB[i * 3 + 1] + bob);
+    }
+    for (let i = AB.length / 3; i < AP.length; i++) AP[i].visible = false;
 
     this.syncBars();
 

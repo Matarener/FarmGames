@@ -11,6 +11,7 @@ import { Quests } from './quests.js';
 import { Gifts } from './gifts.js';
 import { Wheel } from './wheel.js';
 import { Buildings } from './buildings.js';
+import { Animals, HOP } from './animals.js';
 import { Achievements } from './achievements.js';
 import { Orders } from './orders.js';
 import { Mover } from './Mover.js';
@@ -48,7 +49,8 @@ export class Farm {
     this.quests = new Quests(this);
     this.gifts = new Gifts(this);
     this.wheel = new Wheel(this);
-    this.builds = new Buildings(this); // здания с крафтом: кухня, мастерские, кузница
+    this.builds = new Buildings(this); // здания с крафтом: кухня, мастерские, кузница, кормоцех
+    this.animals = new Animals(this); // животные: кормление, рост, продукты
     this.ach = new Achievements(this);
     this.orders = new Orders(this);
     // Режим тестера (окно «Настройки»): монеты, кристаллы, предметы, энергия и проверка заданий —
@@ -77,13 +79,20 @@ export class Farm {
       objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, wildGrass: a.wildGrass,
       house: a.house, well: a.well, crops: a.crops, fog: a.fog.clouds.length ? a.fog : null, sprinkler: a.sprinkler,
       buildings: a.buildings, sites: a.sites, houseUp: a.houseUp,
-      deco: a.deco, fence: a.fence,
+      deco: a.deco, fence: a.fence, animal: a.animal,
     });
     this.groundV++;
     for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
     // пузыри над грядками — те же иконки: квадрат 24×24 единицы, опора — низ хвостика
     this.S.bubble = {};
     for (const k of ['ready', 'water']) this.S.bubble[k] = { canvas: this.iconImg['bubble_' + k], w: 24, h: 24, ax: 12, ay: 24, name: 'bubble_' + k };
+    // пузыри над животными: в пузыре — его корм (хочет есть) или продукт (готово), ключ — id предмета
+    for (const id of Object.keys(ITEMS)) {
+      const it = ITEMS[id];
+      if (!(it.tabs.includes('animals') && !it.place)) continue; // корма и продукты (не сами животные)
+      const c = bubbleWith(this.iconImg.bubble_water, this.iconImg[it.icon]);
+      if (c) this.S.bubble[id] = { canvas: c, w: 24, h: 24, ax: 12, ay: 24, name: 'bubble_' + id };
+    }
     // подсказка к заданию: стрелка над целью (опора — кончик), кольцо на земле под целью,
     // кружок у края экрана (он рисуется в пикселях экрана, остальное — в единицах мира)
     const hs = (name, w, ax, ay) => {
@@ -150,6 +159,7 @@ export class Farm {
     }
     if (o.bare && S.flora[o.type]) return S.flora[o.type].bare; // плоды собраны
     if (OBJECTS[o.type] && OBJECTS[o.type].building) return this.builds.sprite(o); // здание или его стройка
+    if (S.animal && S.animal[o.type]) return this.animals.sprite(o); // животное своей стадии, повёрнутое
     if (S.ponds[o.type]) return S.ponds[o.type];
     // декор: картинка своего положения поворота; забор — секция по соседям-заборам
     const dv = S.deco && S.deco[o.type];
@@ -255,7 +265,7 @@ export class Farm {
     // колодец убран в рюкзак (well.js) — на карте его нет; иначе он на своей траве (старые сохранения: рядом с домом)
     if (Well.inBag(this.st)) { if (w.well) w.remove(w.well); w.well = null; } else w.fixWell();
     this.restorePlants();
-    Placed.restorePlaced(this.st, w); // свои постройки (поливалки): место занято — в рюкзак
+    Placed.restorePlaced(this.st, w); // свои постройки (поливалки, декор, животные): место занято — в рюкзак
     this.restoreWild();
     if (this.awaySec > 0) this.grow(this.awaySec, true);
     Flora.tidyFruit(this.st, Date.now());
@@ -278,6 +288,7 @@ export class Farm {
     this.cam.centerOn(tmp.x, tmp.y - 20);
     this.tickEnergy();
     this.builds.tick(Date.now(), true); // стройки, которые кончились, пока игры не было
+    this.animals.tick(Date.now(), true); // животные, которые доели, пока игры не было
     this.syncHint();
     this.ui.update(this);
   }
@@ -406,6 +417,10 @@ export class Farm {
     const U = this.bldBub || (this.bldBub = []);
     U.length = 0;
     this.builds.bars(now, B, U);
+    // животные: полоска «ест», пузыри с кормом или продуктом (this.aniBub — x, y, картинка по 3 значения)
+    const AU = this.aniBub || (this.aniBub = []);
+    AU.length = 0;
+    this.animals.bars(now, B, AU);
     this.barsV = (this.barsV || 0) + 1;
   }
 
@@ -670,6 +685,7 @@ export class Farm {
     if (!def) return;
     if (def.sprinkler) return this.sprinklerPopup(o, sx, sy);
     if (def.building) return this.builds.tap(o, sx, sy);
+    if (def.animal) return this.animals.tap(o, sx, sy);
     if (def.deco || def.fence) return this.decoPopup(o, sx, sy);
     if (o.type === 'sapling' || def.flora) return this.floraPopup(o, sx, sy);
     if (def.action) this.queue({ kind: def.action, obj: o });
@@ -701,6 +717,7 @@ export class Farm {
     if (Spr.kindOf(o)) this.showArea(o, 2.5);
     this.quests.emit('place', o.type);
     if (this.builds.is(o)) return this.builds.placed(o);
+    if (this.animals.is(o)) { o.hop = HOP; this.syncBars(); }
   }
 
   // Режим перестановки сразу с выбранным своим объектом o
@@ -1382,6 +1399,7 @@ export class Farm {
       this.floraTick(now); t = pf.part('растения', t);
       this.wildTick(now); t = pf.part('поросль', t);
       this.builds.tick(now); t = pf.part('здания', t);
+      this.animals.tick(now); t = pf.part('животные', t);
       this.quests.tick(); t = pf.part('задания', t);
       this.ach.tick(); t = pf.part('достижения', t);
       this.orders.tick(); t = pf.part('заказы', t);
@@ -1392,7 +1410,12 @@ export class Farm {
     t = pf.part('призрак', t);
     this.pourWater(dt);
     const OB = this.world.objects;
-    for (let i = 0; i < OB.length; i++) { const o = OB[i]; if (o && o.shake > 0) o.shake = Math.max(0, o.shake - dt); }
+    for (let i = 0; i < OB.length; i++) {
+      const o = OB[i];
+      if (!o) continue;
+      if (o.shake > 0) o.shake = Math.max(0, o.shake - dt);
+      if (o.hop > 0) o.hop = Math.max(0, o.hop - dt); // прыжок животного (покормили, подросло)
+    }
     const P = this.particles;
     for (let i = P.length - 1; i >= 0; i--) {
       const p = P[i];
@@ -1433,6 +1456,22 @@ export class Farm {
 
 // Половина картинки (0 — верхняя, 1 — нижняя) того же размера: кольцо вокруг цели рисуется
 // задней половиной под объектом, передней — над ним
+// Пузырь с картинкой: пузырь с каплей (bubble_water), капля закрашена цветом пузыря, сверху — иконка предмета.
+// → canvas 128×128 или null (картинок нет или пиксели нельзя прочитать)
+function bubbleWith(base, icon) {
+  if (!base || !icon) return null;
+  try {
+    const c = makeCanvas(128, 128), g = c.getContext('2d');
+    g.drawImage(base, 0, 0, 128, 128);
+    // середина пузыря — (64, 56), капля — в рамке 36…91 × 20…91 (ic_bubble_water)
+    g.fillStyle = '#fce5c0';
+    g.beginPath(); g.ellipse(64, 56, 31, 38, 0, 0, Math.PI * 2); g.fill();
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(icon, 64 - 32, 56 - 32, 64, 64);
+    return c;
+  } catch (e) { return null; }
+}
+
 function halfOf(s, k) {
   const im = s.canvas, w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
   const c = makeCanvas(w, h), g = c.getContext('2d'), y0 = Math.round(h / 2);

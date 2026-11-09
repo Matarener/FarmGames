@@ -5,7 +5,8 @@
 //   task    — цель ступени: {n} — число ступени, {a|b|c} — форма слова для этого числа
 //   goal    — откуда прогресс (всё за всё время игры):
 //             { ev, key? }     — счётчик событий игры, тот же, что у заданий (Farm → quests.emit):
-//                                harvest, fish, chop, mine, mow, pick, sow, sell, earn, quest (сданные задания);
+//                                harvest, fish, chop, mine, mow, pick, sow, sell, earn, quest (сданные задания),
+//                                feed (покормили животное), animal (забрали продукт у животного);
 //                                key — точный ключ (культура, рыба)
 //             { kinds, group } — сколько разных ключей группы было в событии kinds (разные культуры урожая;
 //                                группы — GROUPS в questRules.js)
@@ -19,6 +20,7 @@ export const ACH_GROUPS = [
   { key: 'fishing', name: 'Рыбалка' },
   { key: 'forest', name: 'Лес и сад' },
   { key: 'build', name: 'Стройка' },
+  { key: 'animals', name: 'Животные' },
   { key: 'trade', name: 'Торговля' },
   { key: 'farmer', name: 'Фермер' },
 ];
@@ -53,6 +55,12 @@ export const ACH = [
     task: 'Поймай {n} {рыбу|рыбы|рыб}', goal: { ev: 'fish' }, tiers: [10, 50, 200, 750, 2000] },
   { id: 'gold', group: 'fishing', name: 'Золотая рыбка', icon: 'fish_gold',
     task: 'Поймай {n} {золотую рыбку|золотые рыбки|золотых рыбок}', goal: { ev: 'fish', key: 'fish_gold' }, tiers: [1, 5, 20, 75, 200] },
+
+  // ---- Животные ----
+  { id: 'feed', group: 'animals', name: 'Заботливый хозяин', icon: 'feed_grain',
+    task: 'Покорми животных {n} {раз|раза|раз}', goal: { ev: 'feed' }, tiers: [10, 50, 200, 750, 2000] },
+  { id: 'animal', group: 'animals', name: 'Животновод', icon: 'paw',
+    task: 'Собери {n} {продукт|продукта|продуктов} от животных', goal: { ev: 'animal' }, tiers: [5, 30, 150, 600, 2000] },
 
   // ---- Лес и сад ----
   { id: 'chop', group: 'forest', name: 'Лесоруб', icon: 'axe',

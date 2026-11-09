@@ -53,7 +53,7 @@ function own(st, w, sp, x, y, grown) {
 }
 
 test('таблица STORE_ALL: группы по одной, у каждой три формы слова; ростки по умолчанию выключены', () => {
-  assert.deepEqual(SA.GROUPS, ['paths', 'beds', 'ponds', 'decor', 'well', 'plants', 'placed', 'sprouts']);
+  assert.deepEqual(SA.GROUPS, ['paths', 'beds', 'ponds', 'decor', 'well', 'plants', 'placed', 'animals', 'sprouts']);
   for (const g of STORE_ALL) {
     assert.ok(g.name && g.icon && g.note, g.key);
     assert.equal(g.word.length, 3, g.key);

@@ -248,9 +248,10 @@ test('task texts: number and word agree', () => {
 test('full playthrough of branches', () => {
   const st = fresh(), Q = R.questState(st);
   let c = at('2026-11-07T12:00:00Z');
-  const evs = ['harvest', 'plant', 'water', 'fish', 'chop', 'stump', 'mine', 'mow', 'pick', 'sow', 'sell', 'earn', 'buy', 'expand', 'place', 'build', 'craft'];
-  const keys = { harvest: ['carrot', 'wheat', 'beet', 'cabbage', 'tomato', 'corn', 'pumpkin'], plant: ['carrot'], fish: ['fish_carp', 'fish_perch', 'fish_gold'], mine: ['rock', 'boulder'], pick: ['apple', 'cherry'], sell: ['carrot', 'fish_carp'], buy: ['seed_carrot', 'sap_apple', 'sprinkler_drip', 'bp_kitchen', 'decor_bench'], sow: ['apple'], chop: ['oak', 'pine'], place: ['sprinkler_drip', 'decor_bench'],
-    build: ['kitchen', 'carpentry', 'forge', 'stonecutter'], craft: ['carrot_salad', 'planks', 'nails', 'borscht', 'stone_block'] };
+  const evs = ['harvest', 'plant', 'water', 'fish', 'chop', 'stump', 'mine', 'mow', 'pick', 'sow', 'sell', 'earn', 'buy', 'expand', 'place', 'build', 'craft', 'feed', 'animal'];
+  const keys = { harvest: ['carrot', 'wheat', 'beet', 'cabbage', 'tomato', 'corn', 'pumpkin'], plant: ['carrot'], fish: ['fish_carp', 'fish_perch', 'fish_gold'], mine: ['rock', 'boulder'], pick: ['apple', 'cherry'], sell: ['carrot', 'fish_carp'], buy: ['seed_carrot', 'sap_apple', 'sprinkler_drip', 'bp_kitchen', 'decor_bench', 'bp_feedmill', 'animal_chicken_baby'], sow: ['apple'], chop: ['oak', 'pine'], place: ['sprinkler_drip', 'decor_bench', 'animal_chicken_baby'],
+    build: ['kitchen', 'carpentry', 'forge', 'stonecutter', 'feedmill'], craft: ['carrot_salad', 'planks', 'nails', 'borscht', 'stone_block'],
+    feed: ['chicken'], animal: ['egg', 'angora', 'goose_feather', 'truffle', 'wool', 'milk', 'milk', 'milk', 'milk'] };
   for (let round = 0; round < 60; round++) {
     st.level = Math.min(15, 1 + round); st.house = Math.min(5, 1 + (round >> 2)); st.well = round > 3 ? 1 : 0;
     c = { ...c, stats: { beds: 2 + 2 * round, bedsAll: 2 + 2 * round } }; // грядок прибавляется

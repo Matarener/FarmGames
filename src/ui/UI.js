@@ -15,6 +15,7 @@ import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 import * as Dev from '../game/devRules.js';
 import { BUILDINGS, RECIPES, bldId } from '../game/buildData.js';
+import { ANIMALS } from '../game/animalData.js';
 import * as BR from '../game/buildRules.js';
 import * as HR from '../game/houseRules.js';
 import { Mover } from '../game/Mover.js';
@@ -534,7 +535,6 @@ export class UI {
       { label: 'Колесо', icon: 'wheel', open: () => this.wheelPanel(f), dot: f.wheel.freeLeft() > 0 },
       { label: 'Достижения', icon: 'trophy', open: () => this.achPanel(f), dot: f.ach.available() > 0 },
       { label: 'Настройки', icon: 'gear', open: () => this.settingsPanel(f) },
-      { label: 'Животные', icon: 'paw', soon: true },
       { label: 'Мастерская', icon: 'build', soon: true },
       { label: 'Декор', icon: 'decor', soon: true },
     ];
@@ -1474,7 +1474,8 @@ export class UI {
     const curKey = o.cur || 'coins', cur = curKey === 'gems' ? 'gem' : 'coin';
     const per = it.blueprint ? `${o.price} ${this.ic(cur)} · стройка ${fmtShort(BUILDINGS[it.blueprint].time)}`
       : pack > 1 ? `${o.price} ${this.ic(cur)} за ${pack} шт.` : `${o.price} ${this.ic(cur)} за шт.`;
-    const box = this.mkCard(it, `${per}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${it.floraOf && FLORA[it.floraOf].pick ? ` · плоды: ${ITEMS[FLORA[it.floraOf].fruit].name.toLowerCase()} по ${ITEMS[FLORA[it.floraOf].fruit].sell} ${this.ic('coin')}` : ''}${o.bed ? ` · грядок ${bed.owned} из ${Math.max(bed.owned, bed.limit)}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
+    const an = it.animal && ANIMALS[it.animal], prod = an && ITEMS[an.product];
+    const box = this.mkCard(it, `${per}${an ? ` · даёт: ${prod.name.toLowerCase()} по ${prod.sell} ${this.ic('coin')}` : ''}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${it.floraOf && FLORA[it.floraOf].pick ? ` · плоды: ${ITEMS[FLORA[it.floraOf].fruit].name.toLowerCase()} по ${ITEMS[FLORA[it.floraOf].fruit].sell} ${this.ic('coin')}` : ''}${o.bed ? ` · грядок ${bed.owned} из ${Math.max(bed.owned, bed.limit)}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
     if (o.bed) box.appendChild(h('div', 'ii-note', this.bedNote(bed, st.level)));
     const locked = o.level > st.level;
     if (locked && !o.bed) box.appendChild(h('div', 'ii-note', `Откроется с ${o.level} уровня.`));

@@ -6,6 +6,7 @@
 // траву: материалы cost списываются, и time секунд на месте стоят леса (спрайт стройки). Потом в здании
 // можно делать товары по рецептам RECIPES, по одному за раз, в очереди до slots мест.
 // sprite — картинка готового здания, site — его же стройка в лесах (assets/art), xp — опыт за постройку.
+// he — название мужского рода («Кормоцех построен», «нажмите на него»); без него — женского («Кухня построена»).
 export const BUILDINGS = {
   kitchen: {
     name: 'Кухня', level: 3, blueprint: 50, cost: { wood: 20, stone: 15 }, time: 5 * 60, xp: 10, slots: 3, w: 2, h: 2,
@@ -26,6 +27,12 @@ export const BUILDINGS = {
     name: 'Камнерезная мастерская', short: 'Камнерезная', level: 6, blueprint: 200, cost: { planks: 12, nails: 10, stone: 15 }, time: 30 * 60, xp: 25, slots: 3, w: 2, h: 2,
     sprite: 'building_stonecutter', site: 'site_stonecutter', verb: 'Вытесать',
     desc: 'Тешет из камня блоки, мостовую и камни для дорожек.',
+  },
+  // корм для животных (animalData.js): каждый вид ест свой корм
+  feedmill: {
+    name: 'Кормоцех', he: true, level: 4, blueprint: 60, cost: { wood: 25, stone: 10 }, time: 5 * 60, xp: 10, slots: 3, w: 2, h: 2,
+    sprite: 'building_feedmill', site: 'site_feedmill', verb: 'Сделать',
+    desc: 'Делает корм для животных из урожая и сена: курам и гусям — зерносмесь, коровам и овцам — сенной брикет.',
   },
 };
 for (const [k, b] of Object.entries(BUILDINGS)) b.key = k;
@@ -50,6 +57,11 @@ export const CRAFT_GOODS = {
   crate:            { name: 'Деревянный ящик',     tab: 'res', sell: 40,     desc: 'Крепкий ящик на гвоздях.' },
   horseshoe:        { name: 'Подкова на счастье',  tab: 'res', sell: 35,     desc: 'Блестящая подкова. Говорят, приносит удачу.' },
   millstone:        { name: 'Жернов',              tab: 'res', sell: 60,     desc: 'Тяжёлый каменный жернов. Пригодится для мельницы.' },
+  // корма Кормоцеха: кто их ест — animalData.js ANIMALS[вид].feed
+  feed_grain:       { name: 'Зерносмесь',          tab: 'animals', desc: 'Корм для кур и гусей: дроблёная пшеница.' },
+  feed_rabbit:      { name: 'Кроличий корм',       tab: 'animals', desc: 'Корм для кроликов: морковка и капустные листья.' },
+  feed_mash:        { name: 'Мешанка',             tab: 'animals', desc: 'Корм для свиней: рубленые овощи с зерном.' },
+  feed_hay:         { name: 'Сенной брикет',       tab: 'animals', desc: 'Корм для коров и овец: прессованное сено с пшеницей.' },
 };
 
 // Рецепты. Ключ — id рецепта; at — здание, level — с какого уровня игрока, need — что уходит
@@ -82,6 +94,11 @@ export const RECIPES = {
   path_cobble:      { at: 'stonecutter', level: 6, need: { stone: 3 }, item: 'path_cobble', n: 2, time: 120, xp: 1 },
   path_stones:      { at: 'stonecutter', level: 6, need: { stone: 1 }, item: 'path_stones', n: 1, time: 60, xp: 1 },
   millstone:        { at: 'stonecutter', level: 6, need: { stone_block: 3 }, item: 'millstone', n: 1, time: 1200, xp: 5 },
+  // кормоцех
+  feed_grain:       { at: 'feedmill', level: 4, need: { wheat: 2 }, item: 'feed_grain', n: 3, time: 60, xp: 1 },
+  feed_rabbit:      { at: 'feedmill', level: 4, need: { carrot: 2, cabbage: 1 }, item: 'feed_rabbit', n: 2, time: 90, xp: 1 },
+  feed_mash:        { at: 'feedmill', level: 6, need: { carrot: 2, beet: 1 }, item: 'feed_mash', n: 2, time: 120, xp: 1 },
+  feed_hay:         { at: 'feedmill', level: 7, need: { hay: 3, wheat: 1 }, item: 'feed_hay', n: 2, time: 120, xp: 1 },
 };
 for (const [k, r] of Object.entries(RECIPES)) r.key = k;
 

@@ -7,7 +7,9 @@
 //   goal   — { ev, key?, group?, n } — счётчик событий игры (Farm → quests.emit):
 //            harvest, plant, water, fish, chop, stump, mine, dig, mow, pick, sow, sell, earn (монеты с рынка),
 //            buy, expand, order (сдан заказ с доски на рынке), place (свою постройку из рюкзака: key — её тип),
-//            build (стройка здания кончилась: key — здание), craft (забрали товар из здания: key — товар).
+//            build (стройка здания кончилась: key — здание), craft (забрали товар из здания: key — товар),
+//            feed (покормили животное: key — вид), grow (животное подросло: key — вид), adult (выросло во взрослое),
+//            animal (забрали, что дало животное: key — продукт: egg, milk…).
 //            key — точный ключ (культура, рыба, вид дерева), group — группа ключей (GROUPS в questRules.js)
 //            { state, n } — значение из состояния: house (уровень дома), well (колодец), level (уровень игрока),
 //            beds (грядок на ферме), bedsAll (всех своих грядок: на ферме и в рюкзаке) — их даёт мир (ctx.stats)
@@ -34,6 +36,7 @@ export const LINES = [
   { key: 'forest', name: 'Лес и сад', icon: 'axe', after: 'story.wood' },
   { key: 'build', name: 'Стройка', icon: 'house', after: 'story.well' },
   { key: 'craft', name: 'Мастерские', icon: 'build', after: 'story.well' },
+  { key: 'animals', name: 'Животные', icon: 'paw', after: 'story.well' },
   { key: 'trade', name: 'Торговля', icon: 'market', after: 'garden.first' },
 ];
 
@@ -315,6 +318,59 @@ export const QUESTS = {
         { ev: 'craft', key: 'stone_block', n: 2, task: 'Вытеши 2 каменных блока' },
       ],
       reward: { gems: 3 },
+    },
+  ],
+
+  // животные (animalData.js): кормоцех → цыплёнок → яйца, потом остальные виды по уровням
+  animals: [
+    {
+      id: 'animals.feedmill', title: 'Кормоцех', who: 'note', level: 4,
+      text: '«Какая ферма без живности? Только сперва поставь кормоцех: из пшеницы там выходит зерносмесь, а куры её обожают. Бабушка Марфа»',
+      goals: [
+        { ev: 'buy', key: 'bp_feedmill', n: 1, task: 'Купи чертёж кормоцеха (рынок, раздел «Постройки»)' },
+        { ev: 'build', key: 'feedmill', n: 1, task: 'Построй кормоцех' },
+      ],
+      reward: { coins: 40 },
+    },
+    {
+      id: 'animals.chick', title: 'Цып-цып-цып', who: 'ghost', level: 4,
+      text: 'На рынке продают пушистых цыплят! Куплю одного, поставлю во дворе и угощу зерносмесью.',
+      goals: [
+        { ev: 'buy', key: 'animal_chicken_baby', n: 1, task: 'Купи цыплёнка (рынок, раздел «Животные»)' },
+        { ev: 'place', key: 'animal_chicken_baby', n: 1, task: 'Поставь его на траву' },
+        { ev: 'feed', key: 'chicken', n: 3, task: 'Покорми его 3 раза' },
+      ],
+      reward: { coins: 30, items: { feed_grain: 6 } },
+    },
+    {
+      id: 'animals.egg', title: 'Первое яичко', who: 'note', level: 4,
+      text: '«Цыплёнок подрастёт в молодку, молодка — в курочку, а курочка снесёт яичко. Корми её почаще, и яиц будет много! Бабушка Марфа»',
+      task: 'Собери 3 яйца', goal: { ev: 'animal', key: 'egg', n: 3 }, reward: { gems: 2 },
+    },
+    {
+      id: 'animals.rabbit', title: 'Ушастый пух', who: 'ghost', level: 4,
+      text: 'Кролики такие мягкие! Из их пуха бабушка вязала самые тёплые варежки. Заведу крольчонка.',
+      task: 'Собери ангорский пух', goal: { ev: 'animal', key: 'angora', n: 1 }, reward: { coins: 50 },
+    },
+    {
+      id: 'animals.goose', title: 'Гуси-лебеди', who: 'note', level: 5,
+      text: '«Гуси — птицы важные, зато перья у них — на загляденье: подушки из них мягкие, как облако. Бабушка Марфа»',
+      task: 'Собери 2 гусиных пера', goal: { ev: 'animal', key: 'goose_feather', n: 2 }, reward: { coins: 70 },
+    },
+    {
+      id: 'animals.pig', title: 'Хрюшкины находки', who: 'ghost', level: 6,
+      text: 'Говорят, свинки умеют находить под землёй трюфели! Проверю, правда ли это.',
+      task: 'Найди трюфель со свинкой', goal: { ev: 'animal', key: 'truffle', n: 1 }, reward: { coins: 90 },
+    },
+    {
+      id: 'animals.sheep', title: 'Тёплая шерсть', who: 'note', level: 7,
+      text: '«Овечка даст шерсть, а из шерсти выйдут нитки. Сенной брикет делай в кормоцехе: сено с дикой травы пригодится. Бабушка Марфа»',
+      task: 'Собери 2 шерсти', goal: { ev: 'animal', key: 'wool', n: 2 }, reward: { gems: 3 },
+    },
+    {
+      id: 'animals.milk', title: 'Парное молоко', who: 'note', level: 8,
+      text: '«Своя корова — своё молоко! Из него выйдет и тыквенная каша, и клубничный торт. Бабушка Марфа»',
+      task: 'Надои 12 бутылок молока', goal: { ev: 'animal', key: 'milk', n: 12 }, reward: { gems: 3 },
     },
   ],
 
