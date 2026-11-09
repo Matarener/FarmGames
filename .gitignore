@@ -8,3 +8,5 @@ Thumbs.db
 .history/
 # картинки для проверки прудов (python tools/pond_art.py --preview)
 .pond-art/
+# картинки для проверки заборов (python tools/fence_art.py --preview)
+.fence-art/

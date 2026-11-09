@@ -33,6 +33,8 @@ assets/map.json  стартовая карта (редактор карты)
 | украшения прудов и кувшинки | `pond_<что>` | `pond_cattail`, `pond_lily` |
 | дом, колодец | `house_<уровень>`, `well_broken`, `well_fixed` | |
 | поливалка | `<ключ из SPRINKLERS>` (иконка на рынке и в рюкзаке — сама картинка) | `sprinkler_spin` |
+| декор (фонари, лавочки, столики) | `<ключ из DECOR>`, вид сзади — `<ключ>_back` (иконка — сама картинка) | `decor_park_bench`, `decor_park_bench_back` |
+| забор | `<ключ из FENCES>_post` (столбик), `<ключ>_span` (пролёт на полклетки, делает `tools/fence_art.py`) | `fence_picket_post` |
 | здание с крафтом, стройка | `building_<ключ из BUILDINGS>` (иконка — само здание), `site_<ключ>` — оно же в лесах | `building_forge`, `site_forge` |
 | дом в лесах (идёт улучшение) | `house_up_<уровень, до которого улучшают>` | `house_up_3` |
 | туман | `fog_clouds_<n>`, `fog_strips_<n>`, `fog_wisps_<n>` | |
@@ -83,6 +85,18 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 `assets/source/pond_<вид>.png` той же формы и с той же опорой. Камыш, рогоз и камни (`pond_reeds`, `pond_cattail`,
 `pond_rocks`) в картинку не входят: это украшения `POND_DECOR`, игрок ставит их сам на воду пруда.
 
+Декор (`DECOR` в `src/game/data.js`) — по картинке на вещь, как поливалки (`PROPS` в `slice_art.py`: высота в мире
+и опора). Положение поворота 0 — картинка как есть: у вещи на две клетки длинная сторона — вдоль gx (на экране от
+левого верхнего угла к правому нижнему), лицом к зрителю — вниз-влево. Положение 1 — её зеркало (игра отражает сама),
+2 — вид сзади `<ключ>_back` (та же вещь, повёрнутая на пол-оборота), 3 — его зеркало. У вещей, которые спереди и сзади
+одинаковы (`rot: 2`), вида сзади нет, у симметричных (`rot: 1`) — и зеркала. Лавочки и столик со стульями стоят на
+ножках по концам: их опора (`foot` в `PROPS`) — посередине между нижними точками левого и правого краёв.
+
+Заборы (`FENCES`) — из двух картинок на вид: `assets/source/<вид>_post.png` — столбик в изометрии,
+`<вид>_panel.png` — пролёт спереди, плоско, повторяется по горизонтали без шва. `python tools/fence_art.py`
+(`--preview` — ещё и забор с углами на траве в `.fence-art/`) делает столбик и скошенный пролёт на полклетки;
+игра склеивает из них секцию по соседям-заборам (`artSprites.fenceSprite`).
+
 ## Как нарезать
 
 Нужен Python с numpy, Pillow и scipy (`pip install numpy pillow scipy`).
@@ -91,10 +105,11 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 python tools/slice_art.py                   # всё: картинки, manifest.json, иконки, icons.json
 python tools/slice_fog.py                   # облака тумана (дописывает manifest.json)
 python tools/pond_art.py                    # пруды (дописывает manifest.json)
+python tools/fence_art.py                   # заборы (дописывает manifest.json)
 
 python tools/slice_art.py tree_apple_bare   # только эти листы (остальное в манифесте не трогается)
 python tools/slice_art.py tiles             # только плитки земли
 ```
 
 Полная нарезка `slice_art.py` пишет `manifest.json` заново, поэтому после неё всегда запускайте
-`slice_fog.py` и `pond_art.py`.
+`slice_fog.py`, `pond_art.py` и `fence_art.py`.

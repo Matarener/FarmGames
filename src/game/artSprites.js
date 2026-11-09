@@ -2,7 +2,7 @@
 // игра не открывается, пока не загружены все картинки, чтобы в игре не было подгрузок.
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
-import { FLORA, PATHS, PATH_KEYS, PONDS, POND_DECOR, pondDecorId, SPRINKLERS, BED_ITEM, WELL_ITEM } from './data.js';
+import { FLORA, PATHS, PATH_KEYS, PONDS, POND_DECOR, pondDecorId, SPRINKLERS, BED_ITEM, WELL_ITEM, DECOR, FENCES } from './data.js';
 import { BUILDINGS, bldId } from './buildData.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
@@ -26,6 +26,67 @@ function iconOf(s) {
   const w = sw * k, h = sh * k;
   g.imageSmoothingQuality = 'high';
   g.drawImage(s.canvas, x, y, sw, sh, (64 - w) / 2, (64 - h) / 2, w, h);
+  return c.toDataURL();
+}
+
+// Зеркальная копия спрайта (повёрнутый декор): опора отражается вместе с картинкой
+export function mirrorSprite(s) {
+  if (!s) return s;
+  if (s.mirror) return s.mirror;
+  const c = makeCanvas(s.canvas.width, s.canvas.height), g = c.getContext('2d');
+  g.translate(c.width, 0); g.scale(-1, 1);
+  g.drawImage(s.canvas, 0, 0);
+  s.mirror = { canvas: c, w: s.w, h: s.h, ax: s.w - s.ax, ay: s.ay, name: s.name + '_m' };
+  return s.mirror;
+}
+
+// Секция забора по соседям: столбик (post) и пролёты на полклетки (span) к соседям-заборам, склеенные в одну
+// картинку. span нарисован от середины клетки (его опора) к соседу gx + 1 — на экране вправо-вниз на 16 × 8 единиц;
+// к соседу gx − 1 — он же, сдвинутый на полклетки назад, к соседям по gy — его зеркало. mask: 1 — сосед gx + 1,
+// 2 — gy + 1, 4 — gx − 1, 8 — gy − 1. Одиночная секция (0) — прямая вдоль gx. Столбик — поверх пролётов:
+// они уходят в него (tools/fence_art.py).
+export function fenceSprite(post, span, mask, name) {
+  if (!mask) mask = 5;
+  const parts = [];
+  if (mask & 4) parts.push([span, false, -16, -8]);
+  if (mask & 8) parts.push([span, true, 16, -8]);
+  if (mask & 1) parts.push([span, false, 0, 0]);
+  if (mask & 2) parts.push([span, true, 0, 0]);
+  parts.push([post, false, 0, 0]);
+  let L = Infinity, T = Infinity, R = -Infinity, B = -Infinity;
+  for (const [p, m, dx, dy] of parts) {
+    const ax = m ? p.w - p.ax : p.ax;
+    L = Math.min(L, dx - ax); R = Math.max(R, dx - ax + p.w);
+    T = Math.min(T, dy - p.ay); B = Math.max(B, dy - p.ay + p.h);
+  }
+  const k = post.canvas.width / post.w; // пикселей на единицу мира
+  const c = makeCanvas((R - L) * k, (B - T) * k), g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  for (const [p, m, dx, dy] of parts) {
+    const ax = m ? p.w - p.ax : p.ax, x = (dx - ax - L) * k, y = (dy - p.ay - T) * k, w = p.w * k, h = p.h * k;
+    if (m) { g.save(); g.translate(x + w, y); g.scale(-1, 1); g.drawImage(p.canvas, 0, 0, w, h); g.restore(); } else g.drawImage(p.canvas, x, y, w, h);
+  }
+  return { canvas: c, w: R - L, h: B - T, ax: -L, ay: -T, name: name + '_' + mask };
+}
+
+// Иконка «Повернуть» (кнопка в «Переставить»), пока у художника её нет: круговая стрелка по часовой
+function rotateIcon() {
+  const c = makeCanvas(64, 64), g = c.getContext('2d'), cx = 31, cy = 34, r = 18;
+  const a0 = Math.PI * 0.75, a1 = Math.PI * 2.2; // по часовой: от левого низа через верх к правому боку
+  const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1);
+  const tx = -Math.sin(a1), ty = Math.cos(a1), nx = Math.cos(a1), ny = Math.sin(a1); // касательная (по ходу) и нормаль
+  const draw = (lw, col, head) => {
+    g.strokeStyle = g.fillStyle = col; g.lineWidth = lw;
+    g.beginPath(); g.arc(cx, cy, r, a0, a1 - 0.25); g.stroke();
+    g.beginPath();
+    g.moveTo(ex + tx * (11 + head), ey + ty * (11 + head));
+    g.lineTo(ex + nx * (10 + head) - tx * (2 + head), ey + ny * (10 + head) - ty * (2 + head));
+    g.lineTo(ex - nx * (10 + head) - tx * (2 + head), ey - ny * (10 + head) - ty * (2 + head));
+    g.closePath(); g.fill();
+  };
+  g.lineCap = g.lineJoin = 'round';
+  draw(14, '#3d2b1f', 3.5);
+  draw(7, '#f5c242', 0);
   return c.toDataURL();
 }
 
@@ -93,6 +154,26 @@ export async function loadArt(onProgress) {
     sprinkler[k] = A[k];
     if (!icons[k]) try { floraIcons[k] = iconOf(A[k]); } catch (e) { /* */ }
   }
+  // декор (data.js DECOR): картинка на каждое положение поворота — [лицом, зеркало, спиной (<ключ>_back), зеркало];
+  // у симметричных вещей одна. Иконка на рынке и в рюкзаке — сама вещь в положении 0
+  const deco = {};
+  for (const [k, d] of Object.entries(DECOR)) {
+    const front = A[k];
+    if (!front) continue;
+    const back = A[k + '_back'] || front, n = d.rot || 1;
+    deco[k] = n === 1 ? [front] : n === 2 ? [front, mirrorSprite(front)] : [front, mirrorSprite(front), back, mirrorSprite(back)];
+    if (!icons[k]) try { floraIcons[k] = iconOf(front); } catch (e) { /* */ }
+  }
+  if (!icons.rotate) try { floraIcons.rotate = rotateIcon(); } catch (e) { /* */ }
+  // заборы (data.js FENCES): 16 секций на вид — по соседям (fenceSprite), иконка — прямая секция
+  const fence = {};
+  for (const k of Object.keys(FENCES)) {
+    const post = A[k + '_post'], span = A[k + '_span'];
+    if (!post || !span) continue;
+    fence[k] = Array.from({ length: 16 }, (_, m) => m && fenceSprite(post, span, m, k));
+    fence[k][0] = fence[k][5];
+    if (!icons[k]) try { floraIcons[k] = iconOf(fence[k][5]); } catch (e) { /* */ }
+  }
   // пруды (data.js PONDS): одна картинка на пруд (tools/pond_art.py), иконка в рюкзаке и на рынке — сам пруд
   const ponds = {};
   for (const k of Object.keys(PONDS)) {
@@ -137,7 +218,7 @@ export async function loadArt(onProgress) {
   // дикая высокая трава: grass_tall_0, grass_tall_1, ...
   const wildGrass = Object.keys(A).filter((n) => /^grass_tall_\d+$/.test(n)).sort().map((n) => A[n]);
   return {
-    wildGrass, fog, obj, crops, icons, flora, floraIcons, ponds, sprinkler, buildings, sites,
+    wildGrass, fog, obj, crops, icons, flora, floraIcons, ponds, sprinkler, buildings, sites, deco, fence,
     sprouts: { tree: A.sprout_tree, bush: A.sprout_bush }, // ростки посаженных растений
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {

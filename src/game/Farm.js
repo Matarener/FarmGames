@@ -77,6 +77,7 @@ export class Farm {
       objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, wildGrass: a.wildGrass,
       house: a.house, well: a.well, crops: a.crops, fog: a.fog.clouds.length ? a.fog : null, sprinkler: a.sprinkler,
       buildings: a.buildings, sites: a.sites, houseUp: a.houseUp,
+      deco: a.deco, fence: a.fence,
     });
     this.groundV++;
     for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
@@ -150,6 +151,10 @@ export class Farm {
     if (o.bare && S.flora[o.type]) return S.flora[o.type].bare; // плоды собраны
     if (OBJECTS[o.type] && OBJECTS[o.type].building) return this.builds.sprite(o); // здание или его стройка
     if (S.ponds[o.type]) return S.ponds[o.type];
+    // декор: картинка своего положения поворота; забор — секция по соседям-заборам
+    const dv = S.deco && S.deco[o.type];
+    if (dv) return dv[o.rot || 0] || dv[0];
+    if (S.fence && S.fence[o.type]) return S.fence[o.type][this.fenceMask(o)];
     const v = S.objArt[o.type];
     if (v && v.length) return v[o.id % v.length];
     if (S.sprinkler && S.sprinkler[o.type]) return S.sprinkler[o.type];
@@ -161,15 +166,24 @@ export class Farm {
     return S.objArt.rock[0];
   }
 
+  // С какими соседями-заборами соединяется секция забора o: 1 — gx + 1, 2 — gy + 1, 4 — gx − 1, 8 — gy − 1
+  // (artSprites.fenceSprite). o может быть и заготовкой предпросмотра на месте, куда забор ставят.
+  fenceMask(o) {
+    const w = this.world;
+    if (!w) return 0;
+    const fe = (x, y) => { const n = w.objectAt(x, y); return n && n !== o && n !== o.self && OBJECTS[n.type].fence ? 1 : 0; };
+    return fe(o.gx + 1, o.gy) | fe(o.gx, o.gy + 1) << 1 | fe(o.gx - 1, o.gy) << 2 | fe(o.gx, o.gy - 1) << 3;
+  }
+
   // Картинка предмета из рюкзака на месте, куда его ставят (предпросмотр в «Переставить»): пруд, украшение
   // пруда или своя постройка (placed.js). У постройки — объект-заготовка с o.item и o.preview: свои правила
-  // картинки могут их учесть.
-  placeSprite(itemId) {
+  // картинки могут их учесть. rot — положение поворота (декор), gx, gy — куда ставят (забор соединится с соседями).
+  placeSprite(itemId, rot = 0, gx = -9, gy = -9) {
     if (itemId === WELL_ITEM) return this.S.well[1];
     if (Ponds.isPondItem(itemId)) return this.S.ponds[itemId];
     if (Ponds.isDecorItem(itemId)) return this.S.decor[ITEMS[itemId].decorOf];
     const type = Placed.objOf(itemId);
-    return type ? this.objSprite({ type, id: 0, gx: -1, gy: -1, item: itemId, preview: true }) : null;
+    return type ? this.objSprite({ type, id: 0, gx, gy, rot, item: itemId, preview: true }) : null;
   }
 
   // ---------------- Состояние ----------------
@@ -656,6 +670,7 @@ export class Farm {
     if (!def) return;
     if (def.sprinkler) return this.sprinklerPopup(o, sx, sy);
     if (def.building) return this.builds.tap(o, sx, sy);
+    if (def.deco || def.fence) return this.decoPopup(o, sx, sy);
     if (o.type === 'sapling' || def.flora) return this.floraPopup(o, sx, sy);
     if (def.action) this.queue({ kind: def.action, obj: o });
   }
@@ -668,6 +683,13 @@ export class Farm {
       title: SPRINKLERS[k].name, text: `Поливает ${n} ${n === 4 ? 'соседние клетки' : 'клеток вокруг'}: грядки там поливаются сами.`,
       items: [{ icon: 'move', label: 'Переставить', onClick: () => this.moveThis(o) }],
     });
+  }
+
+  // Декор или забор: переставить, повернуть (у кого есть повороты)
+  decoPopup(o, sx, sy) {
+    const def = OBJECTS[o.type], items = [{ icon: 'move', label: 'Переставить', onClick: () => this.moveThis(o) }];
+    if (Placed.rotCount(o.type) > 1) items.push({ icon: 'rotate', label: 'Повернуть', onClick: () => { this.moveThis(o); this.mover.rotate(); } });
+    this.ui.popup(sx, sy, { title: def.name, text: def.fence ? 'Секция забора: соседние секции соединяются сами.' : undefined, items });
   }
 
   // Подсветить на несколько секунд клетки, которые поливает поливалка o (рисует PixiScene)
@@ -841,7 +863,7 @@ export class Farm {
       else if (s.g === 'ponds') {
         const water = PONDS[s.o.type].water, step = Math.max(1, Math.round(water.length / 4));
         for (let k = 0; k < water.length; k += step) { toWorld(s.o.gx + water[k][0] + 0.5, s.o.gy + water[k][1] + 0.5, tmp); this.burst(tmp.x, tmp.y, '#9fd8f5', Math.max(2, n >> 1)); }
-      } else this.burst(s.o.wx, s.o.wy - 4, s.g === 'placed' || s.g === 'well' ? '#e8d9a8' : '#8a5a30', n);
+      } else this.burst(s.o.wx, s.o.wy - 4, s.g === 'placed' || s.g === 'decor' || s.g === 'well' ? '#e8d9a8' : '#8a5a30', n);
     }
     if (r.done.paths || r.done.beds) this.groundV++;
     toWorld(this.player.x, this.player.y, tmp);

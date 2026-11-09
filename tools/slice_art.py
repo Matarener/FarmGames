@@ -50,6 +50,19 @@ PROPS = {
     'sprinkler_drip': {'h': 32, 'lift': 4},
     'sprinkler_spin': {'h': 40, 'lift': 4},
     'sprinkler_rain': {'h': 56, 'lift': 5},
+    # декор (DECOR в src/game/data.js); _back — вид сзади (положения поворота 2 и 3).
+    # w вместо h — масштаб по ширине картинки (вещи на две клетки и лавочки лежат по диагонали: их высота на экране
+    # зависит от длины, а длина задана клетками). foot: вещь на ножках по концам (лавочки, столик со стульями) —
+    # опора посередине между самыми нижними точками левого и правого краёв картинки, а не у нижнего края.
+    'decor_lantern': {'h': 38, 'lift': 2},
+    'decor_bench': {'w': 48, 'foot': True, 'lift': 2},
+    'decor_table': {'w': 36, 'lift': 4},
+    'decor_lamp': {'h': 90, 'lift': 3},
+    'decor_hook_lamp': {'h': 72, 'lift': 4},
+    'decor_park_bench': {'w': 84, 'foot': True, 'lift': 4},
+    'decor_park_bench_back': {'w': 84, 'foot': True, 'lift': 4},
+    'decor_stone_lamp': {'h': 50, 'lift': 5},
+    'decor_table_set': {'w': 88, 'foot': True, 'lift': 4},
 }
 # Урожай: каждая стадия (0–3) — своя картинка crop_<культура>_<стадия>.png. Растения заполняют
 # ромб грядки: масштаб по ширине (ширина стадии в мире), опора — центр ромба.
@@ -167,6 +180,7 @@ ICON_SHEETS = {
     'ui_dishes2': ['borscht', 'pumpkin_porridge', 'strawberry_cake', 'blueprint'],
     'ui_craft1': ['planks', 'birch_box', 'acorn_toy', 'pine_wreath', 'crate'],
     'ui_craft2': ['iron_ingot', 'nails', 'horseshoe', 'stone_block', 'millstone'],  # колесо фортуны: кнопка в интерфейсе и пункт «Ещё» (само колесо в окне рисуется кодом)
+    'ui_rotate': ['rotate'],  # «Повернуть» в «Переставить» (декор)
 }
 ICON_PX = 128
 # Иконки не в квадрате 128, а по контуру картинки (без полей), длинная сторона — столько пикселей:
@@ -465,10 +479,20 @@ def main(only=None):
         ys = np.where(m.any(1))[0]
         low = m[int(ys[-1] - (ys[-1] - ys[0]) * 0.15):]  # нижние 15%: на чём стоит
         xs = np.where(low.any(0))[0]
-        k = pr['h'] / (y1 - y0)  # мир/пиксель
+        k = pr['w'] / (x1 - x0) if 'w' in pr else pr['h'] / (y1 - y0)  # мир/пиксель
         W, H = (x1 - x0) * k, (y1 - y0) * k
         img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
-        save(img, name, W, H, (xs[0] + xs[-1]) / 2 * k, ys[-1] * k - pr['lift'], man)
+        ax, ay = (xs[0] + xs[-1]) / 2 * k, ys[-1] * k - pr.get('lift', 0)
+        if pr.get('foot'):
+            cols = np.where(m.any(0))[0]
+            n = max(1, int(len(cols) * 0.12))
+            def low(cs):
+                lows = [np.where(m[:, c])[0][-1] for c in cs]
+                j = int(np.argmax(lows))
+                return cs[j], lows[j]
+            (lx, ly), (rx, ry) = low(cols[:n]), low(cols[-n:])
+            ax, ay = (lx + rx) / 2 * k, (ly + ry) / 2 * k - pr.get('lift', 0)
+        save(img, name, W, H, ax, ay, man)
         print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
 
     # Грядки: объёмный ромб (верх + бортик). Ширина — по краям картинки, центр ромба —

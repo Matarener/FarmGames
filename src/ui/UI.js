@@ -79,6 +79,7 @@ export class UI {
     $('#mb-cancel').onclick = () => farm.mover.cancel();
     $('#mb-place').onclick = () => farm.mover.place();
     $('#mb-store').onclick = () => farm.mover.store();
+    $('#mb-rot').onclick = () => farm.mover.rotate();
     $('#mb-all').onclick = () => this.storeAllPanel(farm);
     $('#pb-pick').onclick = () => {
       const P = farm.planting;
@@ -572,6 +573,7 @@ export class UI {
     $('#mb-cancel').hidden = !st.selected;
     $('#mb-place').hidden = !st.selected || !!st.brush; // «Кладём дорожку»: клетка кладётся сразу по нажатию
     $('#mb-store').hidden = !st.canStore;
+    $('#mb-rot').hidden = !st.canRotate;
     $('#mb-all').hidden = !st.canStoreAll;
   }
 

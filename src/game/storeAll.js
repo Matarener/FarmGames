@@ -2,9 +2,9 @@
 // Чистые функции над состоянием st и миром (без звуков, DOM, Date.now и Math.random — время и случайность
 // приходят в ctx), чтобы их же потом мог выполнять сервер. Эффекты (пыль, брызги, надписи) делает Farm.
 //
-// Группы — таблица STORE_ALL (data.js): дорожки, пустые грядки, пруды (с украшениями), починенный колодец, свои
-// взрослые деревья и кусты (висящие плоды — тоже в рюкзак), свои постройки (placed.js: постройка сама может
-// отказаться, например пока строится), растущие ростки (вернутся саженцами). Каждая вещь убирается тем же
+// Группы — таблица STORE_ALL (data.js): дорожки, пустые грядки, пруды (с украшениями), декор и заборы, починенный
+// колодец, свои взрослые деревья и кусты (висящие плоды — тоже в рюкзак), свои постройки (placed.js: постройка сама
+// может отказаться, например пока строится), растущие ростки (вернутся саженцами). Каждая вещь убирается тем же
 // правилом, что и по одной в «Переставить»: Paths.storePaths, Beds.storeBed, Ponds.storePond, Well.storeWell,
 // Placed.storeObj, Flora.storeOwn.
 // Не трогаются: дом, грядки, где что-то растёт, сломанный колодец, дикая природа, вещи на закрытых участках и
@@ -30,14 +30,14 @@ export function groupOf(o) {
   if (!o) return null;
   if (o.type === 'well') return 'well';
   if (Ponds.isPond(o)) return 'ponds';
-  if (Placed.isPlaced(o)) return Placed.itemOf(o.type) ? 'placed' : null;
+  if (Placed.isPlaced(o)) return !Placed.itemOf(o.type) ? null : OBJECTS[o.type].deco || OBJECTS[o.type].fence ? 'decor' : 'placed';
   if (!o.own) return null;
   if (o.type === 'sapling') return 'sprouts';
   return Flora.floraOf(o) ? 'plants' : null;
 }
 
 // Объект целиком на открытой земле
-const onOpen = (w, o) => objCells(OBJECTS[o.type]).every(([dx, dy]) => w.isOpen(o.gx + dx, o.gy + dy));
+const onOpen = (w, o) => objCells(OBJECTS[o.type], o.rot).every(([dx, dy]) => w.isOpen(o.gx + dx, o.gy + dy));
 
 // Что уберётся. → { группа: { list, kept } }: list — клетки дорожек и грядок (номера) или объекты, kept — сколько
 // своих останется на месте (занято, постройка не даёт: строится; колодец сломан). Грядки, где что-то растёт,
@@ -57,7 +57,7 @@ export function collect(st, w, ctx = {}) {
   for (const o of w.objects) {
     const g = groupOf(o);
     if (!g || !onOpen(w, o)) continue;
-    const no = (g === 'placed' && Placed.storeWhy(st, o, ctx)) || (g === 'well' && Well.storeWhy(st, w));
+    const no = ((g === 'placed' || g === 'decor') && Placed.storeWhy(st, o, ctx)) || (g === 'well' && Well.storeWhy(st, w));
     if (busy({ obj: o }) || no) out[g].kept++;
     else out[g].list.push(o);
   }
@@ -92,7 +92,7 @@ export function storeAll(st, w, groups, ctx = {}) {
       let items = null;
       if (g === 'well') { if (Well.storeWell(st, w)) items = [{ id: WELL_ITEM, n: 1 }]; }
       else if (g === 'ponds') items = Ponds.storePond(st, w, o);
-      else if (g === 'placed') { const r = Placed.storeObj(st, w, o, ctx); if (r.id) items = [{ id: r.id, n: 1 }]; }
+      else if (g === 'placed' || g === 'decor') { const r = Placed.storeObj(st, w, o, ctx); if (r.id) items = [{ id: r.id, n: 1 }]; }
       else { const r = Flora.storeOwn(st, o, ctx.now, ctx.rng); if (r) { w.remove(o); items = r.items; } }
       if (items) put(items, g, { o });
     }

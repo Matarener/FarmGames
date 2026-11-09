@@ -595,6 +595,8 @@ body[data-side="2"] .debug { top: calc(var(--safe-t) + 248px); }
 .mb-btns .btn-s { flex: 1; min-width: 0; padding: 0 6px; justify-content: center; min-height: 40px; font-size: 13px; }
 .mb-btns .btn-s[hidden] { display: none; }
 .mb-btns .btn-s.done { background: linear-gradient(#9be06a, #5fb03a); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.mb-btns .btn-s.mb-rot { flex: 0 0 46px; padding: 0; }
+.mb-btns .btn-s.mb-rot .ic { width: 26px; height: 26px; margin: 0; }
 body.moving .hud-bottom { display: none; }
 body.moving .toast { bottom: calc(var(--safe-b) + 112px); }
 .move-bar.shake { animation: mb-shake .32s; }
