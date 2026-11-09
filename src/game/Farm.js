@@ -25,6 +25,8 @@ import * as Spr from './sprinklers.js';
 import * as Ponds from './ponds.js';
 import * as Well from './well.js';
 import * as Hints from './hints.js';
+import * as Chop from './chop.js';
+import { plural } from './questRules.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
   CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, PATHS, SPRINKLERS, WELL_ITEM, BED_ITEM, floraSeedId, floraOwnId, seedId, WELL_COST,
@@ -41,6 +43,7 @@ export class Farm {
     this.r = renderer; this.cam = camera; this.ui = ui; this.tg = tg; this.save = save; this.perf = perf;
     this.particles = [];
     this.floaters = [];
+    this.rings = new Map(); // кольца прочности над тем, что рубят (ringTouch)
     this.hover = null;
     this.focus = [];
     this.tapFx = null;
@@ -257,6 +260,7 @@ export class Farm {
     this.restorePlants();
     Placed.restorePlaced(this.st, w); // свои постройки (поливалки): место занято — в рюкзак
     this.restoreWild();
+    Chop.tidy(this.st, (x, y) => w.objectAt(x, y)); // начатая рубка: объекта на клетке больше нет — забыть
     if (this.awaySec > 0) this.grow(this.awaySec, true);
     Flora.tidyFruit(this.st, Date.now());
     this.floraTick(Date.now());
@@ -366,7 +370,7 @@ export class Farm {
       if (!o) continue;
       if (o.type === 'sapling') {
         const stage = Flora.plantStage(o.tree, o.born, now);
-        if (stage >= 2) { o.type = o.tree; o.hp = OBJECTS[o.type].hp; o.stage = 2; changed = true; this.burst(o.wx, o.wy - 20, '#7ccf4f', 10, true); }
+        if (stage >= 2) { o.type = o.tree; o.stage = 2; changed = true; this.burst(o.wx, o.wy - 20, '#7ccf4f', 10, true); }
         else if (o.stage !== stage) { o.stage = stage; changed = true; }
       }
       if (FLORA[o.type]) {
@@ -744,13 +748,15 @@ export class Farm {
     // собирать касанием можно только плоды и ягоды (pick); кора, шишки, цветы — только рубкой
     const f = FLORA[o.type], left = f.pick ? Flora.fruitLeft(this.st, o, now) : 0, fruit = FLORA_GOODS[f.fruit];
     const ripe = f.pick && !left;
-    // дикое без сбора рубится сразу; плодовое, пока плоды отрастают, — меню «Срубить» и время до урожая
-    if (!f.pick && !o.own) return this.queue({ kind: 'chop', obj: o });
-    const items = [];
+    // дикое без сбора рубится сразу; плодовое, пока плоды отрастают, — меню «Срубить» и время до урожая.
+    // Рубку уже начали (есть удары или удар ждёт в очереди) — каждое нажатие сразу ещё один удар, без меню.
+    if ((!f.pick && !o.own) || this.chopping(o)) return this.queue({ kind: 'chop', obj: o });
+    const items = [], n = Chop.durability(o);
     if (ripe) items.push({ icon: f.fruit, label: `Собрать: ${fruit.name.toLowerCase()}`, sub: `⚡ ${ENERGY.pick}`, onClick: () => this.queue({ kind: 'pick', obj: o }) });
     items.push({ icon: 'wood', label: o.own ? 'Срубить своё' : 'Срубить', sub: `⚡ ${ENERGY.chop} за удар`, onClick: () => this.queue({ kind: 'chop', obj: o }) });
+    const about = left ? `Следующий урожай (${fruit.name.toLowerCase()}) через ${fmtTime(left)}. ` : !f.pick ? `${fruit.name}: только при рубке. ` : '';
     this.ui.popup(sx, sy, {
-      title: (o.own ? 'Моё: ' : '') + f.name, text: left ? `Следующий урожай (${fruit.name.toLowerCase()}) через ${fmtTime(left)}` : !f.pick ? `${fruit.name}: только при рубке` : undefined, items,
+      title: (o.own ? 'Моё: ' : '') + f.name, text: `${about}Прочность: ${n} ${plural(n, ['удар', 'удара', 'ударов'])}`, items,
     });
   }
 
@@ -1058,10 +1064,57 @@ export class Farm {
     this.changed();
   }
 
+  // Поставить дело призрачку. Удар по дереву, кусту, пню, камню (chop.js): если по этому объекту уже
+  // заказаны удары — к ним добавляется ещё один (одно дело в очереди), но не больше, чем осталось до конца.
   queue(a) {
     if (this.mover.active) return;
-    if (!this.player.enqueue(a)) { this.toast('Очередь заполнена'); return; }
+    const p = this.player;
+    if (Chop.isHit(a)) {
+      const same = p.find(a);
+      if (same) {
+        const n = same.n || 1;
+        if (!Chop.canOrder(this.st, a.obj, n)) return; // ударов уже хватит, чтобы срубить
+        same.n = n + 1;
+        this.ringTouch(a.obj);
+        this.sfx('tap');
+        return;
+      }
+      a.n = 1;
+    }
+    const r = p.enqueue(a);
+    if (r === 'full') return this.toast('Очередь заполнена');
+    if (r !== 'ok') return;
+    if (a.n) this.ringTouch(a.obj);
     this.sfx('tap');
+  }
+
+  // Рубку объекта уже начали: есть удары или удар ждёт в очереди
+  chopping(o) { return Chop.hitsDone(this.st, o) > 0 || !!this.player.find({ kind: 'chop', obj: o }); }
+
+  // Кнопка «Отменить всё»: призрачок бросает текущее дело и всю очередь. Сделанные удары остаются.
+  cancelAll() {
+    const p = this.player;
+    if (!p.current && !p.queue.length) return;
+    p.clear();
+    this.sfx('tap');
+    this.ui.queueBtn(0);
+  }
+
+  // Кольцо прочности (рисует PixiScene.syncRings): над объектом, по которому заказаны удары, и ещё
+  // RING_HOLD секунд после последнего удара. this.rings: объект → { type, total, done, last — срублен, t }.
+  // Сколько ударов ещё заказано, сцена считает по очереди призрачка.
+  ringTouch(o, r) {
+    let e = this.rings.get(o);
+    if (r) {
+      // удар: последний — кольцо дорисовывается полным над тем, что срубили (объект уже пень или убран)
+      if (!e || e.type !== o.type || e.last) { e = { type: o.type, total: r.total, done: r.done - 1, shown: r.done - 1 }; this.rings.set(o, e); }
+      e.total = r.total; e.done = r.done; e.last = r.last;
+    } else if (!e || e.type !== o.type || e.last) {
+      const done = Chop.hitsDone(this.st, o);
+      e = { type: o.type, total: Chop.durability(o), done, shown: done, last: false };
+      this.rings.set(o, e);
+    }
+    e.t = this.time;
   }
 
   toast(msg, kind) { this.ui.toast(msg, kind); if (kind === 'warn') this.sfx('error'); }
@@ -1126,18 +1179,25 @@ export class Farm {
     const w = this.world, st = this.st;
     switch (a.kind) {
       case 'chop': case 'mine': {
-        const o = a.obj;
-        if (w.objects[o.id] !== o || !this.spend(1)) return false;
-        o.hp--; o.shake = 0.25;
-        if (o.hp > 0) this.sfx(a.kind === 'chop' ? 'chop' : 'mine');
-        const s = this.objSprite(o);
+        // один удар; a.n — сколько ударов по этому объекту ещё заказано (каждое нажатие — один)
+        const o = a.obj, cost = ENERGY[a.kind];
+        if (w.objects[o.id] !== o || !this.spend(cost)) return false;
+        const r = Chop.hit(st, o);
+        a.n = Math.max(0, (a.n || 1) - 1);
+        o.shake = 0.25;
+        if (!r.last) this.sfx(a.kind === 'chop' ? 'chop' : 'mine');
         const od = OBJECTS[o.type];
         const hy = o.type === 'stump' || o.type === 'rock' || o.type === 'sapling' || od.bush ? 8 : o.type === 'boulder' ? 20 : 26;
         this.burst(o.wx, o.wy - hy, a.kind === 'chop' ? '#b07a45' : '#b8bec3', 6);
         if (a.kind === 'chop' && o.type !== 'stump' && o.type !== 'sapling') this.burst(o.wx, o.wy - 60, '#5aa83a', 4, true);
-        if (o.hp <= 0) { this.destroy(o); this.changed(); return false; }
+        this.ringTouch(o, r);
+        if (r.last) { this.destroy(o); this.changed(); return false; }
         this.ui.update(this);
-        return st.energy >= 1;
+        this.save.schedule(() => this.serialize());
+        if (!a.n) return false;
+        // заказаны ещё удары, а энергия кончилась — призрачок останавливается и говорит почему
+        if (st.energy < cost) { this.spend(cost); return false; }
+        return true;
       }
       case 'pick': {
         const o = a.obj, now = Date.now();
@@ -1274,7 +1334,7 @@ export class Farm {
       this.burst(o.wx, o.wy - 10, '#7a4b28', 12);
       this.sfx('break');
       // своё дерево уходит целиком, дикое оставляет пень
-      if (def.stump && !o.own) { o.was = o.type; o.type = 'stump'; o.hp = OBJECTS.stump.hp; o.bare = false; this.world.version++; }
+      if (def.stump && !o.own) { o.was = o.type; o.type = 'stump'; o.bare = false; this.world.version++; }
       else this.world.remove(o);
       return;
     }
@@ -1293,7 +1353,7 @@ export class Farm {
     this.quests.emit(def.stump ? 'chop' : o.type === 'stump' ? 'stump' : def.action === 'mine' ? 'mine' : 'clear', o.type);
     this.burst(o.wx, o.wy - 10, o.type === 'rock' || o.type === 'boulder' ? '#9aa1a7' : '#7a4b28', 12);
     this.sfx('break');
-    if (def.stump) { o.was = o.type; o.type = 'stump'; o.hp = OBJECTS.stump.hp; this.world.version++; }
+    if (def.stump) { o.was = o.type; o.type = 'stump'; this.world.version++; }
     else this.world.remove(o);
   }
 
@@ -1389,6 +1449,9 @@ export class Farm {
       this.ui.tick(this); t = pf.part('интерфейс', t);
     }
     this.player.update(dt);
+    // кнопка «Отменить всё»: видна, пока у призрачка есть дела, цифра — сколько их
+    const tasks = this.player.tasks;
+    if (tasks !== this._tasks) { this._tasks = tasks; this.ui.queueBtn(tasks); }
     t = pf.part('призрак', t);
     this.pourWater(dt);
     const OB = this.world.objects;
@@ -1407,7 +1470,7 @@ export class Farm {
   isIdle() {
     // стрелка подсказки подпрыгивает изредка: только во время прыжка нужны частые кадры
     return !this.mover.active && this.player.idleTime > 2 && !this.particles.length && !this.floaters.length && !this.tapFx && !this.cam.animating && !this.hover &&
-      !(this.scene && this.scene.hintMoving);
+      !(this.scene && (this.scene.hintMoving || this.scene.ringsMoving));
   }
 
   // ---------------- Отрисовка ----------------
