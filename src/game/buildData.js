@@ -42,11 +42,11 @@ for (const [k, b] of Object.entries(BUILDINGS)) b.key = k;
 export const CRAFT_GOODS = {
   carrot_salad:     { name: 'Морковный салат',     tab: 'food', food: 14, sell: 18,  desc: 'Тёртая морковка с зеленью.' },
   linden_tea:       { name: 'Липовый чай',         tab: 'food', food: 8,  sell: 10,  desc: 'Душистый чай из липового цвета.' },
-  fish_soup:        { name: 'Уха',                 tab: 'food', food: 16, sell: 18,  desc: 'Наваристая уха из карасей.' },
+  fish_soup:        { name: 'Уха',                 tab: 'food', food: 10, sell: 18,  desc: 'Наваристая уха из карасей.' },
   raspberry_jam:    { name: 'Малиновое варенье',   tab: 'food', food: 12, sell: 16,  desc: 'Баночка густого малинового варенья.' },
   borscht:          { name: 'Борщ',                tab: 'food', food: 26, sell: 110, desc: 'Бабушкин борщ со сметаной.' },
-  pumpkin_porridge: { name: 'Тыквенная каша',      tab: 'food', food: 32, sell: 190, desc: 'Сладкая каша прямо в тыкве.' },
-  strawberry_cake:  { name: 'Клубничный торт',     tab: 'food', food: 55, sell: 950, desc: 'Праздничный торт со сливками и клубникой.' },
+  pumpkin_porridge: { name: 'Тыквенная каша',      tab: 'food', food: 32, sell: 115, desc: 'Сладкая каша прямо в тыкве.' },
+  strawberry_cake:  { name: 'Клубничный торт',     tab: 'food', food: 55, sell: 420, desc: 'Праздничный торт со сливками и клубникой.' },
   planks:           { name: 'Доски',               tab: 'res',               desc: 'Ровные доски из столярной. Нужны для новых построек.' },
   iron_ingot:       { name: 'Железный слиток',     tab: 'res',               desc: 'Слиток из кузницы. Из него куют гвозди и подковы.' },
   nails:            { name: 'Гвозди',              tab: 'res',               desc: 'Крепкие гвозди из кузницы. Нужны для построек и ящиков.' },
@@ -56,7 +56,7 @@ export const CRAFT_GOODS = {
   pine_wreath:      { name: 'Шишечный венок',      tab: 'res', sell: 22,     desc: 'Венок из шишек и кленовых листьев.' },
   crate:            { name: 'Деревянный ящик',     tab: 'res', sell: 40,     desc: 'Крепкий ящик на гвоздях.' },
   horseshoe:        { name: 'Подкова на счастье',  tab: 'res', sell: 35,     desc: 'Блестящая подкова. Говорят, приносит удачу.' },
-  millstone:        { name: 'Жернов',              tab: 'res', sell: 60,     desc: 'Тяжёлый каменный жернов. Пригодится для мельницы.' },
+  millstone:        { name: 'Жернов',              tab: 'res', sell: 55,     desc: 'Тяжёлый каменный жернов. Пригодится для мельницы.' },
   // корма Кормоцеха: кто их ест — animalData.js ANIMALS[вид].feed
   feed_grain:       { name: 'Зерносмесь',          tab: 'animals', desc: 'Корм для кур и гусей: дроблёная пшеница.' },
   feed_rabbit:      { name: 'Кроличий корм',       tab: 'animals', desc: 'Корм для кроликов: морковка и капустные листья.' },

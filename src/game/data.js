@@ -9,11 +9,11 @@ export const CROPS = {
   beet:       { name: 'Свёкла',    level: 3,  seed: 5,   time: 480,   sell: 14,  xp: 3,  food: 4 },
   cabbage:    { name: 'Капуста',   level: 4,  seed: 8,   time: 900,   sell: 22,  xp: 4,  food: 5 },
   tomato:     { name: 'Помидор',   level: 5,  seed: 15,  time: 1800,  sell: 40,  xp: 7,  food: 6 },
-  corn:       { name: 'Кукуруза',  level: 7,  seed: 25,  time: 3600,  sell: 70,  xp: 12, food: 8 },
-  sunflower:  { name: 'Подсолнух', level: 8,  seed: 30,  time: 5400,  sell: 90,  xp: 15, food: 0 },
-  pumpkin:    { name: 'Тыква',     level: 10, seed: 50,  time: 10800, sell: 160, xp: 25, food: 12 },
-  strawberry: { name: 'Клубника',  level: 12, seed: 80,  time: 21600, sell: 280, xp: 40, food: 10 },
-  cotton:     { name: 'Хлопок',    level: 14, seed: 100, time: 28800, sell: 360, xp: 50, food: 0 },
+  corn:       { name: 'Кукуруза',  level: 7,  seed: 20,  time: 3600,  sell: 55,  xp: 9,  food: 8 },
+  sunflower:  { name: 'Подсолнух', level: 8,  seed: 25,  time: 5400,  sell: 68,  xp: 11, food: 0 },
+  pumpkin:    { name: 'Тыква',     level: 10, seed: 35,  time: 10800, sell: 90,  xp: 14, food: 12 },
+  strawberry: { name: 'Клубника',  level: 12, seed: 45,  time: 21600, sell: 115, xp: 18, food: 10 },
+  cotton:     { name: 'Хлопок',    level: 14, seed: 55,  time: 28800, sell: 140, xp: 22, food: 0 },
 };
 for (const [k, v] of Object.entries(CROPS)) v.key = k;
 
@@ -21,14 +21,20 @@ for (const [k, v] of Object.entries(CROPS)) v.key = k;
 // закрытых по уровню культур в конце сетки — не больше locked, ближайших по уровню.
 export const PLANT_PICK = { fast: 1800, locked: 4 };
 
-// Рыба из пруда: хранится вместе с урожаем, её можно съесть или продать
+// Рыба из пруда: хранится вместе с урожаем, её можно съесть или продать.
+// Сытость рыбы меньше энергии на заброс (в среднем 0,9 энергии с заброса), иначе рыбалка — вечный двигатель:
+// поел рыбы — энергии больше, чем потратил (проверено ботом баланса tools/balance-sim.mjs).
 export const FISH = {
-  fish_carp:   { name: 'Карась',        chance: 60, sell: 4,  food: 3, xp: 1 },
-  fish_perch:  { name: 'Окунь',         chance: 30, sell: 8,  food: 5, xp: 2 },
-  fish_gold:   { name: 'Золотая рыбка', chance: 10, sell: 40, food: 8, xp: 5 },
+  fish_carp:   { name: 'Карась',        chance: 60, sell: 4,  food: 1, xp: 1 },
+  fish_perch:  { name: 'Окунь',         chance: 30, sell: 8,  food: 1, xp: 2 },
+  fish_gold:   { name: 'Золотая рыбка', chance: 10, sell: 40, food: 3, xp: 5 },
 };
 for (const [k, v] of Object.entries(FISH)) v.key = k;
 export const FISH_CATCH = 0.75; // шанс, что рыба не сорвётся
+
+// Клёв: поклёвок в запасе на всю ферму не больше bites, новая — каждые regen секунд.
+// Без поклёвок рыбачить нельзя: рыбалка — пара минут в заход, а не бесконечный заработок. Правила — fishRules.js.
+export const FISHING = { bites: 10, regen: 6 * 60 };
 
 export const RESOURCES = {
   wood: { name: 'Дерево' },
@@ -117,7 +123,7 @@ export const floraOwnId = (sp) => 'own_' + sp;
 export const OBJECTS = {
   stump:   { name: 'Пень',    hp: 2, action: 'chop', drops: { wood: [1, 1] }, xp: 1 },
   rock:    { name: 'Камень',  hp: 2, action: 'mine', drops: { stone: [2, 4] }, xp: 2, oreChance: 0.1, ore: [1, 1] },
-  boulder: { name: 'Валун',   hp: 5, action: 'mine', drops: { stone: [6, 9] }, xp: 5, oreChance: 1, ore: [1, 3], w: 2, h: 2 },
+  boulder: { name: 'Валун',   hp: 5, action: 'mine', drops: { stone: [6, 9] }, xp: 5, oreChance: 1, ore: [2, 3], w: 2, h: 2 },
   house:   { name: 'Дом',     static: true, w: 2, h: 2 },
   well:    { name: 'Колодец', static: true },
   // росток, посаженный игроком: o.tree — во что вырастет, o.born — когда посажен (мс)
@@ -228,9 +234,9 @@ export const HOUSE = [
   null,
   { energy: 30, can: 3, chunks: 3 },
   { energy: 40, can: 4, chunks: 6,  cost: { wood: 20, stone: 10, coins: 50 }, time: 3 * 60 },
-  { energy: 55, can: 5, chunks: 10, cost: { wood: 60, stone: 40, coins: 300 }, time: 20 * 60 },
-  { energy: 75, can: 6, chunks: 16, cost: { wood: 150, stone: 80, ore: 20, coins: 1500 }, time: 60 * 60 },
-  { energy: 100, can: 8, chunks: 25, cost: { wood: 300, stone: 120, ore: 25, coins: 6000 }, time: 3 * 60 * 60 },
+  { energy: 55, can: 5, chunks: 10, cost: { wood: 60, stone: 40, coins: 2000 }, time: 20 * 60 },
+  { energy: 75, can: 6, chunks: 16, cost: { wood: 150, stone: 80, ore: 15, coins: 10000 }, time: 60 * 60 },
+  { energy: 100, can: 8, chunks: 25, cost: { wood: 300, stone: 120, ore: 25, coins: 40000 }, time: 3 * 60 * 60 },
 ];
 
 // Склад не ограничен: ресурсы не пропадают
@@ -244,14 +250,16 @@ export const DEV_LIMITS = { wallet: 999999999, item: 99999, quick: [1, 10, 100, 
 // Починка бабушкиного колодца: после него воду можно набирать у грядок
 export const WELL_COST = { wood: 5, stone: 4, coins: 15 };
 
-export function xpToNext(level) { return Math.round(20 * Math.pow(level, 1.5)); }
+// Опыт до следующего уровня: 25·L² — каждый уровень чуть дольше прошлого (темп «~1,5 месяца до всей карты»
+// у игрока с 4 заходами в день, проверено ботом баланса tools/balance-sim.mjs)
+export function xpToNext(level) { return Math.round(25 * level * level); }
 
 const r5 = (v) => Math.max(5, Math.round(v / 5) * 5);
 export function expansionCost(n) {
   // n — порядковый номер покупаемого участка (1, 2, ...).
-  // Дерево и камень растут линейно: участок приносит их примерно поровну с ценой
-  // следующего (проверено tools/balance-bot.mjs), монеты — плавно по экспоненте.
-  return { wood: r5(15 + 3.5 * (n - 1)), stone: r5(6 + 1.5 * (n - 1)), coins: r5(40 * Math.pow(1.3, n - 1)) };
+  // Дерево и камень растут линейно: участок приносит их примерно поровну с ценой следующего.
+  // Монеты — 50·n²: 1-й участок 50, 10-й 5 000, последний (24-й) 28 800 (бот баланса tools/balance-sim.mjs).
+  return { wood: r5(15 + 3.5 * (n - 1)), stone: r5(6 + 1.5 * (n - 1)), coins: r5(50 * n * n) };
 }
 
 // Улучшить дом можно, только открыв хотя бы один новый участок на текущем уровне
@@ -485,7 +493,7 @@ for (const [k, p] of Object.entries(PONDS).sort((a, b) => a[1].price - b[1].pric
 for (const [k, d] of Object.entries({ ...FENCES, ...DECOR })) SHOP.push({ tab: 'decor', item: k, price: d.price, level: d.level });
 // Животные: детёныши, от дешёвых к дорогим (animalData.js)
 for (const a of Object.values(ANIMALS).sort((x, y) => x.price - y.price)) SHOP.push({ tab: 'animals', item: animalType(a.key, 0), price: a.price, level: a.level });
-SHOP.push({ tab: 'res', item: 'stone', price: 4 });
+SHOP.push({ tab: 'res', item: 'stone', price: 5 });
 // сено для сенного брикета (корм коров и овец), если своей травы мало
 SHOP.push({ tab: 'res', item: 'hay', price: 3, level: 7 });
 SHOP.push({ tab: 'res', item: 'wood', price: 1, cur: 'gems', qty: 10 });
