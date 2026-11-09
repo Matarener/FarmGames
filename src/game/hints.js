@@ -15,6 +15,8 @@ import * as Inv from './inventory.js';
 import * as Flora from './flora.js';
 import { cropFlags } from './beds.js';
 import { GROUPS } from './questRules.js';
+import { BUILDINGS, RECIPES, bpId } from './buildData.js';
+import * as BR from './buildRules.js';
 
 // Первые задания сюжета учат играть: в них стрелка видна сама. Дальше она включается только по просьбе
 // игрока (переключатель в окне задания) и держится до смены задания.
@@ -47,10 +49,22 @@ export const HINT_STEPS = {
   sellFish: ['market', 'pond'],
   buy: ['shop'],
   place: ['place'],
+  build: ['building'],
+  craft: ['workshop'],
   expand: ['chunk'],
   well: ['well'],
   house: ['house'],
 };
+
+// Здание, где делают товар item (нет здания — сначала построить его; убрано в рюкзак — к рюкзаку)
+function madeAt(c, item, depth) {
+  const r = item && Object.values(RECIPES).find((x) => x.item === item);
+  if (!r || depth > 2) return null;
+  if (!BR.isBuilt(c.st, r.at, c.now)) return STEP.building({ ...c, key: r.at }, depth + 1);
+  const o = c.world.objects.find((x) => x && x.type === r.at);
+  if (!o) return { step: 'workshop', kind: 'ui', ui: 'bag' };
+  return { step: 'workshop', kind: 'obj', obj: o, x: o.gx, y: o.gy, icon: 'build' };
+}
 
 // Не хватает на починку, участок или дом → где это добыть
 const NEED_STEPS = {
@@ -274,6 +288,20 @@ const STEP = {
     const has = Object.entries(c.st.items).some(([id, n]) => n > 0 && ITEMS[id] && ITEMS[id].place === 'obj' && (c.key ? id === c.key : !G || G(id)));
     return { step: 'place', kind: 'ui', ui: has ? 'bag' : 'market' };
   },
+
+  // построить здание (ключ задания — какое): нет чертежа — на рынок; не хватает материалов — где их добыть
+  // (доски и гвозди — в мастерской, которая их делает); всё есть — к рюкзаку («Построить»); строится — ждём
+  building: (c, depth) => {
+    const k = c.key, st = c.st;
+    if (!k || !BUILDINGS[k] || depth > 2) return null;
+    if (BR.owned(st, k)) return BR.isBuilt(st, k, c.now) ? null : WAIT;
+    if (!Inv.count(st, bpId(k))) return { step: 'building', kind: 'ui', ui: 'market' };
+    const lack = BR.missing(st, BUILDINGS[k].cost)[0];
+    if (lack) return need(c, { [lack.id]: lack.need }, depth) || madeAt(c, lack.id, depth + 1);
+    return { step: 'building', kind: 'ui', ui: 'bag' };
+  },
+  // сделать товар (ключ — товар): к зданию, где его делают
+  workshop: (c, depth) => madeAt(c, c.key, depth),
 
   // бабушкин колодец: сначала то, чего не хватает на починку
   well: (c, depth) => {

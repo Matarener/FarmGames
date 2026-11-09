@@ -71,6 +71,18 @@ export class Buildings {
     this.f.ui.craftPanel(this.f, k);
   }
 
+  // Чертёж поставили на карту (Mover → Farm.placedFx): стройка началась. → надпись для плашки перестановки
+  placed(o) {
+    const k = o.type, b = BUILDINGS[k], now = Date.now();
+    this.f.syncBars(now);
+    if (R.isBuilt(this.st, k, now)) return null;
+    this.f.burst(o.wx, o.wy - 20, '#e8d9a8', 18);
+    return `Стройка началась: ${(b.short || b.name).toLowerCase()} будет готова через ${fmt(R.buildLeft(this.st, k, now))}`;
+  }
+
+  // Купить чертёж здания k (Farm.buy): один на ферму
+  buyBlueprint(k, offer) { return R.buyBlueprint(this.st, k, offer); }
+
   speedBuild(k) {
     const r = R.speedBuild(this.st, k, Date.now());
     if (!r) return this.f.toast('Не хватает кристаллов', 'warn');

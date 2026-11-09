@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import * as B from '../src/game/buildRules.js';
 import { BUILDINGS, RECIPES, CRAFT_GOODS, bpId, bldId } from '../src/game/buildData.js';
 import { ITEMS, SHOP, OBJECTS, GEM_SPEEDUP_SEC } from '../src/game/data.js';
+import * as P from '../src/game/placed.js';
+import { World, N, START_CHUNK, CHUNK, CHUNKS } from '../src/game/World.js';
 
 const T0 = Date.parse('2026-11-09T09:00:00Z'), M = 60e3;
 const fresh = (o = {}) => ({ coins: 1000, gems: 50, xp: 0, level: 20, items: {}, stats: { cleared: 0, harvested: 0 }, ...o });
@@ -178,6 +180,43 @@ test('later buildings need crafted materials', () => {
   assert.match(B.buildBlock(st, 'stonecutter'), /гвозди: 10/);
   st.items.nails = 10;
   assert.equal(B.buildBlock(st, 'stonecutter'), null);
+});
+
+test('map: blueprint is placed as a construction site, built one goes to the bag and back', () => {
+  const w = new World(1, { v: 2, n: N, tiles: [], objects: [], well: [0, 0], player: [1, 1] });
+  const x0 = (START_CHUNK % CHUNKS) * CHUNK + 1, y0 = Math.floor(START_CHUNK / CHUNKS) * CHUNK + 1;
+  const st = fresh();
+  // чертёж — только на рынке и один
+  const offer = SHOP.find((o) => o.item === 'bp_kitchen');
+  assert.deepEqual(B.buyBlueprint(st, 'kitchen', offer), { id: 'bp_kitchen', n: 1, cost: 50, cur: 'coins' });
+  assert.match(B.buyBlueprint(st, 'kitchen', offer).why, /уже в рюкзаке/);
+  assert.equal(st.coins, 950);
+  // материалов не хватает — не поставить, чертёж остаётся
+  assert.match(P.placeWhy(st, w, 'bp_kitchen', x0, y0, { now: T0 }), /Не хватает: дерево: 20, камень: 15/);
+  st.items.wood = 20; st.items.stone = 15;
+  const { o } = P.placeObj(st, w, 'bp_kitchen', x0, y0, { now: T0 });
+  assert.ok(o && o.type === 'kitchen' && o.placed);
+  assert.equal(w.objectAt(x0 + 1, y0 + 1), o);
+  assert.deepEqual(st.items, {});
+  assert.ok(!B.isBuilt(st, 'kitchen', T0 + 1000));
+  assert.match(P.storeWhy(st, o, { now: T0 + 1000 }), /строится/);
+  assert.match(B.blueprintBlock(st, 'kitchen').why, /уже есть/);
+  // достроилась — в рюкзак и обратно, очередь и стройка не теряются
+  const end = T0 + BUILDINGS.kitchen.time * 1000;
+  B.buildTick(st, end);
+  st.items.carrot = 3; B.craft(st, 'kitchen', 'carrot_salad', end);
+  assert.deepEqual(P.storeObj(st, w, o, { now: end }), { id: 'bld_kitchen' });
+  assert.equal(w.objectAt(x0 + 1, y0 + 1), null);
+  assert.equal(P.placeWhy(st, w, 'bld_kitchen', x0 + 3, y0, { now: end }), null);
+  const o2 = P.placeObj(st, w, 'bld_kitchen', x0 + 3, y0, { now: end }).o;
+  assert.ok(o2 && B.isBuilt(st, 'kitchen', end));
+  assert.equal(B.queueView(st, 'kitchen', end).jobs.length, 1);
+  assert.deepEqual(st.placed, [['kitchen', x0 + 3, y0]]);
+  // здание, выданное без записи (режим тестера), ставится сразу готовым
+  const st2 = fresh({ items: { bld_forge: 1 } });
+  P.placeObj(st2, w, 'bld_forge', x0, y0 + 3, { now: T0 });
+  assert.ok(B.isBuilt(st2, 'forge', T0));
+  assert.deepEqual(B.buildTick(st2, T0), []);
 });
 
 console.log(`\n${tests} tests passed`);

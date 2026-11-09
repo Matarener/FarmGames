@@ -297,7 +297,7 @@ for (const [k, g] of Object.entries(CRAFT_GOODS)) ITEMS[k] = {
 for (const b of Object.values(BUILDINGS)) {
   ITEMS[bpId(b.key)] = {
     key: bpId(b.key), name: 'Чертёж: ' + (b.short || b.name).toLowerCase(), icon: bldId(b.key), badge: 'blueprint', tabs: ['build'],
-    place: 'obj', objOf: b.key, blueprint: b.key,
+    place: 'obj', objOf: b.key, blueprint: b.key, placeName: `Стройка: ${(b.short || b.name).toLowerCase()}`,
     desc: `${b.desc} Нажмите «Построить» и выберите место: материалы спишутся, и начнётся стройка.`,
   };
   ITEMS[bldId(b.key)] = {

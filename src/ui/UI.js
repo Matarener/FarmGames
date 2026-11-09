@@ -12,6 +12,8 @@ import { WHEEL } from '../game/wheelData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 import * as Dev from '../game/devRules.js';
+import { BUILDINGS, RECIPES, bldId } from '../game/buildData.js';
+import * as BR from '../game/buildRules.js';
 
 // версия сборки (tools/build.mjs); при локальном запуске — «локально»
 const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'локально';
@@ -146,6 +148,7 @@ export class UI {
     this.giftTick(f, true);
     this.wheelTick(f, true);
     if (this.popupEl.classList.contains('show') && this._popupTick) this._popupTick();
+    if (this.panelOpen && this.panelEl.dataset.kind === 'craft') this.craftTick(f);
   }
 
   toast(msg, kind) {
@@ -440,6 +443,7 @@ export class UI {
       () => firstQuest && this.questPanel(f, { id: firstQuest.id }),
       () => this.plantPanel(f, null),
       () => this.housePanel(f),
+      () => this.craftPanel(f, 'kitchen'),
       () => this.giftPanel(f),
       () => this.wheelPanel(f),
       () => this.settingsPanel(f),
@@ -457,7 +461,7 @@ export class UI {
     } finally {
       this.closePanel(); this.closePopup(); this.toggleMore(false);
       Q.seen = seen; // окно задания сюжета помечает его прочитанным — возвращаем как было
-      this.qp = this.mk = this.inv = this.pl = this.gp = null; // вкладки и выбор в окнах — по умолчанию
+      this.qp = this.mk = this.inv = this.pl = this.gp = this.cr = null; // вкладки и выбор в окнах — по умолчанию
       this._openT = -1;
       void this.root.offsetHeight; // окна закрылись ещё без анимации
       this.root.classList.remove('warming');
@@ -966,6 +970,115 @@ export class UI {
     });
   }
 
+  // ---------- Здание с крафтом: очередь и рецепты ----------
+  // Сверху — очередь (готовое, что делается, что ждёт, свободные места), под ней — рецепты сеткой.
+  // Выбранный рецепт — карточка снизу: что уйдёт и кнопка. Время в очереди идёт каждую секунду
+  // (craftTick); товар доделался — окно пересобирается.
+  craftPanel(f, k) {
+    const b = BUILDINGS[k];
+    if (!this.cr || this.cr.k !== k) this.cr = { k, sel: null };
+    const S = this.cr;
+    this.openPanel('craft', b.name, (body, card) => {
+      const st = f.st, now = Date.now(), v = BR.queueView(st, k, now);
+      S.key = this.craftKey(f, k, now);
+      body.appendChild(h('div', 'pn-hero', `${this.ic(bldId(k), 'ic big')}<div><span>${b.desc}</span></div>`));
+      body.appendChild(h('div', 'pn-sub', `Очередь · ${v.jobs.length} из ${b.slots}`));
+      const q = h('div', 'cr-queue');
+      for (let i = 0; i < b.slots; i++) q.appendChild(this.craftSlot(f, k, v.jobs[i]));
+      body.appendChild(q);
+      if (v.ready) {
+        const c = h('button', 'btn-main', `Забрать готовое: ${v.ready}`);
+        c.onclick = () => f.builds.collect(k);
+        body.appendChild(c);
+      }
+      body.appendChild(h('div', 'pn-sub', 'Рецепты'));
+      const g = h('div', 'mk-grid');
+      for (const { r, open, block } of BR.recipesOf(st, k, now)) {
+        const it = ITEMS[r.item];
+        const c = h('button', 'mk-cell' + (open ? '' : ' locked') + (open && block ? ' poor' : '') + (S.sel === r.key ? ' sel' : ''),
+          `<i>${this.ic(it.icon, 'ic')}${open ? '' : this.ic('lock', 'mk-lock')}${r.n > 1 ? `<b>×${r.n}</b>` : ''}</i>` +
+          `<span>${open ? fmtShort(r.time) : `с ${r.level} ур.`}</span>`);
+        c.title = it.name;
+        c.onclick = () => { S.sel = S.sel === r.key ? null : r.key; this.sfx('tap'); this.refreshPanel(); };
+        g.appendChild(c);
+      }
+      body.appendChild(g);
+      const r = S.sel && RECIPES[S.sel];
+      if (r && r.at === k) card.appendChild(this.recipeCard(f, k, r, now));
+      else S.sel = null;
+    });
+  }
+
+  // Место в очереди: j — товар (BR.queueView) или пусто
+  craftSlot(f, k, j) {
+    if (!j) return h('div', 'cr-slot empty', '<i></i><span>свободно</span>');
+    const it = ITEMS[j.r.item];
+    const s = h('div', 'cr-slot' + (j.done ? ' done' : j.running ? ' run' : ' wait'),
+      `<i>${this.ic(it.icon, 'ic')}${j.r.n > 1 ? `<b>×${j.r.n}</b>` : ''}${j.done ? '<em>✓</em>' : ''}</i>`);
+    s.title = it.name;
+    if (j.done) s.appendChild(h('span', '', 'готово'));
+    else if (j.running) {
+      s.appendChild(h('div', 'cr-bar', `<u style="width:${(j.k * 100).toFixed(1)}%"></u>`));
+      s.appendChild(h('span', 'cr-left', leftText(j.left)));
+      const gems = BR.gemsFor(j.left), sp = h('button', 'btn-s cr-speed', `${gems} ${this.ic('gem', 'ic-s')}`);
+      sp.title = 'Доделать сейчас';
+      sp.disabled = f.st.gems < gems; sp.onclick = () => f.builds.speedCraft(k);
+      s.appendChild(sp);
+    } else {
+      s.appendChild(h('span', 'cr-left', `ждёт · ${fmtShort(j.r.time)}`));
+      const x = h('button', 'cr-x', '✕');
+      x.title = 'Отменить: продукты вернутся в рюкзак';
+      x.onclick = () => f.builds.cancel(k, j.idx);
+      s.appendChild(x);
+    }
+    return s;
+  }
+
+  // Карточка рецепта: что получится, что уйдёт, кнопка «Приготовить · 2 мин»
+  recipeCard(f, k, r, now) {
+    const b = BUILDINGS[k], it = ITEMS[r.item], st = f.st, block = BR.craftBlock(st, k, r.key, now);
+    const facts = [
+      `${fmtShort(r.time)}`,
+      it.food && `+${it.food} ${this.ic('energy')}`,
+      it.sell && `${it.sell} ${this.ic('coin')} за шт.`,
+      Inv.count(st, it.key) && `в рюкзаке ${fmtNum(Inv.count(st, it.key))}`,
+    ].filter(Boolean).join(' · ');
+    const box = h('div', 'inv-info ui-layer',
+      `<div class="ii-ic">${this.ic(it.icon, 'ic big')}</div>` +
+      `<div class="ii-t"><b>${it.name}${r.n > 1 ? ` ×${r.n}` : ''}</b><span>${it.desc}</span><span class="ii-f">${facts}</span></div>`);
+    const x = h('button', 'ii-x', '✕'); x.onclick = () => { this.cr.sel = null; this.refreshPanel(); };
+    box.appendChild(x);
+    box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(r.need, f)));
+    if (st.level < r.level) { box.appendChild(h('div', 'ii-note', `Откроется с ${r.level} уровня.`)); return box; }
+    if (block && !/^Не хватает/.test(block)) box.appendChild(h('div', 'ii-note', block));
+    const acts = h('div', 'ii-a');
+    const go = h('button', 'btn-s gold', `${b.verb} · ${fmtShort(r.time)}`);
+    go.disabled = !!block; go.onclick = () => f.builds.craft(k, r.key);
+    acts.appendChild(go);
+    box.appendChild(acts);
+    return box;
+  }
+
+  // Что в очереди здания (вид каждого места): сменилось — окно пересобирается
+  craftKey(f, k, now) {
+    return BR.queueView(f.st, k, now).jobs.map((j) => (j.done ? 'd' : j.running ? 'r' : 'w') + j.id).join(',') + '|' + (BR.isBuilt(f.st, k, now) ? 1 : 0);
+  }
+
+  // Раз в секунду, пока открыто окно здания: время и полоска у того, что делается сейчас
+  craftTick(f) {
+    const S = this.cr;
+    if (!S) return;
+    const now = Date.now();
+    if (this.craftKey(f, S.k, now) !== S.key) return this.refreshPanel();
+    const j = BR.queueView(f.st, S.k, now).jobs.find((x) => x.running), el = this.panelEl.querySelector('.cr-slot.run');
+    if (!j || !el) return;
+    el.querySelector('.cr-bar u').style.width = (j.k * 100).toFixed(1) + '%';
+    el.querySelector('.cr-left').textContent = leftText(j.left);
+    const gems = BR.gemsFor(j.left), sp = el.querySelector('.cr-speed');
+    if (sp.dataset.g !== String(gems)) { sp.dataset.g = gems; sp.innerHTML = `${gems} ${this.ic('gem', 'ic-s')}`; }
+    sp.disabled = f.st.gems < gems;
+  }
+
   // ---------- Рынок: «Купить» и «Продать» ----------
   marketPanel(f) {
     const M = this.mk || (this.mk = { mode: 'sell', tab: 'seeds', sel: null });
@@ -1040,9 +1153,10 @@ export class UI {
     const g = h('div', 'mk-grid');
     for (const o of offers) {
       const it = ITEMS[o.item], locked = o.level > st.level, cur = o.cur === 'gems' ? 'gem' : 'coin';
+      const own = it.blueprint && BR.owned(st, it.blueprint); // здание уже есть — чертёж больше не нужен
       const c = h('button', 'mk-cell' + (locked ? ' locked' : '') + (M.sel === o.item ? ' sel' : ''),
         `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${locked ? this.ic('lock', 'mk-lock') : ''}${o.qty > 1 ? `<b>×${o.qty}</b>` : ''}</i>` +
-        `<span>${locked ? `с ${o.level} ур.` : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
+        `<span>${locked ? `с ${o.level} ур.` : own ? 'построено' : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
       c.onclick = () => { M.sel = M.sel === o.item ? null : o.item; this.sfx('tap'); this.refreshPanel(); };
       g.appendChild(c);
     }
@@ -1051,9 +1165,11 @@ export class UI {
     if (!o) { M.sel = null; return; }
     const it = ITEMS[o.item], have = Inv.count(st, it.key), pack = o.qty || 1;
     const curKey = o.cur || 'coins', cur = curKey === 'gems' ? 'gem' : 'coin';
-    const per = pack > 1 ? `${o.price} ${this.ic(cur)} за ${pack} шт.` : `${o.price} ${this.ic(cur)} за шт.`;
+    const per = it.blueprint ? `${o.price} ${this.ic(cur)} · стройка ${fmtShort(BUILDINGS[it.blueprint].time)}`
+      : pack > 1 ? `${o.price} ${this.ic(cur)} за ${pack} шт.` : `${o.price} ${this.ic(cur)} за шт.`;
     const box = this.mkCard(it, `${per}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${it.floraOf && FLORA[it.floraOf].pick ? ` · плоды: ${ITEMS[FLORA[it.floraOf].fruit].name.toLowerCase()} по ${ITEMS[FLORA[it.floraOf].fruit].sell} ${this.ic('coin')}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
     if (o.level > st.level) box.appendChild(h('div', 'ii-note', `Откроется с ${o.level} уровня.`));
+    else if (it.blueprint) this.blueprintBuy(f, box, o, it);
     else {
       const max = Math.min(99, Math.floor(st[curKey] / o.price));
       const Q = this.buyQty || (this.buyQty = {});
@@ -1075,6 +1191,31 @@ export class UI {
       box.appendChild(row);
     }
     card.appendChild(box);
+  }
+
+  // Чертёж здания на рынке: материалы на стройку; купить можно один, пока здания нет на ферме.
+  // Чертёж в рюкзаке — «Построить» (выбрать место, Mover.takeFromBag)
+  blueprintBuy(f, box, o, it) {
+    const k = it.blueprint, st = f.st, block = BR.blueprintBlock(st, k);
+    box.appendChild(h('div', 'ii-note', 'Материалы на стройку:'));
+    box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(BUILDINGS[k].cost, f)));
+    if (block && !Inv.count(st, it.key)) box.appendChild(h('div', 'ii-note', block.why + '.'));
+    const acts = h('div', 'ii-a');
+    if (!block) {
+      const b = h('button', 'btn-s gold', `Купить чертёж · ${o.price} ${this.ic(o.cur === 'gems' ? 'gem' : 'coin')}`);
+      b.disabled = st[o.cur || 'coins'] < o.price; b.onclick = () => f.buy(o, 1);
+      acts.appendChild(b);
+    }
+    if (Inv.count(st, it.key)) acts.appendChild(this.buildBtn(f, it));
+    if (acts.children.length) box.appendChild(acts);
+  }
+
+  // «Построить» у чертежа: хватает материалов — окно закрывается, выбираем место для стройки
+  buildBtn(f, it) {
+    const b = h('button', 'btn-s gold', `${this.ic('build')} Построить`), why = BR.buildBlock(f.st, it.blueprint);
+    b.disabled = !!why;
+    b.onclick = () => { this.closePanel(); f.mover.takeFromBag(it.key); };
+    return b;
   }
 
   // карточка выбранного товара на рынке (снизу окна)
@@ -1299,7 +1440,11 @@ export class UI {
     }
     // дорожки: «Поставить» закрывает рюкзак и включает «Кладём дорожку» (нажимай на траву);
     // постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
-    if ((it.place === 'path' || it.place === 'obj') && n > 0) {
+    // чертёж здания: что нужно на стройку и «Построить»
+    if (it.blueprint && n > 0) {
+      box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(BUILDINGS[it.blueprint].cost, f)));
+      acts.appendChild(this.buildBtn(f, it));
+    } else if ((it.place === 'path' || it.place === 'obj') && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
       b.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
       acts.appendChild(b);
@@ -1346,3 +1491,5 @@ function fmtLeft(ms) {
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 function fmtDay(t) { const d = new Date(t + QUEST_TZ * 3600e3); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; }
 function fmtClock(s) { s = Math.max(0, s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
+// сколько осталось сделать (секунды): до часа — «4:05», дольше — «1 ч 10 мин»
+function leftText(sec) { return sec < 3600 ? fmtClock(Math.ceil(sec)) : fmtLeft(sec * 1000); }

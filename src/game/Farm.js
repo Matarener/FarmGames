@@ -11,6 +11,7 @@ import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Gifts } from './gifts.js';
 import { Wheel } from './wheel.js';
+import { Buildings } from './buildings.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
 import * as Wild from './wild.js';
@@ -23,7 +24,7 @@ import * as Spr from './sprinklers.js';
 import * as Hints from './hints.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
-  CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, SPRINKLERS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
+  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, SPRINKLERS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
   ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC,
 } from './data.js';
 
@@ -44,6 +45,7 @@ export class Farm {
     this.quests = new Quests(this);
     this.gifts = new Gifts(this);
     this.wheel = new Wheel(this);
+    this.builds = new Buildings(this); // здания с крафтом: кухня, мастерские, кузница
     // Режим тестера (окно «Настройки»): монеты, кристаллы, предметы, энергия и проверка заданий —
     // сдвиг часов заданий и событие. Включается ?debug в адресе или нажатиями по строке версии.
     this.urlDebug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
@@ -69,6 +71,7 @@ export class Farm {
       grass: a.grass, paths: a.paths, pathParts: a.pathEdge, pathBlend: a.pathBlend, pathEdge: new Map(), bed: a.bed, waterTex: a.waterTex, decor: a.decor,
       objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, wildGrass: a.wildGrass,
       house: a.house, well: a.well, crops: a.crops, fog: a.fog.clouds.length ? a.fog : null, sprinkler: a.sprinkler,
+      buildings: a.buildings, site: a.site,
     });
     this.groundV++;
     for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
@@ -171,6 +174,7 @@ export class Farm {
       return o.stage >= 1 && fl ? fl.young : S.sprouts[fd ? fd.kind : 'tree'];
     }
     if (o.bare && S.flora[o.type]) return S.flora[o.type].bare; // плоды собраны
+    if (OBJECTS[o.type] && OBJECTS[o.type].building) return this.builds.sprite(o); // здание или его стройка
     const v = S.objArt[o.type];
     if (v && v.length) return v[o.id % v.length];
     if (S.sprinkler && S.sprinkler[o.type]) return S.sprinkler[o.type];
@@ -277,6 +281,7 @@ export class Farm {
     this.player.worldPos(tmp);
     this.cam.centerOn(tmp.x, tmp.y - 20);
     this.tickEnergy();
+    this.builds.tick(Date.now(), true); // стройки, которые кончились, пока игры не было
     this.syncHint();
     this.ui.update(this);
   }
@@ -401,6 +406,10 @@ export class Farm {
       const s = this.objSprite(o);
       B.push(o.wx, o.wy - barTop(s), Math.max(0, Math.min(1, k)), kind);
     }
+    // здания: полоска стройки или крафта, пузырь «готово» (this.bldBub — x, y по 2 числа)
+    const U = this.bldBub || (this.bldBub = []);
+    U.length = 0;
+    this.builds.bars(now, B, U);
     this.barsV = (this.barsV || 0) + 1;
   }
 
@@ -646,7 +655,7 @@ export class Farm {
     for (const o of this.world.objects) {
       if (!o) continue;
       const s = this.objSprite(o);
-      const big = o.type === 'house' || o.type === 'boulder';
+      const big = o.type === 'house' || o.type === 'boulder' || (o.w || 1) > 1;
       const kx = big ? 0.9 : 0.62;
       const hit = wx >= o.wx - s.ax * kx && wx <= o.wx + (s.w - s.ax) * kx &&
         wy >= o.wy - s.ay * 0.92 && wy <= o.wy + (big ? (s.h - s.ay) * 0.8 : 6);
@@ -663,6 +672,7 @@ export class Farm {
     const def = OBJECTS[o.type];
     if (!def) return;
     if (def.sprinkler) return this.sprinklerPopup(o, sx, sy);
+    if (def.building) return this.builds.tap(o, sx, sy);
     if (o.type === 'sapling' || def.flora) return this.floraPopup(o, sx, sy);
     if (def.action) this.queue({ kind: def.action, obj: o });
   }
@@ -681,9 +691,11 @@ export class Farm {
   showArea(o, sec = 4) { this.areaShow = { o, until: this.time + sec }; }
 
   // Постройку поставили из рюкзака (Mover): у поливалки — подсветка клеток полива; задание «Поставь …»
+  // Возвращает надпись для плашки перестановки (или ничего — «поставлено»).
   placedFx(o) {
     if (Spr.kindOf(o)) this.showArea(o, 2.5);
     this.quests.emit('place', o.type);
+    if (this.builds.is(o)) return this.builds.placed(o);
   }
 
   // Режим перестановки сразу с выбранным своим объектом o
@@ -989,8 +1001,11 @@ export class Farm {
   }
 
   buy(offer, n) {
-    const r = Inv.buyItem(this.st, offer, n);
+    // чертёж здания — один на ферму (buildRules.js)
+    const bp = ITEMS[offer.item] && ITEMS[offer.item].blueprint;
+    const r = bp ? this.builds.buyBlueprint(bp, offer) : Inv.buyItem(this.st, offer, n);
     if (!r) return;
+    if (r.why) return this.toast(r.why, 'warn');
     if (r.locked) return this.toast(`Откроется с ${offer.level} уровня`, 'warn');
     if (r.poor) return this.toast(r.poor === 'gems' ? 'Не хватает кристаллов' : 'Не хватает монет', 'warn');
     this.quests.emit('buy', r.id, r.n);
@@ -1342,6 +1357,7 @@ export class Farm {
       this.tickEnergy(); t = pf.part('энергия', t);
       this.floraTick(now); t = pf.part('растения', t);
       this.wildTick(now); t = pf.part('поросль', t);
+      this.builds.tick(now); t = pf.part('здания', t);
       this.quests.tick(); t = pf.part('задания', t);
       this.syncHint(); t = pf.part('подсказка', t);
       this.ui.tick(this); t = pf.part('интерфейс', t);

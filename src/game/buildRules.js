@@ -8,10 +8,15 @@
 //          готовые лежат в очереди (и занимают место), пока их не заберут
 // Где стоит здание — не здесь, а в общем списке своих объектов на карте (placed.js). Здание
 // в рюкзаке (bld_<здание>) хранит свою очередь здесь же: время идёт, товары ждут.
+//
+// Как здание попадает на карту (placed.js, правила — HOOKS ниже): чертёж из рюкзака ставится, как
+// поливалка, — на этом месте начинается стройка (материалы списываются). Готовое здание можно убрать
+// в рюкзак (bld_<здание>) и поставить снова; стройку убрать нельзя.
 
 import { BUILDINGS, RECIPES, bpId, bldId } from './buildData.js';
 import { ITEMS, GEM_SPEEDUP_SEC } from './data.js';
 import * as Inv from './inventory.js';
+import { registerPlaced } from './placed.js';
 
 const S = 1000;
 
@@ -55,6 +60,13 @@ export function blueprintBlock(st, k) {
   return null;
 }
 
+// Купить чертёж здания k по строке магазина offer (один). → { id, n, cost, cur } | { why } | { poor } | null
+export function buyBlueprint(st, k, offer) {
+  const why = blueprintBlock(st, k);
+  if (why) return { why: why.why };
+  return Inv.buyItem(st, offer, 1);
+}
+
 // ---------------- Стройка ----------------
 
 // Можно ли начать стройку здания k по чертежу из рюкзака: null или причина
@@ -71,8 +83,13 @@ export function buildBlock(st, k) {
 // Начать стройку: чертёж и материалы уходят, здание строится b.time секунд. → { k, end } или null
 export function startBuild(st, k, now) {
   if (buildBlock(st, k)) return null;
-  const b = BUILDINGS[k];
   Inv.takeItem(st, bpId(k), 1);
+  return beginBuild(st, k, now);
+}
+
+// Стройка, когда чертёж уже ушёл из рюкзака (его поставили на карту, placed.js): материалы списываются
+function beginBuild(st, k, now) {
+  const b = BUILDINGS[k];
   pay(st, b.cost);
   builds(st)[k] = { end: now + b.time * S, q: [] };
   return { k, end: now + b.time * S };
@@ -201,6 +218,21 @@ export function recipesOf(st, k, now) {
 export function readyCount(st, k, now) {
   const R = rec(st, k);
   return R && R.end <= now ? R.q.filter((j) => j[2] <= now).length : 0;
+}
+
+// ---------------- На карте (placed.js) ----------------
+// Чертёж ставится, только если хватает материалов (проверка — пока чертёж ещё в рюкзаке), и на месте
+// начинается стройка. Готовое здание из рюкзака ставится как есть (если записи нет — например, его
+// выдали в режиме тестера, — оно сразу готово). Стройку убрать в рюкзак нельзя.
+for (const k of Object.keys(BUILDINGS)) {
+  registerPlaced(k, {
+    canPlace: (st, id) => (id === bpId(k) ? buildBlock(st, k) : null),
+    onPlace: (st, id, o, ctx) => {
+      if (id === bpId(k)) beginBuild(st, k, ctx.now);
+      else if (!owned(st, k)) builds(st)[k] = { end: ctx.now, done: 1, q: [] };
+    },
+    canStore: (st, o, ctx) => storeBlock(st, k, ctx.now),
+  });
 }
 
 export { bpId, bldId };

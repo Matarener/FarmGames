@@ -387,7 +387,7 @@ export class Mover {
     if (!this.active) this.enter();
     const def = OBJECTS[type];
     this.brush = null; this.to = null;
-    this.sel = { kind: 'bag', id, name: it.name, w: def.w || 1, h: def.h || 1, gx: -9, gy: -9, cells: objCells(def) };
+    this.sel = { kind: 'bag', id, name: it.placeName || it.name, w: def.w || 1, h: def.h || 1, gx: -9, gy: -9, cells: objCells(def) };
     if (gx != null) {
       const tx = gx - ((this.sel.w - 1) >> 1), ty = gy - ((this.sel.h - 1) >> 1), c = this.check(tx, ty);
       this.to = { gx: tx, gy: ty, ok: c.ok, why: c.why };
@@ -405,11 +405,11 @@ export class Mover {
     const o = r.o;
     f.burst(o.wx, o.wy - 6, '#e8d9a8', 14);
     f.sfx('dig');
-    f.placedFx(o);
+    const msg = f.placedFx(o); // своя надпись постройки (у чертежа здания — «стройка началась»)
     const n = Inv.count(f.st, s.id);
     this.to = null;
     if (n) this.hint(`${s.name}: поставлено. Есть ещё ${n} — нажмите на клетку, куда поставить`);
-    else { this.sel = null; this.hint(`${s.name}: поставлено`); }
+    else { this.sel = null; this.hint(msg || `${s.name}: поставлено`); }
     f.changed();
     return true;
   }

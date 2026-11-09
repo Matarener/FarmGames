@@ -3,6 +3,7 @@
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
 import { FLORA, PATHS, PATH_KEYS, SPRINKLERS } from './data.js';
+import { BUILDINGS, SITE_SPRITE, bldId } from './buildData.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
@@ -89,6 +90,16 @@ export async function loadArt(onProgress) {
     sprinkler[k] = A[k];
     if (!icons[k]) try { floraIcons[k] = iconOf(A[k]); } catch (e) { /* */ }
   }
+  // здания с крафтом (buildData.js): картинка готового здания и общая стройка (леса). Иконка здания
+  // и его чертежа в рюкзаке — само здание (если нет отдельной ic_bld_<здание>).
+  // ВРЕМЕННО, пока нет арта: вместо здания — дом, вместо лесов — старый дом (убрать, когда арт будет)
+  const buildings = {};
+  for (const b of Object.values(BUILDINGS)) {
+    const sp = A[b.sprite] || A.house_2;
+    buildings[b.key] = sp;
+    if (sp && !icons[bldId(b.key)]) try { floraIcons[bldId(b.key)] = iconOf(sp); } catch (e) { /* */ }
+  }
+  const site = A[SITE_SPRITE] || A.house_1;
   // куски травяного края у дорожек (склеивает Farm.pathEdge): полосы вдоль сторон и углы
   const pathEdge = {};
   for (const name of Object.keys(A)) if (/^path_(edge|corner)_/.test(name)) pathEdge[name.slice(5)] = A[name];
@@ -109,7 +120,7 @@ export async function loadArt(onProgress) {
   // дикая высокая трава: grass_tall_0, grass_tall_1, ...
   const wildGrass = Object.keys(A).filter((n) => /^grass_tall_\d+$/.test(n)).sort().map((n) => A[n]);
   return {
-    wildGrass, fog, obj, crops, icons, flora, floraIcons, sprinkler,
+    wildGrass, fog, obj, crops, icons, flora, floraIcons, sprinkler, buildings, site,
     sprouts: { tree: A.sprout_tree, bush: A.sprout_bush }, // ростки посаженных растений
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {
