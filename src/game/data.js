@@ -41,30 +41,32 @@ export const RESOURCES = {
 // отрастут снова. Без pick (кора, шишки, лепестки, листья, цветы) добыча — только при рубке.
 // Рубка даёт дерево (wood), добычу (у pick — если плоды висят) и с шансом seedChop — саженец
 // этого вида. Сбором саженцы не добываются.
+// hp — прочность: сколько ударов топором нужно, чтобы срубить (одно нажатие игрока — один удар, chop.js);
+// чем крупнее растение, тем крепче: ель и дуб 5, липа, берёза, клён 4, сакура и плодовые 3, кусты 2.
 // grow — сколько секунд растёт посаженное игроком семя до взрослого растения.
 // sapSell — цена продажи саженца (ниже цены в магазине SAPLING_SHOP, чтобы не было перепродажи).
 // ownSell — цена продажи выкопанного взрослого растения (тоже ниже цены саженца в магазине).
 export const FLORA = {
-  oak:       { name: 'Дуб',       kind: 'tree', fruit: 'acorn',        n: [1, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
-  birch:     { name: 'Берёза',    kind: 'tree', fruit: 'birch_bark',   n: [1, 2], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
+  oak:       { name: 'Дуб',       kind: 'tree', fruit: 'acorn',        n: [1, 3], wood: [2, 4], hp: 5, xp: 2, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
+  birch:     { name: 'Берёза',    kind: 'tree', fruit: 'birch_bark',   n: [1, 2], wood: [2, 4], hp: 4, xp: 2, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
   sakura:    { name: 'Сакура',    kind: 'tree', fruit: 'sakura_petal', n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 10, ownSell: 30, grow: 4 * 3600 },
   cherry:    { name: 'Вишня',     kind: 'tree', fruit: 'cherry',       n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 15, ownSell: 45, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
-  maple:     { name: 'Клён',      kind: 'tree', fruit: 'maple_leaf',   n: [2, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 8, ownSell: 24, grow: 3 * 3600 },
+  maple:     { name: 'Клён',      kind: 'tree', fruit: 'maple_leaf',   n: [2, 3], wood: [2, 4], hp: 4, xp: 2, seedChop: 0.25, sapSell: 8, ownSell: 24, grow: 3 * 3600 },
   apple:     { name: 'Яблоня',    kind: 'tree', fruit: 'apple',        n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 18, ownSell: 54, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
-  pine:      { name: 'Ель',       kind: 'tree', fruit: 'pinecone',     n: [1, 3], wood: [3, 5], hp: 4, xp: 3, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
-  linden:    { name: 'Липа',      kind: 'tree', fruit: 'linden_blossom', n: [2, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 8, ownSell: 24, grow: 3 * 3600 },
+  pine:      { name: 'Ель',       kind: 'tree', fruit: 'pinecone',     n: [1, 3], wood: [3, 5], hp: 5, xp: 3, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
+  linden:    { name: 'Липа',      kind: 'tree', fruit: 'linden_blossom', n: [2, 3], wood: [2, 4], hp: 4, xp: 2, seedChop: 0.25, sapSell: 8, ownSell: 24, grow: 3 * 3600 },
   // плодовые деревья из магазина (2026-11-09): чем выше уровень, тем дороже плоды, дольше рост и реже урожай
   bird_cherry: { name: 'Черёмуха', kind: 'tree', fruit: 'bird_cherry', n: [3, 5], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 22, ownSell: 66, grow: 4 * 3600, pick: true, regrow: 2.5 * 3600 },
   plum:      { name: 'Слива',     kind: 'tree', fruit: 'plum',         n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 27, ownSell: 81, grow: 5 * 3600, pick: true, regrow: 3 * 3600 },
   pear:      { name: 'Груша',     kind: 'tree', fruit: 'pear',         n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 32, ownSell: 96, grow: 5 * 3600, pick: true, regrow: 3 * 3600 },
   apricot:   { name: 'Абрикос',   kind: 'tree', fruit: 'apricot',      n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 42, ownSell: 126, grow: 6 * 3600, pick: true, regrow: 4 * 3600 },
   persimmon: { name: 'Хурма',     kind: 'tree', fruit: 'persimmon',    n: [2, 3], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 55, ownSell: 165, grow: 6 * 3600, pick: true, regrow: 5 * 3600 },
-  blueberry: { name: 'Голубика',  kind: 'bush', fruit: 'blueberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 9, ownSell: 27, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
-  raspberry: { name: 'Малина',    kind: 'bush', fruit: 'raspberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 8, ownSell: 24, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
-  rosehip:   { name: 'Шиповник',  kind: 'bush', fruit: 'rosehip',      n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 5, ownSell: 15, grow: 3600,     pick: true, regrow: 2 * 3600 },
-  hydrangea: { name: 'Гортензия', kind: 'bush', fruit: 'hydrangea',    n: [1, 2], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 6, ownSell: 18, grow: 3600 },
-  lavender:  { name: 'Лаванда',   kind: 'bush', fruit: 'lavender',     n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 6, ownSell: 18, grow: 3600 },
-  rose:      { name: 'Роза',      kind: 'bush', fruit: 'rose_petal',   n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 7, ownSell: 21, grow: 3600 },
+  blueberry: { name: 'Голубика',  kind: 'bush', fruit: 'blueberry',    n: [2, 4], wood: [1, 1], hp: 2, xp: 1, seedChop: 0.35, sapSell: 9, ownSell: 27, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
+  raspberry: { name: 'Малина',    kind: 'bush', fruit: 'raspberry',    n: [2, 4], wood: [1, 1], hp: 2, xp: 1, seedChop: 0.35, sapSell: 8, ownSell: 24, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
+  rosehip:   { name: 'Шиповник',  kind: 'bush', fruit: 'rosehip',      n: [2, 3], wood: [1, 1], hp: 2, xp: 1, seedChop: 0.35, sapSell: 5, ownSell: 15, grow: 3600,     pick: true, regrow: 2 * 3600 },
+  hydrangea: { name: 'Гортензия', kind: 'bush', fruit: 'hydrangea',    n: [1, 2], wood: [1, 1], hp: 2, xp: 1, seedChop: 0.35, sapSell: 6, ownSell: 18, grow: 3600 },
+  lavender:  { name: 'Лаванда',   kind: 'bush', fruit: 'lavender',     n: [2, 3], wood: [1, 1], hp: 2, xp: 1, seedChop: 0.35, sapSell: 6, ownSell: 18, grow: 3600 },
+  rose:      { name: 'Роза',      kind: 'bush', fruit: 'rose_petal',   n: [2, 3], wood: [1, 1], hp: 2, xp: 1, seedChop: 0.35, sapSell: 7, ownSell: 21, grow: 3600 },
 };
 for (const [k, v] of Object.entries(FLORA)) v.key = k;
 
@@ -109,7 +111,7 @@ export const floraSeedId = (sp) => 'sap_' + sp;
 // своё взрослое растение, выкопанное в рюкзак: сажается обратно сразу взрослым
 export const floraOwnId = (sp) => 'own_' + sp;
 
-// Препятствия: hp — число ударов, action — какой инструмент нужен.
+// Препятствия: hp — прочность (сколько ударов, одно нажатие — один удар, chop.js), action — какой инструмент нужен.
 // Деревья и кусты собираются из FLORA (ниже), здесь — остальное.
 export const OBJECTS = {
   stump:   { name: 'Пень',    hp: 2, action: 'chop', drops: { wood: [1, 1] }, xp: 1 },
@@ -204,6 +206,9 @@ export const FOG = { width: 4, forest: [0.6, 0.55, 0.45, 0], color: 0xe4ecee };
 
 // Стоимость энергии за удар/действие
 export const ENERGY = { chop: 1, mine: 1, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1, pick: 1, sow: 0, mow: 0 };
+// Очередь дел призрачка: сколько дел можно поставить, кроме того, что он делает сейчас
+// (удары по одному дереву или камню — одно дело)
+export const QUEUE_MAX = 20;
 export const ENERGY_REGEN_SEC = 120;
 
 // Уровни дома: energy — запас энергии, can — поливов в лейке, chunks — сколько участков можно открыть,

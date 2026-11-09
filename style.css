@@ -685,6 +685,11 @@ body.planting .hud-bottom, body.digging .pb-more { display: none; }
 .more-menu:not([hidden]) ~ .fab, body.moving .fab { display: none; }
 /* «Грядки» над кнопкой «К фермеру»: ставить грядки из рюкзака (цифра — сколько их там), нет — рынок */
 .fab-beds { bottom: calc(var(--safe-b) + 140px); }
+/* «Отменить всё» — слева, напротив «К фермеру»: призрачок бросает все дела, цифра — сколько их */
+.fab-cancel { right: auto; left: calc(var(--safe-l) + 10px); }
+.fab-cancel[hidden] { display: none; }
+.fab-cancel svg { width: 26px; height: 26px; fill: none; stroke: #c8412f; stroke-width: 3.4; stroke-linecap: round; }
+.fab-cancel .fab-badge { background: var(--ink); }
 .fab-badge {
   position: absolute; top: -5px; right: -5px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px;
   background: #e5483b; color: #fff; border: 2px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3);
@@ -700,7 +705,7 @@ body.planting .hud-bottom, body.digging .pb-more { display: none; }
 @media (max-height: 500px) and (orientation: landscape) {
   .fab { bottom: calc(var(--safe-b) + 64px); width: 42px; height: 42px; }
   .fab-beds { bottom: calc(var(--safe-b) + 114px); }
-  .fab img { width: 26px; height: 26px; }
+  .fab img, .fab-cancel svg { width: 26px; height: 26px; }
   .more-menu { bottom: calc(var(--safe-b) + 62px); grid-template-columns: repeat(4, 1fr); width: min(400px, calc(100% - 16px)); }
 }
 
