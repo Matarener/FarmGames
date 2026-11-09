@@ -3,6 +3,7 @@
 // Кости и события анимаций совместимы с Player (hit — момент действия).
 
 import { makeSprite } from '../engine/Sprite.js';
+import { TOOL_TINT } from './toolData.js';
 
 const OUT = '#3d2b1f';
 const C = {
@@ -66,39 +67,65 @@ function hatSprite() {
   });
 }
 
-// Инструменты в руке: начало координат — точка хвата, +y — вдоль предплечья.
-function toolSprites() {
-  const P = {};
-  const handle = (g, len) => { g.fillStyle = OUT; g.fillRect(-1.3, -3, 2.6, len + 4); g.fillStyle = '#a66c3a'; g.fillRect(-0.7, -2.4, 1.4, len + 2.8); };
-  P.axe = makeSprite(14, 22, 8, 4, (g) => {
+// Цвет металла: hex, сдвинутый к белому (k > 0) или к чёрному (k < 0)
+function shade(hex, k) {
+  const n = parseInt(hex.slice(1), 16), t = k > 0 ? 255 : 0, a = Math.abs(k);
+  const c = (v) => Math.round(v + (t - v) * a).toString(16).padStart(2, '0');
+  return '#' + c(n >> 16) + c((n >> 8) & 255) + c(n & 255);
+}
+
+// Топор и кирка: m — цвет металла (уровень из кузницы, TOOL_TINT; без него — как всегда)
+function axeSprite(handle, m) {
+  return makeSprite(14, 22, 8, 4, (g) => {
     handle(g, 13);
     g.fillStyle = OUT; g.beginPath(); g.moveTo(0.8, 8.4); g.lineTo(-6.6, 7.4); g.quadraticCurveTo(-8.2, 11.5, -6.6, 15.6); g.lineTo(0.8, 14.4); g.closePath(); g.fill();
-    g.fillStyle = '#b8c0c6'; g.beginPath(); g.moveTo(0, 9.2); g.lineTo(-5.8, 8.4); g.quadraticCurveTo(-7, 11.5, -5.8, 14.6); g.lineTo(0, 13.6); g.closePath(); g.fill();
-    g.fillStyle = '#eef3f6'; g.fillRect(-6.4, 9.4, 1.2, 4.4);
+    g.fillStyle = m || '#b8c0c6'; g.beginPath(); g.moveTo(0, 9.2); g.lineTo(-5.8, 8.4); g.quadraticCurveTo(-7, 11.5, -5.8, 14.6); g.lineTo(0, 13.6); g.closePath(); g.fill();
+    g.fillStyle = m ? shade(m, 0.6) : '#eef3f6'; g.fillRect(-6.4, 9.4, 1.2, 4.4);
   });
-  P.pickaxe = makeSprite(22, 24, 11, 4, (g) => {
+}
+function pickSprite(handle, m) {
+  return makeSprite(22, 24, 11, 4, (g) => {
     handle(g, 13);
     // головка на конце рукояти, острия загнуты назад к руке
     const arc = (w, c) => { g.strokeStyle = c; g.lineWidth = w; g.beginPath(); g.moveTo(-9.5, 10); g.quadraticCurveTo(0, 18.5, 9.5, 10); g.stroke(); };
-    arc(3.6, OUT); arc(2, '#9aa1a7');
-    g.strokeStyle = '#d4dade'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(-6, 12.6); g.quadraticCurveTo(0, 16.4, 6, 12.6); g.stroke();
-    g.fillStyle = OUT; g.fillRect(-1.9, 12.6, 3.8, 3.6); g.fillStyle = '#7d858b'; g.fillRect(-1.2, 13.2, 2.4, 2.4);
+    arc(3.6, OUT); arc(2, m || '#9aa1a7');
+    g.strokeStyle = m ? shade(m, 0.55) : '#d4dade'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(-6, 12.6); g.quadraticCurveTo(0, 16.4, 6, 12.6); g.stroke();
+    g.fillStyle = OUT; g.fillRect(-1.9, 12.6, 3.8, 3.6); g.fillStyle = m ? shade(m, -0.25) : '#7d858b'; g.fillRect(-1.2, 13.2, 2.4, 2.4);
   });
+}
+// Лейка: m — цвет жести (уровень из кузницы); без него — синяя, как всегда
+function canSprite(m) {
+  const body = m || '#5aa6e8', spout = m ? shade(m, -0.12) : '#4f95d8', hi = m ? shade(m, 0.5) : '#9fd0f7';
+  return makeSprite(24, 24, 12, 8, (g) => {
+    // тело лейки свисает в сторону −x (вниз, когда рука вытянута вперёд), носик вдоль +y
+    g.strokeStyle = OUT; g.lineWidth = 3; g.beginPath(); g.moveTo(-6, 6); g.lineTo(-3, 13); g.stroke();
+    g.strokeStyle = spout; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-6, 6); g.lineTo(-3, 13); g.stroke();
+    g.fillStyle = OUT; g.beginPath(); g.roundRect(-11.5, -4.5, 8.4, 11, 2.4); g.fill();
+    g.fillStyle = body; g.beginPath(); g.roundRect(-10.8, -3.8, 7, 9.6, 2); g.fill();
+    g.fillStyle = hi; g.fillRect(-9.8, -2.6, 1.6, 7);
+    g.strokeStyle = OUT; g.lineWidth = 1.4; g.beginPath(); g.arc(-3, 0.5, 3.2, -Math.PI / 2, Math.PI / 2); g.stroke();
+    g.fillStyle = OUT; ell(g, -2.6, 14, 2, 1.4); g.fill();
+  });
+}
+
+// Инструменты в руке: начало координат — точка хвата, +y — вдоль предплечья.
+// Топор, кирка и лейка улучшаются в кузнице: axe2…axe4 и т. п. — они же другого цвета (Player.toolSkin)
+function toolSprites() {
+  const P = {};
+  const handle = (g, len) => { g.fillStyle = OUT; g.fillRect(-1.3, -3, 2.6, len + 4); g.fillStyle = '#a66c3a'; g.fillRect(-0.7, -2.4, 1.4, len + 2.8); };
+  P.axe = axeSprite(handle);
+  P.pickaxe = pickSprite(handle);
+  for (let lv = 2; lv <= TOOL_TINT.length; lv++) {
+    P['axe' + lv] = axeSprite(handle, TOOL_TINT[lv - 1]);
+    P['pickaxe' + lv] = pickSprite(handle, TOOL_TINT[lv - 1]);
+    P['can' + lv] = canSprite(TOOL_TINT[lv - 1]);
+  }
   P.hoe = makeSprite(14, 24, 8, 4, (g) => {
     handle(g, 15);
     g.fillStyle = OUT; g.fillRect(-6.4, 13.2, 7.4, 4.2);
     g.fillStyle = '#9aa1a7'; g.fillRect(-5.8, 13.8, 6.2, 3);
   });
-  P.can = makeSprite(24, 24, 12, 8, (g) => {
-    // тело лейки свисает в сторону −x (вниз, когда рука вытянута вперёд), носик вдоль +y
-    g.strokeStyle = OUT; g.lineWidth = 3; g.beginPath(); g.moveTo(-6, 6); g.lineTo(-3, 13); g.stroke();
-    g.strokeStyle = '#4f95d8'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-6, 6); g.lineTo(-3, 13); g.stroke();
-    g.fillStyle = OUT; g.beginPath(); g.roundRect(-11.5, -4.5, 8.4, 11, 2.4); g.fill();
-    g.fillStyle = '#5aa6e8'; g.beginPath(); g.roundRect(-10.8, -3.8, 7, 9.6, 2); g.fill();
-    g.fillStyle = '#9fd0f7'; g.fillRect(-9.8, -2.6, 1.6, 7);
-    g.strokeStyle = OUT; g.lineWidth = 1.4; g.beginPath(); g.arc(-3, 0.5, 3.2, -Math.PI / 2, Math.PI / 2); g.stroke();
-    g.fillStyle = OUT; ell(g, -2.6, 14, 2, 1.4); g.fill();
-  });
+  P.can = canSprite();
   P.seedbag = makeSprite(14, 14, 7, 2, (g) => {
     g.fillStyle = OUT; ell(g, -2, 5, 4.6, 4.2); g.fill(); g.fillStyle = '#d9b77a'; ell(g, -2, 5, 3.8, 3.4); g.fill();
     g.fillStyle = '#5fb03a'; ell(g, -2, 5, 1.4, 1.4); g.fill();
@@ -151,6 +178,11 @@ export function makeGhostData() {
     axe: att(T.axe, 0, HY), pickaxe: att(T.pickaxe, 0, HY), hoe: att(T.hoe, 0, HY),
     can: att(T.can, 0, HY + 0.2), seedbag: att(T.seedbag, 0, HY), rod: att(rodSprite(), 0, HY),
   };
+  for (let lv = 2; lv <= TOOL_TINT.length; lv++) {
+    tools['axe' + lv] = att(T['axe' + lv], 0, HY);
+    tools['pickaxe' + lv] = att(T['pickaxe' + lv], 0, HY);
+    tools['can' + lv] = att(T['can' + lv], 0, HY + 0.2);
+  }
   const hand = handSprite(C.body), handFar = handSprite(C.shade), hat = hatSprite();
   const skins = {
     default: {

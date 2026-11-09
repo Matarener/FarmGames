@@ -79,7 +79,9 @@ export class Buildings {
       return;
     }
     if (R.readyCount(this.st, k, now)) return this.collect(k);
-    this.f.ui.craftPanel(this.f, k);
+    // стрелка задания вела к кузнице улучшить инструмент — окно сразу на вкладке «Инструменты»
+    const h = this.f.hint;
+    this.f.ui.craftPanel(this.f, k, h && h.step === 'tool' ? 'tools' : null);
   }
 
   // Чертёж поставили на карту (Mover → Farm.placedFx): стройка началась. → надпись для плашки перестановки

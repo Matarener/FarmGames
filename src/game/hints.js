@@ -19,6 +19,8 @@ import { BUILDINGS, RECIPES, bpId } from './buildData.js';
 import * as BR from './buildRules.js';
 import * as AR from './animalRules.js';
 import { ANIMALS } from './animalData.js';
+import { TOOL_UP, TOOL_AT } from './toolData.js';
+import * as TR from './toolRules.js';
 
 // Первые задания сюжета учат играть: в них стрелка видна сама. Дальше она включается только по просьбе
 // игрока (переключатель в окне задания) и держится до смены задания.
@@ -62,6 +64,7 @@ export const HINT_STEPS = {
   expand: ['chunk'],
   well: ['well'],
   house: ['house'],
+  tool: ['tool'],
 };
 
 // Здание, где делают товар item (нет здания — сначала построить его; убрано в рюкзак — к рюкзаку)
@@ -320,6 +323,23 @@ const STEP = {
   },
   // сделать товар (ключ — товар): к зданию, где его делают
   workshop: (c, depth) => madeAt(c, c.key, depth),
+  // улучшить инструмент (ключ — инструмент и уровень: axe2): нет кузницы — построить её; на наковальне что-то
+  // куётся — ждём; не хватает материалов — где их добыть; всё есть — к кузнице (вкладка «Инструменты»)
+  tool: (c, depth) => {
+    const m = /^([a-z]+)(\d)$/.exec(c.key || ''), t = m && m[1];
+    if (!t || !TOOL_UP[t] || TR.toolLevel(c.st, t) >= +m[2]) return null;
+    if (!BR.isBuilt(c.st, TOOL_AT, c.now)) return BR.owned(c.st, TOOL_AT) ? WAIT : STEP.building({ ...c, key: TOOL_AT }, depth + 1);
+    const why = TR.upBlock(c.st, t, c.now);
+    if (why && why.busy) return WAIT;
+    if (why && why.lack) {
+      const lack = why.lack[0];
+      return need(c, { [lack.id]: lack.need }, depth) || madeAt(c, lack.id, depth + 1);
+    }
+    if (why) return null;
+    const o = c.world.objects.find((x) => x && x.type === TOOL_AT);
+    if (!o) return { step: 'tool', kind: 'ui', ui: 'bag' };
+    return { step: 'tool', kind: 'obj', obj: o, x: o.gx, y: o.gy, icon: ITEMS[TOOL_UP[t].item].icon };
+  },
 
   // животное с готовым продуктом (ключ задания — вид или продукт)
   animalReady: (c) => objects(c, 'animalReady', (o) => animalFor(c, o) && AR.stateOf(o, c.now) === 'ready', null,

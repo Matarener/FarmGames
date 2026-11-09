@@ -6,7 +6,8 @@
 //   goal    — откуда прогресс (всё за всё время игры):
 //             { ev, key? }     — счётчик событий игры, тот же, что у заданий (Farm → quests.emit):
 //                                harvest, fish, chop, mine, mow, pick, sow, sell, earn, quest (сданные задания),
-//                                feed (покормили животное), animal (забрали продукт у животного);
+//                                feed (покормили животное), animal (забрали продукт у животного),
+//                                tool (инструмент доковался в кузнице);
 //                                key — точный ключ (культура, рыба)
 //             { kinds, group } — сколько разных ключей группы было в событии kinds (разные культуры урожая;
 //                                группы — GROUPS в questRules.js)
@@ -81,6 +82,9 @@ export const ACH = [
     task: 'Расширь ферму до {n} {участка|участков|участков}', goal: { stat: 'chunks' }, tiers: [3, 6, 10, 16, 25] },
   { id: 'house', group: 'build', name: 'Свой дом', icon: 'house',
     task: 'Улучши дом до {n} уровня', goal: { stat: 'house' }, tiers: [2, 3, 4, 5] },
+  // улучшений всего 9: топор, кирка и лейка × 3 уровня (toolData.js)
+  { id: 'tools', group: 'build', name: 'Мастер на все руки', icon: 'pick',
+    task: 'Улучши инструменты в кузнице {n} {раз|раза|раз}', goal: { ev: 'tool' }, tiers: [1, 3, 5, 7, 9] },
 
   // ---- Торговля ----
   { id: 'sell', group: 'trade', name: 'Торговец', icon: 'market',

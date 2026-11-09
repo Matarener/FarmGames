@@ -30,6 +30,7 @@ export class Player {
     this.anim.onEvent = (name) => { if (name === 'hit' && this.current && this.state === 'work') this.onHit(); };
     this.anim.onComplete = (name) => { if (name === 'happy') this.anim.play('idle'); };
     this.handlers = null; // { perform(action) → bool продолжать, fail(action, reason) }
+    this.toolSkin = null; // имя инструмента в руке → его картинка нынешнего уровня (axe → axe3), задаёт Farm
     this.idleTime = 0;
   }
 
@@ -108,7 +109,7 @@ export class Player {
     const cx = a.obj ? a.obj.gx + a.obj.w / 2 : a.x + 0.5, cy = a.obj ? a.obj.gy + a.obj.h / 2 : a.y + 0.5;
     this.face(cx - this.x, cy - this.y);
     const [anim, tool] = TOOL_ANIM[a.kind];
-    this.sk.override.tool = tool;
+    this.sk.override.tool = tool && this.toolSkin ? this.toolSkin(tool) : tool;
     this.state = 'work';
     this.anim.play(anim, { restart: true, mix: 0.12 });
     if (this.handlers.started) this.handlers.started(a);
