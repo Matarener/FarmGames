@@ -148,9 +148,10 @@ export class Player {
       }
       if (!this.path.length) this.arrive();
     }
-    // в полёте — над препятствием сейчас или на следующей клетке пути; приземляется плавно
-    const next = this.path.length ? this.path[0] : null;
-    const up = !this.world.walkable(this.tx, this.ty) || (next && !this.world.walkable(next[0], next[1])) ? 1 : 0;
+    // в полёте — над препятствием сейчас или на двух следующих клетках пути (между деревьями не ныряет
+    // вниз); приземляется плавно
+    const w = this.world, P = this.path, blocked = (c) => c && !w.walkable(c[0], c[1]);
+    const up = !w.walkable(this.tx, this.ty) || blocked(P[0]) || blocked(P[1]) ? 1 : 0;
     this.fly += (up - this.fly) * Math.min(1, dt * 7);
     if (Math.abs(up - this.fly) < 0.005) this.fly = up;
     this.idleTime = this.busy || this.anim.name !== 'idle' ? 0 : this.idleTime + dt;
