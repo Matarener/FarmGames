@@ -1306,7 +1306,7 @@ export class Farm {
       }
       case 'mow': {
         const o = a.obj;
-        if (w.objects[o.id] !== o) return false;
+        if (w.objects[o.id] !== o || !this.spend(ENERGY.mow)) return false;
         const r = Wild.mowGrass(st, o.gx, o.gy, Math.random);
         this.dropFx(o, r.items);
         this.burst(o.wx, o.wy - 10, '#8fd35c', 10, true);
@@ -1525,7 +1525,12 @@ export class Farm {
     }
   }
 
-  float(x, y, text, icon) { this.floaters.push({ x, y, text, icon, t: 0 }); }
+  // Всплывающий текст с иконкой. icon — имя иконки или id предмета: у семян и чертежей своей картинки нет,
+  // у них иконка культуры или постройки и значок (мешочек семян, чертёж) — как в рюкзаке
+  float(x, y, text, icon) {
+    const it = icon && ITEMS[icon];
+    this.floaters.push({ x, y, text, icon: it ? it.icon : icon, badge: it && it.badge, t: 0 });
+  }
 
   updateBounds() {
     const w = this.world;

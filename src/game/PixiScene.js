@@ -28,6 +28,8 @@ const RING_RO = 11.8, RING_RI = 6.3, RING_PX = 256, RING_HOLD = 0.45, RING_FADE 
 // гаснут на MOVER_FADE (непрозрачность ≈ 0,57) — видно землю и грядки за ними
 const FADE_A = 0.62, MOVER_TALL = 56, MOVER_FADE = 0.7;
 const ATLAS = 2048, PAD = 6;
+// всплывающие «+N»: значок предмета на иконке 12×12 (мешочек у семян) — размер и на сколько выступает вправо и вниз
+const FLOAT_BADGE = 7, FLOAT_BADGE_OUT = 2;
 const Z = (depth, wy) => depth * 1e4 + wy * 0.1; // порядок отрисовки: глубина клетки, затем y
 
 // прямоугольник непрозрачных пикселей картинки (с запасом в 1 px), null — если пусто;
@@ -1141,6 +1143,7 @@ export class PixiScene {
       box.tx = new PIXI.BitmapText({ text: '', style: { fontFamily: 'farm-float', fontSize: 11 } });
       box.tx.anchor.set(0, 0.5); box.addChild(box.tx);
       box.ic = new PIXI.Sprite(); box.ic.width = 12; box.ic.height = 12; box.addChild(box.ic);
+      box.bd = new PIXI.Sprite(); box.bd.width = FLOAT_BADGE; box.bd.height = FLOAT_BADGE; box.addChild(box.bd);
       C.addChild(box);
     }
     C.children.forEach((box, i) => {
@@ -1152,14 +1155,19 @@ export class PixiScene {
       const iconOk = img && img.complete && img.naturalWidth;
       box.ic.visible = !!iconOk;
       if (iconOk) { const t = this.iconTex(img); if (box.ic.texture !== t) { box.ic.texture = t; box.ic.width = 12; box.ic.height = 12; } }
+      // значок предмета (мешочек у семян, чертёж) — в правом нижнем углу иконки, чуть выступает за неё
+      const bimg = iconOk && fl.badge && f.iconImg[fl.badge], badgeOk = !!(bimg && bimg.complete && bimg.naturalWidth);
+      box.bd.visible = badgeOk;
+      if (badgeOk) { const t = this.iconTex(bimg); if (box.bd.texture !== t) { box.bd.texture = t; box.bd.width = FLOAT_BADGE; box.bd.height = FLOAT_BADGE; } }
       // плавно: быстро всплывает и замедляется (ease-out), в начале мягко «выпрыгивает», в конце тает
-      const k = Math.min(1, fl.t / 1.3), tw = box.tx.width, iw = iconOk ? 12 : 0;
+      const k = Math.min(1, fl.t / 1.3), tw = box.tx.width, iw = iconOk ? 12 + (badgeOk ? FLOAT_BADGE_OUT : 0) : 0;
       const rise = 1 - (1 - k) * (1 - k) * (1 - k);
       const pop = k < 0.12 ? k / 0.12 : 1, sc = 0.7 + 0.3 * (1 - (1 - pop) * (1 - pop));
       box.alpha = k < 0.12 ? pop : k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
       box.scale.set(sc);
       box.position.set(fl.x - (tw + iw) * sc / 2, fl.y - rise * 28);
       box.ic.position.set(tw + 1, -6);
+      if (badgeOk) box.bd.position.set(tw + 1 + 12 + FLOAT_BADGE_OUT - FLOAT_BADGE, 6 + 2 - FLOAT_BADGE);
     });
   }
 }

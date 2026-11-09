@@ -51,7 +51,8 @@ const OPT = {
 // Бот играет на числах игры (data.js, buildData.js). Чтобы примерить другие, не меняя игру, задайте их в PACE (JSON):
 //   xp: [a, b] — опыт до следующего уровня a·L^b;  exp: [k, p] — монеты за n-й участок k·n^p;
 //   house: [монеты за дом 2, 3, 4, 5];  crops: { corn: [семена, продажа, опыт] … };
-//   goods: { strawberry_cake: цена продажи … } (товары мастерских);  beds: { …BEDS.limit }
+//   goods: { strawberry_cake: цена продажи … } (товары мастерских);  beds: { …BEDS.limit };
+//   energy: { mow: 0 … } — сколько энергии стоит действие (ENERGY)
 // Например: PACE='{"xp":[20,2],"exp":[40,2],"house":[50,1200,6000,25000]}' — вариант «~3 недели» из отчёта 9 ноября.
 const SIM_FN = { expansionCost: D.expansionCost, xpToNext: D.xpToNext };
 const PACE = process.env.PACE ? JSON.parse(process.env.PACE) : null;
@@ -68,6 +69,7 @@ if (PACE) {
   (PACE.house || []).forEach((c, i) => { if (c && HOUSE[i + 2]) HOUSE[i + 2].cost.coins = c; });
   if (PACE.exp) { const [k, pw] = PACE.exp; SIM_FN.expansionCost = (n) => ({ ...D.expansionCost(n), coins: r5(k * Math.pow(n, pw)) }); }
   if (PACE.beds) Object.assign(D.BEDS.limit, PACE.beds);
+  if (PACE.energy) Object.assign(ENERGY, PACE.energy);
 }
 // ---------------- Улучшение инструментов (toolRules.js, toolData.js) ----------------
 // Бот улучшает кирку, топор и лейку в кузнице по порядку TOOL_ORDER, как только открыто по уровню и монет хватает
@@ -214,6 +216,15 @@ export function scanLoops() {
     const profit = it.sell - cost;
     if (profit > 0) add('ВАЖНО', `Купить → сделать → продать: ${it.name}`, `сырьё с рынка ${cost.toFixed(0)} мон. → продажа ${it.sell} (+${profit.toFixed(0)} мон. и опыт за ${Math.round(time / 60)} мин зданий; без конца)`);
   }
+  // --- высокая трава: энергия за сбор против сена и семян ---
+  {
+    const m = D.WILD.mow, hay = avg(m.hay), hayShop = shopPrice('hay');
+    const seedC = Object.values(CROPS).reduce((s, c) => s + c.seed, 0) / Object.keys(CROPS).length;
+    const grow = 3600 / D.WILD.every * D.WILD.chance * D.WILD.grass.w / (D.WILD.grass.w + D.WILD.bush.w);
+    add('инфо', 'Высокая трава', `сбор = ${ENERGY.mow} эн. → ${hay} сена (продать ${(hay * ITEMS.hay.sell).toFixed(1)} мон.` +
+      (hayShop ? `, на рынке купить — ${(hay * hayShop).toFixed(1)}` : '') + `) и семена с шансом ${Math.round(m.seed * 100)}% ` +
+      `(посадка без них стоит в среднем ${seedC.toFixed(0)} мон.). Ограничено ростом: до ${D.WILD.grass.max} кустиков, ≈${grow.toFixed(1)} в час.`);
+  }
   // --- колесо ---
   const W = WHEEL.sectors, wt = W.reduce((s, x) => s + x.w, 0);
   const ev = (k) => W.reduce((s, x) => s + (x.w / wt) * (k === 'coins' || k === 'gems' ? x[k] || 0 : (x.items && x.items[k]) || 0), 0);
@@ -259,6 +270,7 @@ class Sim {
     this.blockCal = {}; // то же, календарные часы (между заходами)
     this.gemRescue = { ore: 0, wood: 0, gems: 0 };
     this.spent = { energy: 0, eaten: 0 };
+    this.mowed = 0;     // сколько высокой травы собрано
     this.toolSpent = { coins: 0 }; this.oreGot = 0;
     this.baitSpent = 0; this.casts = { bait: 0, none: 0 };
     this.lvIncome = [0, 0];
@@ -1015,8 +1027,11 @@ class Sim {
       this.spend(ENERGY.pick); Inv.addItem(st, f.fruit, roll(this.rng, f.n)); o.fruitAt = this.now + f.regrow * SEC;
       this.ev('pick', f.fruit); this.addXp(1); budget -= ACT.pick;
     }
-    while (this.wild.grass > 0 && budget > 0) {
-      this.wild.grass--;
+    // трава: каждый сбор стоит ENERGY.mow; энергию на полив грядок без поливалки (keepE) не трогаем
+    const keepE = Math.max(0, this.beds.length - cov);
+    while (this.wild.grass > 0 && budget > 0 && (!ENERGY.mow || st.energy >= keepE + ENERGY.mow)) {
+      if (ENERGY.mow) this.spend(ENERGY.mow);
+      this.wild.grass--; this.mowed++;
       Inv.addItem(st, 'hay', roll(this.rng, D.WILD.mow.hay));
       if (this.rng() < D.WILD.mow.seed) { const cs = Object.values(CROPS).filter((c) => c.level <= st.level); Inv.addItem(st, D.seedId(cs[Math.floor(this.rng() * cs.length)].key), 1); }
       this.ev('mow'); budget -= ACT.mow;
@@ -1025,7 +1040,6 @@ class Sim {
     for (const id of Object.keys(st.items)) if (id.startsWith('sap_') && FLORA[id.slice(4)] && !FLORA[id.slice(4)].pick && budget > 0) { this.sowOwn(id.slice(4)); budget -= ACT.sow; }
     // расчистка остатком энергии: оставляем на полив грядок без поливалки
     const goal = this.nextGoal(), lack = this.lack(goal.cost);
-    const keepE = Math.max(0, this.beds.length - cov);
     // не хватает дерева/камня/руды на цель — едим, что есть, а если монет много — покупаем еду (как игрок)
     if ((lack.wood || lack.stone || lack.ore) && st.energy < keepE + 6 && this.mapLeft()[Object.keys(lack).find((k) => k !== 'coins') || 'wood'] > 0) {
       this.eatFor(Math.min(this.maxE, keepE + 30), {});
@@ -1191,6 +1205,8 @@ function report() {
     }
     if (R.P.fish) p(`Рыбалка: забросов на наживку ${Math.round(S.reduce((a, s) => a + s.casts.bait, 0) / S.length)}, без наживки ${Math.round(S.reduce((a, s) => a + s.casts.none, 0) / S.length)}; на наживку из лавки потрачено монет ${Math.round(S.reduce((a, s) => a + s.baitSpent, 0) / S.length)}`);
     p(`На инструменты потрачено монет ${Math.round(S.reduce((a, s) => a + s.toolSpent.coins, 0) / S.length)}; руды добыто ${Math.round(S.reduce((a, s) => a + s.oreGot, 0) / S.length)}; энергии потрачено ${Math.round(S.reduce((a, s) => a + s.spent.energy, 0) / S.length)}, еды съедено ${Math.round(S.reduce((a, s) => a + s.spent.eaten, 0) / S.length)}`);
+    const mowed = S.reduce((a, s) => a + s.mowed, 0) / S.length, days = S.reduce((a, s) => a + s.day(), 0) / S.length;
+    p(`Высокая трава: собрано ${Math.round(mowed)} (≈${(mowed / days).toFixed(1)} в день), на неё ушло ${Math.round(mowed * ENERGY.mow)} энергии (${ENERGY.mow} за сбор)`);
     const last = S[0];
     p(`Конец прогона 1: день ${last.day().toFixed(1)}, ур. ${last.st.level}, дом ${last.st.house}, участков ${last.open.size}, грядок ${last.beds.length}, монет ${last.st.coins}, кристаллов ${last.st.gems}, руды ${Inv.count(last.st, 'ore')}, дерева ${Inv.count(last.st, 'wood')}, камня ${Inv.count(last.st, 'stone')}`);
     if (OPT.trace) p('По дням (прогон 1):\n  ' + last.trace.join('\n  '));
