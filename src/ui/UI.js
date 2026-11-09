@@ -1512,12 +1512,11 @@ export class UI {
   // нажатие по клетке: выбрать предмет (его карточка — снизу) или снять выбор
   pick(S, key) { S.sel = S.sel === key ? null : key; this._reveal = !!S.sel; this.sfx('tap'); this.refreshPanel(); }
 
-  // своё в шапке окна между названием и ✕: у рынка — «Купить / Продать», у рюкзака — энергия
+  // своё в шапке окна между названием и ✕: у рынка — «Купить / Продать / Заказы», у рюкзака — энергия
   headExtra(card, el) { const head = card.querySelector('.pn-head'); head.insertBefore(el, head.lastChild); }
 
-  // ---------- Рынок: «Заказы», «Купить» и «Продать» ----------
-  // mode — сразу этот раздел (иначе тот, что был открыт в прошлый раз)
-  // mode — сразу этот режим ('orders' | 'buy' | 'sell'); item — сразу этот товар на «Купить» (кнопка «Грядки»)
+  // ---------- Рынок: «Купить», «Продать» и «Заказы» ----------
+  // mode — сразу этот режим ('buy' | 'sell' | 'orders', иначе тот, что был открыт в прошлый раз); item — сразу этот товар на «Купить» (кнопка «Грядки»)
   marketPanel(f, mode, item) {
     const M = this.mk || (this.mk = { mode: 'sell', tab: 'seeds', sel: null });
     if (mode && mode !== M.mode) { M.mode = mode; M.sel = null; }
@@ -1525,7 +1524,7 @@ export class UI {
     if (o) { M.mode = 'buy'; M.tab = o.tab; M.sel = item; M.skip = null; }
     this.openPanel('market', 'Рынок', (body, card) => {
       const seg = h('div', 'mk-seg n3'), ready = f.orders.ready();
-      for (const [k, name] of [['orders', 'Заказы'], ['buy', 'Купить'], ['sell', 'Продать']]) {
+      for (const [k, name] of [['buy', 'Купить'], ['sell', 'Продать'], ['orders', 'Заказы']]) {
         const b = h('button', M.mode === k ? 'on' : '', name + (k === 'orders' && ready ? '<i class="qt-dot"></i>' : ''));
         b.onclick = () => { if (M.mode !== k) { M.mode = k; M.sel = null; M.skip = null; this.sfx('tap'); this.refreshPanel(); } };
         seg.appendChild(b);
