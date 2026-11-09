@@ -709,6 +709,15 @@ export class PixiScene {
       if (bu.visible) this.put(bu, bs, b.wx, b.wy - 26 + bob);
     });
     this.crops.forEach((e) => { const b = e.b; if (f.beds.get(b.i) === b) return; e.destroy(); this.crops.delete(b); const bu = this.bub.get(b); if (bu) { bu.destroy(); this.bub.delete(b); } });
+    // пузыри «готово» над зданиями с крафтом (Farm.syncBars → f.bldBub: x, y по 2 числа)
+    const BB = f.bldBub || [], BP = this.bldBub || (this.bldBub = []);
+    for (let i = 0; i * 2 < BB.length; i++) {
+      let bu = BP[i];
+      if (!bu) { bu = BP[i] = new PIXI.Sprite(); this.bubbles.addChild(bu); }
+      bu.visible = r.visible(BB[i * 2] - 16, BB[i * 2 + 1] - 30, 32, 32);
+      if (bu.visible) this.put(bu, S.bubble.ready, BB[i * 2], BB[i * 2 + 1] + bob);
+    }
+    for (let i = BB.length / 2; i < BP.length; i++) BP[i].visible = false;
 
     this.syncBars();
 

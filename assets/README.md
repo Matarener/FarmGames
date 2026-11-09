@@ -33,6 +33,8 @@ assets/map.json  стартовая карта (редактор карты)
 | украшения прудов и кувшинки | `pond_<что>` | `pond_cattail`, `pond_lily` |
 | дом, колодец | `house_<уровень>`, `well_broken`, `well_fixed` | |
 | поливалка | `<ключ из SPRINKLERS>` (иконка на рынке и в рюкзаке — сама картинка) | `sprinkler_spin` |
+| здание с крафтом, стройка | `building_<ключ из BUILDINGS>` (иконка — само здание), `site_<ключ>` — оно же в лесах | `building_forge`, `site_forge` |
+| дом в лесах (идёт улучшение) | `house_up_<уровень, до которого улучшают>` | `house_up_3` |
 | туман | `fog_clouds_<n>`, `fog_strips_<n>`, `fog_wisps_<n>` | |
 | иконка интерфейса | `ic_<имя>` | `ic_coin`, `ic_sap_oak` |
 

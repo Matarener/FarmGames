@@ -505,7 +505,7 @@ export class Mover {
     if (!this.active) this.enter();
     const def = decor ? {} : OBJECTS[type || id];
     this.brush = null; this.to = null;
-    this.sel = { kind: 'bag', id, decor, name: it.name, w: def.w || 1, h: def.h || 1, gx: -9, gy: -9, cells: objCells(def) };
+    this.sel = { kind: 'bag', id, decor, name: it.placeName || it.name, w: def.w || 1, h: def.h || 1, gx: -9, gy: -9, cells: objCells(def) };
     if (gx != null) {
       const tx = gx - ((this.sel.w - 1) >> 1), ty = gy - ((this.sel.h - 1) >> 1), c = this.check(tx, ty);
       this.to = { gx: tx, gy: ty, ok: c.ok, why: c.why };
@@ -519,6 +519,7 @@ export class Mover {
   // Есть ещё такие — выбор остаётся.
   placeFromBag(gx, gy) {
     const f = this.f, w = f.world, s = this.sel;
+    let msg = null;
     if (s.id === WELL_ITEM) {
       const o = Well.placeWell(f.st, w, gx, gy);
       if (!o) { this.to.ok = false; this.to.why = 'Сюда нельзя'; this.fail(this.to.why); return false; }
@@ -528,7 +529,7 @@ export class Mover {
       if (r.why) { this.to.ok = false; this.to.why = r.why; this.fail(r.why); return false; }
       const o = r.o;
       f.burst(o.wx, o.wy - 6, '#e8d9a8', 14);
-      f.placedFx(o);
+      msg = f.placedFx(o); // своя надпись постройки (у чертежа здания — «стройка началась»)
     } else {
       const o = s.decor ? Ponds.placeDecor(f.st, w, s.id, gx, gy) : Ponds.placePond(f.st, w, s.id, gx, gy);
       if (!o) { this.to.ok = false; this.to.why = 'Сюда нельзя'; this.fail(this.to.why); return false; }
@@ -538,7 +539,7 @@ export class Mover {
     const n = Inv.count(f.st, s.id);
     this.to = null;
     if (n) this.hint(`${s.name}: поставлено. Есть ещё ${n} — нажмите на клетку, куда поставить`);
-    else { this.sel = null; this.hint(`${s.name}: поставлено`); }
+    else { this.sel = null; this.hint(msg || `${s.name}: поставлено`); }
     f.changed();
     return true;
   }

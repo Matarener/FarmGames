@@ -338,6 +338,38 @@ button:disabled { cursor: default; }
 @media (min-width: 700px) and (min-height: 500px) { .inv-grid { grid-template-columns: repeat(7, 1fr); } }
 @media (max-height: 500px) and (orientation: landscape) { .inv-grid { grid-template-columns: repeat(8, 1fr); } .inv-info { padding: 6px 14px 8px; } }
 
+/* ---------- Здание с крафтом: очередь и рецепты ---------- */
+.panel[data-kind="craft"] .pn-card { max-height: 94%; }
+.cr-queue { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cr-slot {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 108px; padding: 8px 6px;
+  border-radius: 14px; background: var(--paper-2); border: 2px solid rgba(61,43,31,.18);
+}
+.cr-slot i { position: relative; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 12px; }
+.cr-slot i .ic { width: 80%; height: 80%; }
+.cr-slot i b { position: absolute; right: 2px; bottom: 0; font-size: 12px; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+.cr-slot i em {
+  position: absolute; right: -7px; top: -7px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink);
+  background: var(--green); color: #fff; font-style: normal; font-size: 13px; line-height: 18px; text-align: center;
+}
+.cr-slot span { font-size: 12px; font-weight: 600; color: #6b5442; white-space: nowrap; }
+.cr-slot.done { background: #e4f5d4; border-color: var(--green); }
+.cr-slot.run { background: #fff3c4; border-color: var(--gold); }
+.cr-slot.wait i .ic { opacity: .6; }
+.cr-slot.empty { justify-content: center; background: transparent; border-style: dashed; }
+.cr-slot.empty i { background: transparent; }
+.cr-slot.empty span { color: #a0806a; font-weight: 500; }
+.cr-bar { width: 100%; height: 8px; border-radius: 4px; background: rgba(61,43,31,.15); overflow: hidden; }
+.cr-bar u { display: block; height: 100%; border-radius: 4px; background: linear-gradient(#d9b3ff, #a970e6); transition: width 1s linear; }
+.cr-speed { min-height: 28px; padding: 0 8px; }
+.cr-x { position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 7px; background: rgba(0,0,0,.08); font-size: 12px; }
+.mk-cell.poor i .ic { opacity: .55; }
+.cr-need { width: 100%; padding: 0; }
+.hu-prog { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; font-size: 13px; }
+.hu-prog .cr-bar { height: 10px; border-radius: 5px; }
+.hu-prog .cr-bar u { background: linear-gradient(#ffe48a, #e0a93a); }
+.hu-speed span .ic-s { vertical-align: -2px; }
+
 /* ---------- Рынок ---------- */
 .mk-seg { display: flex; gap: 2px; margin-right: 8px; padding: 3px; border-radius: 13px; background: rgba(0,0,0,.22); }
 .mk-seg button { min-width: 82px; height: 32px; padding: 0 10px; border-radius: 10px; font-size: 14px; color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.35); }
