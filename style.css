@@ -279,15 +279,15 @@ button:disabled { cursor: default; }
   grid-template-columns: 84px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
 }
 .sh-rail {
-  grid-row: 1; display: flex; flex-direction: column; gap: 4px; padding: 8px 0 10px 6px; overflow-y: auto; touch-action: pan-y;
+  grid-row: 1; display: flex; flex-direction: column; gap: 4px; padding: 8px 0 10px 4px; overflow-y: auto; touch-action: pan-y;
   background: var(--paper-2); border-right: 2px solid rgba(61,43,31,.16); scrollbar-width: none;
 }
 .sh-rail::-webkit-scrollbar { display: none; }
 /* выбранный раздел — «вкладка папки»: закрывает границу и сливается со списком справа */
 .sh-tab {
-  position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; margin-right: -2px; padding: 7px 2px 6px;
+  position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; margin-right: -2px; padding: 7px 0 6px;
   border: 2px solid transparent; border-right: 0; border-radius: 14px 0 0 14px;
-  font-size: 10.5px; line-height: 1.15; letter-spacing: -.15px; color: #6b5442;
+  font-size: 10.5px; line-height: 1.15; letter-spacing: -.3px; color: #6b5442;
 }
 .sh-tab .ic { width: 30px; height: 30px; object-fit: contain; vertical-align: 0; }
 .sh-tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -868,7 +868,7 @@ body.planting .hud-bottom, body.digging .pb-more { display: none; }
 @media (max-height: 500px) and (orientation: landscape) {
   .panel[data-kind="bag"] .pn-card, .panel[data-kind="market"] .pn-card, .panel[data-kind="devitems"] .pn-card, .panel[data-kind="quest"] .pn-card { width: min(820px, 100%); height: 100%; }
   .sh-rail { gap: 2px; padding-top: 6px; }
-  .sh-tab { padding: 4px 2px; font-size: 10px; }
+  .sh-tab { padding: 4px 0; font-size: 10px; }
   .sh-tab .ic { width: 24px; height: 24px; }
   .sh-sort { margin: 6px 10px 4px; }
   .sh-sort button { height: 26px; }
