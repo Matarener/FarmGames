@@ -390,6 +390,45 @@ button:disabled { cursor: default; }
   .cr-slot i { width: 40px; height: 40px; border-radius: 10px; }
   .cr-speed { min-height: 24px; }
 }
+/* ---------- Кузница: вкладка «Инструменты» (UI.forgeTools) ---------- */
+/* значок уровня инструмента (II, III, IV) — в углу иконки, цветом металла */
+.tl-lv {
+  position: absolute; left: 2px; top: 2px; min-width: 20px; height: 17px; padding: 0 3px; border-radius: 6px;
+  border: 1.5px solid var(--ink); color: var(--ink); font-style: normal; font-size: 10.5px; font-weight: 800; line-height: 14px; text-align: center;
+}
+.ii-ic .tl-lv { left: -5px; top: -5px; }
+.tl-anvil { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: #fff3c4; border: 2px solid var(--gold); }
+.tl-anvil > i { position: relative; flex: none; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 12px; }
+.tl-anvil > i .ic { width: 80%; height: 80%; }
+.tl-a-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.tl-a-t > b { font-size: 14px; }
+.tl-a-t .cr-bar u { background: linear-gradient(#dfe9f2, #8fa9c0); }
+.tl-speed { flex: none; min-height: 34px; padding: 0 10px; }
+.tl-anvil.empty { justify-content: center; min-height: 46px; background: transparent; border: 2px dashed rgba(61,43,31,.25); color: #a0806a; font-size: 13px; font-weight: 500; }
+.tl-list { display: flex; flex-direction: column; gap: 6px; }
+.tl-row {
+  display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 14px; text-align: left;
+  background: var(--paper-2); border: 2px solid rgba(61,43,31,.18);
+}
+.tl-row > i { position: relative; flex: none; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 12px; }
+.tl-row > i .ic { width: 78%; height: 78%; }
+.tl-row b { display: block; font-size: 14px; }
+.tl-row span { display: block; font-size: 12px; font-weight: 500; color: #6b5442; }
+.tl-row.can span { color: #3e7a2a; font-weight: 600; }
+.tl-row.sel { border-color: var(--ink); background: #fff3c4; }
+.tl-stats { width: 100%; padding: 2px 10px; background: rgba(255,255,255,.55); }
+.tl-stats .stat { padding: 4px 0; font-size: 12.5px; gap: 8px; }
+.tl-stats .stat b { text-align: right; white-space: nowrap; }
+.tl-stats .stat:not(.up) b { color: #6b5442; font-weight: 600; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .tl-anvil { padding: 5px 8px; }
+  .tl-anvil > i, .tl-row > i { width: 38px; height: 38px; }
+  .tl-row { gap: 6px; padding: 4px 6px 4px 4px; }
+  .tl-row b { font-size: 12.5px; line-height: 1.2; }
+  .tl-row span { font-size: 11px; }
+  .tl-list { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .tl-card .ii-t b { font-size: 14px; }
+}
 .hu-prog { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; font-size: 13px; }
 .hu-prog .cr-bar { height: 10px; border-radius: 5px; }
 .hu-prog .cr-bar u { background: linear-gradient(#ffe48a, #e0a93a); }
@@ -901,6 +940,9 @@ body.planting .hud-bottom, body.digging .pb-more { display: none; }
 .set-ver { margin-top: 14px; padding: 8px 0 2px; text-align: center; font-size: 11.5px; color: #a0806a; user-select: none; -webkit-user-select: none; cursor: default; }
 .dev-row { display: grid; grid-template-columns: auto 1fr 120px auto; align-items: center; gap: 8px; padding: 6px 0; font-size: 14px; }
 .dev-row .ic { width: 22px; height: 22px; object-fit: contain; }
+.dev-row.dev-tool { grid-template-columns: auto 1fr auto; padding: 3px 0; }
+.dev-lv { display: flex; gap: 4px; }
+.dev-lv .inv-chip { min-width: 36px; padding: 0 6px; font-weight: 700; }
 .dev-num { min-width: 0; width: 100%; height: 38px; padding: 0 8px; border-radius: 10px; border: 2px solid rgba(61,43,31,.5); background: #fff; font: inherit; font-size: 14px; color: var(--ink); }
 .dev-acts .dev-num { flex: 0 0 96px; }
 .inv-cell.dev-none { opacity: .55; }

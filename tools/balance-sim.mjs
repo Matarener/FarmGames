@@ -9,6 +9,7 @@
 //   PACE='{"xp":[30,2],"exp":[80,2]}' node tools/balance-sim.mjs — примерить другие числа темпа (см. PACE ниже)
 //   node tools/balance-sim.mjs --seeds 10 --days 150 --profile normal --log
 //   node tools/balance-sim.mjs --json out.json      — сырые данные для графиков
+//   TOOLS=off node tools/balance-sim.mjs            — без улучшения инструментов в кузнице (сравнить)
 //
 // Бот не жульничает: не рыбачит ради денег (кроме профиля «Абузер»), кристаллы тратит только на выход из тупика
 // (руда, дерево за кристаллы на рынке) — такие траты считаются отдельно, это и есть мягкий тупик.
@@ -29,6 +30,8 @@ import * as Wheel from '../src/game/wheelRules.js';
 import * as Ord from '../src/game/orderRules.js';
 import * as Ach from '../src/game/achRules.js';
 import * as Fish from '../src/game/fishRules.js';
+import * as Tool from '../src/game/toolRules.js';
+import { TOOL_UP, TOOL_PERKS, TOOL_AT } from '../src/game/toolData.js';
 import { QUEST_TZ } from '../src/game/questData.js';
 import { ORDERS } from '../src/game/orderData.js';
 import { WHEEL } from '../src/game/wheelData.js';
@@ -66,6 +69,14 @@ if (PACE) {
   if (PACE.beds) Object.assign(D.BEDS.limit, PACE.beds);
 }
 const FISHING = D.FISHING;
+
+// ---------------- Улучшение инструментов в кузнице (toolRules.js, toolData.js) ----------------
+// Бот улучшает кирку, топор и лейку по порядку TOOL_ORDER, как только открыто по уровню и монет хватает
+// (не больше TOOL_SHARE от свободных). Лейка поливает область: грядки бота — список без клеток, поэтому
+// за одно нажатие считаем столько грядок, сколько в среднем попадает в область (CAN_PER_TAP).
+const TOOLS_ON = process.env.TOOLS !== 'off';
+const TOOL_ORDER = ['pick', 'axe', 'can'], TOOL_SHARE = 0.5;
+const CAN_PER_TAP = { one: 1, cross: 3, square: 5 };
 
 const r5 = (v) => Math.max(5, Math.round(v / 5) * 5);
 const avg = ([a, b]) => (a + b) / 2;
@@ -230,6 +241,7 @@ class Sim {
     this.blockCal = {}; // то же, календарные часы (между заходами)
     this.gemRescue = { ore: 0, wood: 0, gems: 0 };
     this.spent = { energy: 0, eaten: 0 };
+    this.toolSpent = { coins: 0 }; this.oreGot = 0;
     this.lvIncome = [0, 0];
     this.oreAt = {};
     this.gemsIn = { levels: 0, quests: 0, ach: 0, gifts: 0 };
@@ -269,7 +281,7 @@ class Sim {
   earned() { const I = this.income; return I.crops + I.orders + I.animals + I.craft + I.fish + I.other; }
   ctx() { return { now: this.now, tz: QUEST_TZ, rng: this.rng, stats: { beds: this.beds.length, bedsAll: this.beds.length + Inv.count(this.st, D.BED_ITEM) }, fruit: [...new Set(this.orchard.map((o) => FLORA[o.sp].fruit))] }; }
   get maxE() { return HOUSE[this.st.house].energy; }
-  get canMax() { return HOUSE[this.st.house].can; }
+  get canMax() { return Tool.canMax(this.st); }
 
   // ---------- опыт, события, награды ----------
   addXp(n) {
@@ -567,6 +579,7 @@ class Sim {
       if (!this.buy(s.k)) break;
       this.spr[s.k]++; this.ev('place', s.k);
     }
+    this.toolBuy(free);
     // выход из тупика за кристаллы: дом/участок стоит только из-за руды или дерева, а на открытой земле их нет
     const L = this.lack(g.cost);
     const onlyMat = Object.keys(L).length && Object.keys(L).every((k) => k === 'ore' || k === 'wood');
@@ -584,6 +597,32 @@ class Sim {
     }
   }
   waited(k) { return (this.blockCal[k] || 0); }
+  // инструмент доковался
+  toolTick() {
+    const r = Tool.upTick(this.st, this.now);
+    if (r) { this.ev('tool', r.t + r.to); this.mark('tool_' + r.t + r.to); this.note(`инструмент ${r.t} → ${r.to}`); }
+  }
+  // следующее улучшение, открытое по уровню (порядок — TOOL_ORDER, сначала самые низкие уровни). → { t, next } или null
+  nextTool() {
+    const st = this.st;
+    if (!TOOLS_ON || st.toolUp || !Build.isBuilt(st, TOOL_AT, this.now)) return null;
+    let best = null;
+    for (const t of TOOL_ORDER) {
+      const next = Tool.nextUp(st, t);
+      if (!next || next.level > st.level) continue;
+      if (!best || Tool.toolLevel(st, t) < Tool.toolLevel(st, best.t)) best = { t, next };
+    }
+    return best;
+  }
+  // отдать инструмент в кузницу: всё есть и монет не больше TOOL_SHARE от свободных
+  toolBuy(free) {
+    const n = this.nextTool();
+    if (!n || Tool.upBlock(this.st, n.t, this.now) || (n.next.cost.coins || 0) > free() * TOOL_SHARE) return;
+    const r = Tool.startUp(this.st, n.t, this.now);
+    if (!r) return;
+    this.toolSpent.coins += n.next.cost.coins || 0;
+    this.note(`кузница: ${n.t} → ${r.to}`);
+  }
   lackNone(cost) { return !Object.keys(this.lack(cost)).length; }
   pay(cost) { for (const [k, v] of Object.entries(cost)) { if (k === 'coins' || k === 'gems') this.st[k] -= v; else Inv.takeItem(this.st, k, v); } }
   mapLeft() {
@@ -679,6 +718,9 @@ class Sim {
     for (const [id, n] of Object.entries(this.feedTargets())) add(id, n - Inv.count(st, id));
     // материалы для зданий, которые скоро понадобятся (по заданиям «Мастерские»)
     for (const { g } of this.goals()) if (g.ev === 'build' && BUILDINGS[g.key]) for (const [id, n] of Object.entries(BUILDINGS[g.key].cost)) if (RECIPES[id]) add(id, n - Inv.count(st, id));
+    // материалы на следующее улучшение инструмента
+    const nt = this.nextTool();
+    if (nt) for (const [id, n] of Object.entries(nt.next.cost)) if (RECIPES[id]) add(id, n - Inv.count(st, id));
     // гвозди → слитки, доски для ящиков не делаем
     if (want.nails) add('iron_ingot', Math.ceil(want.nails / RECIPES.nails.n) - Inv.count(st, 'iron_ingot'));
     for (const [id, n] of Object.entries(want)) {
@@ -735,6 +777,7 @@ class Sim {
     const wantChop = qg.some((g) => g.ev === 'chop'), wantStump = qg.some((g) => g.ev === 'stump'), wantMine = qg.some((g) => g.ev === 'mine' && !g.key), wantBoulder = qg.some((g) => g.ev === 'mine' && g.key === 'boulder');
     let best = null, bs = -Infinity;
     const consider = (src, c, o, hp, gain) => {
+      hp = Tool.hitsFor(st, o.type, hp); // топор и кирка из кузницы: меньше ударов
       if (hp > st.energy) return;
       let s = gain / hp;
       if (wantChop && OBJECTS[o.type] && OBJECTS[o.type].stump) s += 5;
@@ -778,14 +821,17 @@ class Sim {
       if (rng() < f.seedChop) give(D.floraSeedId(f.key), 1);
       this.addXp(d.xp || 1);
       this.ev(d.stump ? 'chop' : 'clear', o.type);
-      if (src === 'obj') { this.objs[c].splice(this.objs[c].indexOf(o), 1); if (d.stump) this.stumps[c]++; }
-      if (src === 'wildtree') { this.wild.trees.splice(this.wild.trees.indexOf(o.ref), 1); this.wild.stumps++; }
+      // мастерский топор: пня не остаётся, то, что дал бы пень, — сразу
+      const root = d.stump && (src === 'obj' || src === 'wildtree') && Tool.noStump(st);
+      if (root) { const r = Tool.rootOut(st, rng); this.addXp(r.xp); this.ev('stump', 'stump'); }
+      if (src === 'obj') { this.objs[c].splice(this.objs[c].indexOf(o), 1); if (d.stump && !root) this.stumps[c]++; }
+      if (src === 'wildtree') { this.wild.trees.splice(this.wild.trees.indexOf(o.ref), 1); if (!root) this.wild.stumps++; }
       if (src === 'wildbush') this.wild.bushes.splice(this.wild.bushes.indexOf(o.ref), 1);
       if (src === 'own') this.own.splice(this.own.indexOf(o.ref), 1);
       return;
     }
     for (const [k, r] of Object.entries(d.drops || {})) give(k, roll(rng, r));
-    if (d.oreChance && rng() < d.oreChance) give('ore', roll(rng, d.ore));
+    if (d.oreChance && rng() < Tool.oreChance(st, o.type)) { const n = give('ore', roll(rng, Tool.oreRange(st, o.type))); this.oreGot += n || 0; }
     this.addXp(d.xp || 1);
     this.ev(d.action === 'mine' ? 'mine' : 'clear', o.type);
     this.objs[c].splice(this.objs[c].indexOf(o), 1);
@@ -825,6 +871,7 @@ class Sim {
     this.growAll(len / SEC, false);
     const hu = House.houseTick(st, this.now);
     if (hu) { this.mark('house' + hu.to); this.note(`дом ${hu.to} готов`); }
+    this.toolTick();
     this.craftStep();
     this.animalStep();
     this.wildStep();
@@ -857,12 +904,16 @@ class Sim {
     let need = 0;
     this.beds.forEach((b, i) => { if (b.crop && i >= cov && Beds.cropInfo(b).needsWater) need++; });
     if (need) this.eatFor(Math.min(need, this.maxE), this.reserve());
+    // лейка из кузницы поливает область: одно нажатие (1 энергия) — до per грядок, вода — за каждую
+    const per = CAN_PER_TAP[TOOL_PERKS.can.area[Tool.toolLevel(st, 'can') - 1]];
+    let inTap = 0;
     for (let i = cov; i < this.beds.length && budget > 0; i++) {
       const b = this.beds[i];
       if (!b.crop || !Beds.cropInfo(b).needsWater) continue;
-      if (st.can <= 0) { st.can = this.canMax; budget -= ACT.fill; }
-      if (!this.spend(ENERGY.water)) break;
-      st.can--; b.w++; this.ev('water'); budget -= ACT.water;
+      if (st.can <= 0) { st.can = this.canMax; budget -= ACT.fill; inTap = 0; }
+      if (!inTap) { if (!this.spend(ENERGY.water)) break; budget -= ACT.water; }
+      inTap = (inTap + 1) % per;
+      st.can--; b.w++; this.ev('water');
     }
     // плоды и трава
     for (const o of this.orchard) {
@@ -1036,6 +1087,15 @@ function report() {
     const inc = {};
     for (const s of S) for (const [k, v] of Object.entries(s.income)) inc[k] = (inc[k] || 0) + v / S.length;
     p(`Доход за игру (монет, в среднем): ${Object.entries(inc).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${Math.round(v)}`).join(', ')}`);
+    if (TOOLS_ON) {
+      const tl = [];
+      for (const t of TOOL_ORDER) for (let to = 2; to <= TOOL_UP[t].names.length; to++) {
+        const d = median(S.map((s) => s.mile['tool_' + t + to] && s.mile['tool_' + t + to].day)), n = S.filter((s) => s.mile['tool_' + t + to]).length;
+        if (d != null) tl.push(`${t}${to}: д${d.toFixed(1)} (${n}/${S.length})`);
+      }
+      p(`Инструменты (медиана дня, когда доковался): ${tl.join(', ')}`);
+    }
+    p(`На инструменты потрачено монет ${Math.round(S.reduce((a, s) => a + s.toolSpent.coins, 0) / S.length)}; руды добыто ${Math.round(S.reduce((a, s) => a + s.oreGot, 0) / S.length)}; энергии потрачено ${Math.round(S.reduce((a, s) => a + s.spent.energy, 0) / S.length)}, еды съедено ${Math.round(S.reduce((a, s) => a + s.spent.eaten, 0) / S.length)}`);
     const last = S[0];
     p(`Конец прогона 1: день ${last.day().toFixed(1)}, ур. ${last.st.level}, дом ${last.st.house}, участков ${last.open.size}, грядок ${last.beds.length}, монет ${last.st.coins}, кристаллов ${last.st.gems}, руды ${Inv.count(last.st, 'ore')}, дерева ${Inv.count(last.st, 'wood')}, камня ${Inv.count(last.st, 'stone')}`);
     if (OPT.trace) p('По дням (прогон 1):\n  ' + last.trace.join('\n  '));

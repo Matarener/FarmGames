@@ -11,6 +11,7 @@ import { Quests } from './quests.js';
 import { Gifts } from './gifts.js';
 import { Wheel } from './wheel.js';
 import { Buildings } from './buildings.js';
+import { Tools } from './tools.js';
 import { Animals, HOP } from './animals.js';
 import { Achievements } from './achievements.js';
 import { Orders } from './orders.js';
@@ -28,6 +29,7 @@ import * as Well from './well.js';
 import * as Hints from './hints.js';
 import * as Chop from './chop.js';
 import * as Fish from './fishRules.js';
+import * as TR from './toolRules.js';
 import { plural } from './questRules.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
@@ -57,6 +59,7 @@ export class Farm {
     this.gifts = new Gifts(this);
     this.wheel = new Wheel(this);
     this.builds = new Buildings(this); // здания с крафтом: кухня, мастерские, кузница, кормоцех
+    this.tools = new Tools(this); // улучшение топора, кирки и лейки в кузнице
     this.animals = new Animals(this); // животные: кормление, рост, продукты
     this.ach = new Achievements(this);
     this.orders = new Orders(this);
@@ -284,6 +287,7 @@ export class Farm {
       if (b && b.crop === 'carrot') { b.p = CROPS.carrot.time; b.w = 2; }
     }
     this.player = new Player(w, makeGhostData(), px, py);
+    this.player.toolSkin = (n) => this.tools.skin(n); // топор, кирка, лейка из кузницы — своего цвета
     this.wildTick(Date.now(), true); // поросль за время отсутствия
     this.player.handlers = {
       canStart: (a) => this.canStart(a),
@@ -296,6 +300,7 @@ export class Farm {
     this.cam.centerOn(tmp.x, tmp.y - 20);
     this.tickEnergy();
     this.builds.tick(Date.now(), true); // стройки, которые кончились, пока игры не было
+    this.tools.tick(Date.now(), true); // инструмент доковался, пока игры не было
     this.animals.tick(Date.now(), true); // животные, которые доели, пока игры не было
     this.syncHint();
     this.ui.update(this);
@@ -412,6 +417,7 @@ export class Farm {
     const U = this.bldBub || (this.bldBub = []);
     U.length = 0;
     this.builds.bars(now, B, U);
+    this.tools.bars(now, B); // куётся инструмент
     // животные: полоска «ест», пузыри с кормом или продуктом (this.aniBub — x, y, картинка по 3 значения)
     const AU = this.aniBub || (this.aniBub = []);
     AU.length = 0;
@@ -519,6 +525,14 @@ export class Farm {
   // правила грядок — в beds.js
   cropInfo(b) { return Beds.cropInfo(b); }
 
+  // Нужен ли грядке на клетке (x, y) полив (лейка из кузницы поливает и соседние грядки)
+  needsWater(x, y) {
+    const w = this.world;
+    if (!w.inside(x, y) || w.tiles[w.idx(x, y)] !== T.SOIL) return false;
+    const b = this.beds.get(w.idx(x, y));
+    return !!b && !!b.crop && !!(this.cropFlags(b) & 8);
+  }
+
   // то же, что cropInfo, без создания объекта (для каждого кадра): стадия | готово<<2 | нужен полив<<3
   cropFlags(b) { return Beds.cropFlags(b); }
 
@@ -579,7 +593,8 @@ export class Farm {
   }
 
   get maxEnergy() { return HOUSE[this.st.house].energy; }
-  get canMax() { return HOUSE[this.st.house].can; }
+  // лейка: сколько воды в неё входит (дом + улучшения лейки в кузнице)
+  get canMax() { return TR.canMax(this.st); }
 
   tickEnergy() {
     const st = this.st, now = Date.now(), period = ENERGY_REGEN_SEC * 1000;
@@ -764,7 +779,7 @@ export class Farm {
     // дикое без сбора рубится сразу; плодовое, пока плоды отрастают, — меню «Срубить» и время до урожая.
     // Рубку уже начали (есть удары или удар ждёт в очереди) — каждое нажатие сразу ещё один удар, без меню.
     if ((!f.pick && !o.own) || this.chopping(o)) return this.queue({ kind: 'chop', obj: o });
-    const items = [], n = Chop.durability(o);
+    const items = [], n = Chop.durability(o, this.st);
     if (ripe) items.push({ icon: f.fruit, label: `Собрать: ${fruit.name.toLowerCase()}`, sub: `⚡ ${ENERGY.pick}`, onClick: () => this.queue({ kind: 'pick', obj: o }) });
     items.push({ icon: 'wood', label: o.own ? 'Срубить своё' : 'Срубить', sub: `⚡ ${ENERGY.chop} за удар`, onClick: () => this.queue({ kind: 'chop', obj: o }) });
     const about = left ? `Следующий урожай (${fruit.name.toLowerCase()}) через ${fmtTime(left)}. ` : !f.pick ? `${fruit.name}: только при рубке. ` : '';
@@ -1133,7 +1148,7 @@ export class Farm {
       e.total = r.total; e.done = r.done; e.last = r.last;
     } else if (!e || e.type !== o.type || e.last) {
       const done = Chop.hitsDone(this.st, o);
-      e = { type: o.type, total: Chop.durability(o), done, shown: done, last: false };
+      e = { type: o.type, total: Chop.durability(o, this.st), done, shown: done, last: false };
       this.rings.set(o, e);
     }
     e.t = this.time;
@@ -1283,13 +1298,17 @@ export class Farm {
         return false;
       }
       case 'water': {
+        // одно нажатие — 1 энергия; лейка из кузницы поливает и соседние грядки (вода — за каждую политую)
         if (w.tiles[w.idx(a.x, a.y)] !== T.SOIL) return false;
-        const b = this.bedAt(w.idx(a.x, a.y));
-        if (st.can <= 0 || !this.spend(ENERGY.water)) return false;
-        st.can--; b.w++;
-        this.quests.emit('water');
+        const cells = TR.waterCells(st, a.x, a.y, (x, y) => this.needsWater(x, y));
+        if (!cells.length || !this.spend(ENERGY.water)) return false;
+        for (const [x, y] of cells) {
+          const b = this.bedAt(w.idx(x, y));
+          st.can--; b.w++;
+          this.burst(b.wx, b.wy - 6, '#6fc2ff', 10);
+        }
+        this.quests.emit('water', undefined, cells.length);
         this.sfx('water');
-        this.burst(b.wx, b.wy - 6, '#6fc2ff', 10);
         this.changed();
         return false;
       }
@@ -1364,8 +1383,15 @@ export class Farm {
       this.quests.emit(def.stump ? 'chop' : 'clear', o.type);
       this.burst(o.wx, o.wy - 10, '#7a4b28', 12);
       this.sfx('break');
-      // своё дерево уходит целиком, дикое оставляет пень
-      if (def.stump && !o.own) { o.was = o.type; o.type = 'stump'; o.bare = false; this.world.version++; }
+      // своё дерево уходит целиком, дикое оставляет пень; мастерский топор выкорчёвывает его сразу
+      if (def.stump && !o.own && TR.noStump(st)) {
+        const root = TR.rootOut(st, Math.random);
+        this.dropFx({ wx: o.wx + 14, wy: o.wy - 14 * r.items.length }, root.items);
+        if (root.xp) this.addXp(root.xp);
+        st.stats.cleared++;
+        this.quests.emit('stump', 'stump');
+        this.world.remove(o);
+      } else if (def.stump && !o.own) { o.was = o.type; o.type = 'stump'; o.bare = false; this.world.version++; }
       else this.world.remove(o);
       return;
     }
@@ -1375,8 +1401,9 @@ export class Farm {
       const got = this.addItem(res, n);
       if (got) { this.float(o.wx, o.wy + dy, `+${got}`, res); dy -= 14; }
     }
-    if (def.oreChance && Math.random() < def.oreChance) {
-      const [o0, o1] = def.ore || [1, 2], got = this.addItem('ore', o0 + Math.floor(Math.random() * (o1 - o0 + 1)));
+    // руда: кирка из кузницы находит её в камне чаще, а из валуна достаёт больше
+    if (def.oreChance && Math.random() < TR.oreChance(st, o.type)) {
+      const [o0, o1] = TR.oreRange(st, o.type), got = this.addItem('ore', o0 + Math.floor(Math.random() * (o1 - o0 + 1)));
       if (got) { this.float(o.wx + 14, o.wy + dy, `+${got}`, 'ore'); dy -= 14; }
     }
     this.addXp(def.xp || 1);
@@ -1473,6 +1500,7 @@ export class Farm {
       this.floraTick(now); t = pf.part('растения', t);
       this.wildTick(now); t = pf.part('поросль', t);
       this.builds.tick(now); t = pf.part('здания', t);
+      this.tools.tick(now); t = pf.part('инструменты', t);
       this.animals.tick(now); t = pf.part('животные', t);
       this.quests.tick(); t = pf.part('задания', t);
       this.ach.tick(); t = pf.part('достижения', t);
