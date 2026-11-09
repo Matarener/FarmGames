@@ -30,6 +30,8 @@ import * as Hints from './hints.js';
 import * as Chop from './chop.js';
 import * as Fish from './fishRules.js';
 import * as TR from './toolRules.js';
+import * as Builds from './buildRules.js';
+import { BAITS, FISHER } from './fishData.js';
 import { plural } from './questRules.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
@@ -827,19 +829,61 @@ export class Farm {
   }
 
   // Пруд: набрать воды или рыбачить. Нажали на середину большого пруда — призрак
-  // идёт к ближнему берегу (клетка воды, у которой можно встать)
+  // идёт к ближнему берегу (клетка воды, у которой можно встать). Наживку выбирают здесь же (строка «Наживка»
+  // — когда есть домик рыболова или наживка в рюкзаке), выбор запоминается (fishRules.js).
   pondPopup(o, gx, gy, sx, sy) {
     const c = Ponds.shoreCell(this.world, o, gx, gy);
     if (!c) return this.toast('К этому пруду не подойти');
-    const { x, y } = c, b = this.bites();
-    this.ui.popup(sx, sy, { title: OBJECTS[o.type].name, text: this.bitesText(b), items: [
-      { icon: 'water', label: 'Набрать воды', sub: `${this.st.can}/${this.canMax}`, disabled: this.st.can >= this.canMax, onClick: () => this.queue({ kind: 'fill', x, y }) },
-      { icon: 'fish', label: 'Рыбачить', sub: `⚡ ${ENERGY.fish}`, disabled: !b.n, onClick: () => this.queue({ kind: 'fish', x, y }) },
-    ] });
+    const { x, y } = c, b = this.bites(), st = this.st, bait = Fish.baitOf(st);
+    const items = [
+      { icon: 'water', label: 'Набрать воды', sub: `${st.can}/${this.canMax}`, disabled: st.can >= this.canMax, onClick: () => this.queue({ kind: 'fill', x, y }) },
+      { icon: bait || 'fish', label: 'Рыбачить', sub: `⚡ ${ENERGY.fish}${bait ? ` · ${BAITS[bait].short}` : ''}`, disabled: !b.n, onClick: () => this.queue({ kind: 'fish', x, y }) },
+    ];
+    if (this.baitKnown()) {
+      const sel = st.bait && BAITS[st.bait], n = sel ? Inv.count(st, st.bait) : 0;
+      items.push({ icon: sel ? st.bait : 'bait_worm', label: 'Наживка', sub: sel ? `${sel.name}: ${n} шт.` : 'без наживки', onClick: () => this.baitPopup(o, gx, gy, sx, sy) });
+    }
+    this.ui.popup(sx, sy, { title: OBJECTS[o.type].name, text: this.bitesText(b), items });
+  }
+
+  // Наживку уже видели: есть домик рыболова или наживка в рюкзаке (до этого строки «Наживка» у пруда нет)
+  baitKnown() { const st = this.st; return Builds.owned(st, FISHER) || Object.keys(BAITS).some((k) => Inv.count(st, k) > 0); }
+
+  // Выбор наживки: «Без наживки» и наживка из рюкзака; у каждой — кто на неё клюёт (крупная рыба со слабой
+  // удочкой срывается — «нужна удочка покрепче»). Выбрали — снова окно пруда.
+  baitPopup(o, gx, gy, sx, sy) {
+    const st = this.st, lv = Fish.rodLevel(st);
+    const who = (bait) => Fish.odds(st, bait, lv).filter((r) => r.p > 0).sort((a, b) => b.p - a.p)
+      .map((r) => FISH[r.fish].name.toLowerCase()).join(', ');
+    const pick = (bait) => () => { Fish.setBait(st, bait); this.sfx('tap'); this.changed(); this.pondPopup(o, gx, gy, sx, sy); };
+    const items = [{ icon: 'fish', label: `Без наживки${st.bait ? '' : ' ✓'}`, note: who(null), onClick: pick(null) }];
+    for (const b of Object.values(BAITS)) {
+      const n = Inv.count(st, b.key);
+      if (!n && st.bait !== b.key) continue;
+      const big = Fish.odds(st, b.key, lv).filter((r) => r.big).map((r) => FISH[r.fish].name.toLowerCase());
+      items.push({
+        icon: b.key, label: `${b.name}${st.bait === b.key ? ' ✓' : ''}`, sub: `${n} шт.`,
+        note: `${who(b.key) || 'никто'}${big.length ? `; ${big.join(', ')} — нужна удочка покрепче` : ''}`,
+        disabled: !n, onClick: pick(b.key),
+      });
+    }
+    const text = items.length > 1 ? 'Одна наживка — один заброс' : 'Наживку делают и продают в домике рыболова';
+    this.ui.popup(sx, sy, { title: 'Наживка', text, items, wide: true });
   }
 
   // Клёв (fishRules.js): сколько поклёвок в запасе и когда следующая
   bites() { return Fish.bitesView(this.st, this.quests.ctx().now); }
+
+  // Купить пачку наживки в лавке домика рыболова (окно домика, вкладка «Лавка»)
+  buyBait(id) {
+    const r = Fish.buyBait(this.st, id, Date.now());
+    if (r.why) return this.toast(r.why, 'warn');
+    this.quests.emit('buy', r.id, r.n);
+    const o = this.builds.find(FISHER);
+    if (o) this.dropFx({ wx: o.wx, wy: o.wy - 50 }, [{ id: r.id, n: r.n }]);
+    this.sfx('coin');
+    this.changed();
+  }
 
   bitesText(b = this.bites()) {
     const wait = b.next ? fmtTime((b.next - this.quests.ctx().now) / 1000) : '';
@@ -1324,9 +1368,25 @@ export class Farm {
       case 'fish': {
         if (!this.bites().n) { this.toast(this.bitesText(), 'warn'); return false; }
         if (!this.spend(ENERGY.fish)) return false;
+        const had = st.bait && BAITS[st.bait] && !Fish.baitOf(st); // выбранная наживка кончилась раньше
         const r = Fish.cast(st, this.quests.ctx());
         toWorld(a.x + 0.5, a.y + 0.5, tmp);
         this.burst(tmp.x, tmp.y - 2, '#bfe6ff', 10);
+        if (r.bait) {
+          this._baitOut = 0;
+          this.quests.emit('bait', r.bait);
+          if (!Inv.count(st, r.bait)) this.toast(`Наживка «${BAITS[r.bait].name}» кончилась: дальше ловим без неё`, 'warn');
+        } else if (had && !this._baitOut) { this._baitOut = 1; this.toast(`Наживки «${BAITS[st.bait].name}» в рюкзаке нет: ловим без неё`); }
+        if (r.big) {
+          // крупная рыба клюнула, но удочка слабая: подсказка, какая нужна
+          const f = FISH[r.big];
+          this.float(tmp.x, tmp.y - 20, `${f.name} ${f.fem ? 'сорвалась' : 'сорвался'}!`, r.big);
+          if (!this._bigTold || this._bigTold < this.time - 30) {
+            this._bigTold = this.time;
+            this.toast(`${f.name} ${f.fem ? 'сорвалась' : 'сорвался'}: нужна ${TR.toolName(st, 'rod', f.rod).toLowerCase()} (домик рыболова)`, 'warn');
+          }
+          this.sfx('splash'); this.changed(); return false;
+        }
         if (!r.fish) { this.float(tmp.x, tmp.y - 20, 'Сорвалась!', null); this.sfx('splash'); this.changed(); return false; }
         const fish = FISH[r.fish];
         const got = this.addItem(fish.key, 1);

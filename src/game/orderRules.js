@@ -9,7 +9,8 @@
 //   n — сколько заказов создано (id следующего), done — сколько сдано.
 
 import { ORDERS, CUSTOMERS } from './orderData.js';
-import { CROPS, ITEMS, GEM_SPEEDUP_SEC } from './data.js';
+import { CROPS, FISH, ITEMS, GEM_SPEEDUP_SEC } from './data.js';
+import { toolLevel } from './toolRules.js';
 import { count, takeItem } from './inventory.js';
 
 const EMPTY = { slots: [], n: 0, done: 0 };
@@ -28,6 +29,7 @@ export function goodsPool(st, ctx) {
   crops.forEach((c, i) => out.push({ id: c.key, w: i >= crops.length - G.crop.recent ? G.crop.recentW : G.crop.w, k: 1 }));
   const Q = st.quests;
   if (!G.fish.need || (Q && Q.done && Q.done[G.fish.need])) for (const id of G.fish.items) out.push({ id, w: G.fish.w, k: G.fish.k });
+  if (G.bigFish) for (const id of G.bigFish.items) if (FISH[id] && FISH[id].rod <= toolLevel(st, 'rod')) out.push({ id, w: G.bigFish.w, k: G.bigFish.k });
   for (const id of new Set(ctx.fruit || [])) out.push({ id, w: G.fruit.w, k: G.fruit.k });
   return out.filter((g) => ITEMS[g.id] && ITEMS[g.id].sell > 0);
 }

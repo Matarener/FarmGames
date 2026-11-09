@@ -10,7 +10,7 @@
 // step — шаг из HINT_STEPS, icon — иконка для кружка у края экрана, когда цель за экраном.
 
 import { N, CHUNK, CHUNKS, T } from './World.js';
-import { CROPS, OBJECTS, FLORA, HOUSE, WELL_COST, ITEMS, BED_ITEM, expansionCost, houseNeedChunks } from './data.js';
+import { CROPS, FISH, OBJECTS, FLORA, HOUSE, WELL_COST, ITEMS, BED_ITEM, expansionCost, houseNeedChunks } from './data.js';
 import * as Inv from './inventory.js';
 import * as Flora from './flora.js';
 import { cropFlags } from './beds.js';
@@ -19,8 +19,10 @@ import { BUILDINGS, RECIPES, bpId } from './buildData.js';
 import * as BR from './buildRules.js';
 import * as AR from './animalRules.js';
 import { ANIMALS } from './animalData.js';
-import { TOOL_UP, TOOL_AT } from './toolData.js';
+import { TOOL_UP } from './toolData.js';
 import * as TR from './toolRules.js';
+import { BAITS, FISHER } from './fishData.js';
+import * as Fish from './fishRules.js';
 
 // Первые задания сюжета учат играть: в них стрелка видна сама. Дальше она включается только по просьбе
 // игрока (переключатель в окне задания) и держится до смены задания.
@@ -29,7 +31,8 @@ export const HINT_AUTO = 5;
 export const hintAuto = (q) => !!q && q.kind === 'line' && q.line === 'story' && q.idx < HINT_AUTO;
 // Есть ли у задания подсказка на карте (у «Достигни 5 уровня» её нет)
 export const hasHint = (q) => !!q && !!q.goal && !!stepsFor(q.goal);
-const stepsFor = (g) => HINT_STEPS[g.ev === 'mine' && g.key === 'boulder' ? 'boulder' : g.ev === 'sell' && g.group === 'fish' ? 'sellFish' : g.ev || g.state];
+const stepsFor = (g) => HINT_STEPS[g.ev === 'mine' && g.key === 'boulder' ? 'boulder' : g.ev === 'sell' && g.group === 'fish' ? 'sellFish'
+  : g.ev === 'buy' && BAITS[g.key] ? 'buyBait' : g.ev || g.state];
 
 // Цель задания (goal.ev или goal.state) → шаги по порядку. Подсказка — первый шаг, для которого
 // нашлась цель: «собери урожай» — к созревшей грядке, нет такой — к грядке, которую надо полить, и т. д.
@@ -42,7 +45,10 @@ export const HINT_STEPS = {
   water: ['thirsty', 'empty', 'free', 'bed'],
   beds: ['bed'],
   bedsAll: ['buyBed'],
-  fish: ['pond'],
+  // рыба, которая клюёт только на наживку (лещ, щука, сом), и «порыбачь на червя»: сначала удочка и наживка
+  fish: ['bait', 'pond'],
+  bait: ['bait', 'pond'],
+  buyBait: ['bait'],
   chop: ['tree'],
   stump: ['stump', 'tree'],
   mine: ['rock'],
@@ -65,6 +71,7 @@ export const HINT_STEPS = {
   well: ['well'],
   house: ['house'],
   tool: ['tool'],
+  baitShop: ['baitShop'],
 };
 
 // Здание, где делают товар item (нет здания — сначала построить его; убрано в рюкзак — к рюкзаку)
@@ -101,7 +108,7 @@ export function questHint(q, done, s, prev) {
   if (done) return { step: 'quest', kind: 'ui', ui: 'quest' };
   const g = q.goal, steps = g && stepsFor(g);
   if (!steps) return null;
-  const c = { st: s.st, world: s.world, beds: s.beds, now: s.now, key: g.key || null, group: g.group || null, prev: prev || null, cache: { px: s.px, py: s.py } };
+  const c = { st: s.st, world: s.world, beds: s.beds, now: s.now, ev: g.ev || null, key: g.key || null, group: g.group || null, prev: prev || null, cache: { px: s.px, py: s.py } };
   const h = first(steps, c, 0);
   if (h && h.step === 'bed' && h.kind === 'tile' && s.mode !== 'bed') return { step: 'bed', kind: 'ui', ui: 'beds' };
   if (h && h.step === 'sow' && s.mode !== 'sow') return { step: 'sow', kind: 'ui', ui: 'bag' };
@@ -323,12 +330,12 @@ const STEP = {
   },
   // сделать товар (ключ — товар): к зданию, где его делают
   workshop: (c, depth) => madeAt(c, c.key, depth),
-  // улучшить инструмент (ключ — инструмент и уровень: axe2): нет кузницы — построить её; на наковальне что-то
-  // куётся — ждём; не хватает материалов — где их добыть; всё есть — к кузнице (вкладка «Инструменты»)
+  // улучшить инструмент (ключ — инструмент и уровень: axe2, rod3): нет здания (кузница, домик рыболова) — построить
+  // его; там что-то улучшается — ждём; не хватает материалов — где их добыть; всё есть — к зданию (вкладка улучшения)
   tool: (c, depth) => {
-    const m = /^([a-z]+)(\d)$/.exec(c.key || ''), t = m && m[1];
+    const m = /^([a-z]+)(\d)$/.exec(c.key || ''), t = m && m[1], at = t && TR.atOf(t);
     if (!t || !TOOL_UP[t] || TR.toolLevel(c.st, t) >= +m[2]) return null;
-    if (!BR.isBuilt(c.st, TOOL_AT, c.now)) return BR.owned(c.st, TOOL_AT) ? WAIT : STEP.building({ ...c, key: TOOL_AT }, depth + 1);
+    if (!BR.isBuilt(c.st, at, c.now)) return BR.owned(c.st, at) ? WAIT : STEP.building({ ...c, key: at }, depth + 1);
     const why = TR.upBlock(c.st, t, c.now);
     if (why && why.busy) return WAIT;
     if (why && why.lack) {
@@ -336,9 +343,38 @@ const STEP = {
       return need(c, { [lack.id]: lack.need }, depth) || madeAt(c, lack.id, depth + 1);
     }
     if (why) return null;
-    const o = c.world.objects.find((x) => x && x.type === TOOL_AT);
+    const o = c.world.objects.find((x) => x && x.type === at);
     if (!o) return { step: 'tool', kind: 'ui', ui: 'bag' };
     return { step: 'tool', kind: 'obj', obj: o, x: o.gx, y: o.gy, icon: ITEMS[TOOL_UP[t].item].icon };
+  },
+
+  // Наживка для задания. Ключ — наживка («порыбачь на червя», «купи червяков») или рыба, которая без наживки
+  // не клюёт («поймай леща»): удочка её не удержит — сначала улучшить удочку; нужной наживки нет — где её взять
+  // (лавка домика рыболова или его очередь); есть — дальше (к пруду; наживку игрок выбирает в окне пруда).
+  // У «купи червяков» (buy) к пруду не идём: ведём в лавку, даже если черви уже есть.
+  bait: (c, depth) => {
+    const st = c.st, k = c.key, f = FISH[k];
+    let list;
+    if (BAITS[k]) list = [k];
+    else if (f && !f.chance) {
+      if (f.rod > Fish.rodLevel(st)) return STEP.tool({ ...c, key: 'rod' + f.rod }, depth) || WAIT;
+      list = Object.values(BAITS).filter((b) => b.pool[k]).map((b) => b.key);
+    } else return null;
+    if (c.ev !== 'buy' && list.some((b) => Inv.count(st, b) > 0)) return null;
+    for (const b of list) {
+      const offer = Fish.shopOffer(b);
+      if (offer && st.level >= offer.level) return STEP.baitShop({ ...c, key: b }, depth + 1);
+      const r = RECIPES[b];
+      if (r && st.level >= r.level) return madeAt(c, b, depth);
+    }
+    return null;
+  },
+  // лавка домика рыболова (ключ — наживка): нет домика — построить его
+  baitShop: (c, depth) => {
+    if (!BR.isBuilt(c.st, FISHER, c.now)) return BR.owned(c.st, FISHER) ? WAIT : STEP.building({ ...c, key: FISHER }, depth + 1);
+    const o = c.world.objects.find((x) => x && x.type === FISHER);
+    if (!o) return { step: 'baitShop', kind: 'ui', ui: 'bag' };
+    return { step: 'baitShop', kind: 'obj', obj: o, x: o.gx, y: o.gy, icon: c.key && BAITS[c.key] ? c.key : 'bait_worm' };
   },
 
   // животное с готовым продуктом (ключ задания — вид или продукт)

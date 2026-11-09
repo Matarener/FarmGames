@@ -135,12 +135,18 @@ function toolSprites() {
 
 // Удочка: рукоять в ладони, кончик — по +y на 26 единиц (там крепится леска)
 export const ROD_TIP = 26;
-function rodSprite() {
+// Удочка: shaft — цвет удилища, reel — цвет катушки. Улучшенные в домике рыболова (rod2…rod4) — своего цвета:
+// бамбуковая, с катушкой, мастерская (Player.toolSkin)
+const ROD_SHAFT = ['#c98b4a', '#d9c25e', '#6b8fb3', '#e0b040'];
+function rodSprite(lv = 1) {
+  const shaft = ROD_SHAFT[lv - 1], reel = lv > 1 ? TOOL_TINT[lv - 1] : '#b8c0c6';
   return makeSprite(10, 36, 5, 6, (g) => {
     g.strokeStyle = OUT; g.lineWidth = 2.6; g.beginPath(); g.moveTo(0, -4); g.lineTo(0, ROD_TIP); g.stroke();
-    g.strokeStyle = '#c98b4a'; g.lineWidth = 1.3; g.beginPath(); g.moveTo(0, -3.4); g.lineTo(0, ROD_TIP - 0.6); g.stroke();
+    g.strokeStyle = shaft; g.lineWidth = 1.3; g.beginPath(); g.moveTo(0, -3.4); g.lineTo(0, ROD_TIP - 0.6); g.stroke();
+    // бамбук — с коленцами
+    if (lv === 2) { g.fillStyle = OUT; for (const y of [6, 12, 18]) g.fillRect(-1.3, y, 2.6, 0.7); }
     g.fillStyle = OUT; g.fillRect(-1.9, -4.6, 3.8, 7.4); g.fillStyle = '#7a4b28'; g.fillRect(-1.2, -4, 2.4, 6.2);
-    g.fillStyle = OUT; ell(g, -2.6, 4.6, 2.2, 2.2); g.fill(); g.fillStyle = '#b8c0c6'; ell(g, -2.6, 4.6, 1.4, 1.4); g.fill();
+    g.fillStyle = OUT; ell(g, -2.6, 4.6, 2.2, 2.2); g.fill(); g.fillStyle = reel; ell(g, -2.6, 4.6, 1.4, 1.4); g.fill();
     g.fillStyle = OUT; ell(g, 0, ROD_TIP, 1.1, 1.1); g.fill();
   });
 }
@@ -182,6 +188,7 @@ export function makeGhostData() {
     tools['axe' + lv] = att(T['axe' + lv], 0, HY);
     tools['pickaxe' + lv] = att(T['pickaxe' + lv], 0, HY);
     tools['can' + lv] = att(T['can' + lv], 0, HY + 0.2);
+    tools['rod' + lv] = att(rodSprite(lv), 0, HY);
   }
   const hand = handSprite(C.body), handFar = handSprite(C.shade), hat = hatSprite();
   const skins = {

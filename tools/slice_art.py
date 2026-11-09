@@ -43,6 +43,8 @@ SINGLE = {
     'house_up_2': -132, 'house_up_3': -132, 'house_up_4': -132, 'house_up_5': -132,
     # кормоцех (корм для животных, 2026-11-09) и его стройка
     'building_feedmill': -132, 'site_feedmill': -132,
+    # домик рыболова (удочка, наживка, лавка наживки, 2026-11-09) и его стройка
+    'building_fisher': -132, 'site_fisher': -132,
 }
 SHEETS.update({name: [(name, w)] for name, w in SINGLE.items()})
 # Постройки без «пятачка» травы (поливалки): одна на картинку, масштаб — по высоте в мире; опора — середина
@@ -198,6 +200,9 @@ ICON_SHEETS = {
     # животные (2026-11-09): корма Кормоцеха и что дают животные (src/game/animalData.js, buildData.js)
     'ui_feed': ['feed_grain', 'feed_hay', 'feed_mash', 'feed_rabbit'],
     'ui_animal': ['egg', 'goose_feather', 'truffle', 'wool', 'angora'],
+    # рыбалка (2026-11-09): крупная рыба и наживка (src/game/fishData.js; прозрачный фон)
+    'ui_fish2': ['fish_bream', 'fish_pike', 'fish_catfish'],
+    'ui_bait': ['bait_worm', 'bait_dough', 'bait_jig', 'bait_live', 'bait_crawler'],
 }
 ICON_PX = 128
 # Иконки не в квадрате 128, а по контуру картинки (без полей), длинная сторона — столько пикселей:

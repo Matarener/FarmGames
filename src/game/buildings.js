@@ -46,7 +46,7 @@ export class Buildings {
         this.f.float(o.wx, o.wy - 110, `${b.short || b.name}: готово!`, null);
         this.f.player.celebrate();
       }
-      // кухня, мастерская, кузница — «она», кормоцех — «он» (b.he)
+      // кухня, мастерская, кузница — «она», кормоцех и домик рыболова — «он» (b.he)
       this.f.toast(`${b.name} ${b.he ? 'построен' : 'построена'}! Нажмите на ${b.he ? 'него' : 'неё'}, чтобы ${b.verb.toLowerCase()} что-нибудь`, 'good');
       this.f.sfx('unlock');
       this.f.addXp(xp);
@@ -79,9 +79,9 @@ export class Buildings {
       return;
     }
     if (R.readyCount(this.st, k, now)) return this.collect(k);
-    // стрелка задания вела к кузнице улучшить инструмент — окно сразу на вкладке «Инструменты»
+    // стрелка задания вела улучшить инструмент или купить наживку — окно сразу на этой вкладке
     const h = this.f.hint;
-    this.f.ui.craftPanel(this.f, k, h && h.step === 'tool' ? 'tools' : null);
+    this.f.ui.craftPanel(this.f, k, h && h.step === 'tool' ? 'tools' : h && h.step === 'baitShop' ? 'shop' : null);
   }
 
   // Чертёж поставили на карту (Mover → Farm.placedFx): стройка началась. → надпись для плашки перестановки
