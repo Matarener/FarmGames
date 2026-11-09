@@ -1,0 +1,5 @@
+﻿tree_bird_cherry: tree_bird_cherry__1.png — OK: hanging clusters of black berries, 4 tufts, clean key (session 01a1bf6c)
+tree_plum: tree_plum__1.png — OK: oval purple plums, 3 tufts, clean key (session 01a1bf73)
+tree_pear: tree_pear__1.png — OK: pear-shaped yellow-green pears with a blush, narrow oval crown, 4 tufts (session 01a1bf74)
+tree_apricot: tree_apricot__1.png — OK: round orange apricots; the crown looks very much like the reference apple tree (session 01a1bf75)
+tree_persimmon: tree_persimmon__1.png — OK: flattened orange fruits with green caps, grey trunk (session 01a1bf76)
