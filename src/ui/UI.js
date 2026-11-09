@@ -1576,8 +1576,13 @@ export class UI {
       b.disabled = st[o.cur || 'coins'] < o.price; b.onclick = () => f.buy(o, 1);
       acts.appendChild(b);
     }
-    if (Inv.count(st, it.key)) acts.appendChild(this.buildBtn(f, it));
+    if (Inv.count(st, it.key)) { this.ownedNote(f, box, it); acts.appendChild(this.buildBtn(f, it)); }
     if (acts.children.length) box.appendChild(acts);
+  }
+
+  // Чертёж здания, которое уже есть на ферме (лишний выдали в режиме тестера): почему «Построить» серая
+  ownedNote(f, box, it) {
+    if (BR.owned(f.st, it.blueprint)) box.appendChild(h('div', 'ii-note', `${BR.buildBlock(f.st, it.blueprint)}: второе такое не построить.`));
   }
 
   // «Построить» у чертежа: хватает материалов — окно закрывается, выбираем место для стройки
@@ -1786,6 +1791,7 @@ export class UI {
     // пруды, украшения прудов и постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
     if (it.blueprint && n > 0) {
       box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(BUILDINGS[it.blueprint].cost, f)));
+      this.ownedNote(f, box, it);
       acts.appendChild(this.buildBtn(f, it));
     } else if (Mover.placeable(it) && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
