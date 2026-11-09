@@ -1,0 +1,415 @@
+[
+ {
+  "name": "tree_oak",
+  "refs": [
+   "art-candidates/nobase/refs/tree_oak.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Oak tree: thick gnarled brown trunk, wide round crown of green oak leaves."
+ },
+ {
+  "name": "tree_oak_young",
+  "refs": [
+   "art-candidates/nobase/refs/tree_oak_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young oak: brown trunk with a rounded crown of green lobed leaves."
+ },
+ {
+  "name": "tree_apple",
+  "refs": [
+   "art-candidates/nobase/refs/tree_apple.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Apple tree: brown trunk, round green crown with shiny red apples."
+ },
+ {
+  "name": "tree_apple_bare",
+  "refs": [
+   "art-candidates/nobase/refs/tree_apple_bare.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Apple tree without fruit: brown trunk, round green crown of leaves, no apples."
+ },
+ {
+  "name": "tree_apple_young",
+  "refs": [
+   "art-candidates/nobase/refs/tree_apple_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young apple tree: thin brown trunk with a few branches and a small airy crown of green leaves."
+ },
+ {
+  "name": "tree_birch",
+  "refs": [
+   "art-candidates/nobase/refs/tree_birch.jpg"
+  ],
+  "size": "1024x1536",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Birch tree: tall white trunk with black marks, thin branches, airy crown of light yellow-green leaves.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "tree_birch_young",
+  "refs": [
+   "art-candidates/nobase/refs/tree_birch_young.jpg"
+  ],
+  "size": "1024x1536",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young birch: thin white trunk with black marks and sparse light yellow-green leaves.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "tree_cherry",
+  "refs": [
+   "art-candidates/nobase/refs/tree_cherry.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Cherry tree: thick brown trunk, round green crown with many dark red cherries hanging in pairs."
+ },
+ {
+  "name": "tree_cherry_bare",
+  "refs": [
+   "art-candidates/nobase/refs/tree_cherry_bare.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Blossoming cherry tree: brown trunk, green crown with white flowers and pink buds, no berries.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "tree_cherry_young",
+  "refs": [
+   "art-candidates/nobase/refs/tree_cherry_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young cherry tree: thin brown trunk, small green crown with a few white flowers.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "tree_linden",
+  "refs": [
+   "art-candidates/nobase/refs/tree_linden.jpg"
+  ],
+  "size": "1024x1536",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Linden tree: straight grey-brown trunk, tall oval crown of heart-shaped light green leaves with pale yellow blossom clusters."
+ },
+ {
+  "name": "tree_linden_young",
+  "refs": [
+   "art-candidates/nobase/refs/tree_linden_young.jpg"
+  ],
+  "size": "1024x1536",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young linden: slim trunk and a small rounded crown of big heart-shaped light green leaves."
+ },
+ {
+  "name": "tree_maple",
+  "refs": [
+   "art-candidates/nobase/refs/tree_maple.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Maple tree: brown trunk, crown of bright orange and red maple leaves."
+ },
+ {
+  "name": "tree_maple_young",
+  "refs": [
+   "art-candidates/nobase/refs/tree_maple_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young maple: thin brown trunk with a few branches of orange and red maple leaves."
+ },
+ {
+  "name": "tree_pine",
+  "refs": [
+   "art-candidates/nobase/refs/tree_pine.jpg"
+  ],
+  "size": "1024x1536",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Spruce tree: tall cone of layered green needle branches, short brown trunk."
+ },
+ {
+  "name": "tree_pine_young",
+  "refs": [
+   "art-candidates/nobase/refs/tree_pine_young.jpg"
+  ],
+  "size": "1024x1536",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young spruce: small cone of layered green needle branches, short brown trunk."
+ },
+ {
+  "name": "tree_sakura",
+  "refs": [
+   "art-candidates/nobase/refs/tree_sakura.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Sakura tree: dark curved trunk, lush crown of pink cherry blossoms.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "tree_sakura_bare",
+  "refs": [
+   "art-candidates/nobase/refs/tree_sakura_bare.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Sakura tree after blossoming: dark curved trunk, lush crown of fresh green leaves, no flowers.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "tree_sakura_young",
+  "refs": [
+   "art-candidates/nobase/refs/tree_sakura_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact tree, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the tree completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the tree: no ground, no soil, no lawn, no flowers, no stones, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young sakura: thin dark curved trunk with a few branches of pink blossoms.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "bush_blueberry",
+  "refs": [
+   "art-candidates/nobase/refs/bush_blueberry.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Round green blueberry bush with many ripe dark blue berries."
+ },
+ {
+  "name": "bush_blueberry_bare",
+  "refs": [
+   "art-candidates/nobase/refs/bush_blueberry_bare.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Round green blueberry bush, leaves only, no berries."
+ },
+ {
+  "name": "bush_blueberry_young",
+  "refs": [
+   "art-candidates/nobase/refs/bush_blueberry_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Small young blueberry bush: a few stems with big green leaves and small unripe green berries."
+ },
+ {
+  "name": "bush_hydrangea",
+  "refs": [
+   "art-candidates/nobase/refs/bush_hydrangea.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Hydrangea bush with big round clusters of blue flowers among large green leaves."
+ },
+ {
+  "name": "bush_hydrangea_bare",
+  "refs": [
+   "art-candidates/nobase/refs/bush_hydrangea_bare.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Hydrangea bush of large green leaves, no flowers."
+ },
+ {
+  "name": "bush_hydrangea_young",
+  "refs": [
+   "art-candidates/nobase/refs/bush_hydrangea_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young hydrangea: one stem with big green leaves and a single blue flower cluster on top."
+ },
+ {
+  "name": "bush_lavender",
+  "refs": [
+   "art-candidates/nobase/refs/bush_lavender.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Lavender bush: many thin grey-green stems with tall purple flower spikes.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "bush_lavender_bare",
+  "refs": [
+   "art-candidates/nobase/refs/bush_lavender_bare.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Lavender bush: many thin grey-green stems and narrow leaves, no flowers, only tiny green buds."
+ },
+ {
+  "name": "bush_lavender_young",
+  "refs": [
+   "art-candidates/nobase/refs/bush_lavender_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young lavender: a small clump of grey-green leaves with a few purple flower spikes.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "bush_raspberry",
+  "refs": [
+   "art-candidates/nobase/refs/bush_raspberry.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Leafy raspberry bush with ripe red raspberries on thin canes."
+ },
+ {
+  "name": "bush_raspberry_bare",
+  "refs": [
+   "art-candidates/nobase/refs/bush_raspberry_bare.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Leafy raspberry bush, green leaves on thin reddish canes, no berries."
+ },
+ {
+  "name": "bush_raspberry_young",
+  "refs": [
+   "art-candidates/nobase/refs/bush_raspberry_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young raspberry: a few thin reddish canes with green serrated leaves."
+ },
+ {
+  "name": "bush_rose",
+  "refs": [
+   "art-candidates/nobase/refs/bush_rose.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Rose bush with big pink roses and rosebuds among green leaves.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "bush_rose_bare",
+  "refs": [
+   "art-candidates/nobase/refs/bush_rose_bare.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Rose bush of dense green leaves, no flowers."
+ },
+ {
+  "name": "bush_rose_young",
+  "refs": [
+   "art-candidates/nobase/refs/bush_rose_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young rose: one woody stem with green leaves and a single pink rosebud on top.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "bush_rosehip",
+  "refs": [
+   "art-candidates/nobase/refs/bush_rosehip.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Wild rose bush with pink five-petal flowers and buds among green leaves.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "bush_rosehip_bare",
+  "refs": [
+   "art-candidates/nobase/refs/bush_rosehip_bare.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Wild rose bush of dense small green leaves, no flowers."
+ },
+ {
+  "name": "bush_rosehip_young",
+  "refs": [
+   "art-candidates/nobase/refs/bush_rosehip_young.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact bush, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the bush completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the bush: no ground, no soil, no lawn, no flowers, no stones, no shadow. The stems and lower leaves reach down to the ground line, and 3 to 5 small soft grass tufts grow right at the foot of the bush, between the stems. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the bush can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Young wild rose: a few woody stems with green leaves, one big pink five-petal flower and a few buds.",
+  "key": "#00FFFF"
+ },
+ {
+  "name": "stump_oak",
+  "refs": [
+   "art-candidates/nobase/refs/stump_oak.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact stump, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the stump completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Oak stump: wide stump with brown bark, a light cut top showing tree rings, thick spreading roots, a few small oak-leaf sprouts on its sides."
+ },
+ {
+  "name": "stump_birch",
+  "refs": [
+   "art-candidates/nobase/refs/stump_birch.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact stump, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the stump completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Birch stump: short white bark stump with black marks and a light cut top with rings, a few small green leaves on its sides."
+ },
+ {
+  "name": "stump_pine",
+  "refs": [
+   "art-candidates/nobase/refs/stump_pine.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact stump, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the stump completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Spruce stump: dark brown scaly bark, light cut top with rings, spreading roots."
+ },
+ {
+  "name": "stump_oak_moss",
+  "refs": [
+   "art-candidates/nobase/refs/stump_oak_moss.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact stump, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the stump completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Old oak stump covered with thick green moss, hollow broken top, a small red mushroom growing on its side."
+ },
+ {
+  "name": "stump_apple",
+  "refs": [
+   "art-candidates/nobase/refs/stump_apple.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact stump, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the stump completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Apple tree stump: grey-brown bark with a knot, light cut top with rings, spreading roots."
+ },
+ {
+  "name": "stump_sakura",
+  "refs": [
+   "art-candidates/nobase/refs/stump_sakura.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact stump, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the stump completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Sakura stump: dark reddish-brown bark with horizontal lines, light cut top with rings, spreading roots."
+ },
+ {
+  "name": "stump_cherry",
+  "refs": [
+   "art-candidates/nobase/refs/stump_cherry.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact stump, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the stump completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Cherry stump: brown bark, light cut top with rings, spreading roots, a small twig with white blossoms growing from its side."
+ },
+ {
+  "name": "stump_maple",
+  "refs": [
+   "art-candidates/nobase/refs/stump_maple.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact stump, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the stump completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Maple stump: reddish-brown bark, light cut top with rings, spreading roots."
+ },
+ {
+  "name": "stump_linden",
+  "refs": [
+   "art-candidates/nobase/refs/stump_linden.jpg"
+  ],
+  "size": "1024x1024",
+  "prompt": "Edit the reference image: keep this exact stump, change only what is under it. Keep everything else exactly as in the reference: same shape, silhouette, proportions, colors, leaves, lighting from the top-left and isometric viewing angle, same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove the grass island, the soil block and any ground patch under the stump completely, together with all the flowers, stones, petals and fallen leaves lying on that ground. Nothing must remain under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it. Linden stump: grey-brown ridged bark, light cut top with rings, spreading roots, a few heart-shaped green leaves sprouting at its sides."
+ },
+ {
+  "name": "grass_tall_0",
+  "refs": [
+   "art-candidates/nobase/refs/bush_lavender_bare.jpg"
+  ],
+  "size": "1536x1024",
+  "prompt": "Draw a NEW object in the same art style as the reference (do not copy the reference plant): a clump of tall wild meadow grass, seen from the same isometric angle, cozy hand-painted game art with smooth clean dark-brown outlines around the clump and the blade tips, soft painted shading, light from the top-left, crisp details, no pixel blocks, no blur. Many long thin grass blades of different heights, curving and slightly bent by the wind, in the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, a bit deeper and more saturated than the lawn so the clump stands out on it. The blades grow from one spot and the clump ends at the ground line; no ground, no soil, no base, no lawn patch, no stones, no shadow. One clump only, centered, wider than tall, with an empty margin around it. A medium, rounded clump."
+ },
+ {
+  "name": "grass_tall_1",
+  "refs": [
+   "art-candidates/nobase/refs/bush_lavender_bare.jpg"
+  ],
+  "size": "1536x1024",
+  "prompt": "Draw a NEW object in the same art style as the reference (do not copy the reference plant): a clump of tall wild meadow grass, seen from the same isometric angle, cozy hand-painted game art with smooth clean dark-brown outlines around the clump and the blade tips, soft painted shading, light from the top-left, crisp details, no pixel blocks, no blur. Many long thin grass blades of different heights, curving and slightly bent by the wind, in the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, a bit deeper and more saturated than the lawn so the clump stands out on it. The blades grow from one spot and the clump ends at the ground line; no ground, no soil, no base, no lawn patch, no stones, no shadow. One clump only, centered, wider than tall, with an empty margin around it. A denser and taller clump with three or four dry golden-yellow blades among the green ones."
+ },
+ {
+  "name": "grass_tall_2",
+  "refs": [
+   "art-candidates/nobase/refs/bush_lavender_bare.jpg"
+  ],
+  "size": "1536x1024",
+  "prompt": "Draw a NEW object in the same art style as the reference (do not copy the reference plant): a clump of tall wild meadow grass, seen from the same isometric angle, cozy hand-painted game art with smooth clean dark-brown outlines around the clump and the blade tips, soft painted shading, light from the top-left, crisp details, no pixel blocks, no blur. Many long thin grass blades of different heights, curving and slightly bent by the wind, in the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, a bit deeper and more saturated than the lawn so the clump stands out on it. The blades grow from one spot and the clump ends at the ground line; no ground, no soil, no base, no lawn patch, no stones, no shadow. One clump only, centered, wider than tall, with an empty margin around it. A medium clump with two or three tiny white and yellow wildflowers on thin stems among the blades."
+ },
+ {
+  "name": "grass_tall_3",
+  "refs": [
+   "art-candidates/nobase/refs/bush_lavender_bare.jpg"
+  ],
+  "size": "1536x1024",
+  "prompt": "Draw a NEW object in the same art style as the reference (do not copy the reference plant): a clump of tall wild meadow grass, seen from the same isometric angle, cozy hand-painted game art with smooth clean dark-brown outlines around the clump and the blade tips, soft painted shading, light from the top-left, crisp details, no pixel blocks, no blur. Many long thin grass blades of different heights, curving and slightly bent by the wind, in the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, a bit deeper and more saturated than the lawn so the clump stands out on it. The blades grow from one spot and the clump ends at the ground line; no ground, no soil, no base, no lawn patch, no stones, no shadow. One clump only, centered, wider than tall, with an empty margin around it. A small, low and wide clump of shorter blades."
+ }
+]
