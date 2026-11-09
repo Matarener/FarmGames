@@ -1,4 +1,6 @@
-// Игровые таблицы. Все числа баланса — здесь.
+// Игровые таблицы. Все числа баланса — здесь (здания с крафтом — в buildData.js).
+
+import { BUILDINGS, CRAFT_GOODS, bpId, bldId } from './buildData.js';
 
 export const CROPS = {
   carrot:     { name: 'Морковь',   level: 1,  seed: 2,   time: 120,   sell: 5,   xp: 1,  food: 3 },
@@ -51,6 +53,12 @@ export const FLORA = {
   apple:     { name: 'Яблоня',    kind: 'tree', fruit: 'apple',        n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 18, ownSell: 54, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
   pine:      { name: 'Ель',       kind: 'tree', fruit: 'pinecone',     n: [1, 3], wood: [3, 5], hp: 4, xp: 3, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
   linden:    { name: 'Липа',      kind: 'tree', fruit: 'linden_blossom', n: [2, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 8, ownSell: 24, grow: 3 * 3600 },
+  // плодовые деревья из магазина (2026-11-09): чем выше уровень, тем дороже плоды, дольше рост и реже урожай
+  bird_cherry: { name: 'Черёмуха', kind: 'tree', fruit: 'bird_cherry', n: [3, 5], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 22, ownSell: 66, grow: 4 * 3600, pick: true, regrow: 2.5 * 3600 },
+  plum:      { name: 'Слива',     kind: 'tree', fruit: 'plum',         n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 27, ownSell: 81, grow: 5 * 3600, pick: true, regrow: 3 * 3600 },
+  pear:      { name: 'Груша',     kind: 'tree', fruit: 'pear',         n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 32, ownSell: 96, grow: 5 * 3600, pick: true, regrow: 3 * 3600 },
+  apricot:   { name: 'Абрикос',   kind: 'tree', fruit: 'apricot',      n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 42, ownSell: 126, grow: 6 * 3600, pick: true, regrow: 4 * 3600 },
+  persimmon: { name: 'Хурма',     kind: 'tree', fruit: 'persimmon',    n: [2, 3], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 55, ownSell: 165, grow: 6 * 3600, pick: true, regrow: 5 * 3600 },
   blueberry: { name: 'Голубика',  kind: 'bush', fruit: 'blueberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 9, ownSell: 27, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
   raspberry: { name: 'Малина',    kind: 'bush', fruit: 'raspberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 8, ownSell: 24, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
   rosehip:   { name: 'Шиповник',  kind: 'bush', fruit: 'rosehip',      n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 5, ownSell: 15, grow: 3600,     pick: true, regrow: 2 * 3600 },
@@ -83,6 +91,11 @@ export const FLORA_GOODS = {
   apple:        { name: 'Яблоко',          sell: 5, food: 4, color: '#e2392f', desc: 'Сочное яблоко. Можно съесть или продать.' },
   pinecone:     { name: 'Шишка',           sell: 2,          color: '#9a6538', desc: 'Еловая шишка. Пригодится для поделок.' },
   linden_blossom: { name: 'Липовый цвет',  sell: 4,          color: '#efe08a', desc: 'Душистые соцветия липы. Пригодятся для чая.' },
+  bird_cherry:  { name: 'Черёмуха',        sell: 4, food: 1, color: '#2e2333', desc: 'Терпкие ягоды черёмухи. Можно съесть или продать.' },
+  plum:         { name: 'Слива',           sell: 7, food: 3, color: '#5b3f8f', desc: 'Спелая слива. Можно съесть или продать.' },
+  pear:         { name: 'Груша',           sell: 8, food: 4, color: '#c9cf4a', desc: 'Сочная груша. Можно съесть или продать.' },
+  apricot:      { name: 'Абрикос',         sell: 11, food: 5, color: '#f29a3a', desc: 'Сладкий абрикос. Можно съесть или продать.' },
+  persimmon:    { name: 'Хурма',           sell: 18, food: 7, color: '#ec6a1c', desc: 'Медовая хурма. Можно съесть или продать.' },
   blueberry:    { name: 'Голубика',        sell: 3, food: 2, color: '#3f5fc8', desc: 'Горсть голубики. Можно съесть или продать.' },
   raspberry:    { name: 'Малина',          sell: 3, food: 2, color: '#e0335a', desc: 'Сладкая малина. Можно съесть или продать.' },
   rosehip:      { name: 'Шиповник',        sell: 3, food: 1, color: '#e2552f', desc: 'Плоды шиповника. Полезные, но кислые.' },
@@ -112,6 +125,9 @@ export const OBJECTS = {
 for (const f of Object.values(FLORA)) {
   OBJECTS[f.key] = { name: f.name, hp: f.hp, action: 'chop', drops: { wood: f.wood }, xp: f.xp, stump: f.kind === 'tree', flora: f.key, bush: f.kind === 'bush' };
 }
+// Здания с крафтом (buildData.js): свои постройки игрока, ставятся из рюкзака; item — предмет, которым
+// здание убирается в рюкзак
+for (const b of Object.values(BUILDINGS)) OBJECTS[b.key] = { name: b.name, static: true, w: b.w, h: b.h, building: b.key, item: bldId(b.key) };
 
 // ---------------- Пруды ----------------
 // Пруд — один объект на карте и одна картинка на весь пруд (assets/art/pond_<вид>.webp, tools/pond_art.py),
@@ -190,13 +206,15 @@ export const FOG = { width: 4, forest: [0.6, 0.55, 0.45, 0], color: 0xe4ecee };
 export const ENERGY = { chop: 1, mine: 1, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1, pick: 1, sow: 0, mow: 0 };
 export const ENERGY_REGEN_SEC = 120;
 
+// Уровни дома: energy — запас энергии, can — поливов в лейке, chunks — сколько участков можно открыть,
+// cost — цена улучшения до этого уровня, time — сколько секунд дом стоит в лесах (houseRules.js)
 export const HOUSE = [
   null,
   { energy: 30, can: 3, chunks: 3 },
-  { energy: 40, can: 4, chunks: 6,  cost: { wood: 20, stone: 10, coins: 50 } },
-  { energy: 55, can: 5, chunks: 10, cost: { wood: 60, stone: 40, coins: 300 } },
-  { energy: 75, can: 6, chunks: 16, cost: { wood: 150, stone: 80, ore: 20, coins: 1500 } },
-  { energy: 100, can: 8, chunks: 25, cost: { wood: 300, stone: 120, ore: 25, coins: 6000 } },
+  { energy: 40, can: 4, chunks: 6,  cost: { wood: 20, stone: 10, coins: 50 }, time: 3 * 60 },
+  { energy: 55, can: 5, chunks: 10, cost: { wood: 60, stone: 40, coins: 300 }, time: 20 * 60 },
+  { energy: 75, can: 6, chunks: 16, cost: { wood: 150, stone: 80, ore: 20, coins: 1500 }, time: 60 * 60 },
+  { energy: 100, can: 8, chunks: 25, cost: { wood: 300, stone: 120, ore: 25, coins: 6000 }, time: 3 * 60 * 60 },
 ];
 
 // Склад не ограничен: ресурсы не пропадают
@@ -265,7 +283,7 @@ for (const c of Object.values(CROPS)) ITEMS[seedId(c.key)] = {
   key: seedId(c.key), name: 'Семена: ' + c.name.toLowerCase(), icon: c.key, badge: 'seed', tabs: ['plants'], seedOf: c.key,
   desc: `Посадите на пустую грядку. Растёт ${fmtMin(c.time)}, доступно с ${c.level} уровня.`,
 };
-for (const [k, r] of Object.entries(RESOURCES)) ITEMS[k] = { key: k, name: r.name, icon: k, tabs: ['res'], desc: 'Нужно для улучшения дома, колодца и новых участков.' };
+for (const [k, r] of Object.entries(RESOURCES)) ITEMS[k] = { key: k, name: r.name, icon: k, tabs: ['res'], desc: 'Нужно для улучшения дома, построек и новых участков.' };
 for (const g of Object.values(FLORA_GOODS)) ITEMS[g.key] = {
   key: g.key, name: g.name, icon: g.key, sell: g.sell, food: g.food,
   tabs: g.food ? ['food', 'plants'] : ['res'], desc: g.desc,
@@ -332,6 +350,23 @@ for (const [t, d] of Object.entries(POND_DECOR)) ITEMS[pondDecorId(t)] = {
   desc: `${d.desc} Ставится только на воду пруда: нажмите «Поставить» и выберите клетку пруда.`,
 };
 for (const [k, f] of Object.entries(SHOP_FOOD)) ITEMS[k] = { key: k, name: f.name, icon: k, food: f.food, tabs: ['food'], desc: f.desc + ' Восстанавливает энергию.' };
+// Товары зданий с крафтом, чертежи и убранные в рюкзак здания (buildData.js)
+for (const [k, g] of Object.entries(CRAFT_GOODS)) ITEMS[k] = {
+  key: k, name: g.name, icon: k, sell: g.sell, food: g.food, tabs: [g.tab], craft: true,
+  desc: g.desc + (g.food ? ' Восстанавливает энергию.' : ''),
+};
+// иконки чертежа и здания делает artSprites из картинки здания (bp_ — со значком чертежа)
+for (const b of Object.values(BUILDINGS)) {
+  ITEMS[bpId(b.key)] = {
+    key: bpId(b.key), name: 'Чертёж: ' + (b.short || b.name).toLowerCase(), icon: bldId(b.key), badge: 'blueprint', tabs: ['build'],
+    place: 'obj', objOf: b.key, blueprint: b.key, placeName: `Стройка: ${(b.short || b.name).toLowerCase()}`,
+    desc: `${b.desc} Нажмите «Построить» и выберите место: материалы спишутся, и начнётся стройка.`,
+  };
+  ITEMS[bldId(b.key)] = {
+    key: bldId(b.key), name: b.name, icon: bldId(b.key), tabs: ['build'], place: 'obj', objOf: b.key, building: b.key,
+    desc: `${b.desc} Здание убрано в рюкзак: поставьте его обратно, и оно снова заработает.`,
+  };
+}
 // порядок «по умолчанию»: как в таблице (инструменты, урожай, рыба, семена, ресурсы)
 let _ord = 0;
 for (const it of Object.values(ITEMS)) it.order = _ord++;
@@ -359,6 +394,11 @@ export const SAPLING_SHOP = {
   blueberry: { price: 35, level: 4 },
   cherry:    { price: 60, level: 5 },
   apple:     { price: 75, level: 6 },
+  bird_cherry: { price: 90, level: 7 },
+  plum:      { price: 110, level: 8 },
+  pear:      { price: 130, level: 9 },
+  apricot:   { price: 170, level: 11 },
+  persimmon: { price: 220, level: 13 },
 };
 for (const [sp, o] of Object.entries(SAPLING_SHOP)) if (FLORA[sp] && FLORA[sp].pick) SHOP.push({ tab: 'trees', item: floraSeedId(sp), price: o.price, level: o.level });
 // Декор: дорожки, от дешёвых к дорогим
@@ -371,6 +411,8 @@ for (const [k, p] of Object.entries(PONDS).sort((a, b) => a[1].price - b[1].pric
 SHOP.push({ tab: 'res', item: 'stone', price: 4 });
 SHOP.push({ tab: 'res', item: 'wood', price: 1, cur: 'gems', qty: 10 });
 SHOP.push({ tab: 'res', item: 'ore', price: 1, cur: 'gems', qty: 3 });
+// Чертежи зданий с крафтом: каждое здание одно на ферму (купить второй чертёж нельзя — buildRules.js)
+for (const b of Object.values(BUILDINGS)) SHOP.push({ tab: 'build', item: bpId(b.key), price: b.blueprint, level: b.level, once: true });
 
 // ---------------- Грядки и колодец в рюкзаке ----------------
 // Грядки не копают: их покупают на рынке (раздел «Постройки», цена растёт с каждой грядкой, предел — по уровню)

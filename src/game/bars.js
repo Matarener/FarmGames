@@ -2,9 +2,9 @@
 // высоты над картинкой. Сами полоски считает Farm.syncBars, рисует PixiScene.syncBars.
 import { makeCanvas } from '../engine/Sprite.js';
 
-// Полоски времени роста: вид → цвет заливки (грядка, плоды, росток)
-export const BAR_KIND = { crop: 0, fruit: 1, grow: 2 };
-export const BAR_COLORS = [0x8fd14f, 0xff9a3c, 0x5fc7e8];
+// Полоски времени: вид → цвет заливки (грядка, плоды, росток, стройка здания, товар в здании)
+export const BAR_KIND = { crop: 0, fruit: 1, grow: 2, build: 3, craft: 4 };
+export const BAR_COLORS = [0x8fd14f, 0xff9a3c, 0x5fc7e8, 0xf2c14e, 0xc995ff];
 export const BAR_W = 26, BAR_H = 5;
 // Полоски видны только при достаточном приближении (дальше они мелкие и только рябят)
 export const BAR_MIN_ZOOM = 0.7;

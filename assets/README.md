@@ -33,21 +33,31 @@ assets/map.json  стартовая карта (редактор карты)
 | украшения прудов и кувшинки | `pond_<что>` | `pond_cattail`, `pond_lily` |
 | дом, колодец | `house_<уровень>`, `well_broken`, `well_fixed` | |
 | поливалка | `<ключ из SPRINKLERS>` (иконка на рынке и в рюкзаке — сама картинка) | `sprinkler_spin` |
+| здание с крафтом, стройка | `building_<ключ из BUILDINGS>` (иконка — само здание), `site_<ключ>` — оно же в лесах | `building_forge`, `site_forge` |
+| дом в лесах (идёт улучшение) | `house_up_<уровень, до которого улучшают>` | `house_up_3` |
 | туман | `fog_clouds_<n>`, `fog_strips_<n>`, `fog_wisps_<n>` | |
 | иконка интерфейса | `ic_<имя>` | `ic_coin`, `ic_sap_oak` |
 
 `<вид>` — ключ из `FLORA` в `src/game/data.js` (oak, birch, sakura, cherry, maple, apple, pine, linden,
+bird_cherry, plum, pear, apricot, persimmon,
 blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` — ключ из `CROPS`.
 Картинки деревьев и кустов игра находит по этим именам сама: новый вид — это строка в `FLORA` и
 картинки `tree_<вид>` (или `bush_<вид>`), `_young`, при сборе плодов — `_bare`, у дерева — `stump_<вид>`.
 
 Листы в `assets/source`: лист с одной картинкой называется так же, как картинка
-(`tree_apple_bare.png`, `house_3.png`); листы с несколькими — по содержимому (`stumps.png`,
+(`tree_apple_bare.png`, `house_3.png`); листы с несколькими — по содержимому (`sprouts.png`,
 `well.png`, `ui_menu1.png`). Что на каком листе и в каком порядке, записано
 в `tools/slice_art.py` (SHEETS, SINGLE, CROPS, ICON_SHEETS, …).
 
-Деревья, камни, кусты, каждая стадия урожая (`crop_<культура>_<стадия>.png`) и плитки земли — по одному
-объекту на картинку: на общих листах «пиксели» стиля выходили крупными и в игре было видно ступеньки.
+Деревья, кусты, пни, высокая трава, камни, каждая стадия урожая (`crop_<культура>_<стадия>.png`) и плитки
+земли — по одному объекту на картинку: на общих листах «пиксели» стиля выходили крупными и в игре было видно
+ступеньки.
+
+Деревья, кусты, пни и высокая трава — **без подложки** (с 2026-11-09): без травяного островка и земляного
+блока, у ствола только несколько травинок в цвет травы. Они стоят прямо на плитке травы, а мягкую тень
+под ними рисует `slice_art.py` (`SHADOW`). Размер задаёт `NOBASE` в `slice_art.py`: ширина кроны в мировых
+единицах (у пней и травы — вся ширина, у липы — высота, чтобы не переросла берёзу), опора — середина низа
+ствола или стеблей. Новое растение — строка в `NOBASE`.
 
 Трава бесшовная: `tools/grass_tiles.py` собирает из `tile_grass.png` и `tile_grass_flowers.png` четыре
 плитки с одинаковой каймой у краёв (любые две рядом стыкуются), цветы с второй картинки накладываются
@@ -73,9 +83,6 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 `assets/source/pond_<вид>.png` той же формы и с той же опорой. Камыш, рогоз и камни (`pond_reeds`, `pond_cattail`,
 `pond_rocks`) в картинку не входят: это украшения `POND_DECOR`, игрок ставит их сам на воду пруда.
 
-Опора кустов — центр ромба, нижний угол которого — низ земляного блока под кустом (иначе куст стоит
-ниже своей клетки).
-
 ## Как нарезать
 
 Нужен Python с numpy, Pillow и scipy (`pip install numpy pillow scipy`).
@@ -87,10 +94,7 @@ python tools/pond_art.py                    # пруды (дописывает m
 
 python tools/slice_art.py tree_apple_bare   # только эти листы (остальное в манифесте не трогается)
 python tools/slice_art.py tiles             # только плитки земли
-python tools/cut_grass_base.py assets/source/grass_tall_raw.png assets/source/grass_tall.png
 ```
 
 Полная нарезка `slice_art.py` пишет `manifest.json` заново, поэтому после неё всегда запускайте
-`slice_fog.py` и `pond_art.py`. `tools/cut_bush_base.py` (срезать земляной блок у кустов) сейчас **не запускать**:
-у новых кустов (2026-11-07) основание оставлено как есть, его, возможно, перерисуют позже. Высокую траву сначала чистит `cut_grass_base.py`
-(`grass_tall_raw.png` → `grass_tall.png`), потом её режет `slice_art.py`.
+`slice_fog.py` и `pond_art.py`.

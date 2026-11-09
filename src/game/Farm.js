@@ -10,6 +10,7 @@ import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Gifts } from './gifts.js';
 import { Wheel } from './wheel.js';
+import { Buildings } from './buildings.js';
 import { Achievements } from './achievements.js';
 import { Orders } from './orders.js';
 import { Mover } from './Mover.js';
@@ -26,7 +27,7 @@ import * as Well from './well.js';
 import * as Hints from './hints.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
-  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, PATHS, SPRINKLERS, WELL_ITEM, BED_ITEM, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
+  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, PATHS, SPRINKLERS, WELL_ITEM, BED_ITEM, floraSeedId, floraOwnId, seedId, WELL_COST,
   ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC,
 } from './data.js';
 
@@ -47,6 +48,7 @@ export class Farm {
     this.quests = new Quests(this);
     this.gifts = new Gifts(this);
     this.wheel = new Wheel(this);
+    this.builds = new Buildings(this); // здания с крафтом: кухня, мастерские, кузница
     this.ach = new Achievements(this);
     this.orders = new Orders(this);
     // Режим тестера (окно «Настройки»): монеты, кристаллы, предметы, энергия и проверка заданий —
@@ -74,6 +76,7 @@ export class Farm {
       grass: a.grass, paths: a.paths, pathParts: a.pathEdge, pathBlend: a.pathBlend, pathEdge: new Map(), bed: a.bed, ponds: a.ponds, decor: a.decor,
       objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, wildGrass: a.wildGrass,
       house: a.house, well: a.well, crops: a.crops, fog: a.fog.clouds.length ? a.fog : null, sprinkler: a.sprinkler,
+      buildings: a.buildings, sites: a.sites, houseUp: a.houseUp,
     });
     this.groundV++;
     for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
@@ -145,13 +148,14 @@ export class Farm {
       return o.stage >= 1 && fl ? fl.young : S.sprouts[fd ? fd.kind : 'tree'];
     }
     if (o.bare && S.flora[o.type]) return S.flora[o.type].bare; // плоды собраны
+    if (OBJECTS[o.type] && OBJECTS[o.type].building) return this.builds.sprite(o); // здание или его стройка
     if (S.ponds[o.type]) return S.ponds[o.type];
     const v = S.objArt[o.type];
     if (v && v.length) return v[o.id % v.length];
     if (S.sprinkler && S.sprinkler[o.type]) return S.sprinkler[o.type];
     switch (o.type) {
       case 'grass': return S.wildGrass[o.id % S.wildGrass.length];
-      case 'house': return S.house[this.st.house];
+      case 'house': return this.builds.houseSprite();
       case 'well': return S.well[this.st.well ? 1 : 0];
     }
     return S.objArt.rock[0];
@@ -259,6 +263,7 @@ export class Farm {
     this.player.worldPos(tmp);
     this.cam.centerOn(tmp.x, tmp.y - 20);
     this.tickEnergy();
+    this.builds.tick(Date.now(), true); // стройки, которые кончились, пока игры не было
     this.syncHint();
     this.ui.update(this);
   }
@@ -383,6 +388,10 @@ export class Farm {
       const s = this.objSprite(o);
       B.push(o.wx, o.wy - barTop(s), Math.max(0, Math.min(1, k)), kind);
     }
+    // здания: полоска стройки или крафта, пузырь «готово» (this.bldBub — x, y по 2 числа)
+    const U = this.bldBub || (this.bldBub = []);
+    U.length = 0;
+    this.builds.bars(now, B, U);
     this.barsV = (this.barsV || 0) + 1;
   }
 
@@ -628,7 +637,7 @@ export class Farm {
     for (const o of this.world.objects) {
       if (!o || OBJECTS[o.type].flat) continue; // пруд плоский: нажатие по нему — по клеткам (objectAt)
       const s = this.objSprite(o);
-      const big = o.type === 'house' || o.type === 'boulder';
+      const big = o.type === 'house' || o.type === 'boulder' || (o.w || 1) > 1;
       const kx = big ? 0.9 : 0.62;
       const hit = wx >= o.wx - s.ax * kx && wx <= o.wx + (s.w - s.ax) * kx &&
         wy >= o.wy - s.ay * 0.92 && wy <= o.wy + (big ? (s.h - s.ay) * 0.8 : 6);
@@ -646,6 +655,7 @@ export class Farm {
     const def = OBJECTS[o.type];
     if (!def) return;
     if (def.sprinkler) return this.sprinklerPopup(o, sx, sy);
+    if (def.building) return this.builds.tap(o, sx, sy);
     if (o.type === 'sapling' || def.flora) return this.floraPopup(o, sx, sy);
     if (def.action) this.queue({ kind: def.action, obj: o });
   }
@@ -664,9 +674,11 @@ export class Farm {
   showArea(o, sec = 4) { this.areaShow = { o, until: this.time + sec }; }
 
   // Постройку поставили из рюкзака (Mover): у поливалки — подсветка клеток полива; задание «Поставь …»
+  // Возвращает надпись для плашки перестановки (или ничего — «поставлено»).
   placedFx(o) {
     if (Spr.kindOf(o)) this.showArea(o, 2.5);
     this.quests.emit('place', o.type);
+    if (this.builds.is(o)) return this.builds.placed(o);
   }
 
   // Режим перестановки сразу с выбранным своим объектом o
@@ -947,8 +959,9 @@ export class Farm {
     const n = w.unlockedCount();
     const limit = HOUSE[this.st.house].chunks;
     if (n >= limit) {
-      const need = HOUSE.findIndex((h, i) => h && i > this.st.house && h.chunks > n);
-      return this.ui.popup(sx, sy, { title: 'Новый участок', text: `Улучшите дом до ${need} уровня, чтобы расширить ферму.`, items: [{ icon: 'house', label: 'К дому', onClick: () => this.ui.housePanel(this) }] });
+      const need = HOUSE.findIndex((h, i) => h && i > this.st.house && h.chunks > n), up = this.st.houseUp;
+      const text = up && up.to >= need ? `Дом улучшается до ${up.to} уровня: когда достроится, ферму можно будет расширить.` : `Улучшите дом до ${need} уровня, чтобы расширить ферму.`;
+      return this.ui.popup(sx, sy, { title: 'Новый участок', text, items: [{ icon: 'house', label: 'К дому', onClick: () => this.ui.housePanel(this) }] });
     }
     const cost = expansionCost(n);
     this.ui.popup(sx, sy, {
@@ -989,21 +1002,8 @@ export class Farm {
     this.changed();
   }
 
-  upgradeHouse() {
-    const next = HOUSE[this.st.house + 1];
-    if (!next || this.world.unlockedCount() < houseNeedChunks(this.st.house)) return false;
-    if (!this.pay(next.cost)) return false;
-    const oldMax = this.maxEnergy;
-    this.st.house++;
-    this.st.energy += this.maxEnergy - oldMax;
-    const h = this.world.objects.find((o) => o && o.type === 'house');
-    if (h) { this.burst(h.wx, h.wy - 40, '#ffe066', 30); this.float(h.wx, h.wy - 110, `Дом ${this.st.house} ур.`, null); }
-    this.addXp(20);
-    this.sfx('unlock');
-    this.player.celebrate();
-    this.changed();
-    return true;
-  }
+  // Улучшение дома идёт по времени (houseRules.js): начинает и заканчивает его Buildings
+  upgradeHouse() { return this.builds.upgradeHouse(); }
 
   sell(key, n) {
     const r = Inv.sellItem(this.st, key, n);
@@ -1015,10 +1015,12 @@ export class Farm {
   }
 
   buy(offer, n) {
-    // грядка — по одной: цена растёт с каждой, предел по уровню (beds.js)
-    const r = offer.bed ? Beds.buyBed(this.st, this.bedCounts().bedsAll) : Inv.buyItem(this.st, offer, n);
+    // грядка — по одной: цена растёт с каждой, предел по уровню (beds.js); чертёж здания — один на ферму (buildRules.js)
+    const bp = ITEMS[offer.item] && ITEMS[offer.item].blueprint;
+    const r = offer.bed ? Beds.buyBed(this.st, this.bedCounts().bedsAll) : bp ? this.builds.buyBlueprint(bp, offer) : Inv.buyItem(this.st, offer, n);
     if (!r) return;
     if (r.limit != null) return this.toast(r.limit ? `Больше грядок — с ${r.limit} уровня` : 'Грядок уже столько, сколько можно', 'warn');
+    if (r.why) return this.toast(r.why, 'warn');
     if (r.locked) return this.toast(`Откроется с ${offer.level} уровня`, 'warn');
     if (r.poor) return this.toast(r.poor === 'gems' ? 'Не хватает кристаллов' : 'Не хватает монет', 'warn');
     this.quests.emit('buy', r.id, r.n);
@@ -1357,6 +1359,7 @@ export class Farm {
       this.tickEnergy(); t = pf.part('энергия', t);
       this.floraTick(now); t = pf.part('растения', t);
       this.wildTick(now); t = pf.part('поросль', t);
+      this.builds.tick(now); t = pf.part('здания', t);
       this.quests.tick(); t = pf.part('задания', t);
       this.ach.tick(); t = pf.part('достижения', t);
       this.orders.tick(); t = pf.part('заказы', t);
