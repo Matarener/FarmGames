@@ -41,7 +41,7 @@ FLOATS = {
     'pond_drop':   [('lily', 1.35, 1.45, 0.8), ('leaves', 0.75, 0.75, 0.75)],
     'pond_long':   [('lily', 1.55, 1.2, 0.8), ('lily', 3.4, 1.75, 0.65), ('leaves', 2.6, 1.0, 0.8)],
     'pond_round':  [('lily', 2.4, 1.3, 0.85), ('lily', 1.3, 2.55, 0.65), ('leaves', 2.45, 2.4, 0.8)],
-    'pond_island': [('lily', 2.6, 1.15, 0.8), ('leaves', 2.95, 2.3, 0.75)],
+    'pond_big':    [('lily', 2.5, 1.4, 0.9), ('lily', 1.5, 3.3, 0.7), ('leaves', 3.3, 3.2, 0.8)],
 }
 
 
@@ -96,14 +96,11 @@ def render(key, p, seed):
     h, w = p['h'], p['w']
     rng = np.random.default_rng(seed)
     gh, gw = (h + 2 * P) * R, (w + 2 * P) * R
-    pond = np.zeros((gh, gw), bool); isl = np.zeros((gh, gw), bool)
+    pond = np.zeros((gh, gw), bool)
     for y, row in enumerate(cells):
         for x, c in enumerate(row):
-            sl = (slice((y + P) * R, (y + P + 1) * R), slice((x + P) * R, (x + P + 1) * R))
-            if c in 'wi': pond[sl] = True
-            if c == 'i': isl[sl] = True
+            if c == 'w': pond[(y + P) * R:(y + P + 1) * R, (x + P) * R:(x + P + 1) * R] = True
     sp = shape_field(pond, ROUND, rng) - INSET
-    si = shape_field(isl, 0.12, rng) - 0.16 if isl.any() else np.full(pond.shape, -1.0)
     X0, X1, Y0, Y1, W, H = frame(p)
     py, px = np.mgrid[0:H, 0:W].astype(np.float64)
     X = X0 + (px + 0.5) / D
@@ -119,26 +116,22 @@ def render(key, p, seed):
     ug, vg = grid(X, Y)
     grass = wrap(gsq, ug * n - 0.5, vg * n - 0.5)
     blade = ndimage.gaussian_filter(PT._sample(PT.blade_map(gsq), ug, vg), 0.8 * D / 4)
-    dP, dI = field(sp, X, Y), field(si, X, Y)
+    dP = field(sp, X, Y)
     ground = dP <= LIP * (1 + 0.6 * blade)            # трава, с пучками над водой
-    island = dI > -LIP * 0.6 * (1 + 0.6 * blade)
     # Вода ниже земли на DEPTH: пиксель видит воду, если и край земли над ним, и вода под ним — внутри пруда;
-    # иначе — стенку (дальний берег и ближняя сторона островка)
-    far = np.zeros(X.shape, bool); iw = np.zeros(X.shape, bool)
-    top = np.full(X.shape, DEPTH); itop = np.full(X.shape, DEPTH)
+    # иначе — стенку дальнего берега
+    far = np.zeros(X.shape, bool)
+    top = np.full(X.shape, DEPTH)
     for t in np.linspace(DEPTH / 8, DEPTH, 8):
         a = field(sp, X, Y - t) <= 0
         top = np.where(a & ~far, t, top); far |= a
-        b = field(si, X, Y - t) > 0
-        itop = np.where(b & ~iw, t, itop); iw |= b
-    hole = ~ground & ~island
+    hole = ~ground
     wall = hole & far
-    iwall = hole & ~wall & iw
-    water = hole & ~wall & ~iwall
+    water = hole & ~wall
     # --- вода: текстура по клеткам поверхности воды, в глубине темнее, у берега светлее
     uw, vw = grid(X, Y - DEPTH)
     col = wrap(water_tex(), vw * 256 - 0.5, uw * 256 - 0.5)
-    dist = ndimage.distance_transform_edt((sp > 0) & ~(si > 0)) / R
+    dist = ndimage.distance_transform_edt(sp > 0) / R
     dd = ndimage.map_coordinates(dist, [(vw + P) * R - 0.5, (uw + P) * R - 0.5], order=1)
     deep = np.clip(dd / 1.1, 0, 1)[..., None] ** 0.8
     col = col * (1 - 0.5 * deep) + np.array([22, 96, 132.0]) * 0.5 * deep
@@ -152,7 +145,6 @@ def render(key, p, seed):
         base = np.array([150, 104, 60.0]) * (1 - k) + np.array([84, 56, 34.0]) * k
         return base + (np.sin((Y - depth) * 1.9 + 0.7 * blade) * 6)[..., None] + noise[..., None] * 14
     rgb = np.where(wall[..., None], earth(DEPTH - top), col)
-    rgb = np.where(iwall[..., None], earth(DEPTH - itop) * 0.95, rgb)
     # тень от стенки на воде и мокрая полоса у воды
     sh = ndimage.gaussian_filter(np.roll(wall.astype(float), int(1.2 * D), 0), 2.0 * D / 4)
     rgb = rgb * (1 - 0.30 * np.clip(sh * 1.6, 0, 1) * water)[..., None]
@@ -175,12 +167,11 @@ def render(key, p, seed):
         sub = im2[ys.start - y0:ys.stop - y0, xs.start - x0:xs.stop - x0]
         a = sub[..., 3:] / 255 * water[ys, xs][..., None]
         out[ys, xs, :3] = out[ys, xs, :3] * (1 - a) + sub[..., :3] * a
-    # --- трава: островок и пучки над водой (у самого края чуть темнее), снаружи — мягко в траву земли
+    # --- трава: пучки над водой (у самого края чуть темнее), снаружи — мягко в траву земли
     lip = ground & (dP > -0.04)
     gcol = np.where(lip[..., None], grass * 0.88, grass)
-    land = ground | island
-    out[..., :3] = np.where(land[..., None], gcol, out[..., :3])
-    out[..., 3] = np.where(hole | island, 1.0, np.clip((dP + 0.06) / 0.04, 0, 1))
+    out[..., :3] = np.where(ground[..., None], gcol, out[..., :3])
+    out[..., 3] = np.where(hole, 1.0, np.clip((dP + 0.06) / 0.04, 0, 1))
     img = np.dstack([np.clip(out[..., :3], 0, 255), out[..., 3] * 255]).astype(np.uint8)
     return img, geo(p)
 

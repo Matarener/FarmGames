@@ -33,25 +33,30 @@ test('стартовая карта: вода → пруды по формам, 
   assert.equal(w.mapId, mapId(MAP));
   const list = ponds(w);
   assert.ok(list.length >= 1);
-  let water = 0;
-  for (const r of MAP.tiles) for (const c of r) if (c === '2') water++;
-  // каждая клетка воды карты — вода какого-то пруда, и никакой другой воды нет
-  let got = 0;
+  // каждая клетка воды карты — вода какого-то пруда; новая вода — только залитые островки
+  // (трава, со всех четырёх сторон вода)
+  const wet = (x, y) => MAP.tiles[y] && MAP.tiles[y][x] === '2';
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const was = MAP.tiles[y][x] === '2';
-    assert.equal(w.isWater(x, y), was, `${x},${y}`);
-    if (was) got++;
     assert.notEqual(w.tiles[y * N + x], T.WATER, 'в tiles воды больше нет');
+    if (wet(x, y)) assert.ok(w.isWater(x, y), `вода ${x},${y}`);
+    else if (w.isWater(x, y)) assert.ok(wet(x - 1, y) && wet(x + 1, y) && wet(x, y - 1) && wet(x, y + 1), `островок ${x},${y}`);
   }
-  assert.equal(got, water);
   // туда-обратно: карта из редактора с прудами — та же карта
   const m = w.toMap();
-  assert.equal(mapId(m), mapId(MAP));
   assert.deepEqual(m.ponds, list);
   const w2 = new World(1, m);
   assert.deepEqual(ponds(w2), list);
   assert.equal(w2.genCount, w.genCount);
   assert.ok(w.decor.length > 0, 'камыши у прудов');
+});
+
+test('кусок воды с островком: островок заливается, пруд целый', () => {
+  const tiles = Array.from({ length: N }, () => '0'.repeat(N));
+  const put = (x, y) => { tiles[y] = tiles[y].slice(0, x) + '2' + tiles[y].slice(x + 1); };
+  PONDS.pond_round.water.forEach(([dx, dy]) => { if (dx !== 1 || dy !== 2) put(c0 + 2 + dx, r0 + 2 + dy); });
+  const w = new World(1, empty({ tiles }));
+  assert.deepEqual(ponds(w), [['pond_round', c0 + 2, r0 + 2]]);
+  assert.ok(w.isWater(c0 + 3, r0 + 4));
 });
 
 test('кусок воды неизвестной формы: большие формы внутрь, остаток — трава', () => {
@@ -121,21 +126,19 @@ test('загрузка: пруды игрока вместо прудов кар
   assert.deepEqual(st.ponds, [map[0]]);
 });
 
-test('берег: нажали на середину или островок — ближайшая вода, у которой можно встать', () => {
+test('берег: нажали на середину большого пруда — ближайшая вода, у которой можно встать', () => {
   const w = new World(1, empty());
-  const o = w.add('pond_island', c0 + 2, r0 + 2);
-  const p = PONDS.pond_island;
-  // островок
-  const [ix, iy] = p.occ.find(([dx, dy]) => p.cells[dy][dx] === 'i');
-  assert.equal(w.isWater(c0 + 2 + ix, r0 + 2 + iy), false);
-  assert.equal(w.pondAt(c0 + 2 + ix, r0 + 2 + iy), o);
-  const c = P.shoreCell(w, o, c0 + 2 + ix, r0 + 2 + iy);
-  assert.ok(c && w.isWater(c.x, c.y));
+  const o = w.add('pond_big', c0 + 2, r0 + 2);
+  const mx = c0 + 4, my = r0 + 4; // середина: вокруг только вода
+  assert.equal(w.pondAt(mx, my), o);
+  const c = P.shoreCell(w, o, mx, my);
+  assert.ok(c && w.isWater(c.x, c.y) && (c.x !== mx || c.y !== my));
   let near = false;
   for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (w.walkable(c.x + i, c.y + j)) near = true;
   assert.ok(near);
   const all = P.shoreCells(w);
   assert.ok(all.length > 0 && all.every((s) => s.o === o && w.isWater(s.x, s.y)));
+  assert.ok(!all.some((s) => s.x === mx && s.y === my));
 });
 
 console.log(`\nвсе проверки прошли: ${tests}`);

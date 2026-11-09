@@ -29,7 +29,7 @@ assets/map.json  стартовая карта (редактор карты)
 | травяной край дорожек | `path_edge_<сторона>`, `path_corner_<вершина>_<вид>` (делает `tools/path_tiles.py`) | `path_corner_n_out` |
 | переход между видами дорожек | `blend_<вид дорожки>_edge_<сторона>`, `blend_<вид дорожки>_corner_<вершина>_<вид>` (тоже `path_tiles.py`) | `blend_path_cobble_edge_nw` |
 | грядка | `bed_dry`, `bed_wet` | |
-| пруд целиком (одна картинка на пруд) | `pond_<вид>` (делает `tools/pond_art.py`) | `pond_round`, `pond_island` |
+| пруд целиком (одна картинка на пруд) | `pond_<вид>` (делает `tools/pond_art.py`) | `pond_round`, `pond_big` |
 | камыши и кувшинки у прудов | `pond_<что>` | `pond_lily`, `pond_cattail` |
 | дом, колодец | `house_<уровень>`, `well_broken`, `well_fixed` | |
 | туман | `fog_clouds_<n>`, `fog_strips_<n>`, `fog_wisps_<n>` | |

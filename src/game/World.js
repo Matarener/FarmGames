@@ -133,9 +133,9 @@ export class World {
   isOpen(x, y) { return this.inside(x, y) && this.unlocked[this.chunkOf(x, y)] === 1; }
   tile(x, y) { return this.tiles[y * N + x]; }
   objectAt(x, y) { if (!this.inside(x, y)) return null; const i = this.occ[y * N + x]; return i >= 0 ? this.objects[i] : null; }
-  // пруд на клетке (вода или островок) или null
+  // пруд на клетке или null
   pondAt(x, y) { const o = this.objectAt(x, y); return o && PONDS[o.type] ? o : null; }
-  // вода пруда на клетке: здесь рыбачат и набирают воду (островок — не вода)
+  // вода пруда на клетке: здесь рыбачат и набирают воду
   isWater(x, y) { const o = this.pondAt(x, y); return !!o && PONDS[o.type].cells[y - o.gy][x - o.gx] === 'w'; }
 
   walkable(x, y) {
@@ -298,7 +298,8 @@ export class World {
   // Старые карты и генерация: клетки воды (T.WATER) → пруды PONDS. Связный кусок воды становится
   // прудом той формы, чья вода совпадает с ним клетка в клетку (пруды стартовой карты — ровно такие).
   // Иначе в кусок по очереди ставятся самые большие формы, которые в нём помещаются; вода, на которую
-  // формы не хватило, становится травой.
+  // формы не хватило, становится травой. Островок внутри куска (свободная трава, со всех сторон вода)
+  // заливается: прудов с островком нет.
   pondsFromWater() {
     const W = T.WATER, D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     const comps = [], seen = new Uint8Array(N * N);
@@ -313,25 +314,22 @@ export class World {
           if (this.inside(nx, ny) && this.tiles[k] === W && !seen[k]) { seen[k] = 1; st.push(k); }
         }
       }
+      this.fillIslands(comp);
       comps.push(comp);
     }
     for (const comp of comps) for (const j of comp) this.tiles[j] = T.GRASS;
-    // форма p встанет в (gx, gy): вся её вода — в left, островок — на свободной траве вне куска
-    const fits = (p, gx, gy, left, comp) => p.occ.every(([dx, dy]) => {
-      const x = gx + dx, y = gy + dy, i = y * N + x;
-      if (!this.inside(x, y)) return false;
-      return p.cells[dy][dx] === 'w' ? left.has(i) : !comp.has(i) && this.tiles[i] === T.GRASS && this.occ[i] < 0;
-    });
+    // форма p встанет в (gx, gy): вся её вода — в left
+    const fits = (p, gx, gy, left) => p.water.every(([dx, dy]) => this.inside(gx + dx, gy + dy) && left.has((gy + dy) * N + gx + dx));
     const kinds = Object.values(PONDS).sort((a, b) => b.water.length - a.water.length);
     for (const list of comps) {
-      const comp = new Set(list), left = new Set(list);
+      const left = new Set(list);
       for (;;) {
         let best = null;
         for (const p of kinds) {
           if (p.water.length > left.size || (best && best.p.water.length > p.water.length)) continue;
           for (const i of left) {
             const [dx, dy] = p.water[0], gx = i % N - dx, gy = ((i / N) | 0) - dy;
-            if (fits(p, gx, gy, left, comp)) { best = { p, gx, gy }; break; }
+            if (fits(p, gx, gy, left)) { best = { p, gx, gy }; break; }
           }
           if (best && best.p.water.length === left.size) break; // точное совпадение
         }
@@ -340,6 +338,31 @@ export class World {
         if (!o) break;
         for (const [dx, dy] of best.p.water) left.delete((best.gy + dy) * N + best.gx + dx);
       }
+    }
+  }
+
+  // Свободная трава внутри куска воды comp (номера клеток), до которой не дойти снаружи его рамки
+  // не по воде, — тоже в comp
+  fillIslands(comp) {
+    const set = new Set(comp), D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    let x0 = N, y0 = N, x1 = -1, y1 = -1;
+    for (const j of comp) { const x = j % N, y = (j / N) | 0; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const out = new Set(), st = [];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = y * N + x;
+      if ((x === x0 || x === x1 || y === y0 || y === y1) && !set.has(i)) { out.add(i); st.push(i); }
+    }
+    while (st.length) {
+      const j = st.pop(), x = j % N, y = (j / N) | 0;
+      for (const [dx, dy] of D4) {
+        const nx = x + dx, ny = y + dy, k = ny * N + nx;
+        if (nx < x0 || nx > x1 || ny < y0 || ny > y1 || set.has(k) || out.has(k)) continue;
+        out.add(k); st.push(k);
+      }
+    }
+    for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++) {
+      const i = y * N + x;
+      if (!set.has(i) && !out.has(i) && this.tiles[i] === T.GRASS && this.occ[i] < 0) comp.push(i);
     }
   }
 
