@@ -18,6 +18,17 @@ const FOG_OLD = { oak2: 'sakura', bush: 'rosehip', berry: 'blueberry' }; // ст
 
 const tmp = { x: 0, y: 0 };
 
+// Клетки, которые занимает объект с описанием def (OBJECTS): [[dx, dy], ...] от левого верхнего угла.
+// Без def.cells — весь прямоугольник w × h; def.cells — фигура (например, пруд без углов).
+const RECTS = new Map();
+export function objCells(def) {
+  if (def && def.cells) return def.cells;
+  const w = (def && def.w) || 1, h = (def && def.h) || 1, k = w * 64 + h;
+  let r = RECTS.get(k);
+  if (!r) { r = []; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) r.push([x, y]); RECTS.set(k, r); }
+  return r;
+}
+
 // Короткий отпечаток карты: сохранение помнит, на какой карте оно сделано
 export function mapId(m) {
   const s = JSON.stringify([m.tiles, m.objects, m.well, m.seed || 0]);

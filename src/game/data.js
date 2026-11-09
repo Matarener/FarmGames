@@ -265,6 +265,23 @@ for (const [k, p] of Object.entries(PATHS)) ITEMS[k] = {
   key: k, name: p.name, icon: k, tabs: ['decor'], place: 'path', pathOf: k,
   desc: `${p.desc} Одна клетка дорожки: нажмите «Поставить» и выбирайте клетки на траве (или «Ещё» → «Переставить»).`,
 };
+// Поливалки (раздел «Постройки»): свои постройки на одну клетку травы (placed.js). Покупаются на рынке,
+// ставятся из рюкзака и поливают грядки вокруг себя сами, как только те просят воды (sprinklers.js).
+// area — какие клетки вокруг: 'cross' — по r клеток в четыре стороны, 'square' — квадрат со стороной 2r+1
+// (без самой поливалки). Ключ — тип объекта на карте, id предмета и имя картинки (assets/art).
+export const SPRINKLERS = {
+  sprinkler_drip: { name: 'Капельница',  area: 'cross',  r: 1, price: 60,  level: 3, desc: 'Простая поливалка: поливает 4 соседние клетки.' },
+  sprinkler_spin: { name: 'Вертушка',    area: 'square', r: 1, price: 250, level: 6, desc: 'Крутится и поливает 8 клеток вокруг себя.' },
+  sprinkler_rain: { name: 'Дождеватель', area: 'square', r: 2, price: 900, level: 9, desc: 'Большая поливалка: поливает 24 клетки, квадрат 5×5.' },
+};
+for (const [k, s] of Object.entries(SPRINKLERS)) {
+  s.key = k;
+  OBJECTS[k] = { name: s.name, static: true, item: k, sprinkler: k };
+  ITEMS[k] = {
+    key: k, name: s.name, icon: k, tabs: ['build'], place: 'obj', objOf: k,
+    desc: `${s.desc} Грядки рядом поливаются сами, даже когда игра закрыта. Ставится на траву: «Поставить» (или «Ещё» → «Переставить»).`,
+  };
+}
 for (const [k, f] of Object.entries(SHOP_FOOD)) ITEMS[k] = { key: k, name: f.name, icon: k, food: f.food, tabs: ['food'], desc: f.desc + ' Восстанавливает энергию.' };
 // порядок «по умолчанию»: как в таблице (инструменты, урожай, рыба, семена, ресурсы)
 let _ord = 0;
@@ -297,6 +314,8 @@ export const SAPLING_SHOP = {
 for (const [sp, o] of Object.entries(SAPLING_SHOP)) if (FLORA[sp] && FLORA[sp].pick) SHOP.push({ tab: 'trees', item: floraSeedId(sp), price: o.price, level: o.level });
 // Декор: дорожки, от дешёвых к дорогим
 for (const [k, p] of Object.entries(PATHS).sort((a, b) => a[1].price - b[1].price)) SHOP.push({ tab: 'decor', item: k, price: p.price, level: p.level });
+// Постройки: поливалки
+for (const [k, s] of Object.entries(SPRINKLERS)) SHOP.push({ tab: 'build', item: k, price: s.price, level: s.level });
 SHOP.push({ tab: 'res', item: 'stone', price: 4 });
 SHOP.push({ tab: 'res', item: 'wood', price: 1, cur: 'gems', qty: 10 });
 SHOP.push({ tab: 'res', item: 'ore', price: 1, cur: 'gems', qty: 3 });

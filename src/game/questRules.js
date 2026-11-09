@@ -19,7 +19,7 @@
 // reward, done, claimed, frac, … }. goals — цели с прогрессом p, goal — первая невыполненная (для стрелки).
 
 import { LINES, QUESTS, QUEST_XP, PERIODIC_LEVEL, OLD_ORDER, OLD_TITLES, PERIODS, EVENTS, MAX_PINS } from './questData.js';
-import { CROPS, FISH, FLORA, FLORA_GOODS, ITEMS } from './data.js';
+import { CROPS, FISH, FLORA, FLORA_GOODS, ITEMS, SPRINKLERS } from './data.js';
 import { addItem } from './inventory.js';
 
 const H = 3600e3;
@@ -39,6 +39,7 @@ export const GROUPS = {
   fruit: (k) => !!FLORA_GOODS[k],
   // плодовые и ягодные: саженец из магазина (sap_<вид>) или посаженный вид
   orchard: (k) => { const f = FLORA[k.startsWith('sap_') ? k.slice(4) : k]; return !!(f && f.pick); },
+  sprinkler: (k) => !!SPRINKLERS[k],
 };
 
 export function matches(g, ev, key) {

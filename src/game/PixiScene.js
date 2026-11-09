@@ -4,7 +4,8 @@
 import * as PIXI from '../vendor/pixi.min.mjs';
 import { toWorld, HW, HH } from '../engine/Iso.js';
 import { dimSprite, hash2 } from '../engine/Sprite.js';
-import { N, CHUNK, CHUNKS, T, FOG_W } from './World.js';
+import { N, CHUNK, CHUNKS, T, FOG_W, objCells } from './World.js';
+import { areaCells } from './sprinklers.js';
 import { HOUSE, FOG } from './data.js';
 import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop, primeBarTop } from './bars.js';
 
@@ -149,6 +150,8 @@ export class PixiScene {
     this.decorC = new PIXI.Container(); world.addChild(this.decorC); // кувшинки и листья на воде
     this.bedsC = new PIXI.Container({ sortableChildren: true, isRenderGroup: true }); world.addChild(this.bedsC);
     this.border = new PIXI.Graphics(); world.addChild(this.border);
+    // клетки, которые поливает поливалка (под растениями и объектами, над землёй)
+    this.areaG = new PIXI.Graphics(); this.areaG.visible = false; world.addChild(this.areaG); this.areaKey = '';
     this.objC = new PIXI.Container({ sortableChildren: true }); world.addChild(this.objC);
     this.over = new PIXI.Container(); world.addChild(this.over);
     this.border2 = new PIXI.Graphics(this.border.context); this.border2.alpha = 0.45; this.over.addChild(this.border2);
@@ -740,6 +743,7 @@ export class PixiScene {
     this.syncQueue();
     this.syncHint();
     this.syncMover(outline);
+    this.syncArea();
     this.syncFx();
     this.syncFloaters();
     P.part('растения и значки', tp);
@@ -948,24 +952,50 @@ export class PixiScene {
     const pulse = 0.55 + 0.45 * Math.sin(f.time * 6);
     this.moverHi.visible = !!(s && s.kind === 'obj');
     if (this.moverHi.visible) { this.put(this.moverHi, f.objSprite(s.o), s.o.wx, s.o.wy); this.moverHi.alpha = 0.12 + 0.18 * pulse; }
-    if (s) {
-      for (let y = s.gy; y < s.gy + s.h; y++) for (let x = s.gx; x < s.gx + s.w; x++) {
-        toWorld(x + 0.5, y + 0.5, tmp);
+    // клетки объекта (у постройки из рюкзака своего места на карте ещё нет)
+    if (s && s.kind !== 'bag') {
+      for (const [dx, dy] of objCells(s)) {
+        toWorld(s.gx + dx + 0.5, s.gy + dy + 0.5, tmp);
         g.poly([tmp.x, tmp.y - HH + 1, tmp.x + HW - 2, tmp.y, tmp.x, tmp.y + HH - 1, tmp.x - HW + 2, tmp.y]).stroke({ width: 2.5, color: 0xffe65a, alpha: pulse });
       }
     }
     this.moverGhost.visible = !!(s && t);
     if (s && t) {
-      for (let y = t.gy; y < t.gy + s.h; y++) for (let x = t.gx; x < t.gx + s.w; x++) {
-        toWorld(x + 0.5, y + 0.5, tmp);
+      for (const [dx, dy] of objCells(s)) {
+        toWorld(t.gx + dx + 0.5, t.gy + dy + 0.5, tmp);
         g.poly([tmp.x, tmp.y - HH, tmp.x + HW, tmp.y, tmp.x, tmp.y + HH, tmp.x - HW, tmp.y]).fill({ color: t.ok ? 0x6edc5a : 0xeb4632, alpha: 0.38 });
         g.poly([tmp.x, tmp.y - HH + 1, tmp.x + HW - 2, tmp.y, tmp.x, tmp.y + HH - 1, tmp.x - HW + 2, tmp.y]).stroke({ width: 2, color: t.ok ? 0x8ff06a : 0xff6a50 });
       }
-      if (s.kind === 'obj') { toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp); this.put(this.moverGhost, f.objSprite(s.o), tmp.x, tmp.y); }
-      else {
+      if (s.kind === 'obj' || s.kind === 'bag') {
+        toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp);
+        const sp = s.kind === 'obj' ? f.objSprite(s.o) : f.placeSprite(s.id);
+        this.moverGhost.visible = !!sp;
+        if (sp) this.put(this.moverGhost, sp, tmp.x, tmp.y);
+      } else {
         const sp = s.kind === 'path' ? (f.S.paths.find((p) => p.key === s.path) || f.S.paths[0]).tiles[0] : f.S.bed[0];
         toWorld(t.gx + 0.5, t.gy + 0.5, tmp); this.put(this.moverGhost, sp, tmp.x, tmp.y);
       }
+    }
+  }
+
+  // Клетки полива поливалки (Farm.sprinklerArea): голубые ромбы; там, куда её ставят нельзя, — тусклее.
+  // Перерисовываются, только когда поливалка или её место сменились; угасание — прозрачностью.
+  syncArea() {
+    const f = this.f, a = f.sprinklerArea(), G = this.areaG;
+    G.visible = !!a;
+    if (!a) { this.areaKey = ''; return; }
+    G.alpha = a.k;
+    const key = `${a.kind},${a.x},${a.y},${a.bad}`;
+    if (key === this.areaKey) return;
+    this.areaKey = key;
+    const w = f.world, g = G.clear();
+    for (const [x, y] of areaCells(a.kind, a.x, a.y)) {
+      if (!w.inside(x, y) || !w.isOpen(x, y)) continue;
+      toWorld(x + 0.5, y + 0.5, tmp);
+      const bed = w.tile(x, y) === T.SOIL;
+      g.poly([tmp.x, tmp.y - HH + 1.5, tmp.x + HW - 3, tmp.y, tmp.x, tmp.y + HH - 1.5, tmp.x - HW + 3, tmp.y])
+        .fill({ color: 0x4fb6ff, alpha: a.bad ? 0.12 : bed ? 0.4 : 0.24 })
+        .stroke({ width: 1.5, color: 0xa8e0ff, alpha: a.bad ? 0.35 : 0.8 });
     }
   }
 
