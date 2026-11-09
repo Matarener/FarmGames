@@ -82,6 +82,15 @@ export class UI {
     $('#btn-center').onclick = () => { farm.player.worldPos(this._p = this._p || {}); farm.cam.centerOn(this._p.x, this._p.y - 20); };
     $('#energy-pill').onclick = () => this.bagPanel(farm);
     $('#btn-more').onclick = () => this.toggleMore();
+    // плашка перестановки или посадки внизу: сообщения встают над ней, какой бы высоты она ни была
+    // (текст в две-три строки на узком экране) — её высота в --bar-h
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => {
+        const h = Math.max($('#move-bar').offsetHeight, $('#plant-bar').offsetHeight);
+        if (h) document.body.style.setProperty('--bar-h', h + 'px');
+      });
+      ro.observe($('#move-bar')); ro.observe($('#plant-bar'));
+    }
     $('#mb-done').onclick = () => farm.mover.exit();
     $('#mb-cancel').onclick = () => farm.mover.cancel();
     $('#mb-place').onclick = () => farm.mover.place();
@@ -1211,8 +1220,8 @@ export class UI {
       }
       body.appendChild(g);
       const r = S.sel && RECIPES[S.sel];
-      if (r && r.at === k) card.appendChild(this.recipeCard(f, k, r, now));
-      else S.sel = null;
+      // выбранный рецепт — карточкой снизу, а на горизонтальном телефоне колонкой справа (with-info, style.css)
+      if (r && r.at === k) { card.appendChild(this.recipeCard(f, k, r, now)); card.classList.add('with-info'); } else S.sel = null;
     });
   }
 
@@ -1405,8 +1414,8 @@ export class UI {
       if (sure) { M.skip = null; f.orders.skip(s.idx); return; }
       M.skip = o.id; this.sfx('tap'); this.refreshPanel();
     };
-    top.appendChild(x);
     c.appendChild(top);
+    c.appendChild(x);
     const goods = h('div', 'od-goods');
     for (const l of s.lines) {
       const it = ITEMS[l.id], ok = l.have >= l.n;
@@ -1416,7 +1425,7 @@ export class UI {
     }
     c.appendChild(goods);
     const foot = h('div', 'od-foot', `<div class="od-pay"><b>${fmtNum(o.coins)} ${this.ic('coin')}</b><b>+${o.xp} ${this.ic('star')}</b>` +
-      `<small>на рынке ${fmtNum(o.value)} ${this.ic('coin')}</small></div>`);
+      `<small>на рынке <span>${fmtNum(o.value)} ${this.ic('coin')}</span></small></div>`);
     const give = h('button', 'btn-s gold od-give', 'Отдать');
     give.disabled = !s.ready;
     give.onclick = () => { M.skip = null; f.orders.deliver(s.idx); };
@@ -1502,7 +1511,8 @@ export class UI {
       const own = it.blueprint && BR.owned(st, it.blueprint); // здание уже есть — чертёж больше не нужен
       const c = h('button', 'mk-cell' + (locked ? ' locked' : '') + (M.sel === o.item ? ' sel' : ''),
         `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${locked ? this.ic('lock', 'mk-lock') : ''}${o.qty > 1 ? `<b>×${o.qty}</b>` : ''}</i>` +
-        `<span>${locked ? (o.level === Infinity ? 'всё' : `с ${o.level} ур.`) : own ? 'построено' : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
+        (own ? '<span class="mk-own">✓ есть</span>' // «построено» не помещалось под клеткой на узком экране
+          : `<span>${locked ? (o.level === Infinity ? 'всё' : `с ${o.level} ур.`) : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`));
       c.title = it.name;
       c.onclick = () => this.pick(M, o.item);
       g.appendChild(c);
@@ -1566,8 +1576,13 @@ export class UI {
       b.disabled = st[o.cur || 'coins'] < o.price; b.onclick = () => f.buy(o, 1);
       acts.appendChild(b);
     }
-    if (Inv.count(st, it.key)) acts.appendChild(this.buildBtn(f, it));
+    if (Inv.count(st, it.key)) { this.ownedNote(f, box, it); acts.appendChild(this.buildBtn(f, it)); }
     if (acts.children.length) box.appendChild(acts);
+  }
+
+  // Чертёж здания, которое уже есть на ферме (лишний выдали в режиме тестера): почему «Построить» серая
+  ownedNote(f, box, it) {
+    if (BR.owned(f.st, it.blueprint)) box.appendChild(h('div', 'ii-note', `${BR.buildBlock(f.st, it.blueprint)}: второе такое не построить.`));
   }
 
   // «Построить» у чертежа: хватает материалов — окно закрывается, выбираем место для стройки
@@ -1776,6 +1791,7 @@ export class UI {
     // пруды, украшения прудов и постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
     if (it.blueprint && n > 0) {
       box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(BUILDINGS[it.blueprint].cost, f)));
+      this.ownedNote(f, box, it);
       acts.appendChild(this.buildBtn(f, it));
     } else if (Mover.placeable(it) && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
@@ -1821,9 +1837,12 @@ function sortOffers(offers, sort, level) {
   return offers.map((o, i) => ({ o, i, lock: o.level > level ? 1 : 0 }))
     .sort((a, b) => a.lock - b.lock || by(a.o, b.o) || a.i - b.i).map((x) => x.o);
 }
+// Короткое число: 12 345 → «12.3k», 250 000 → «250k», 1 500 000 → «1.5M». Округляется вниз, как у
+// кошелька (99 999 — «99.9k», а не «100.0k»; 999 999 — «999k», а не «1000k»), «.0» не пишется.
 function fmtNum(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M';
-  return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n);
+  const cut = (v, d) => String(Math.floor(v * 10 ** d) / 10 ** d);
+  if (n >= 1e6) return cut(n / 1e6, n >= 1e7 ? 0 : 1) + 'M';
+  return n >= 10000 ? cut(n / 1000, n >= 100000 ? 0 : 1) + 'k' : String(n);
 }
 // сколько осталось: «5 ч 12 мин», «2 д 3 ч», «7 мин»
 function fmtLeft(ms) {

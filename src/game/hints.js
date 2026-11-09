@@ -124,8 +124,9 @@ function first(steps, c, depth) {
 
 // ---------- куда может дойти призрак ----------
 
-// Шагов от клетки (sx, sy) до каждой клетки, по которой можно пройти (-1 — не дойти).
-// Как поиск пути (Pathfinding.js: 8 направлений без срезания углов): дойти можно туда же, что и по 4.
+// Шагов от клетки (sx, sy) до каждой свободной клетки, где призрак может встать (-1 — не добраться).
+// Призрак перелетает препятствия (Player.pass), поэтому путь идёт по любой открытой земле, а встать
+// можно только на свободную клетку.
 export function walkDist(world, sx, sy) {
   const n = N * N, d = new Int16Array(n).fill(-1);
   if (!world.inside(sx, sy)) return d;
@@ -134,11 +135,12 @@ export function walkDist(world, sx, sy) {
   d[sy * N + sx] = 0; q[tail++] = sy * N + sx;
   while (head < tail) {
     const i = q[head++], x = i % N, y = (i / N) | 0, nd = d[i] + 1;
-    if (x > 0 && d[i - 1] < 0 && world.walkable(x - 1, y)) { d[i - 1] = nd; q[tail++] = i - 1; }
-    if (x < N - 1 && d[i + 1] < 0 && world.walkable(x + 1, y)) { d[i + 1] = nd; q[tail++] = i + 1; }
-    if (y > 0 && d[i - N] < 0 && world.walkable(x, y - 1)) { d[i - N] = nd; q[tail++] = i - N; }
-    if (y < N - 1 && d[i + N] < 0 && world.walkable(x, y + 1)) { d[i + N] = nd; q[tail++] = i + N; }
+    if (x > 0 && d[i - 1] < 0 && world.isOpen(x - 1, y)) { d[i - 1] = nd; q[tail++] = i - 1; }
+    if (x < N - 1 && d[i + 1] < 0 && world.isOpen(x + 1, y)) { d[i + 1] = nd; q[tail++] = i + 1; }
+    if (y > 0 && d[i - N] < 0 && world.isOpen(x, y - 1)) { d[i - N] = nd; q[tail++] = i - N; }
+    if (y < N - 1 && d[i + N] < 0 && world.isOpen(x, y + 1)) { d[i + N] = nd; q[tail++] = i + N; }
   }
+  for (let i = 0; i < n; i++) if (d[i] > 0 && !world.walkable(i % N, (i / N) | 0)) d[i] = -1;
   return d;
 }
 

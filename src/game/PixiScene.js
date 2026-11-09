@@ -123,10 +123,11 @@ class PlayerView {
 
   sync(p) {
     toWorld(p.x, p.y, tmp);
-    const f = p.sk.boneMap.float, lift = f ? Math.max(0, -f.ty) : 0, k = Math.max(0.55, 1.15 - lift * 0.035);
+    // полёт над препятствием (Player.lift): тело выше, тень остаётся на земле и становится меньше
+    const fl = p.lift || 0, f = p.sk.boneMap.float, lift = (f ? Math.max(0, -f.ty) : 0) + fl, k = Math.max(0.45, 1.15 - lift * 0.035);
     this.shadow.position.set(tmp.x, tmp.y); this.shadow.scale.set(k); this.shadow.alpha = 0.24 * k;
     let n = 0;
-    p.sk.eachDraw(tmp.x, tmp.y, 1, p.flip, (s, a, b, c, d, e, f2) => {
+    p.sk.eachDraw(tmp.x, tmp.y - fl, 1, p.flip, (s, a, b, c, d, e, f2) => {
       let sp = this.parts[n];
       if (!sp) { sp = this.parts[n] = new PIXI.Sprite(); this.c.addChild(sp); }
       sp.visible = true;
@@ -649,7 +650,8 @@ export class PixiScene {
       const o = a.obj;
       if (o) { if (w.objects[o.id] === o) focArea(o.gx, o.gy, o.w, o.h, o.gx, o.gy); } else if (w.inside(a.x, a.y)) focArea(a.x, a.y, 1, 1, a.x, a.y);
     };
-    foc(tmp.x - 11, tmp.y - 50, tmp.x + 11, tmp.y, pdepth, -1, -1); // F[0] — фермер (его силуэт поверх, ghost2)
+    const pl = p.lift || 0;
+    foc(tmp.x - 11, tmp.y - 50 - pl, tmp.x + 11, tmp.y - pl, pdepth, -1, -1); // F[0] — фермер (его силуэт поверх, ghost2)
     if (f.hover) focAim(f.hover); // клетка под мышкой (ПК)
     // На телефоне наведения нет: прозрачным остаётся то, что закрывает место последнего нажатия
     // (пока открыто его меню, Farm.look) и цели очереди дел — пока призрачок туда идёт и работает

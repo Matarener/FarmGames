@@ -16,6 +16,7 @@ function yieldOf(objs) {
   const r = { wood: 0, stone: 0, ore: 0, hits: 0, xp: 0 };
   for (const o of objs) {
     const d = OBJECTS[o.type];
+    if (!d.hp) continue; // пруд и прочее, что не рубят (у них нет прочности — было NaN в часах)
     for (const [k, v] of Object.entries(d.drops || {})) r[k] += avg(v);
     if (d.oreChance) r.ore += d.oreChance * avg(d.ore || [1, 2]);
     r.hits += d.hp; r.xp += d.xp || 1;

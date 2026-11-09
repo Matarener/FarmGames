@@ -5,7 +5,7 @@ import { AnimationState } from '../skeleton/Animation.js';
 import { toWorld } from '../engine/Iso.js';
 import { findPath } from '../engine/Pathfinding.js';
 import { N } from './World.js';
-import { QUEUE_MAX } from './data.js';
+import { QUEUE_MAX, FLY } from './data.js';
 
 const TOOL_ANIM = {
   chop: ['swing', 'axe'], mine: ['swing', 'pickaxe'], dig: ['swing', 'hoe'],
@@ -23,6 +23,7 @@ export class Player {
     this.state = 'idle';
     this.speed = 3.4; // клеток в секунду
     this.flip = false; this.back = false;
+    this.fly = 0; // 0 — идёт по земле, 1 — летит над препятствием (плавно между ними)
     this.sk = new Skeleton(data);
     this.anim = new AnimationState(this.sk, data.animations);
     this.anim.play('idle');
@@ -35,6 +36,15 @@ export class Player {
   get tx() { return Math.floor(this.x); }
   get ty() { return Math.floor(this.y); }
   get busy() { return this.state !== 'idle' || this.queue.length > 0; }
+  // На сколько единиц мира поднят над землёй (полёт над деревом, камнем, водой)
+  get lift() { return this.fly * FLY.lift; }
+
+  // Можно ли через клетку и во сколько обойдётся шаг (Pathfinding): по свободной земле — 1, над
+  // препятствием на открытой земле — FLY.cost (перелетает), закрытый участок и край карты — нельзя
+  pass(x, y) {
+    const w = this.world;
+    return w.walkable(x, y) ? 1 : w.isOpen(x, y) ? FLY.cost : 0;
+  }
 
   // То же дело (тот же вид действия, тот же объект или клетка), что уже делается или ждёт в очереди, или null
   find(action) {
@@ -66,9 +76,10 @@ export class Player {
 
   celebrate() { if (this.state === 'idle') this.anim.play('happy', { restart: true, loop: false }); }
 
-  // Цели, где можно встать для действия: соседние клетки объекта/тайла
+  // Цели, где можно встать для действия: соседние свободные клетки объекта/тайла (встаёт призрачок
+  // только на свободную клетку, а долететь может до любой)
   goals(a) {
-    if (a.kind === 'walk') return [[a.x, a.y]];
+    if (a.kind === 'walk') return this.world.walkable(a.x, a.y) ? [[a.x, a.y]] : [];
     const x0 = a.obj ? a.obj.gx : a.x, y0 = a.obj ? a.obj.gy : a.y;
     const w = a.obj ? a.obj.w : 1, h = a.obj ? a.obj.h : 1;
     const out = [];
@@ -82,7 +93,7 @@ export class Player {
   start(a) {
     this.current = a;
     const goals = this.goals(a);
-    const path = findPath(N, N, (x, y) => this.world.walkable(x, y), this.tx, this.ty, goals);
+    const path = findPath(N, N, (x, y) => this.pass(x, y), this.tx, this.ty, goals);
     if (!path) { this.handlers.fail(a, 'path'); this.current = null; return; }
     this.path = path;
     if (path.length) { this.state = 'walk'; this.sk.override.tool = null; this.anim.play('walk'); }
@@ -127,8 +138,8 @@ export class Player {
       let move = this.speed * dt;
       while (move > 0 && this.path.length) {
         const [nx, ny] = this.path[0];
-        // клетка могла стать непроходимой — перестроить путь
-        if (!this.world.walkable(nx, ny)) { const a = this.current; this.path = []; this.state = 'idle'; this.start(a); return; }
+        // клетка могла закрыться (или там, где встать, теперь что-то стоит) — перестроить путь
+        if (!this.pass(nx, ny) || (this.path.length === 1 && !this.world.walkable(nx, ny))) { const a = this.current; this.path = []; this.state = 'idle'; this.start(a); return; }
         const tx = nx + 0.5, ty = ny + 0.5;
         const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy);
         this.face(dx, dy);
@@ -137,6 +148,12 @@ export class Player {
       }
       if (!this.path.length) this.arrive();
     }
+    // в полёте — над препятствием сейчас или на двух следующих клетках пути (между деревьями не ныряет
+    // вниз); приземляется плавно
+    const w = this.world, P = this.path, blocked = (c) => c && !w.walkable(c[0], c[1]);
+    const up = !w.walkable(this.tx, this.ty) || blocked(P[0]) || blocked(P[1]) ? 1 : 0;
+    this.fly += (up - this.fly) * Math.min(1, dt * 7);
+    if (Math.abs(up - this.fly) < 0.005) this.fly = up;
     this.idleTime = this.busy || this.anim.name !== 'idle' ? 0 : this.idleTime + dt;
     this.anim.update(dt);
     this.anim.apply();

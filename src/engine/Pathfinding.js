@@ -1,6 +1,8 @@
 // A* по сетке, 8 направлений без срезания углов. Несколько целей сразу
 // (например, любая клетка рядом с деревом). Типизированные массивы и
 // бинарная куча — быстро даже на слабых устройствах.
+// pass(x, y) — можно ли через клетку: false/0 — нельзя, true/1 — обычный шаг, число > 1 — шаг
+// во столько раз дороже (призрак перелетает через дерево; из равных по длине путей выбирает путь по земле).
 
 const SQ2 = Math.SQRT2;
 const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, SQ2], [1, -1, SQ2], [-1, 1, SQ2], [-1, -1, SQ2]];
@@ -17,7 +19,7 @@ function ensure(n) {
   heapF = new Float32Array(n * 2);
 }
 
-export function findPath(w, h, walkable, sx, sy, goals, maxNodes = 6000) {
+export function findPath(w, h, pass, sx, sy, goals, maxNodes = 6000) {
   if (!goals.length) return null;
   const n = w * h;
   ensure(n);
@@ -82,9 +84,10 @@ export function findPath(w, h, walkable, sx, sy, goals, maxNodes = 6000) {
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
       const ni = ny * w + nx;
       if (state[ni] === 2) continue;
-      if (!walkable(nx, ny)) continue;
-      if (d >= 4 && (!walkable(cx + DIRS[d][0], cy) || !walkable(cx, cy + DIRS[d][1]))) continue;
-      const ng = g[cur] + DIRS[d][2];
+      const k = +pass(nx, ny);
+      if (!k) continue;
+      if (d >= 4 && (!pass(cx + DIRS[d][0], cy) || !pass(cx, cy + DIRS[d][1]))) continue;
+      const ng = g[cur] + DIRS[d][2] * k;
       if (state[ni] === 1 && ng >= g[ni]) continue;
       g[ni] = ng; came[ni] = cur; state[ni] = 1;
       push(ni, ng + hFn(nx, ny));
