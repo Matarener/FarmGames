@@ -24,7 +24,7 @@ import * as Spr from './sprinklers.js';
 import * as Hints from './hints.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
-  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, SPRINKLERS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
+  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, SPRINKLERS, floraSeedId, floraOwnId, seedId, WELL_COST,
   ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC,
 } from './data.js';
 
@@ -71,7 +71,7 @@ export class Farm {
       grass: a.grass, paths: a.paths, pathParts: a.pathEdge, pathBlend: a.pathBlend, pathEdge: new Map(), bed: a.bed, waterTex: a.waterTex, decor: a.decor,
       objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, wildGrass: a.wildGrass,
       house: a.house, well: a.well, crops: a.crops, fog: a.fog.clouds.length ? a.fog : null, sprinkler: a.sprinkler,
-      buildings: a.buildings, site: a.site,
+      buildings: a.buildings, sites: a.sites, houseUp: a.houseUp,
     });
     this.groundV++;
     for (const [k, v] of Object.entries(a.icons)) { this.icons[k] = v.url; this.iconImg[k] = v.img; }
@@ -180,7 +180,7 @@ export class Farm {
     if (S.sprinkler && S.sprinkler[o.type]) return S.sprinkler[o.type];
     switch (o.type) {
       case 'grass': return S.wildGrass[o.id % S.wildGrass.length];
-      case 'house': return S.house[this.st.house];
+      case 'house': return this.builds.houseSprite();
       case 'well': return S.well[this.st.well ? 1 : 0];
     }
     return S.objArt.rock[0];
@@ -933,8 +933,9 @@ export class Farm {
     const n = w.unlockedCount();
     const limit = HOUSE[this.st.house].chunks;
     if (n >= limit) {
-      const need = HOUSE.findIndex((h, i) => h && i > this.st.house && h.chunks > n);
-      return this.ui.popup(sx, sy, { title: 'Новый участок', text: `Улучшите дом до ${need} уровня, чтобы расширить ферму.`, items: [{ icon: 'house', label: 'К дому', onClick: () => this.ui.housePanel(this) }] });
+      const need = HOUSE.findIndex((h, i) => h && i > this.st.house && h.chunks > n), up = this.st.houseUp;
+      const text = up && up.to >= need ? `Дом улучшается до ${up.to} уровня: когда достроится, ферму можно будет расширить.` : `Улучшите дом до ${need} уровня, чтобы расширить ферму.`;
+      return this.ui.popup(sx, sy, { title: 'Новый участок', text, items: [{ icon: 'house', label: 'К дому', onClick: () => this.ui.housePanel(this) }] });
     }
     const cost = expansionCost(n);
     this.ui.popup(sx, sy, {
@@ -975,21 +976,8 @@ export class Farm {
     this.changed();
   }
 
-  upgradeHouse() {
-    const next = HOUSE[this.st.house + 1];
-    if (!next || this.world.unlockedCount() < houseNeedChunks(this.st.house)) return false;
-    if (!this.pay(next.cost)) return false;
-    const oldMax = this.maxEnergy;
-    this.st.house++;
-    this.st.energy += this.maxEnergy - oldMax;
-    const h = this.world.objects.find((o) => o && o.type === 'house');
-    if (h) { this.burst(h.wx, h.wy - 40, '#ffe066', 30); this.float(h.wx, h.wy - 110, `Дом ${this.st.house} ур.`, null); }
-    this.addXp(20);
-    this.sfx('unlock');
-    this.player.celebrate();
-    this.changed();
-    return true;
-  }
+  // Улучшение дома идёт по времени (houseRules.js): начинает и заканчивает его Buildings
+  upgradeHouse() { return this.builds.upgradeHouse(); }
 
   sell(key, n) {
     const r = Inv.sellItem(this.st, key, n);

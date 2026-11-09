@@ -339,6 +339,10 @@ button:disabled { cursor: default; }
 .cr-x { position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 7px; background: rgba(0,0,0,.08); font-size: 12px; }
 .mk-cell.poor i .ic { opacity: .55; }
 .cr-need { width: 100%; padding: 0; }
+.hu-prog { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; font-size: 13px; }
+.hu-prog .cr-bar { height: 10px; border-radius: 5px; }
+.hu-prog .cr-bar u { background: linear-gradient(#ffe48a, #e0a93a); }
+.hu-speed span .ic-s { vertical-align: -2px; }
 
 /* ---------- Рынок ---------- */
 .mk-seg { display: flex; gap: 2px; margin-right: 8px; padding: 3px; border-radius: 13px; background: rgba(0,0,0,.22); }

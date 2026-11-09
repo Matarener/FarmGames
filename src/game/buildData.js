@@ -5,33 +5,30 @@
 // в «Постройках» за blueprint монет с уровня level. С чертежом в рюкзаке здание ставится на свободную
 // траву: материалы cost списываются, и time секунд на месте стоят леса (спрайт стройки). Потом в здании
 // можно делать товары по рецептам RECIPES, по одному за раз, в очереди до slots мест.
-// sprite — картинка готового здания (assets/art), xp — опыт за постройку.
+// sprite — картинка готового здания, site — его же стройка в лесах (assets/art), xp — опыт за постройку.
 export const BUILDINGS = {
   kitchen: {
     name: 'Кухня', level: 3, blueprint: 50, cost: { wood: 20, stone: 15 }, time: 5 * 60, xp: 10, slots: 3, w: 2, h: 2,
-    sprite: 'building_kitchen', verb: 'Приготовить',
+    sprite: 'building_kitchen', site: 'site_kitchen', verb: 'Приготовить',
     desc: 'Готовит блюда из урожая, рыбы и ягод: они дают больше энергии, чем продукты по отдельности.',
   },
   carpentry: {
     name: 'Столярная мастерская', short: 'Столярная', level: 4, blueprint: 80, cost: { wood: 30, stone: 10 }, time: 10 * 60, xp: 15, slots: 3, w: 2, h: 2,
-    sprite: 'building_carpentry', verb: 'Сделать',
+    sprite: 'building_carpentry', site: 'site_carpentry', verb: 'Сделать',
     desc: 'Пилит доски для новых построек, кладёт деревянный настил и мастерит поделки из шишек, желудей и берёсты.',
   },
   forge: {
     name: 'Кузница', level: 5, blueprint: 150, cost: { planks: 10, stone: 25, ore: 4 }, time: 20 * 60, xp: 20, slots: 3, w: 2, h: 2,
-    sprite: 'building_forge', verb: 'Выковать',
+    sprite: 'building_forge', site: 'site_forge', verb: 'Выковать',
     desc: 'Плавит руду в слитки и куёт из них гвозди и подковы.',
   },
   stonecutter: {
     name: 'Камнерезная мастерская', short: 'Камнерезная', level: 6, blueprint: 200, cost: { planks: 12, nails: 10, stone: 15 }, time: 30 * 60, xp: 25, slots: 3, w: 2, h: 2,
-    sprite: 'building_stonecutter', verb: 'Вытесать',
+    sprite: 'building_stonecutter', site: 'site_stonecutter', verb: 'Вытесать',
     desc: 'Тешет из камня блоки, мостовую и камни для дорожек.',
   },
 };
 for (const [k, b] of Object.entries(BUILDINGS)) b.key = k;
-
-// Картинка стройки (леса) — одна на все здания
-export const SITE_SPRITE = 'construction_site';
 
 // Новые товары зданий (их иконки — ic_<ключ>). food — энергия (можно съесть), sell — цена продажи
 // (без sell не продаётся, как дерево), tab — раздел рюкзака. Хлеб, пирожок и дорожки — уже есть в data.js.

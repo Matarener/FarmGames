@@ -154,13 +154,15 @@ export const FOG = { width: 4, forest: [0.6, 0.55, 0.45, 0], color: 0xe4ecee };
 export const ENERGY = { chop: 1, mine: 1, dig: 2, water: 1, plant: 0, harvest: 0, fill: 0, fish: 1, pick: 1, sow: 0, mow: 0 };
 export const ENERGY_REGEN_SEC = 120;
 
+// Уровни дома: energy — запас энергии, can — поливов в лейке, chunks — сколько участков можно открыть,
+// cost — цена улучшения до этого уровня, time — сколько секунд дом стоит в лесах (houseRules.js)
 export const HOUSE = [
   null,
   { energy: 30, can: 3, chunks: 3 },
-  { energy: 40, can: 4, chunks: 6,  cost: { wood: 20, stone: 10, coins: 50 } },
-  { energy: 55, can: 5, chunks: 10, cost: { wood: 60, stone: 40, coins: 300 } },
-  { energy: 75, can: 6, chunks: 16, cost: { wood: 150, stone: 80, ore: 20, coins: 1500 } },
-  { energy: 100, can: 8, chunks: 25, cost: { wood: 300, stone: 120, ore: 25, coins: 6000 } },
+  { energy: 40, can: 4, chunks: 6,  cost: { wood: 20, stone: 10, coins: 50 }, time: 3 * 60 },
+  { energy: 55, can: 5, chunks: 10, cost: { wood: 60, stone: 40, coins: 300 }, time: 20 * 60 },
+  { energy: 75, can: 6, chunks: 16, cost: { wood: 150, stone: 80, ore: 20, coins: 1500 }, time: 60 * 60 },
+  { energy: 100, can: 8, chunks: 25, cost: { wood: 300, stone: 120, ore: 25, coins: 6000 }, time: 3 * 60 * 60 },
 ];
 
 // Склад не ограничен: ресурсы не пропадают

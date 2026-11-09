@@ -310,9 +310,11 @@ const STEP = {
     return need(c, WELL_COST, depth) || { step: 'well', kind: 'obj', obj: o, x: o.gx, y: o.gy, icon: ICON.well };
   },
 
-  // улучшить дом: нужен новый участок, потом ресурсы, потом сам дом (нажать — откроется окно дома)
+  // улучшить дом: нужен новый участок, потом ресурсы, потом сам дом (нажать — откроется окно дома);
+  // дом уже в лесах — ждём
   house: (c, depth) => {
     const st = c.st, w = c.world;
+    if (st.houseUp) return WAIT;
     if (!HOUSE[st.house + 1] || depth > 2) return null;
     if (w.unlockedCount() < houseNeedChunks(st.house)) return STEP.chunk(c, depth + 1);
     const lack = need(c, HOUSE[st.house + 1].cost, depth);

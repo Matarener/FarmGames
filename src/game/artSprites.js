@@ -3,7 +3,7 @@
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
 import { FLORA, PATHS, PATH_KEYS, SPRINKLERS } from './data.js';
-import { BUILDINGS, SITE_SPRITE, bldId } from './buildData.js';
+import { BUILDINGS, bldId } from './buildData.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
@@ -90,15 +90,15 @@ export async function loadArt(onProgress) {
     sprinkler[k] = A[k];
     if (!icons[k]) try { floraIcons[k] = iconOf(A[k]); } catch (e) { /* */ }
   }
-  // здания с крафтом (buildData.js): картинка готового здания и общая стройка (леса). Иконка здания
+  // здания с крафтом (buildData.js): картинка готового здания и его стройка (леса). Иконка здания
   // и его чертежа в рюкзаке — само здание (если нет отдельной ic_bld_<здание>).
-  const buildings = {};
+  const buildings = {}, sites = {};
   for (const b of Object.values(BUILDINGS)) {
     const sp = A[b.sprite];
     buildings[b.key] = sp;
+    sites[b.key] = A[b.site];
     if (sp && !icons[bldId(b.key)]) try { floraIcons[bldId(b.key)] = iconOf(sp); } catch (e) { /* */ }
   }
-  const site = A[SITE_SPRITE];
   // куски травяного края у дорожек (склеивает Farm.pathEdge): полосы вдоль сторон и углы
   const pathEdge = {};
   for (const name of Object.keys(A)) if (/^path_(edge|corner)_/.test(name)) pathEdge[name.slice(5)] = A[name];
@@ -119,7 +119,7 @@ export async function loadArt(onProgress) {
   // дикая высокая трава: grass_tall_0, grass_tall_1, ...
   const wildGrass = Object.keys(A).filter((n) => /^grass_tall_\d+$/.test(n)).sort().map((n) => A[n]);
   return {
-    wildGrass, fog, obj, crops, icons, flora, floraIcons, sprinkler, buildings, site,
+    wildGrass, fog, obj, crops, icons, flora, floraIcons, sprinkler, buildings, sites,
     sprouts: { tree: A.sprout_tree, bush: A.sprout_bush }, // ростки посаженных растений
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {
@@ -128,6 +128,8 @@ export async function loadArt(onProgress) {
       return (k === 'oak' && id % 3 === 0 && A.stump_oak_moss) || A['stump_' + k] || null;
     },
     house: [null, A.house_1, A.house_2, A.house_3, A.house_4, A.house_5],
+    // дом в лесах, пока идёт улучшение до этого уровня (houseRules.js)
+    houseUp: [null, null, A.house_up_2, A.house_up_3, A.house_up_4, A.house_up_5],
     well: [A.well_broken, A.well_fixed],
     // варианты травы 0,1 — простая (55% и 25%), 2,3 — с цветами (по 10%). Не отзеркаливать: плитки
     // бесшовные (tools/grass_tiles.py), у зеркальной край другой — будет шов

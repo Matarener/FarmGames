@@ -1,10 +1,12 @@
-// Здания с крафтом в игре: связывает правила (buildRules.js) с фермой — картинка здания или лесов,
-// нажатие на здание, салют в конце стройки, всплывающие «+1» за готовые товары, звуки и сохранение.
-// Окно здания (рецепты и очередь) — UI.craftPanel. Где стоит здание — общий список своих объектов (placed.js).
+// Здания с крафтом и улучшение дома в игре: связывает правила (buildRules.js, houseRules.js) с фермой —
+// картинка здания или лесов, нажатие на здание, салют в конце стройки, всплывающие «+1» за готовые
+// товары, звуки и сохранение. Окна — UI.craftPanel и UI.housePanel. Где стоит здание — общий список
+// своих объектов (placed.js).
 
 import * as R from './buildRules.js';
+import * as H from './houseRules.js';
 import { BUILDINGS, RECIPES } from './buildData.js';
-import { OBJECTS, ITEMS } from './data.js';
+import { OBJECTS, ITEMS, HOUSE } from './data.js';
 import { BAR_KIND, barTop } from './bars.js';
 
 export class Buildings {
@@ -18,13 +20,20 @@ export class Buildings {
   // Объект здания k на карте (null — ещё нет или убрано в рюкзак)
   find(k) { return this.f.world.objects.find((o) => o && o.type === k) || null; }
 
-  // Картинка: пока идёт стройка — леса, потом само здание. o.preview — призрак в режиме «Поставить»:
-  // чертёж ставится лесами, здание из рюкзака — готовым.
+  // Картинка: пока идёт стройка — это же здание в лесах, потом само здание. o.preview — призрак в режиме
+  // «Поставить»: чертёж ставится лесами, здание из рюкзака — готовым.
   sprite(o, now = Date.now()) {
-    const S = this.f.S;
-    if (o.preview) return ITEMS[o.item] && ITEMS[o.item].blueprint ? S.site : S.buildings[o.type];
-    return R.isBuilt(this.st, o.type, now) ? S.buildings[o.type] : S.site;
+    const S = this.f.S, k = o.type;
+    if (o.preview) return ITEMS[o.item] && ITEMS[o.item].blueprint ? S.sites[k] : S.buildings[k];
+    return R.isBuilt(this.st, k, now) ? S.buildings[k] : S.sites[k];
   }
+
+  // Дом: пока идёт улучшение — дом следующего уровня в лесах
+  houseSprite() {
+    const S = this.f.S, u = H.houseUp(this.st);
+    return (u && S.houseUp[u.to]) || S.house[this.st.house];
+  }
+  house() { return this.f.world.objects.find((o) => o && o.type === 'house') || null; }
 
   // Раз в секунду и при входе: кончилась ли стройка (опыт начисляется один раз). quiet — при входе:
   // без салюта, только тост.
@@ -43,7 +52,9 @@ export class Buildings {
       this.f.addXp(xp);
       this.f.quests.emit('build', k);
     }
-    if (done.length) { this.f.world.version++; this.f.changed(); }
+    const up = H.houseTick(this.st, now);
+    if (up) this.houseDone(up, quiet);
+    if (done.length || up) { this.f.world.version++; this.f.changed(); }
     // готовые товары появились — пузырь над зданием
     const ready = this.readyKey(now);
     if (ready !== this._ready) { this._ready = ready; this.f.syncBars(now); }
@@ -78,6 +89,44 @@ export class Buildings {
     if (R.isBuilt(this.st, k, now)) return null;
     this.f.burst(o.wx, o.wy - 20, '#e8d9a8', 18);
     return `Стройка началась: ${(b.short || b.name).toLowerCase()} будет готова через ${fmt(R.buildLeft(this.st, k, now))}`;
+  }
+
+  // ---------- Дом ----------
+
+  // Начать улучшение дома (кнопка в окне дома). → true, если началось
+  upgradeHouse() {
+    const f = this.f, now = Date.now(), why = H.houseUpBlock(this.st, f.world.unlockedCount());
+    if (why) { f.toast(why.why, 'warn'); return false; }
+    const r = H.startHouseUp(this.st, f.world.unlockedCount(), now);
+    const o = this.house();
+    if (o) f.burst(o.wx, o.wy - 20, '#e8d9a8', 18);
+    f.sfx('dig');
+    f.toast(`Дом улучшается до ${r.to} уровня: будет готово через ${fmt(H.houseUpLeft(this.st, now))}`, 'good');
+    f.world.version++;
+    if ((HOUSE[r.to].time || 0) <= 0) this.tick(now); // без времени — сразу готово
+    f.changed();
+    return true;
+  }
+
+  speedHouse() {
+    const r = H.speedHouseUp(this.st, Date.now());
+    if (!r) return this.f.toast('Не хватает кристаллов', 'warn');
+    this.f.sfx('coin');
+    this.tick(Date.now());
+    this.f.changed();
+  }
+
+  // Улучшение кончилось (tick): новый уровень, энергия выросла. quiet — при входе: без салюта.
+  houseDone(up, quiet) {
+    const f = this.f, o = this.house();
+    if (o && !quiet) {
+      f.burst(o.wx, o.wy - 40, '#ffe066', 30);
+      f.float(o.wx, o.wy - 110, `Дом ${up.to} ур.`, null);
+      f.player.celebrate();
+    }
+    f.toast(`Дом улучшен до ${up.to} уровня! Энергия: ${HOUSE[up.to].energy}`, 'good');
+    f.sfx('unlock');
+    f.addXp(20);
   }
 
   // Купить чертёж здания k (Farm.buy): один на ферму
@@ -135,6 +184,8 @@ export class Buildings {
   // Полоски и пузыри над зданиями (Farm.syncBars): стройка — полоска стройки; делается товар —
   // полоска крафта; есть готовое — пузырь с галочкой (B — полоски по 4 числа, U — пузыри по 2)
   bars(now, B, U) {
+    const h = H.upgrading(this.st) && this.house();
+    if (h && this.f.world.isOpen(h.gx, h.gy)) B.push(h.wx, h.wy - barTop(this.houseSprite()), H.houseUpPart(this.st, now), BAR_KIND.build);
     for (const o of this.f.world.objects) {
       if (!this.is(o) || !this.f.world.isOpen(o.gx, o.gy)) continue;
       const k = o.type, s = this.sprite(o, now), top = barTop(s);
@@ -167,4 +218,4 @@ export function fmt(sec) {
   return m ? `${h} ч ${m} мин` : `${h} ч`;
 }
 
-export { R as rules, RECIPES };
+export { R as rules, H as houseRules, RECIPES };

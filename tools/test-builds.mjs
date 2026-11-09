@@ -1,8 +1,10 @@
-// Проверка правил зданий с крафтом (src/game/buildRules.js) без браузера: node tools/test-builds.mjs
+// Проверка правил зданий с крафтом и улучшения дома (src/game/buildRules.js, houseRules.js) без браузера:
+// node tools/test-builds.mjs
 import assert from 'node:assert/strict';
 import * as B from '../src/game/buildRules.js';
+import * as H from '../src/game/houseRules.js';
 import { BUILDINGS, RECIPES, CRAFT_GOODS, bpId, bldId } from '../src/game/buildData.js';
-import { ITEMS, SHOP, OBJECTS, GEM_SPEEDUP_SEC } from '../src/game/data.js';
+import { ITEMS, SHOP, OBJECTS, GEM_SPEEDUP_SEC, HOUSE, houseNeedChunks } from '../src/game/data.js';
 import * as P from '../src/game/placed.js';
 import { World, N, START_CHUNK, CHUNK, CHUNKS } from '../src/game/World.js';
 
@@ -217,6 +219,53 @@ test('map: blueprint is placed as a construction site, built one goes to the bag
   P.placeObj(st2, w, 'bld_forge', x0, y0 + 3, { now: T0 });
   assert.ok(B.isBuilt(st2, 'forge', T0));
   assert.deepEqual(B.buildTick(st2, T0), []);
+});
+
+test('tables: every building has its own construction site sprite', () => {
+  const sites = Object.values(BUILDINGS).map((b) => b.site);
+  for (const b of Object.values(BUILDINGS)) assert.equal(b.site, `site_${b.key}`);
+  assert.equal(new Set(sites).size, sites.length);
+  for (let i = 2; i < HOUSE.length; i++) assert.ok(HOUSE[i].time > 0 && HOUSE[i].time >= (HOUSE[i - 1].time || 0), `house ${i} time`);
+});
+
+test('house upgrade: needs chunks and resources, takes time, then the new level', () => {
+  const st = fresh({ house: 1, energy: 10, items: { wood: 100, stone: 100 } });
+  const cost = HOUSE[2].cost, need = houseNeedChunks(1);
+  assert.equal(H.houseUpBlock(st, need - 1).chunks, need);
+  assert.equal(H.startHouseUp(st, need - 1, T0), null);
+  const poor = fresh({ house: 1, items: {} });
+  assert.match(H.houseUpBlock(poor, need).why, /Не хватает/);
+  const r = H.startHouseUp(st, need, T0);
+  assert.deepEqual(r, { to: 2, end: T0 + HOUSE[2].time * 1000 });
+  assert.equal(st.items.wood, 100 - cost.wood);
+  assert.equal(st.coins, 1000 - cost.coins);
+  assert.equal(st.house, 1, 'level stays until the scaffolding is gone');
+  assert.ok(H.upgrading(st));
+  assert.match(H.houseUpBlock(st, need).why, /уже улучшается/);
+  assert.equal(H.houseTick(st, T0 + 1000), null);
+  assert.ok(Math.abs(H.houseUpPart(st, T0 + HOUSE[2].time * 500) - 0.5) < 1e-9);
+  assert.equal(H.houseUpLeft(st, T0 + 60e3), HOUSE[2].time - 60);
+  const done = H.houseTick(st, T0 + HOUSE[2].time * 1000);
+  assert.deepEqual(done, { to: 2, energy: HOUSE[2].energy - HOUSE[1].energy });
+  assert.equal(st.house, 2);
+  assert.equal(st.energy, 10 + HOUSE[2].energy - HOUSE[1].energy);
+  assert.equal(st.houseUp, undefined);
+  assert.equal(H.houseTick(st, T0 + 9e9), null, 'only once');
+  // последний уровень
+  const top = fresh({ house: HOUSE.length - 1 });
+  assert.match(H.houseUpBlock(top, 99).why, /максимума/);
+});
+
+test('house upgrade speed-up costs gems by time left', () => {
+  const st = fresh({ house: 3, gems: 100, items: { wood: 999, stone: 999, ore: 99 }, coins: 9999, energy: 0 });
+  assert.ok(H.startHouseUp(st, 99, T0));
+  assert.equal(H.speedHouseUp(fresh({ gems: 0, houseUp: { to: 4, end: T0 + 1e6 } }), T0), null);
+  const left = HOUSE[4].time, gems = Math.ceil(left / GEM_SPEEDUP_SEC);
+  assert.deepEqual(H.speedHouseUp(st, T0), { gems });
+  assert.equal(st.gems, 100 - gems);
+  assert.equal(H.speedHouseUp(st, T0), null, 'nothing left to speed up');
+  assert.equal(H.houseTick(st, T0).to, 4);
+  assert.equal(st.house, 4);
 });
 
 console.log(`\n${tests} tests passed`);

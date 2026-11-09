@@ -14,6 +14,7 @@ import { MUSIC } from '../engine/Audio.js';
 import * as Dev from '../game/devRules.js';
 import { BUILDINGS, RECIPES, bldId } from '../game/buildData.js';
 import * as BR from '../game/buildRules.js';
+import * as HR from '../game/houseRules.js';
 
 // версия сборки (tools/build.mjs); при локальном запуске — «локально»
 const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'локально';
@@ -150,6 +151,7 @@ export class UI {
     this.wheelTick(f, true);
     if (this.popupEl.classList.contains('show') && this._popupTick) this._popupTick();
     if (this.panelOpen && this.panelEl.dataset.kind === 'craft') this.craftTick(f);
+    if (this.panelOpen && this.panelEl.dataset.kind === 'house') this.houseTick(f);
   }
 
   toast(msg, kind) {
@@ -959,26 +961,55 @@ export class UI {
     this.update(f);
   }
 
+  // Окно дома: что даёт уровень и улучшение. Улучшение идёт по времени (houseRules.js): пока дом в лесах,
+  // здесь полоска, сколько осталось, и «Достроить сейчас» за кристаллы (время идёт — houseTick).
   housePanel(f) {
     this.openPanel('house', 'Дом фермера', (body) => {
-      const lvl = f.st.house, cur = HOUSE[lvl], next = HOUSE[lvl + 1];
+      const st = f.st, now = Date.now(), up = HR.houseUp(st), lvl = st.house, cur = HOUSE[lvl], next = HOUSE[up ? up.to : lvl + 1];
+      this._houseUp = up ? up.to : 0;
       body.appendChild(h('div', 'pn-hero', `${this.ic('house', 'ic big')}<div><b>${lvl} уровень</b><span>Главное здание: от него зависят энергия, лейка и размер фермы.</span></div>`));
       const row = (label, a, b) => `<div class="stat"><span>${label}</span><b>${a}${b != null ? ` <i>→ ${b}</i>` : ''}</b></div>`;
       body.appendChild(h('div', 'stats',
         row('Энергия', cur.energy, next && next.energy) +
         row('Лейка, поливов', cur.can, next && next.can) +
         row('Участков земли', cur.chunks, next && next.chunks)));
-      if (next) {
+      if (up) {
+        const left = HR.houseUpLeft(st, now), gems = BR.gemsFor(left);
+        body.appendChild(h('div', 'pn-sub', `Идёт улучшение до ${up.to} уровня`));
+        body.appendChild(h('div', 'hu-prog', `<div class="cr-bar"><u style="width:${(HR.houseUpPart(st, now) * 100).toFixed(1)}%"></u></div><span>Осталось <b class="hu-left">${leftText(left)}</b></span>`));
+        const b = h('button', 'btn-main hu-speed', `Достроить сейчас · <span>${gems} ${this.ic('gem', 'ic-s')}</span>`);
+        b.dataset.g = gems;
+        b.disabled = st.gems < gems;
+        b.onclick = () => f.builds.speedHouse();
+        body.appendChild(b);
+      } else if (next) {
         body.appendChild(h('div', 'pn-sub', 'Улучшение'));
         body.appendChild(h('div', 'pp-cost', this.costHtml(next.cost, f)));
         const need = houseNeedChunks(lvl), have = f.world.unlockedCount();
         if (have < need) body.appendChild(h('div', 'pn-text', `Сначала откройте новый участок земли (участков: ${have} из ${need}).`));
+        else if (next.time) body.appendChild(h('div', 'pn-text', `Стройка займёт ${fmtShort(next.time)}: всё это время дом будет в лесах.`));
         const b = h('button', 'btn-main', `Улучшить до ${lvl + 1} уровня`);
         b.disabled = !f.canPay(next.cost) || have < need;
         b.onclick = () => { if (f.upgradeHouse()) this.refreshPanel(); };
         body.appendChild(b);
       } else body.appendChild(h('div', 'pn-text', 'Дом улучшен до максимума!'));
     });
+  }
+
+  // Раз в секунду, пока открыто окно дома: время улучшения идёт; кончилось — окно пересобирается
+  houseTick(f) {
+    const up = HR.houseUp(f.st);
+    if ((up ? up.to : 0) !== this._houseUp) return this.refreshPanel();
+    if (!up) return;
+    const now = Date.now(), el = this.panelEl, left = HR.houseUpLeft(f.st, now);
+    const bar = el.querySelector('.hu-prog u'), t = el.querySelector('.hu-left'), sp = el.querySelector('.hu-speed');
+    if (bar) bar.style.width = (HR.houseUpPart(f.st, now) * 100).toFixed(1) + '%';
+    if (t) t.textContent = leftText(left);
+    if (sp) {
+      const gems = BR.gemsFor(left);
+      if (sp.dataset.g !== String(gems)) { sp.dataset.g = gems; sp.querySelector('span').innerHTML = `${gems} ${this.ic('gem', 'ic-s')}`; }
+      sp.disabled = f.st.gems < gems;
+    }
   }
 
   // ---------- Здание с крафтом: очередь и рецепты ----------
