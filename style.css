@@ -358,6 +358,72 @@ button:disabled { cursor: default; }
 .ii-note { width: 100%; font-size: 13px; font-weight: 600; color: #8a6a50; }
 @media (min-width: 700px) and (min-height: 500px) { .mk-grid { grid-template-columns: repeat(6, 1fr); } }
 @media (max-height: 500px) and (orientation: landscape) { .mk-grid { grid-template-columns: repeat(7, 1fr); } }
+/* пометка «нужно для заказа» в углу клетки на вкладке «Продать» */
+.mk-need { position: absolute; left: 4px; top: 4px; width: 24%; height: 24%; }
+
+/* ---------- Доска заказов (рынок → «Заказы») ---------- */
+/* три кнопки в шапке рынка помещаются на узком телефоне */
+.mk-seg.n3 button { position: relative; min-width: 0; padding: 0 9px; font-size: 13.5px; }
+.mk-seg .qt-dot { top: -3px; right: -3px; }
+.pn-body.od-body { flex: 1; min-height: 0; padding: 10px 12px 16px; }
+.od-head { display: flex; justify-content: space-between; gap: 8px; margin: 0 2px 8px; font-size: 12.5px; font-weight: 700; color: #8a6a50; }
+.od-list { display: grid; gap: 10px; }
+.od-card {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px;
+  background: linear-gradient(#fff, #fbf1dc); border: 2px solid rgba(61,43,31,.35); border-radius: 14px;
+}
+.od-card.ready { border-color: #4f9e36; box-shadow: 0 0 0 2px rgba(95,176,58,.25); }
+.od-who { display: flex; align-items: flex-start; gap: 8px; }
+.od-who > .ic { width: 34px; height: 34px; object-fit: contain; vertical-align: 0; }
+.od-who > div { flex: 1; min-width: 0; }
+.od-who b { display: block; font-size: 14px; }
+.od-who span { display: block; margin-top: 1px; font-size: 12px; line-height: 1.3; font-weight: 500; color: #6b5442; }
+.od-who span b { display: inline; font-size: inherit; font-variant-numeric: tabular-nums; color: var(--ink); }
+.od-skip { flex: none; height: 28px; padding: 0 9px; border-radius: 9px; background: rgba(61,43,31,.08); font-size: 11.5px; font-weight: 700; color: #8a6a50; white-space: nowrap; }
+.od-skip.sure { background: #e5483b; color: #fff; }
+.od-goods { display: flex; gap: 6px; }
+.od-good {
+  flex: 1 1 0; max-width: 112px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 4px 5px;
+  border-radius: 12px; background: var(--paper-2); border: 2px solid transparent;
+}
+.od-good i { position: relative; width: 40px; height: 40px; }
+.od-good i .ic { width: 100%; height: 100%; object-fit: contain; vertical-align: 0; }
+.od-good em {
+  position: absolute; right: -7px; bottom: -3px; width: 19px; height: 19px; border-radius: 50%; border: 2px solid #fff;
+  background: #4f9e36; color: #fff; font: 900 11px/15px system-ui, sans-serif; font-style: normal; text-align: center;
+}
+.od-good span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: #6b5442; }
+.od-good b { font-size: 14px; color: #c0392b; font-variant-numeric: tabular-nums; }
+.od-good.ok { border-color: rgba(95,176,58,.45); }
+.od-good.ok b { color: #3f8a25; }
+.od-foot { display: flex; align-items: center; gap: 8px; }
+.od-pay { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
+.od-pay b { display: inline-flex; align-items: center; gap: 3px; font-size: 16px; }
+.od-pay b .ic { width: 20px; height: 20px; vertical-align: 0; }
+.od-pay small { width: 100%; display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: #8a6a50; }
+.od-pay small .ic { width: 13px; height: 13px; vertical-align: 0; }
+.od-give { flex: none; min-width: 104px; justify-content: center; font-size: 15px; font-weight: 800; }
+.od-wait { background: rgba(246,230,196,.55); border-style: dashed; }
+.od-wait .od-who > .ic { opacity: .45; filter: grayscale(.6); }
+.od-rush { align-self: flex-start; }
+.od-rush .ic { width: 16px; height: 16px; vertical-align: 0; }
+.od-lock { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 36px 20px; text-align: center; }
+.od-lock span { max-width: 300px; font-size: 13px; font-weight: 500; color: #5a4434; }
+/* горизонтальный телефон и широкий экран: три заказа в ряд */
+@media (max-height: 500px) and (orientation: landscape), (min-width: 700px) and (min-height: 500px) {
+  .od-list { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+  .od-foot { margin-top: auto; }
+  .od-give { min-width: 88px; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .pn-body.od-body { padding: 8px 10px 10px; }
+  .od-head { margin-bottom: 6px; }
+  .od-card { gap: 6px; padding: 8px; }
+  .od-say { display: none !important; }
+  .od-good { padding: 4px 2px; }
+  .od-good i { width: 30px; height: 30px; }
+  .od-who > .ic { width: 28px; height: 28px; }
+}
 
 /* ---------- Уведомления ---------- */
 .toast {
