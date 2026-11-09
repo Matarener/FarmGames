@@ -21,20 +21,20 @@
  {
   "name": "tree_plum_bare",
   "refs": [
-   "art-candidates/fruit/refs/tree_plum_c.jpg"
+   "art-candidates/fruit/refs/tree_plum_m.jpg"
   ],
   "size": "1024x1024",
-  "key": "#00FFFF",
+  "key": "magenta",
   "prompt": "Edit the reference image: keep this exact plum tree: same trunk, crown shape and size, leaves, colors, outline, lighting, angle and the same small grass tufts at the foot of the trunk. Same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Remove all the plums from the crown: where they hung there are only leaves now, no fruit at all. Nothing under the tree: no ground, no fallen fruit, no shadow. One object only, centered, with an empty margin around it."
  },
  {
   "name": "tree_plum_young",
   "refs": [
-   "art-candidates/fruit/refs/tree_plum_c.jpg",
-   "art-candidates/fruit/refs/style_young_c.jpg"
+   "art-candidates/fruit/refs/tree_plum_m.jpg",
+   "art-candidates/fruit/refs/style_young_m.jpg"
   ],
   "size": "1024x1024",
-  "key": "#00FFFF",
+  "key": "magenta",
   "prompt": "A YOUNG version of the plum tree from the first reference, drawn in the same style and with the same proportions as the young apple tree in the second reference: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. a thin dark reddish-brown trunk, a small rounded crown of the same mid-green oval leaves, no fruit and no flowers. Nothing must be under the tree: no ground, no soil, no lawn, no grass island, no flowers, no stones, no fallen fruit, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
  },
  {

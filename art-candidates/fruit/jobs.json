@@ -38,10 +38,10 @@
  {
   "name": "tree_plum",
   "refs": [
-   "art-candidates/fruit/refs/style_tree_c.jpg"
+   "art-candidates/fruit/refs/style_tree_m.jpg"
   ],
   "size": "1024x1024",
-  "key": "#00FFFF",
+  "key": "magenta",
   "prompt": "A single new fruit tree for a cozy isometric farm game, drawn in exactly the same art style as the reference apple tree: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Same size and proportions as the reference: a trunk about as tall and a crown about as wide. It must clearly be a plum tree, not an apple tree: a plum tree: a dark reddish-brown trunk, a rounded, slightly spreading crown of mid-green oval leaves, with many oval dark purple-blue plums covered with a soft pale dusty bloom and small highlights. Nothing must be under the tree: no ground, no soil, no lawn, no grass island, no flowers, no stones, no fallen fruit, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
  },
  {
@@ -59,7 +59,7 @@
    "assets/source/ui_flora1.png"
   ],
   "size": "1024x1024",
-  "key": "#00FFFF",
+  "key": "magenta",
   "prompt": "One inventory icon for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, glossy highlight): two oval dark purple-blue plums with a pale dusty bloom and a soft highlight, a short brown stalk and one green leaf. Front view, centered, filling most of the image. No text, nothing else."
  },
  {
@@ -68,7 +68,7 @@
    "assets/source/ui_saplings1.png"
   ],
   "size": "1024x1024",
-  "key": "#00FFFF",
+  "key": "magenta",
   "prompt": "One inventory icon for a mobile farm game, in the same style as the sapling icons in the reference: a young plum sapling with a thin reddish-brown stem, a few oval green leaves and two tiny dark purple-blue plums, planted in the same tied burlap root-ball sack as in the reference. Centered, filling most of the image. No text, nothing else."
  },
  {
