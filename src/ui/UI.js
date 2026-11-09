@@ -1220,8 +1220,8 @@ export class UI {
       }
       body.appendChild(g);
       const r = S.sel && RECIPES[S.sel];
-      if (r && r.at === k) card.appendChild(this.recipeCard(f, k, r, now));
-      else S.sel = null;
+      // выбранный рецепт — карточкой снизу, а на горизонтальном телефоне колонкой справа (with-info, style.css)
+      if (r && r.at === k) { card.appendChild(this.recipeCard(f, k, r, now)); card.classList.add('with-info'); } else S.sel = null;
     });
   }
 
