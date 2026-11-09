@@ -1414,8 +1414,8 @@ export class UI {
       if (sure) { M.skip = null; f.orders.skip(s.idx); return; }
       M.skip = o.id; this.sfx('tap'); this.refreshPanel();
     };
-    top.appendChild(x);
     c.appendChild(top);
+    c.appendChild(x);
     const goods = h('div', 'od-goods');
     for (const l of s.lines) {
       const it = ITEMS[l.id], ok = l.have >= l.n;
@@ -1425,7 +1425,7 @@ export class UI {
     }
     c.appendChild(goods);
     const foot = h('div', 'od-foot', `<div class="od-pay"><b>${fmtNum(o.coins)} ${this.ic('coin')}</b><b>+${o.xp} ${this.ic('star')}</b>` +
-      `<small>на рынке ${fmtNum(o.value)} ${this.ic('coin')}</small></div>`);
+      `<small>на рынке <span>${fmtNum(o.value)} ${this.ic('coin')}</span></small></div>`);
     const give = h('button', 'btn-s gold od-give', 'Отдать');
     give.disabled = !s.ready;
     give.onclick = () => { M.skip = null; f.orders.deliver(s.idx); };

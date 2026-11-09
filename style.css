@@ -426,20 +426,24 @@ button:disabled { cursor: default; }
 .pn-body.od-body { flex: 1; min-height: 0; padding: 10px 12px 16px; }
 .od-head { display: flex; justify-content: space-between; gap: 8px; margin: 0 2px 8px; font-size: 12.5px; font-weight: 700; color: #8a6a50; }
 .od-list { display: grid; gap: 10px; }
+/* карточка — сетка: кто и «Отказаться» сверху, товары, награда и «Отдать» снизу (места меняются в узких карточках) */
 .od-card {
-  display: flex; flex-direction: column; gap: 8px; padding: 10px;
+  display: grid; grid-template-columns: minmax(0, 1fr) min-content; grid-template-areas: "who skip" "goods goods" "pay give";
+  align-items: center; gap: 8px; padding: 10px;
   background: linear-gradient(#fff, #fbf1dc); border: 2px solid rgba(61,43,31,.35); border-radius: 14px;
 }
+.od-card.od-wait { display: flex; flex-direction: column; }
 .od-card.ready { border-color: #4f9e36; box-shadow: 0 0 0 2px rgba(95,176,58,.25); }
-.od-who { display: flex; align-items: flex-start; gap: 8px; }
+.od-who { grid-area: who; align-self: start; display: flex; align-items: flex-start; gap: 8px; }
 .od-who > .ic { width: 34px; height: 34px; object-fit: contain; vertical-align: 0; }
 .od-who > div { flex: 1; min-width: 0; }
 .od-who b { display: block; font-size: 14px; }
 .od-who span { display: block; margin-top: 1px; font-size: 12px; line-height: 1.3; font-weight: 500; color: #6b5442; }
 .od-who span b { display: inline; font-size: inherit; font-variant-numeric: tabular-nums; color: var(--ink); }
-.od-skip { flex: none; height: 28px; padding: 0 9px; border-radius: 9px; background: rgba(61,43,31,.08); font-size: 11.5px; font-weight: 700; color: #8a6a50; white-space: nowrap; }
-.od-skip.sure { background: #e5483b; color: #fff; }
-.od-goods { display: flex; gap: 6px; }
+.od-skip { grid-area: skip; align-self: start; justify-self: end; height: 28px; padding: 0 9px; border-radius: 9px; background: rgba(61,43,31,.08); font-size: 11.5px; font-weight: 700; color: #8a6a50; white-space: nowrap; }
+/* «Точно отказаться?» переносится на две строки, а не раздвигает столбец с «Отдать» */
+.od-skip.sure { height: auto; min-height: 28px; padding: 3px 9px; white-space: normal; line-height: 1.15; background: #e5483b; color: #fff; }
+.od-goods { grid-area: goods; display: flex; gap: 6px; }
 .od-good {
   flex: 1 1 0; max-width: 112px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 4px 5px;
   border-radius: 12px; background: var(--paper-2); border: 2px solid transparent;
@@ -454,23 +458,25 @@ button:disabled { cursor: default; }
 .od-good b { font-size: 14px; color: #c0392b; font-variant-numeric: tabular-nums; }
 .od-good.ok { border-color: rgba(95,176,58,.45); }
 .od-good.ok b { color: #3f8a25; }
-.od-foot { display: flex; align-items: center; gap: 8px; }
-.od-pay { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
+.od-foot { display: contents; }
+.od-pay { grid-area: pay; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
 .od-pay b { display: inline-flex; align-items: center; gap: 3px; font-size: 16px; }
 .od-pay b .ic { width: 20px; height: 20px; vertical-align: 0; }
-.od-pay small { width: 100%; display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: #8a6a50; }
+.od-pay small { width: 100%; font-size: 11px; font-weight: 600; color: #8a6a50; }
+.od-pay small span { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .od-pay small .ic { width: 13px; height: 13px; vertical-align: 0; }
-.od-give { flex: none; min-width: 104px; justify-content: center; font-size: 15px; font-weight: 800; }
+.od-give { grid-area: give; min-width: 104px; justify-content: center; font-size: 15px; font-weight: 800; }
 .od-wait { background: rgba(246,230,196,.55); border-style: dashed; }
 .od-wait .od-who > .ic { opacity: .45; filter: grayscale(.6); }
 .od-rush { align-self: flex-start; }
 .od-rush .ic { width: 16px; height: 16px; vertical-align: 0; }
 .od-lock { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 36px 20px; text-align: center; }
 .od-lock span { max-width: 300px; font-size: 13px; font-weight: 500; color: #5a4434; }
-/* горизонтальный телефон и широкий экран: три заказа в ряд */
-@media (max-height: 500px) and (orientation: landscape), (min-width: 700px) and (min-height: 500px) {
+/* горизонтальный телефон и широкий экран: три заказа в ряд (планшет стоя — один столбец, как на телефоне) */
+@media (max-height: 500px) and (orientation: landscape), (min-width: 900px) and (min-height: 500px) {
   .od-list { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
-  .od-foot { margin-top: auto; }
+  .od-card { grid-template-rows: auto 1fr auto; }
+  .od-goods { align-self: start; }
   .od-give { min-width: 88px; }
 }
 @media (max-height: 500px) and (orientation: landscape) {
@@ -481,6 +487,18 @@ button:disabled { cursor: default; }
   .od-good { padding: 4px 2px; }
   .od-good i { width: 30px; height: 30px; }
   .od-who > .ic { width: 28px; height: 28px; }
+}
+/* узкий горизонтальный телефон (карточка уже 240 px): имя на всю ширину, «Отказаться» под «Отдать»,
+   товары строками — значок, название целиком, сколько */
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 779px) {
+  .od-card { grid-template-areas: "who who" "goods goods" "pay give" "pay skip"; grid-template-rows: auto 1fr auto auto; row-gap: 6px; }
+  .od-skip, .od-skip.sure { align-self: stretch; justify-self: stretch; height: auto; min-height: 26px; padding: 3px 6px; white-space: normal; line-height: 1.1; }
+  .od-goods { flex-direction: column; gap: 4px; }
+  .od-good { flex: none; max-width: none; flex-direction: row; gap: 6px; padding: 1px 6px 1px 2px; border-radius: 9px; }
+  .od-good i { flex: none; width: 24px; height: 24px; }
+  .od-good em { right: -5px; bottom: -3px; width: 14px; height: 14px; border-width: 1.5px; font-size: 8px; line-height: 11px; }
+  .od-good span { flex: 1; min-width: 0; font-size: 11.5px; }
+  .od-good b { flex: none; font-size: 13px; }
 }
 
 /* ---------- Уведомления ---------- */
