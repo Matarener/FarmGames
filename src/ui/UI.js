@@ -1550,6 +1550,12 @@ export class UI {
         p.onclick = () => { this.closePanel(); f.mover.useItem(it.key); };
         acts.appendChild(p);
       }
+      // саженец в рюкзаке — «Посадить», как в рюкзаке: окно закрывается, включается посадка (нажимай на траву)
+      if (it.floraOf && have && !locked) {
+        const p = h('button', 'btn-s', `${this.ic('seed')} Посадить`);
+        p.onclick = () => { this.closePanel(); f.pickSow(it.floraOf, false); };
+        acts.appendChild(p);
+      }
       row.appendChild(acts);
       box.appendChild(row);
     }
