@@ -61,10 +61,10 @@ CROP_STAGE_W = {'cabbage': [17.6, 29.65, 47.13, 56.7]}
 NOBASE = {
     # деревья — по высоте (от верха до опоры), чтобы рост шёл по породам: ель > дуб > липа > берёза >
     # клён > вишня > яблоня > сакура. Взрослое с плодами и без — одной высоты, молодое — 0.6 взрослого.
-    'tree_pine': ('h', 120), 'tree_oak': ('h', 106), 'tree_linden': ('h', 100), 'tree_birch': ('h', 96),
+    'tree_pine': ('h', 110), 'tree_oak': ('h', 106), 'tree_linden': ('h', 100), 'tree_birch': ('h', 96),
     'tree_maple': ('h', 90), 'tree_cherry': ('h', 86), 'tree_cherry_bare': ('h', 86),
     'tree_apple': ('h', 82), 'tree_apple_bare': ('h', 82), 'tree_sakura': ('h', 80), 'tree_sakura_bare': ('h', 80),
-    'tree_pine_young': ('h', 72), 'tree_oak_young': ('h', 64), 'tree_linden_young': ('h', 60),
+    'tree_pine_young': ('h', 66), 'tree_oak_young': ('h', 64), 'tree_linden_young': ('h', 60),
     'tree_birch_young': ('h', 58), 'tree_maple_young': ('h', 54), 'tree_cherry_young': ('h', 52),
     'tree_apple_young': ('h', 49), 'tree_sakura_young': ('h', 48),
     # кусты: с плодами, без, молодые
