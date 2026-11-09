@@ -64,9 +64,9 @@ SHEETS.update({name: [(name, w)] for name, w in SINGLE.items()})
 # клетки: по x — середина нижней части (столбик, ножки), по y — на lift единиц выше самого низа
 # (у треноги задняя ножка стоит выше передних: середина клетки — между ними).
 PROPS = {
-    'sprinkler_drip': {'h': 30, 'lift': 3},
-    'sprinkler_spin': {'h': 38, 'lift': 4},
-    'sprinkler_rain': {'h': 46, 'lift': 6},
+    'sprinkler_drip': {'h': 32, 'lift': 4},
+    'sprinkler_spin': {'h': 40, 'lift': 4},
+    'sprinkler_rain': {'h': 56, 'lift': 5},
 }
 # молодое растение по высоте взрослого: по умолчанию — <имя без _young>
 YOUNG_OF = {'tree_cherry_young': 'tree_cherry_bare'}  # молодая вишня — по цветущей
