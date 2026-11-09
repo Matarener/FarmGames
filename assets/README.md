@@ -29,8 +29,10 @@ assets/map.json  стартовая карта (редактор карты)
 | травяной край дорожек | `path_edge_<сторона>`, `path_corner_<вершина>_<вид>` (делает `tools/path_tiles.py`) | `path_corner_n_out` |
 | переход между видами дорожек | `blend_<вид дорожки>_edge_<сторона>`, `blend_<вид дорожки>_corner_<вершина>_<вид>` (тоже `path_tiles.py`) | `blend_path_cobble_edge_nw` |
 | грядка | `bed_dry`, `bed_wet` | |
-| вода и пруд | `tex_water` (текстура), `pond_<что>` | `pond_lily` |
+| пруд целиком (одна картинка на пруд) | `pond_<вид>` (делает `tools/pond_art.py`) | `pond_round`, `pond_big` |
+| украшения прудов и кувшинки | `pond_<что>` | `pond_cattail`, `pond_lily` |
 | дом, колодец | `house_<уровень>`, `well_broken`, `well_fixed` | |
+| поливалка | `<ключ из SPRINKLERS>` (иконка на рынке и в рюкзаке — сама картинка) | `sprinkler_spin` |
 | туман | `fog_clouds_<n>`, `fog_strips_<n>`, `fog_wisps_<n>` | |
 | иконка интерфейса | `ic_<имя>` | `ic_coin`, `ic_sap_oak` |
 
@@ -50,9 +52,9 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 
 Деревья, кусты, пни и высокая трава — **без подложки** (с 2026-11-09): без травяного островка и земляного
 блока, у ствола только несколько травинок в цвет травы. Они стоят прямо на плитке травы, а мягкую тень
-под ними рисует `slice_art.py` (`SHADOW`). Размер задаёт `NOBASE` в `slice_art.py`: ширина кроны (у пней —
-высота над землёй) в мировых единицах, опора — середина низа ствола или стеблей. Новое растение — строка
-в `NOBASE`.
+под ними рисует `slice_art.py` (`SHADOW`). Размер задаёт `NOBASE` в `slice_art.py`: ширина кроны в мировых
+единицах (у пней и травы — вся ширина, у липы — высота, чтобы не переросла берёзу), опора — середина низа
+ствола или стеблей. Новое растение — строка в `NOBASE`.
 
 Трава бесшовная: `tools/grass_tiles.py` собирает из `tile_grass.png` и `tile_grass_flowers.png` четыре
 плитки с одинаковой каймой у краёв (любые две рядом стыкуются), цветы с второй картинки накладываются
@@ -68,6 +70,16 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 Новый вид дорожки: строка в `PATHS` (со своим `layer`), картинка `tile_path_<вид>.png`, строка в `PATH_TILES`
 (`slice_art.py`), если вид заходит на нижние — строка в `BLEND`, и `python tools/slice_art.py tiles`.
 
+Пруды (виды — `PONDS` в `src/game/data.js`: форма клетками) — по одной картинке на
+пруд, её собирает `tools/pond_art.py`: вода — текстура художника `assets/source/tex_water.png`, трава вокруг —
+та же бесшовная трава, что у плиток земли, кувшинки и листья — `pond_lily`, `pond_leaves` (`FLOATS` в
+`pond_art.py`). Вода чуть ниже земли: у дальнего берега земляная стенка с тенью, у ближнего — пена.
+Опора картинки — середина прямоугольника клеток пруда. Новый вид пруда: строка в `PONDS`, строка в `FLOATS`
+и `python tools/pond_art.py <вид>` (`--preview` — ещё и картинки для проверки в `.pond-art/`: пруд на траве
+с сеткой клеток). Нарисованную художником картинку пруда можно положить вместо собранной:
+`assets/source/pond_<вид>.png` той же формы и с той же опорой. Камыш, рогоз и камни (`pond_reeds`, `pond_cattail`,
+`pond_rocks`) в картинку не входят: это украшения `POND_DECOR`, игрок ставит их сам на воду пруда.
+
 ## Как нарезать
 
 Нужен Python с numpy, Pillow и scipy (`pip install numpy pillow scipy`).
@@ -75,10 +87,11 @@ blueberry, raspberry, rosehip, hydrangea, lavender, rose), `<культура>` 
 ```
 python tools/slice_art.py                   # всё: картинки, manifest.json, иконки, icons.json
 python tools/slice_fog.py                   # облака тумана (дописывает manifest.json)
+python tools/pond_art.py                    # пруды (дописывает manifest.json)
 
 python tools/slice_art.py tree_apple_bare   # только эти листы (остальное в манифесте не трогается)
 python tools/slice_art.py tiles             # только плитки земли
 ```
 
 Полная нарезка `slice_art.py` пишет `manifest.json` заново, поэтому после неё всегда запускайте
-`slice_fog.py`.
+`slice_fog.py` и `pond_art.py`.

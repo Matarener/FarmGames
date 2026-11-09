@@ -4,8 +4,9 @@
 import * as PIXI from '../vendor/pixi.min.mjs';
 import { toWorld, HW, HH } from '../engine/Iso.js';
 import { dimSprite, hash2 } from '../engine/Sprite.js';
-import { N, CHUNK, CHUNKS, T, FOG_W } from './World.js';
-import { HOUSE, FOG } from './data.js';
+import { N, CHUNK, CHUNKS, T, FOG_W, objCells } from './World.js';
+import { areaCells } from './sprinklers.js';
+import { HOUSE, FOG, OBJECTS } from './data.js';
 import { BAR_COLORS, BAR_W, BAR_H, BAR_MIN_ZOOM, barTop, primeBarTop } from './bars.js';
 
 const tmp = { x: 0, y: 0 };
@@ -67,7 +68,8 @@ class Atlases {
       this.map.set(img, t); return t;
     }
     // пустые прозрачные поля обрезаем: видеокарта не тратит на них время, атлас меньше
-    const b = this.trim ? opaqueBox(img, w, h) : { x: 0, y: 0, w, h };
+    // (у клеток земли рамка нужна целиком — сетки кусков; пруды — обычные спрайты, их обрезаем)
+    const b = this.trim || s.flat ? opaqueBox(img, w, h) : { x: 0, y: 0, w, h };
     if (!b) { t = PIXI.Texture.EMPTY; this.map.set(img, t); return t; }
     if (b.y40 !== undefined) primeBarTop(s, b.y40);
     let p = this.list[this.list.length - 1] || this.page();
@@ -146,9 +148,13 @@ export class PixiScene {
     // туман вокруг карты: одна сетка с плавной прозрачностью, над ней — лес (полупрозрачный, «в дымке»)
     this.fogMesh = null; this.fogForest = new PIXI.Container(); this.fogForest.eventMode = 'none';
     this.fogC = new PIXI.Container(); world.addChild(this.fogC); this.fogC.addChild(this.fogForest);
-    this.decorC = new PIXI.Container(); world.addChild(this.decorC); // кувшинки и листья на воде
+    // пруды: плоские, под всем остальным (одна картинка на пруд, Farm.objSprite)
+    this.pondC = new PIXI.Container(); world.addChild(this.pondC);
+    this.decorC = new PIXI.Container(); world.addChild(this.decorC); // плоский декор (сейчас не используется)
     this.bedsC = new PIXI.Container({ sortableChildren: true, isRenderGroup: true }); world.addChild(this.bedsC);
     this.border = new PIXI.Graphics(); world.addChild(this.border);
+    // клетки, которые поливает поливалка (под растениями и объектами, над землёй)
+    this.areaG = new PIXI.Graphics(); this.areaG.visible = false; world.addChild(this.areaG); this.areaKey = '';
     this.objC = new PIXI.Container({ sortableChildren: true }); world.addChild(this.objC);
     this.over = new PIXI.Container(); world.addChild(this.over);
     this.border2 = new PIXI.Graphics(this.border.context); this.border2.alpha = 0.45; this.over.addChild(this.border2);
@@ -194,9 +200,10 @@ export class PixiScene {
     PIXI.BitmapFont.install({ name: 'farm-float', style: { ...font, fontSize: 11, fill: 0xfffbe8, stroke: { color: 0x3a2717, width: 3, join: 'round' } }, chars, resolution: this.textRes, padding: pad });
   }
 
-  // спрайт игры → Pixi-спрайт в точке (x, y) — опорной точке спрайта
+  // спрайт игры → Pixi-спрайт в точке (x, y) — опорной точке спрайта. Плоские (пруды) — из атласа земли:
+  // рисуются сразу после земли, и для них не нужен лишний лист в атласе объектов
   put(sp, s, x, y) {
-    const t = this.atlas.tex(s);
+    const t = (s.flat ? this.groundAtlas : this.atlas).tex(s);
     if (sp.texture !== t) { sp.texture = t; sp.anchor.set(s.ax / s.w, s.ay / s.h); sp.scale.set(s.w / t.width, s.h / t.height); }
     if (sp.x !== x || sp.y !== y) sp.position.set(x, y);
   }
@@ -207,26 +214,21 @@ export class PixiScene {
   syncGround() { const _t = performance.now(); try { this._syncGround(); } finally { this.f.perf.mark('syncGround', performance.now() - _t); } }
   _syncGround() {
     const f = this.f, w = f.world, S = f.S;
-    this.makeWaterTex();
     const per = this.chunks.map(() => []);
     const edges = this.chunks.map(() => []); // травяной край дорожек — поверх всей земли куска
     for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
       const i = gy * N + gx, t = w.tiles[i];
       const cx = (gx - gy) * HW, cy = (gx + gy + 1) * HH;
       let s, bed = null;
-      if (t === T.GRASS) s = S.grass[w.variant[i]];
+      // под прудом — тоже трава: пруд (одна картинка) лежит поверх неё, у берега трава видна
+      if (t === T.GRASS || t === T.WATER) s = S.grass[w.variant[i]];
       else if (t === T.PATH) {
         // дорожка своего вида (две бесшовные плитки вперемешку), там, где рядом трава, — край из травы
         s = (S.paths[w.pathKind[i]] || S.paths[0]).tiles[w.variant[i] & 1];
         const e = f.pathEdge(gx, gy);
         if (e) edges[w.chunkOf(gx, gy)].push(e, cx, cy);
       }
-      else if (t === T.WATER) {
-        // вода — общей текстурой по координатам карты, поверх — берег (у клеток посреди пруда его нет)
-        const ws = f.waterSprite(gx, gy);
-        per[w.chunkOf(gx, gy)].push(this.waterT, gx, gy);
-        s = ws.empty ? null : ws;
-      } else {
+      else {
         // грядка: трава, а поверх неё — объёмная грядка (сухая или политая)
         const b = f.beds.get(i);
         const wet = b && b.crop && !f.cropInfo(b).needsWater && !f.cropInfo(b).ready ? 1 : 0;
@@ -260,21 +262,11 @@ export class PixiScene {
     if (same) return;
     cc.list = list;
     const by = new Map(); // страница атласа → вершины
-    const WT = this.waterT;
     for (let j = 0; j < list.length; j += 3) {
       const s = list[j];
       const t = this.groundAtlas.tex(s), fr = t.frame, p = t.page || t.source;
       let m = by.get(p); if (!m) by.set(p, m = { t, pos: [], uv: [] });
       const W = t.source.width, H = t.source.height;
-      if (s === WT) {
-        // клетка (gx, gy) воды: углы ромба — узлы сетки, текстура повторяется через WT.px × WT.py клеток
-        const gx = list[j + 1], gy = list[j + 2];
-        const cx = (gx - gy) * HW, cy = (gx + gy + 1) * HH;
-        const k = WT.cell, u0 = (fr.x + WT.m + (gx % WT.px) * k) / W, v0 = (fr.y + WT.m + (gy % WT.py) * k) / H, du = k / W, dv = k / H;
-        m.pos.push(cx, cy - HH, cx + HW, cy, cx, cy + HH, cx - HW, cy);
-        m.uv.push(u0, v0, u0 + du, v0, u0 + du, v0 + dv, u0, v0 + dv);
-        continue;
-      }
       const x0 = list[j + 1] - s.ax, y0 = list[j + 2] - s.ay;
       const u0 = fr.x / W, v0 = fr.y / H, u1 = (fr.x + fr.width) / W, v1 = (fr.y + fr.height) / H, um = (u0 + u1) / 2, vm = (v0 + v1) / 2;
       m.pos.push(x0 + s.w / 2, y0, x0 + s.w, y0 + s.h / 2, x0 + s.w / 2, y0 + s.h, x0, y0 + s.h / 2);
@@ -303,21 +295,8 @@ export class PixiScene {
     for (const p of by.keys()) { const mesh = meshes.get(p); if (cc.getChildIndex(mesh) !== k) cc.setChildIndex(mesh, k); k++; }
   }
 
-  // Текстура воды в атлас земли: с полями из противоположных краёв (бесшовный повтор без
-  // швов на стыках, в том числе на уменьшенных копиях — мипмапах)
-  makeWaterTex() {
-    const t = this.f.S.waterTex;
-    if (this.waterT) return;
-    const img = t.canvas, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, M = 16;
-    const c = document.createElement('canvas'); c.width = w + 2 * M; c.height = h + 2 * M;
-    const g = c.getContext('2d');
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) g.drawImage(img, M + dx * w, M + dy * h);
-    // 128 пикселей текстуры на клетку: 768×512 → повтор через 6×4 клеток
-    const cell = 128;
-    this.waterT = { canvas: c, w: c.width, h: c.height, ax: 0, ay: 0, m: M, cell, px: Math.max(1, Math.round(w / cell)), py: Math.max(1, Math.round(h / cell)) };
-  }
-
-  // украшения пруда: стоят на месте, пересобираются только при открытии участка (затемнение)
+  // украшения прудов (камыш, рогоз, камни — World.genDecor): стоят на месте, пересобираются при открытии
+  // участка (затемнение) и когда пруд или украшение переставили, убрали, поставили (World.decorV)
   syncDecor() {
     const f = this.f, w = f.world, D = f.S.decor;
     if (!this.decorSp) this.decorSp = [];
@@ -340,7 +319,7 @@ export class PixiScene {
     }
   }
 
-  // декор пруда заново (редактор поменял воду)
+  // декор прудов заново (пруд переставили, убрали, поставили)
   resetDecor() {
     if (this.decorSp) for (const e of this.decorSp) if (e) e.destroy();
     this.decorSp = [];
@@ -494,24 +473,25 @@ export class PixiScene {
       if (s instanceof Map) { for (const v of s.values()) add(v, dim); return; }
       if (Array.isArray(s) || typeof s === 'object') for (const v of Object.values(s)) add(v, dim);
     };
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.WATER) f.waterSprite(x, y); else if (w.tile(x, y) === T.PATH) f.pathEdge(x, y);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (w.tile(x, y) === T.PATH) f.pathEdge(x, y);
     const S = f.S;
-    const GROUND = ['grass', 'paths', 'pathEdge', 'pathParts', 'pathBlend', 'water'];
-    this.makeWaterTex(); this.groundAtlas.tex(this.waterT);
+    const GROUND = ['grass', 'paths', 'pathEdge', 'pathParts', 'pathBlend', 'ponds'];
     for (const v of S.grass) this.groundAtlas.tex(v);
     for (const p of S.paths) for (const v of p.tiles) this.groundAtlas.tex(v);
     // травяной край: какой есть на карте, и самые частые (прямые дорожки, углы, концы) — если в листе
     // атласа есть место (второй лист — лишние 16 МБ видеопамяти)
     for (const v of S.pathEdge.values()) this.groundAtlas.tex(v);
-    for (const v of S.water.values()) this.groundAtlas.tex(v);
+    // пруды: большие плоские картинки — в лист земли (там есть место), без затемнённых копий:
+    // на закрытом участке их темнит оттенок (tint), как землю
+    for (const v of Object.values(S.ponds)) this.groundAtlas.tex(v);
     for (let key = 1; key < 16; key++) {
       const e = f.pathEdgeOf(key);
       if (!e || this.groundAtlas.map.get(e.canvas)) continue;
       if (!this.groundAtlas.fits(e.canvas.width, e.canvas.height)) break;
       this.groundAtlas.tex(e);
     }
-    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k) && k !== 'waterTex') add(v, k !== 'bubble' && k !== 'fog' && k !== 'hint');
-    for (const o of w.objects || []) { if (!o) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
+    for (const [k, v] of Object.entries(S)) if (typeof v !== 'function' && !GROUND.includes(k)) add(v, k !== 'bubble' && k !== 'fog' && k !== 'hint');
+    for (const o of w.objects || []) { if (!o || OBJECTS[o.type].flat) continue; const s = f.objSprite(o); if (s) { this.atlas.tex(s); this.atlas.tex(dimSprite(s)); } }
     for (const arr of Object.values(S.objArt)) for (const t of arr) for (const id of [0, 1, 3]) { const st = S.stumpOf(t, id); if (st) { this.atlas.tex(st); this.atlas.tex(dimSprite(st)); } }
     for (const im of Object.values(f.iconImg)) if (im.complete && im.naturalWidth) this.iconTex(im);
     // все вложения скелета фермера (кадры хвоста, инструменты) — иначе они грузятся в видеокарту
@@ -609,6 +589,7 @@ export class PixiScene {
     if (K.gv !== f.groundV || K.wet !== wet) { K.gv = f.groundV; K.wet = wet; this.syncGround(); }
     const uc = w.unlockedCount();
     if (K.uc !== uc || K.house !== f.st.house) { K.uc = uc; K.house = f.st.house; this.syncFog(); this.syncSigns(); this.syncDecor(); }
+    if (K.decorV !== w.decorV || K.decorW !== w) { K.decorV = w.decorV; K.decorW = w; this.resetDecor(); }
     if (K.fogV !== w.fogV || K.fogW !== w) { K.fogV = w.fogV; K.fogW = w; this.syncFogForest(); this.syncFog(); }
     if (K.fogS !== f.S.fog) { K.fogS = f.S.fog; this.syncFogClouds(); }
     this.fogC.visible = !(f.editor && f.editor.hideFog);
@@ -657,12 +638,20 @@ export class PixiScene {
     const OB = w.objects;
     const one = (o) => {
       let e = this.objs.get(o);
-      if (!e) { e = new PIXI.Sprite(); e.o = o; this.objs.set(o, e); this.objC.addChild(e); }
+      const flat = OBJECTS[o.type].flat;
+      if (!e) { e = new PIXI.Sprite(); e.o = o; this.objs.set(o, e); (flat ? this.pondC : this.objC).addChild(e); }
       e.stamp = stamp;
       let s = f.objSprite(o);
       const vis = r.visible(o.wx - s.ax - 4, o.wy - s.ay, s.w + 8, s.h);
       if (e.visible !== vis) e.visible = vis;
       if (!vis) { o.fade = 0; return; }
+      if (flat) {
+        // пруд: плоский, призрака не закрывает; на закрытом участке темнеет вместе с землёй (тот же оттенок)
+        const tint = this.chunks[w.chunkOf(o.gx + (o.w >> 1), o.gy + (o.h >> 1))].tint;
+        if (e.tint !== tint) e.tint = tint;
+        this.put(e, s, o.wx, o.wy);
+        return;
+      }
       if (!w.isOpen(o.gx, o.gy)) s = dimSprite(s);
       const sh = o.shake > 0 ? Math.sin(f.time * 70) * 2.2 * (o.shake / 0.25) : 0;
       const fade = f.occludes(o, s, F);
@@ -681,11 +670,13 @@ export class PixiScene {
     if (full) {
       this._obN = OB.length; this._obTick = 0;
       const B = this.buckets = this.chunks.map(() => []);
-      for (let oi = 0; oi < OB.length; oi++) { const o = OB[oi]; if (o) { B[w.chunkOf(o.gx, o.gy)].push(o); one(o); } }
+      const FL = this.flats = []; // пруды большие и их мало: обходим каждый кадр, не по кускам
+      for (let oi = 0; oi < OB.length; oi++) { const o = OB[oi]; if (o) { (OBJECTS[o.type].flat ? FL : B[w.chunkOf(o.gx, o.gy)]).push(o); one(o); } }
       this.objs.forEach((e) => { if (e.stamp !== stamp) { e.destroy(); this.objs.delete(e.o); } });
       this._cvis = this.chunks.map(() => true);
     } else {
-      const B = this.buckets, CV = this._cvis;
+      const B = this.buckets, CV = this._cvis, FL = this.flats;
+      for (let i = 0; i < FL.length; i++) { const o = FL[i]; if (OB[o.id] === o) one(o); else this._obTick = 1e9; }
       for (let c = 0; c < B.length; c++) {
         const cb = CB[c]; // у высоких деревьев верхушка заходит в соседний кусок — запас вверх и в стороны
         const near = cb.maxX + 120 > v.minX && cb.minX - 120 < v.maxX && cb.maxY + 40 > v.minY && cb.minY - 300 < v.maxY;
@@ -740,6 +731,7 @@ export class PixiScene {
     this.syncQueue();
     this.syncHint();
     this.syncMover(outline);
+    this.syncArea();
     this.syncFx();
     this.syncFloaters();
     P.part('растения и значки', tp);
@@ -948,24 +940,51 @@ export class PixiScene {
     const pulse = 0.55 + 0.45 * Math.sin(f.time * 6);
     this.moverHi.visible = !!(s && s.kind === 'obj');
     if (this.moverHi.visible) { this.put(this.moverHi, f.objSprite(s.o), s.o.wx, s.o.wy); this.moverHi.alpha = 0.12 + 0.18 * pulse; }
-    if (s) {
-      for (let y = s.gy; y < s.gy + s.h; y++) for (let x = s.gx; x < s.gx + s.w; x++) {
-        toWorld(x + 0.5, y + 0.5, tmp);
+    // клетки объекта (у постройки из рюкзака своего места на карте ещё нет)
+    if (s && s.kind !== 'bag') {
+      for (const [dx, dy] of objCells(s)) {
+        toWorld(s.gx + dx + 0.5, s.gy + dy + 0.5, tmp);
         g.poly([tmp.x, tmp.y - HH + 1, tmp.x + HW - 2, tmp.y, tmp.x, tmp.y + HH - 1, tmp.x - HW + 2, tmp.y]).stroke({ width: 2.5, color: 0xffe65a, alpha: pulse });
       }
     }
     this.moverGhost.visible = !!(s && t);
     if (s && t) {
-      for (let y = t.gy; y < t.gy + s.h; y++) for (let x = t.gx; x < t.gx + s.w; x++) {
-        toWorld(x + 0.5, y + 0.5, tmp);
+      for (const [dx, dy] of objCells(s)) {
+        toWorld(t.gx + dx + 0.5, t.gy + dy + 0.5, tmp);
         g.poly([tmp.x, tmp.y - HH, tmp.x + HW, tmp.y, tmp.x, tmp.y + HH, tmp.x - HW, tmp.y]).fill({ color: t.ok ? 0x6edc5a : 0xeb4632, alpha: 0.38 });
         g.poly([tmp.x, tmp.y - HH + 1, tmp.x + HW - 2, tmp.y, tmp.x, tmp.y + HH - 1, tmp.x - HW + 2, tmp.y]).stroke({ width: 2, color: t.ok ? 0x8ff06a : 0xff6a50 });
       }
-      if (s.kind === 'obj') { toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp); this.put(this.moverGhost, f.objSprite(s.o), tmp.x, tmp.y); }
-      else {
+      if (s.kind === 'obj' || s.kind === 'bag' || s.kind === 'decor') {
+        if (s.decor) f.decorPoint(t.gx, t.gy, tmp); // украшение пруда: у берега — ближе к земле
+        else toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp);
+        const sp = s.kind === 'obj' ? f.objSprite(s.o) : f.placeSprite(s.id);
+        this.moverGhost.visible = !!sp;
+        if (sp) this.put(this.moverGhost, sp, tmp.x, tmp.y);
+      } else {
         const sp = s.kind === 'path' ? (f.S.paths.find((p) => p.key === s.path) || f.S.paths[0]).tiles[0] : f.S.bed[0];
         toWorld(t.gx + 0.5, t.gy + 0.5, tmp); this.put(this.moverGhost, sp, tmp.x, tmp.y);
       }
+    }
+  }
+
+  // Клетки полива поливалки (Farm.sprinklerArea): голубые ромбы; там, куда её ставят нельзя, — тусклее.
+  // Перерисовываются, только когда поливалка или её место сменились; угасание — прозрачностью.
+  syncArea() {
+    const f = this.f, a = f.sprinklerArea(), G = this.areaG;
+    G.visible = !!a;
+    if (!a) { this.areaKey = ''; return; }
+    G.alpha = a.k;
+    const key = `${a.kind},${a.x},${a.y},${a.bad}`;
+    if (key === this.areaKey) return;
+    this.areaKey = key;
+    const w = f.world, g = G.clear();
+    for (const [x, y] of areaCells(a.kind, a.x, a.y)) {
+      if (!w.inside(x, y) || !w.isOpen(x, y)) continue;
+      toWorld(x + 0.5, y + 0.5, tmp);
+      const bed = w.tile(x, y) === T.SOIL;
+      g.poly([tmp.x, tmp.y - HH + 1.5, tmp.x + HW - 3, tmp.y, tmp.x, tmp.y + HH - 1.5, tmp.x - HW + 3, tmp.y])
+        .fill({ color: 0x4fb6ff, alpha: a.bad ? 0.12 : bed ? 0.4 : 0.24 })
+        .stroke({ width: 1.5, color: 0xa8e0ff, alpha: a.bad ? 0.35 : 0.8 });
     }
   }
 

@@ -3,7 +3,7 @@
 // в сохранение пишется только разница.
 
 import { mulberry32, hash2 } from '../engine/Sprite.js';
-import { OBJECTS, FLORA, FLORA_GROUPS, floraByGroup, FOG, PATH_KEYS } from './data.js';
+import { OBJECTS, FLORA, FLORA_GROUPS, floraByGroup, FOG, PATH_KEYS, PONDS, POND_DECOR } from './data.js';
 import { toWorld } from '../engine/Iso.js';
 
 export const CHUNK = 10;
@@ -18,6 +18,39 @@ const FOG_OLD = { oak2: 'sakura', bush: 'rosehip', berry: 'blueberry' }; // ст
 
 const tmp = { x: 0, y: 0 };
 
+// Клетки, которые занимает объект с описанием def (OBJECTS): [[dx, dy], ...] от левого верхнего угла.
+// Без def.cells — весь прямоугольник w × h; def.cells — фигура (например, пруд без углов).
+const RECTS = new Map();
+export function objCells(def) {
+  if (def && def.cells) return def.cells;
+  const w = (def && def.w) || 1, h = (def && def.h) || 1, k = w * 64 + h;
+  let r = RECTS.get(k);
+  if (!r) { r = []; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) r.push([x, y]); RECTS.set(k, r); }
+  return r;
+}
+
+// Украшение пруда вида k на клетке воды (dx, dy): точка (в клетках от угла пруда), где оно стоит.
+// У берега — ближе к земле (сдвиг к соседним клеткам без воды), посреди воды — в середине клетки.
+export function pondDecorPos(k, dx, dy) {
+  const c = PONDS[k].cells, wet = (x, y) => !!c[y] && c[y][x] === 'w';
+  let ox = 0, oy = 0;
+  for (const [ix, iy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!wet(dx + ix, dy + iy)) { ox += ix; oy += iy; }
+  const l = Math.hypot(ox, oy) || 1, k2 = 0.25 / l;
+  return [dx + 0.5 + ox * k2, dy + 0.5 + oy * k2];
+}
+
+// Список украшений пруда вида k ([[что, dx, dy], ...]) без ошибок: известные украшения, на воде, по одному
+// на клетку. → [годные, негодные]
+export function cleanPondDecor(k, list) {
+  const ok = [], bad = [], seen = new Set(), c = PONDS[k].cells;
+  for (const d of Array.isArray(list) ? list : []) {
+    const [t, dx, dy] = Array.isArray(d) ? d : [];
+    const good = POND_DECOR[t] && c[dy] && c[dy][dx] === 'w' && !seen.has(dx + ',' + dy);
+    if (good) { seen.add(dx + ',' + dy); ok.push([t, dx, dy]); } else if (POND_DECOR[t]) bad.push([t, dx, dy]);
+  }
+  return [ok, bad];
+}
+
 // Короткий отпечаток карты: сохранение помнит, на какой карте оно сделано
 export function mapId(m) {
   const s = JSON.stringify([m.tiles, m.objects, m.well, m.seed || 0]);
@@ -30,6 +63,7 @@ export function mapId(m) {
 export function mapText(m) {
   return '{\n  "v": 2,\n  "n": ' + m.n + ',\n  "seed": ' + (m.seed >>> 0) + ',\n  "tiles": [\n' + m.tiles.map((r) => '    "' + r + '"').join(',\n') + '\n  ],\n' +
     '  "objects": [\n' + m.objects.map((o) => '    ' + JSON.stringify(o)).join(',\n') + '\n  ],\n' +
+    (m.ponds ? '  "ponds": [\n' + m.ponds.map((o) => '    ' + JSON.stringify(o)).join(',\n') + '\n  ],\n' : '') +
     '  "well": ' + JSON.stringify(m.well) + ',\n  "player": ' + JSON.stringify(m.player) +
     (m.fog ? ',\n  "fog": [\n' + m.fog.map((o) => '    ' + JSON.stringify(o)).join(',\n') + '\n  ]' : '') + '\n}\n';
 }
@@ -52,9 +86,12 @@ export class World {
   }
 
   // ---------- Карта из редактора ----------
-  // Формат: { v: 1, n: 50, tiles: [50 строк по 50 цифр T], objects: [[тип, x, y], ...], well: [x, y], player: [x, y] }
+  // Формат: { v: 1, n: 50, tiles: [50 строк по 50 цифр T], objects: [[тип, x, y], ...], ponds: [[вид, x, y], ...],
+  //          well: [x, y], player: [x, y] }
   // Дорожки: цифра 3 — дорожка по умолчанию (PATH_KEYS[0]), 4, 5, … — следующие виды из PATHS (data.js).
   // Грядки — клетки T.SOIL (стартовые), колодец — отдельно (он всегда после genCount, как в генерации).
+  // Пруды — объекты (PONDS); их вода в tiles тоже записана цифрой 2 (так у карты прежний отпечаток mapId).
+  // В старых картах прудов нет, только цифры 2 — из них пруды собираются по формам (pondsFromWater).
   loadMap(m) {
     this.mapId = mapId(m);
     if (m.seed) this.seed = m.seed >>> 0; // у карты свой seed: трава и декор прудов у всех одинаковые
@@ -75,7 +112,14 @@ export class World {
     }
     const v1 = !(m.v >= 2);
     // карта v1 знает только группы деревьев и кустов: вид — по номеру объекта, как раньше картинка
-    for (const [type, x, y] of m.objects || []) if ((OBJECTS[type] || FLORA_GROUPS[type]) && type !== 'well') this.add(v1 ? this.species(type) : type, x, y);
+    for (const [type, x, y] of m.objects || []) if ((OBJECTS[type] || FLORA_GROUPS[type]) && type !== 'well' && !PONDS[type]) this.add(v1 ? this.species(type) : type, x, y);
+    if (Array.isArray(m.ponds)) {
+      for (let i = 0; i < N * N; i++) if (this.tiles[i] === T.WATER) this.tiles[i] = T.GRASS;
+      for (const [type, x, y, decor] of m.ponds) {
+        const o = PONDS[type] && this.add(type, x, y);
+        if (o) o.decor = cleanPondDecor(type, decor)[0];
+      }
+    } else this.pondsFromWater();
     this.genCount = this.objects.length;
     this.wellPos = m.well || [2 * CHUNK + 5, 2 * CHUNK + 4];
     this.well = this.add('well', this.wellPos[0], this.wellPos[1]);
@@ -89,19 +133,20 @@ export class World {
     const tiles = [];
     for (let y = 0; y < N; y++) {
       let r = '';
-      for (let x = 0; x < N; x++) { const i = y * N + x, t = this.tiles[i]; r += t === T.PATH ? T.PATH + this.pathKind[i] : t; }
+      for (let x = 0; x < N; x++) { const i = y * N + x, t = this.tiles[i]; r += this.isWater(x, y) ? T.WATER : t === T.PATH ? T.PATH + this.pathKind[i] : t; }
       tiles.push(r);
     }
-    const objects = [];
+    const objects = [], ponds = [];
     let well = null;
     for (const o of this.objects) {
       if (!o) continue;
       if (o === this.well || o.type === 'well') { well = [o.gx, o.gy]; continue; }
+      if (PONDS[o.type]) { ponds.push(o.decor.length ? [o.type, o.gx, o.gy, o.decor.map((d) => d.slice())] : [o.type, o.gx, o.gy]); continue; }
       if (o.own || o.wild || o.type === 'sapling' || o.type === 'grass') continue; // посаженное игроком — не часть карты
       objects.push([o.type === 'stump' ? (o.was || 'oak') : o.type, o.gx, o.gy]);
     }
     const fog = this.fogTrees.map((t) => [t.type, t.gx, t.gy]);
-    return { v: 2, n: N, seed: this.seed, tiles, objects, well, player: this.playerStart.slice(), fog };
+    return { v: 2, n: N, seed: this.seed, tiles, objects, ponds, well, player: this.playerStart.slice(), fog };
   }
 
   // группа деревьев/кустов (oak, oak2, bush, berry) → вид для следующего объекта
@@ -113,6 +158,10 @@ export class World {
   isOpen(x, y) { return this.inside(x, y) && this.unlocked[this.chunkOf(x, y)] === 1; }
   tile(x, y) { return this.tiles[y * N + x]; }
   objectAt(x, y) { if (!this.inside(x, y)) return null; const i = this.occ[y * N + x]; return i >= 0 ? this.objects[i] : null; }
+  // пруд на клетке или null
+  pondAt(x, y) { const o = this.objectAt(x, y); return o && PONDS[o.type] ? o : null; }
+  // вода пруда на клетке: здесь рыбачат и набирают воду
+  isWater(x, y) { const o = this.pondAt(x, y); return !!o && PONDS[o.type].cells[y - o.gy][x - o.gx] === 'w'; }
 
   walkable(x, y) {
     if (!this.isOpen(x, y)) return false;
@@ -122,23 +171,23 @@ export class World {
 
   add(type, gx, gy) {
     const def = OBJECTS[type];
-    const w = def.w || 1, h = def.h || 1;
-    for (let y = gy; y < gy + h; y++) for (let x = gx; x < gx + w; x++) {
+    const w = def.w || 1, h = def.h || 1, cells = objCells(def);
+    for (const [dx, dy] of cells) {
+      const x = gx + dx, y = gy + dy;
       if (!this.inside(x, y) || this.occ[y * N + x] >= 0 || this.tiles[y * N + x] !== T.GRASS) return null;
     }
     const o = { id: this.objects.length, type, gx, gy, w, h, hp: def.hp || 0, state: 0, shake: 0 };
     toWorld(gx + w / 2, gy + h / 2, tmp);
     o.wx = tmp.x; o.wy = tmp.y;
     o.depth = gx + w / 2 + gy + h / 2;
+    if (def.pond) o.decor = []; // украшения пруда: [[что, dx, dy], ...]
     this.objects.push(o);
-    for (let y = gy; y < gy + h; y++) for (let x = gx; x < gx + w; x++) this.occ[y * N + x] = o.id;
+    for (const [dx, dy] of cells) this.occ[(gy + dy) * N + gx + dx] = o.id;
     return o;
   }
 
   remove(o) {
-    for (let y = o.gy; y < o.gy + o.h; y++) for (let x = o.gx; x < o.gx + o.w; x++) {
-      if (this.occ[y * N + x] === o.id) this.occ[y * N + x] = -1;
-    }
+    this.lift(o);
     this.objects[o.id] = null;
     o.state = 2;
     this.version++;
@@ -225,6 +274,7 @@ export class World {
       const r = rnd2();
       if (this.chunkOf(x, y) !== START_CHUNK && r < 0.055) this.add('rock', x, y);
     }
+    this.pondsFromWater();
     this.genCount = this.objects.length;
     // Колодец бабушки — после счётчика: он не сохраняется в разнице и всегда на месте
     this.wellPos = L(5, 4); // у тропинки к дому, на виду
@@ -270,48 +320,98 @@ export class World {
     }
   }
 
-  // Украшения пруда: не объекты (их нельзя рубить и двигать), всегда одинаковые для мира.
-  // Камыш, рогоз и камни — у берега, кувшинки и листья — на воде.
-  genDecor() {
-    const rnd = mulberry32(this.seed ^ 0x7f4a7c15), W = T.WATER;
-    this.decor = [];
-    const water = (x, y) => this.inside(x, y) && this.tiles[y * N + x] === W;
-    const seen = new Uint8Array(N * N);
-    const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  // ---------- Пруды ----------
+  // Старые карты и генерация: клетки воды (T.WATER) → пруды PONDS. Связный кусок воды становится
+  // прудом той формы, чья вода совпадает с ним клетка в клетку (пруды стартовой карты — ровно такие).
+  // Иначе в кусок по очереди ставятся самые большие формы, которые в нём помещаются; вода, на которую
+  // формы не хватило, становится травой. Островок внутри куска (свободная трава, со всех сторон вода)
+  // заливается: прудов с островком нет.
+  pondsFromWater() {
+    const W = T.WATER, D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const comps = [], seen = new Uint8Array(N * N);
     for (let i = 0; i < N * N; i++) {
       if (this.tiles[i] !== W || seen[i]) continue;
-      // один пруд — связная вода
-      const pond = [], st = [i]; seen[i] = 1;
+      const comp = [], st = [i]; seen[i] = 1;
       while (st.length) {
-        const j = st.pop(); pond.push(j);
+        const j = st.pop(); comp.push(j);
         const x = j % N, y = (j / N) | 0;
-        for (const [dx, dy] of D4) { const k = (y + dy) * N + x + dx; if (water(x + dx, y + dy) && !seen[k]) { seen[k] = 1; st.push(k); } }
+        for (const [dx, dy] of D4) {
+          const nx = x + dx, ny = y + dy, k = ny * N + nx;
+          if (this.inside(nx, ny) && this.tiles[k] === W && !seen[k]) { seen[k] = 1; st.push(k); }
+        }
       }
-      const land = (j) => { const x = j % N, y = (j / N) | 0; return D4.filter(([dx, dy]) => this.inside(x + dx, y + dy) && !water(x + dx, y + dy)); };
-      const shore = pond.filter((j) => land(j).length);
-      const used = new Set();
-      const take = (list) => { const free = list.filter((j) => !used.has(j)); if (!free.length) return -1; const j = free[(rnd() * free.length) | 0]; used.add(j); return j; };
-      const put = (type, j, toLand) => {
-        if (j < 0) return;
-        const x = j % N, y = (j / N) | 0;
-        let ox = (rnd() - 0.5) * 0.2, oy = (rnd() - 0.5) * 0.2;
-        if (toLand) { const L = land(j); if (L.length) { const [dx, dy] = L[(rnd() * L.length) | 0]; ox += dx * 0.28; oy += dy * 0.28; } }
-        this.decor.push({ type, gx: x, gy: y, x: x + 0.5 + ox, y: y + 0.5 + oy });
-      };
-      put('cattail', take(shore), true);
-      if (pond.length > 8) put('cattail', take(shore), true);
-      put('reeds', take(shore), true);
-      if (rnd() < 0.7) put('rocks', take(shore), true);
-      put('lily', take(pond), false);
-      if (pond.length > 8) put('lily', take(pond), false);
-      if (rnd() < 0.6) put('leaves', take(pond), false);
+      this.fillIslands(comp);
+      comps.push(comp);
     }
+    for (const comp of comps) for (const j of comp) this.tiles[j] = T.GRASS;
+    // форма p встанет в (gx, gy): вся её вода — в left
+    const fits = (p, gx, gy, left) => p.water.every(([dx, dy]) => this.inside(gx + dx, gy + dy) && left.has((gy + dy) * N + gx + dx));
+    const kinds = Object.values(PONDS).sort((a, b) => b.water.length - a.water.length);
+    for (const list of comps) {
+      const left = new Set(list);
+      for (;;) {
+        let best = null;
+        for (const p of kinds) {
+          if (p.water.length > left.size || (best && best.p.water.length > p.water.length)) continue;
+          for (const i of left) {
+            const [dx, dy] = p.water[0], gx = i % N - dx, gy = ((i / N) | 0) - dy;
+            if (fits(p, gx, gy, left)) { best = { p, gx, gy }; break; }
+          }
+          if (best && best.p.water.length === left.size) break; // точное совпадение
+        }
+        if (!best) break;
+        const o = this.add(best.p.key, best.gx, best.gy);
+        if (!o) break;
+        o.decor = best.p.decor.map((d) => d.slice()); // камыш и камни, как у пруда стартовой карты
+        for (const [dx, dy] of best.p.water) left.delete((best.gy + dy) * N + best.gx + dx);
+      }
+    }
+  }
+
+  // Свободная трава внутри куска воды comp (номера клеток), до которой не дойти снаружи его рамки
+  // не по воде, — тоже в comp
+  fillIslands(comp) {
+    const set = new Set(comp), D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    let x0 = N, y0 = N, x1 = -1, y1 = -1;
+    for (const j of comp) { const x = j % N, y = (j / N) | 0; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const out = new Set(), st = [];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = y * N + x;
+      if ((x === x0 || x === x1 || y === y0 || y === y1) && !set.has(i)) { out.add(i); st.push(i); }
+    }
+    while (st.length) {
+      const j = st.pop(), x = j % N, y = (j / N) | 0;
+      for (const [dx, dy] of D4) {
+        const nx = x + dx, ny = y + dy, k = ny * N + nx;
+        if (nx < x0 || nx > x1 || ny < y0 || ny > y1 || set.has(k) || out.has(k)) continue;
+        out.add(k); st.push(k);
+      }
+    }
+    for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++) {
+      const i = y * N + x;
+      if (!set.has(i) && !out.has(i) && this.tiles[i] === T.GRASS && this.occ[i] < 0) comp.push(i);
+    }
+  }
+
+  // Украшения прудов (камыш, рогоз, камни — o.decor) для отрисовки: не объекты (клетку не занимают),
+  // переезжают вместе со своим прудом. decorV растёт, когда список поменялся.
+  genDecor() {
+    this.decor = [];
+    for (const o of this.objects) {
+      if (!o || !PONDS[o.type] || !o.decor) continue;
+      for (const [type, dx, dy] of o.decor) {
+        const [x, y] = pondDecorPos(o.type, dx, dy);
+        this.decor.push({ type, gx: o.gx + dx, gy: o.gy + dy, x: o.gx + x, y: o.gy + y });
+      }
+    }
+    this.decorV = (this.decorV || 0) + 1;
   }
 
   // Снять объект с карты (клетки свободны) и поставить обратно — для загрузки сохранения
   lift(o) {
-    for (let y = o.gy; y < o.gy + o.h; y++) for (let x = o.gx; x < o.gx + o.w; x++) {
-      if (this.occ[y * N + x] === o.id) this.occ[y * N + x] = -1;
+    for (const [dx, dy] of objCells(OBJECTS[o.type])) {
+      const i = (o.gy + dy) * N + o.gx + dx;
+      if (this.occ[i] === o.id) this.occ[i] = -1;
     }
   }
 
@@ -319,20 +419,19 @@ export class World {
 
   // Перенос своей постройки (дом, колодец) на другие клетки; проверки — в Mover
   moveObject(o, gx, gy) {
-    for (let y = o.gy; y < o.gy + o.h; y++) for (let x = o.gx; x < o.gx + o.w; x++) {
-      if (this.occ[y * N + x] === o.id) this.occ[y * N + x] = -1;
-    }
+    this.lift(o);
     o.gx = gx; o.gy = gy;
     toWorld(gx + o.w / 2, gy + o.h / 2, tmp);
     o.wx = tmp.x; o.wy = tmp.y;
     o.depth = gx + o.w / 2 + gy + o.h / 2;
-    for (let y = gy; y < gy + o.h; y++) for (let x = gx; x < gx + o.w; x++) this.occ[y * N + x] = o.id;
+    for (const [dx, dy] of objCells(OBJECTS[o.type])) this.occ[(gy + dy) * N + gx + dx] = o.id;
     this.version++;
   }
 
   // Можно ли поставить объект сюда при загрузке (вся площадь — свободная трава открытой земли)
   freeFor(o, gx, gy) {
-    for (let y = gy; y < gy + o.h; y++) for (let x = gx; x < gx + o.w; x++) {
+    for (const [dx, dy] of objCells(OBJECTS[o.type])) {
+      const x = gx + dx, y = gy + dy;
       if (!this.isOpen(x, y) || this.tiles[y * N + x] !== T.GRASS) return false;
       const i = this.occ[y * N + x];
       if (i >= 0 && i !== o.id) return false;

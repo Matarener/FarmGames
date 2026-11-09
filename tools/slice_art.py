@@ -38,6 +38,14 @@ SINGLE = {
     'house_1': -132, 'house_2': -132, 'house_3': -132, 'house_4': -132, 'house_5': -132,
 }
 SHEETS.update({name: [(name, w)] for name, w in SINGLE.items()})
+# Постройки без «пятачка» травы (поливалки): одна на картинку, масштаб — по высоте в мире; опора — середина
+# клетки: по x — середина нижней части (столбик, ножки), по y — на lift единиц выше самого низа
+# (у треноги задняя ножка стоит выше передних: середина клетки — между ними).
+PROPS = {
+    'sprinkler_drip': {'h': 32, 'lift': 4},
+    'sprinkler_spin': {'h': 40, 'lift': 4},
+    'sprinkler_rain': {'h': 56, 'lift': 5},
+}
 # Урожай: каждая стадия (0–3) — своя картинка crop_<культура>_<стадия>.png. Растения заполняют
 # ромб грядки: масштаб по ширине (ширина стадии в мире), опора — центр ромба.
 CROPS = ['wheat', 'carrot', 'beet', 'tomato', 'sunflower', 'pumpkin', 'strawberry', 'cotton', 'corn', 'cabbage']
@@ -92,7 +100,7 @@ GRID_SHEETS = {
 }
 # грядки: сухая и политая; вторая пара — с травяной каймой (не используется)
 BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), None, None]}
-WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)
+WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)  # вода прудов светлее и сочнее (tools/pond_art.py)
 # плитки земли: каждая — своя картинка с одним ромбом. Трава собирается бесшовной из двух картинок
 # (tile_grass.png, tile_grass_flowers.png) в 4 варианта; отзеркаливать их в игре нельзя
 GRASS_TILES = ['tile_grass', 'tile_grass_2', 'tile_grass_flowers', 'tile_grass_flowers_2']
@@ -420,6 +428,22 @@ def main(only=None):
         if only and name not in only: continue
         nobase(name, man)
 
+    for name, pr in PROPS.items():
+        if only and name not in only: continue
+        if not os.path.exists(os.path.join(SRC, name + '.png')): continue
+        a = load(name)
+        (y0, y1, x0, x1, i), = components(a, 1)[0]
+        crop = a[y0:y1, x0:x1].copy()
+        m = crop[..., 3] > 128
+        ys = np.where(m.any(1))[0]
+        low = m[int(ys[-1] - (ys[-1] - ys[0]) * 0.15):]  # нижние 15%: на чём стоит
+        xs = np.where(low.any(0))[0]
+        k = pr['h'] / (y1 - y0)  # мир/пиксель
+        W, H = (x1 - x0) * k, (y1 - y0) * k
+        img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
+        save(img, name, W, H, (xs[0] + xs[-1]) / 2 * k, ys[-1] * k - pr['lift'], man)
+        print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
+
     # Грядки: объёмный ромб (верх + бортик). Ширина — по краям картинки, центр ромба —
     # строка самой левой точки (левый угол верхней грани).
     if only:
@@ -494,17 +518,6 @@ def main(only=None):
             img = Image.fromarray(crop).resize((round(W * DENSITY), round(H * DENSITY)), Image.LANCZOS)
             save(img, name, W, H, ax, ay, man)
             print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
-
-    # Текстура воды: бесшовная, вид сверху. Игра кладёт её на весь пруд по координатам карты
-    # (128 px на клетку). Делаем светлее и сочнее под общий стиль.
-    src = os.path.join(SRC, 'tex_water.png')
-    if os.path.exists(src):
-        t = np.array(Image.open(src).convert('RGB')).astype(np.float32)
-        t = np.clip(t * WATER_GAIN + np.array(WATER_LIFT), 0, 255).astype(np.uint8)
-        img = Image.fromarray(t)
-        img = img.resize((img.width // 2, img.height // 2), Image.LANCZOS)
-        save(img, 'tex_water', img.width, img.height, 0, 0, man)
-        print('tex_water', img.size)
 
     with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
         json.dump(man, f, indent=1)

@@ -9,6 +9,7 @@ import * as R from '../game/questRules.js';
 import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ, MAX_PINS } from '../game/questData.js';
 import { GIFT_TABS, DAILY_GIFT } from '../game/giftData.js';
 import { WHEEL } from '../game/wheelData.js';
+import { ACH_GROUPS, ACH_MEDALS } from '../game/achData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 import * as Dev from '../game/devRules.js';
@@ -61,7 +62,8 @@ export class UI {
     this.refreshIcons();
     farm.onIcons = () => { clearTimeout(this._icT); this._icT = setTimeout(() => this.refreshIcons(), 30); };
     $('#btn-bag').onclick = () => this.bagPanel(farm);
-    $('#btn-market').onclick = () => this.marketPanel(farm);
+    // есть заказ, который можно сдать (цифра на кнопке), — рынок открывается на «Заказах»
+    $('#btn-market').onclick = () => this.marketPanel(farm, farm.orders.ready() ? 'orders' : null);
     $('#btn-quests').onclick = () => this.questPanel(farm);
     $('#btn-gift').onclick = () => this.giftPanel(farm, 'daily');
     $('#btn-wheel').onclick = () => this.wheelPanel(farm);
@@ -131,6 +133,8 @@ export class UI {
     const pct = Math.min(100, (st.xp / xpToNext(st.level)) * 100).toFixed(1) + '%';
     if (this.last.xp !== pct) { this.last.xp = pct; $('#hud-xp').style.width = pct; }
     this.questCards(f);
+    this.moreBadge(f);
+    this.marketBadge(f);
     this.giftTick(f, false);
     this.wheelTick(f, false);
     this.tick(f);
@@ -143,6 +147,8 @@ export class UI {
   tick(f) {
     const full = f.st.energy >= f.maxEnergy;
     this.set('hud-energy-t', full ? '' : fmtClock(f.energyLeftSec()));
+    if (this.panelOpen && this.panelEl.dataset.kind === 'bag') this.set('bag-en', this.bagEnergy(f));
+    if (this.panelOpen && this.panelEl.dataset.kind === 'market' && this.mk && this.mk.mode === 'orders') this.ordersTick(f);
     this.giftTick(f, true);
     this.wheelTick(f, true);
     if (this.popupEl.classList.contains('show') && this._popupTick) this._popupTick();
@@ -436,12 +442,14 @@ export class UI {
       () => this.bagPanel(f),
       () => this.marketPanel(f),
       () => { this.mk.mode = 'buy'; this.refreshPanel(); },
+      () => { this.mk.mode = 'orders'; this.refreshPanel(); },
       () => this.questPanel(f),
       () => firstQuest && this.questPanel(f, { id: firstQuest.id }),
       () => this.plantPanel(f, null),
       () => this.housePanel(f),
       () => this.giftPanel(f),
       () => this.wheelPanel(f),
+      () => this.achPanel(f),
       () => this.settingsPanel(f),
       () => { this.closePanel(); this.toggleMore(true); },
       () => { this.toggleMore(false); this.popup(this.root.clientWidth / 2, this.root.clientHeight / 2, { title: 'Дуб', text: 'Срубить', cost: { wood: 1 }, items: [{ icon: 'axe', label: 'Срубить', sub: '1', onClick() {} }] }); },
@@ -468,6 +476,10 @@ export class UI {
   refreshPanel() {
     const p = this.panelEl;
     const scroll = p.querySelector('.pn-body') ? p.querySelector('.pn-body').scrollTop : 0;
+    // Окна с разделами слева (рюкзак, рынок) прокручивают не всё окно, а свои списки: их прокрутку
+    // помним по data-scroll. У другого раздела ключ другой, и его список открывается сверху.
+    const keep = {};
+    for (const e of p.querySelectorAll('[data-scroll]')) keep[e.dataset.scroll] = e.scrollTop;
     p.innerHTML = '';
     const card = h('div', 'pn-card ui-layer');
     const head = h('div', 'pn-head', `<b>${this._title}</b>`);
@@ -478,6 +490,15 @@ export class UI {
     p.appendChild(card);
     this._build(body, card);
     body.scrollTop = scroll;
+    for (const e of card.querySelectorAll('[data-scroll]')) if (keep[e.dataset.scroll]) e.scrollTop = keep[e.dataset.scroll];
+    // только что выбранную клетку не прячет появившаяся снизу карточка предмета
+    const sel = this._reveal && card.querySelector('.sh-list .sel');
+    this._reveal = false;
+    if (sel) {
+      const l = sel.closest('.sh-list'), r = sel.getBoundingClientRect(), lr = l.getBoundingClientRect();
+      if (r.bottom > lr.bottom) l.scrollTop += r.bottom - lr.bottom + 6;
+      else if (r.top < lr.top) l.scrollTop -= lr.top - r.top + 6;
+    }
   }
 
   closePanel() {
@@ -494,11 +515,11 @@ export class UI {
       { label: 'Дом', icon: 'house', open: () => this.housePanel(f) },
       { label: 'Подарки', icon: 'gift', open: () => this.giftPanel(f, 'daily'), dot: f.gifts.available() > 0 },
       { label: 'Колесо', icon: 'wheel', open: () => this.wheelPanel(f), dot: f.wheel.freeLeft() > 0 },
+      { label: 'Достижения', icon: 'trophy', open: () => this.achPanel(f), dot: f.ach.available() > 0 },
       { label: 'Настройки', icon: 'gear', open: () => this.settingsPanel(f) },
       { label: 'Животные', icon: 'paw', soon: true },
       { label: 'Мастерская', icon: 'build', soon: true },
       { label: 'Декор', icon: 'decor', soon: true },
-      { label: 'Достижения', icon: 'trophy', soon: true },
     ];
   }
 
@@ -658,34 +679,31 @@ export class UI {
   // сколько добавить (+1…+1000 или своё число) и «Убрать все»; «Каждого по 10» — всему разделу сразу
   devItemsPanel(f) {
     const S = this.dv || (this.dv = { tab: 'all', sel: null, n: 10 });
-    this.openPanel('devitems', 'Выдать предметы', (body, card) => {
+    this.openPanel('devitems', 'Выдать предметы', (body) => {
       const st = f.st, all = Dev.grantable();
-      const tabs = h('div', 'inv-tabs wrap');
-      for (const t of INV_TABS) {
-        if (t.key !== 'all' && !all.some((it) => it.tabs.includes(t.key))) continue;
-        const b = h('button', 'inv-tab' + (S.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
-        b.onclick = () => { if (S.tab !== t.key) { S.tab = t.key; S.sel = null; this.sfx('tap'); this.refreshPanel(); } };
-        tabs.appendChild(b);
-      }
-      body.appendChild(tabs);
       const list = all.filter((it) => S.tab === 'all' || it.tabs.includes(S.tab)).sort((a, b) => a.order - b.order);
-      const bulk = h('div', 'inv-sort', '<span>Всем в разделе:</span>');
+      const bulk = h('div', 'inv-sort sh-bulk', '<span>Всем:</span>');
       for (const n of [10, 100]) {
         const b = h('button', 'inv-chip', `+${n} каждого`);
         b.onclick = () => { const r = f.devDo((s) => Dev.grantMany(s, list.map((it) => it.key), n)); if (r) this.toast(`Выдано: ${r.kinds} видов по ${n}`, 'good'); this.refreshPanel(); };
         bulk.appendChild(b);
       }
-      body.appendChild(bulk);
+      const L = this.shelf(body, 'dev', {
+        tabs: INV_TABS.filter((t) => t.key === 'all' || all.some((it) => it.tabs.includes(t.key))),
+        tab: S.tab,
+        onTab: (k) => { S.tab = k; S.sel = null; },
+        top: bulk,
+      });
       const g = h('div', 'inv-grid');
       for (const it of list) {
         const n = Inv.count(st, it.key);
         const c = h('button', 'inv-cell' + (S.sel === it.key ? ' sel' : '') + (n ? '' : ' dev-none'),
           `${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${n ? `<b>${fmtNum(n)}</b>` : ''}`);
         c.title = it.name;
-        c.onclick = () => { S.sel = S.sel === it.key ? null : it.key; this.sfx('tap'); this.refreshPanel(); };
+        c.onclick = () => this.pick(S, it.key);
         g.appendChild(c);
       }
-      body.appendChild(g);
+      L.list.appendChild(g);
       const it = S.sel && ITEMS[S.sel];
       if (!it) return;
       const have = Inv.count(st, it.key);
@@ -708,14 +726,14 @@ export class UI {
       const wrap = h('div', 'ii-sell');
       wrap.append(quick, acts);
       box.appendChild(wrap);
-      card.appendChild(box);
+      L.info(box);
     });
   }
 
   // Проверка заданий без ожидания настоящих дат (режим тестера или ?debug в адресе)
   devQuests(f, body) {
     const d = f.dev, now = f.quests.ctx().now;
-    body.appendChild(h('div', 'pn-sub', 'Проверка заданий, подарков и колеса'));
+    body.appendChild(h('div', 'pn-sub', 'Проверка заданий, подарков, колеса, заказов и достижений'));
     body.appendChild(h('div', 'pn-text', `Время заданий: ${new Date(now + QUEST_TZ * 3600e3).toISOString().slice(0, 16).replace('T', ' ')} МСК` +
       `${d.shift ? ` (сдвиг ${Math.round(d.shift / 3600e3)} ч)` : ''} · событие: ${d.event ? EVENT_NAME(d.event) : 'по датам'}`));
     const row = h('div', 'gfx-row');
@@ -726,6 +744,8 @@ export class UI {
     btn('Событие', () => { const i = EVENTS.findIndex((e) => e.id === d.event); f.setDev({ event: i + 1 < EVENTS.length ? EVENTS[i + 1].id : null }); });
     btn('Подарки заново', () => f.gifts.devReset());
     btn('Колесо заново', () => f.wheel.devReset());
+    btn('Достижения заново', () => f.ach.devReset());
+    btn('Заказы заново', () => f.orders.devReset());
     body.appendChild(row);
   }
 
@@ -944,6 +964,70 @@ export class UI {
     this.update(f);
   }
 
+  // ---------- Достижения ----------
+  // Кружок на кнопке «Ещё»: сколько достижений ждут, чтобы забрали награду (других кнопок у них нет)
+  moreBadge(f) {
+    const n = f.ach.available();
+    if (this.last.moreN === n) return;
+    this.last.moreN = n;
+    const b = $('#more-badge');
+    if (b) { b.hidden = !n; b.textContent = n; }
+  }
+
+  achTier(v, medal) {
+    this.toast(`Достижение «${v.name}»: ${ACH_MEDALS[medal - 1]} медаль!`, 'good');
+  }
+
+  // Окно «Достижения»: сверху — сколько медалей получено (и «Забрать всё», если наград несколько),
+  // ниже — достижения по разделам. В строке: медаль (цвет — забранная ступень), звёзды ступеней,
+  // цель ступени с полоской (взятой, пока её награду не забрали, иначе следующей), справа — награда и «Забрать».
+  achPanel(f) { this.openPanel('ach', 'Достижения', (body) => this.achBody(f, body)); }
+
+  achBody(f, body) {
+    const vs = f.ach.views(), S = f.ach.summary(vs);
+    const top = h('div', 'ach-sum', `${this.ic('trophy', 'ic')}<div class="ach-sum-t"><b>Медали: ${S.got} из ${S.total}</b>` +
+      `<div class="qc-bar"><i style="width:${(S.got / S.total) * 100}%"></i></div></div>`);
+    if (S.can > 1) {
+      const b = h('button', 'btn-s gold', `Забрать всё (${S.can})`);
+      b.onclick = () => this.achClaim(f, null);
+      top.appendChild(b);
+    }
+    body.appendChild(top);
+    for (const g of ACH_GROUPS) {
+      const list = vs.filter((v) => v.group === g.key);
+      if (!list.length) continue;
+      body.appendChild(h('div', 'pn-sub', g.name));
+      for (const v of list) body.appendChild(this.achRow(f, v));
+    }
+  }
+
+  achRow(f, v) {
+    const stars = Array.from({ length: v.tiers }, (_, i) => `<s class="${i < v.got ? 'on' : i < v.reached ? 'can' : ''}">★</s>`).join('');
+    const bar = v.complete ? '<div class="ach-max">Все медали получены!</div>' :
+      `<div class="qc-row"><div class="qc-bar"><i style="width:${v.frac * 100}%"></i></div><span class="qc-n">${v.can ? '✓' : `${fmtNum(v.p)}/${fmtNum(v.n)}`}</span></div>`;
+    const row = h('div', 'ql-row ach-row' + (v.can ? ' done' : '') + (v.complete ? ' max' : ''),
+      `<div class="ach-ic t${v.medal}">${this.ic(v.icon, 'ic')}</div>` +
+      `<div class="ql-t"><i>${v.name}<span class="ach-st">${stars}</span></i>` +
+      `${v.complete ? '' : `<b>${v.task.replace(/(\d+) /g, '$1 ')}</b>`}${bar}</div>`);
+    if (v.reward) {
+      const side = h('div', 'ach-side', `<div class="ach-rw">${this.rewardHtml(v.reward).replace(/ (?=<img)/g, ' ')}</div>`);
+      if (v.can) {
+        const b = h('button', 'btn-s gold ql-get', 'Забрать');
+        b.onclick = () => this.achClaim(f, v.id);
+        side.appendChild(b);
+      }
+      row.appendChild(side);
+    }
+    return row;
+  }
+
+  achClaim(f, id) {
+    const r = f.ach.claim(id);
+    if (!r) return;
+    this.toast(`${id ? `«${r.view.name}»: ` : ''}+${this.rewardHtml(r.reward)}`, 'good');
+    this.refreshPanel();
+  }
+
   housePanel(f) {
     this.openPanel('house', 'Дом фермера', (body) => {
       const lvl = f.st.house, cur = HOUSE[lvl], next = HOUSE[lvl + 1];
@@ -966,87 +1050,207 @@ export class UI {
     });
   }
 
-  // ---------- Рынок: «Купить» и «Продать» ----------
-  marketPanel(f) {
+  // ---------- Окно «разделы слева, предметы справа» (рюкзак, рынок, выдача тестера) ----------
+  // tabs — [{ key, name, icon, empty }] (пустой раздел бледнее, но открывается), tab — выбранный, onTab(key) меняет
+  // состояние окна (окно пересоберётся само). sort — { val, set(v), cheap } — порядок над списком (cheap: «По цене»
+  // сначала дешёвые), top — свой элемент над списком. Возвращает { list, info(box) }: list — куда класть клетки,
+  // info(box) — карточка выбранного предмета (на телефоне — внизу во всю ширину, в горизонтали — колонкой справа).
+  shelf(body, id, { tabs, tab, onTab, sort, top }) {
+    body.classList.add('sh-body');
+    const sh = h('div', 'sh'), rail = h('div', 'sh-rail'), main = h('div', 'sh-main'), list = h('div', 'sh-list');
+    rail.dataset.scroll = `rail:${id}`;
+    list.dataset.scroll = `list:${id}:${tab}`;
+    for (const t of tabs) {
+      const b = h('button', 'sh-tab' + (t.key === tab ? ' on' : '') + (t.empty ? ' empty' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
+      b.onclick = () => { if (t.key !== tab) { onTab(t.key); this.sfx('tap'); this.refreshPanel(); } };
+      rail.appendChild(b);
+    }
+    if (sort) main.appendChild(this.sortBar(sort));
+    if (top) main.appendChild(top);
+    main.appendChild(list);
+    // в горизонтали колонка карточки есть всегда (иначе клетки перестраиваются при выборе): пока пусто — подсказка
+    const none = h('div', 'sh-info sh-none', `${this.ic(id === 'buy' || id === 'sell' ? 'market' : 'bag', 'ic big')}<span>Нажмите на предмет, чтобы узнать о нём больше</span>`);
+    sh.append(rail, main, none);
+    body.appendChild(sh);
+    return { list, info: (box) => { box.classList.add('sh-info'); none.replaceWith(box); } };
+  }
+
+  // Порядок: «Обычный», «По цене» (повторное нажатие меняет направление: ↓ — сначала дорогие, ↑ — дешёвые), «А–Я»
+  sortBar({ val, set, cheap }) {
+    const bar = h('div', 'sh-sort'), byPrice = val === 'price' || val === 'cheap';
+    for (const k of ['auto', 'price', 'name']) {
+      const on = k === 'price' ? byPrice : val === k;
+      const name = k === 'auto' ? 'Обычный' : k === 'name' ? 'А–Я' : byPrice ? `По цене ${val === 'cheap' ? '↑' : '↓'}` : 'По цене';
+      const b = h('button', on ? 'on' : '', name);
+      b.onclick = () => {
+        const v = k !== 'price' ? k : byPrice ? (val === 'cheap' ? 'price' : 'cheap') : cheap ? 'cheap' : 'price';
+        if (v !== val) { set(v); this.sfx('tap'); this.refreshPanel(); }
+      };
+      bar.appendChild(b);
+    }
+    return bar;
+  }
+
+  // нажатие по клетке: выбрать предмет (его карточка — снизу) или снять выбор
+  pick(S, key) { S.sel = S.sel === key ? null : key; this._reveal = !!S.sel; this.sfx('tap'); this.refreshPanel(); }
+
+  // своё в шапке окна между названием и ✕: у рынка — «Купить / Продать», у рюкзака — энергия
+  headExtra(card, el) { const head = card.querySelector('.pn-head'); head.insertBefore(el, head.lastChild); }
+
+  // ---------- Рынок: «Заказы», «Купить» и «Продать» ----------
+  // mode — сразу этот раздел (иначе тот, что был открыт в прошлый раз)
+  marketPanel(f, mode) {
     const M = this.mk || (this.mk = { mode: 'sell', tab: 'seeds', sel: null });
+    if (mode && mode !== M.mode) { M.mode = mode; M.sel = null; }
     this.openPanel('market', 'Рынок', (body, card) => {
-      const seg = h('div', 'mk-seg');
-      for (const [k, name] of [['buy', 'Купить'], ['sell', 'Продать']]) {
-        const b = h('button', M.mode === k ? 'on' : '', name);
-        b.onclick = () => { if (M.mode !== k) { M.mode = k; M.sel = null; this.sfx('tap'); this.refreshPanel(); } };
+      const seg = h('div', 'mk-seg n3'), ready = f.orders.ready();
+      for (const [k, name] of [['orders', 'Заказы'], ['buy', 'Купить'], ['sell', 'Продать']]) {
+        const b = h('button', M.mode === k ? 'on' : '', name + (k === 'orders' && ready ? '<i class="qt-dot"></i>' : ''));
+        b.onclick = () => { if (M.mode !== k) { M.mode = k; M.sel = null; M.skip = null; this.sfx('tap'); this.refreshPanel(); } };
         seg.appendChild(b);
       }
-      body.appendChild(seg);
-      if (M.mode === 'sell') this.marketSell(f, body, card, M);
-      else this.marketBuy(f, body, card, M);
+      this.headExtra(card, seg);
+      if (M.mode === 'orders') this.ordersBody(f, body, M);
+      else if (M.mode === 'sell') this.marketSell(f, body, M);
+      else this.marketBuy(f, body, M);
     });
   }
 
+  // Цифра на кнопке «Рынок»: сколько заказов можно сдать прямо сейчас
+  marketBadge(f) {
+    const n = f.orders.ready();
+    if (this.last.orders === n) return;
+    this.last.orders = n;
+    const b = $('#market-badge');
+    b.hidden = !n; b.textContent = n;
+  }
+
+  // ---------- Доска заказов ----------
+  // Три места: заказ (кто, что просит — есть/нужно, награда, «Отдать» и «Отказаться») или покупатель в пути
+  // (время до нового заказа и «Позвать сейчас» за кристаллы). Отказ — со второго нажатия (M.skip — id заказа).
+  ordersBody(f, body, M) {
+    body.classList.add('od-body');
+    const v = f.orders.view();
+    if (!v.open) {
+      body.appendChild(h('div', 'od-lock', `${this.ic('note', 'ic big')}<b>Доска заказов</b>` +
+        `<span>Соседи будут заказывать урожай и рыбу и платить за них больше, чем рынок. Откроется с ${v.level} уровня.</span>`));
+      return;
+    }
+    body.appendChild(h('div', 'od-head', `<span>Соседи платят больше, чем рынок</span><span>Сдано: ${fmtNum(v.done)}</span>`));
+    const list = h('div', 'od-list');
+    for (const s of v.slots) list.appendChild(s.order ? this.orderCard(f, s, M) : this.orderWait(f, s));
+    body.appendChild(list);
+  }
+
+  orderCard(f, s, M) {
+    const o = s.order, c = h('div', 'od-card' + (s.ready ? ' ready' : ''));
+    c.dataset.id = o.id;
+    const top = h('div', 'od-who', `${this.ic('friends', 'ic')}<div><b>${s.who.name}</b><span class="od-say">${s.who.text}</span></div>`);
+    const sure = M.skip === o.id;
+    const x = h('button', 'od-skip' + (sure ? ' sure' : ''), sure ? 'Точно отказаться?' : 'Отказаться');
+    x.onclick = () => {
+      if (sure) { M.skip = null; f.orders.skip(s.idx); return; }
+      M.skip = o.id; this.sfx('tap'); this.refreshPanel();
+    };
+    top.appendChild(x);
+    c.appendChild(top);
+    const goods = h('div', 'od-goods');
+    for (const l of s.lines) {
+      const it = ITEMS[l.id], ok = l.have >= l.n;
+      const g = h('div', 'od-good' + (ok ? ' ok' : ''), `<i>${this.ic(it.icon, 'ic')}${ok ? '<em>✓</em>' : ''}</i><span>${it.name}</span><b>${fmtNum(Math.min(l.have, l.n))}/${l.n}</b>`);
+      g.title = it.name;
+      goods.appendChild(g);
+    }
+    c.appendChild(goods);
+    const foot = h('div', 'od-foot', `<div class="od-pay"><b>${fmtNum(o.coins)} ${this.ic('coin')}</b><b>+${o.xp} ${this.ic('star')}</b>` +
+      `<small>на рынке ${fmtNum(o.value)} ${this.ic('coin')}</small></div>`);
+    const give = h('button', 'btn-s gold od-give', 'Отдать');
+    give.disabled = !s.ready;
+    give.onclick = () => { M.skip = null; f.orders.deliver(s.idx); };
+    foot.appendChild(give);
+    c.appendChild(foot);
+    return c;
+  }
+
+  orderWait(f, s) {
+    const c = h('div', 'od-card od-wait');
+    c.appendChild(h('div', 'od-who', `${this.ic('friends', 'ic')}<div><b>Покупатель в пути</b><span>Новый заказ через <b class="od-t" data-i="${s.idx}">${fmtWait(s.wait)}</b></span></div>`));
+    const b = h('button', 'btn-s od-rush', `Позвать сейчас · ${s.gems} ${this.ic('gem')}`);
+    b.dataset.g = s.gems;
+    b.disabled = f.st.gems < s.gems;
+    b.onclick = () => f.orders.rush(s.idx);
+    c.appendChild(b);
+    return c;
+  }
+
+  // Раз в секунду, пока открыты «Заказы»: идёт время до покупателя (цена «Позвать сейчас» поменялась — окно заново)
+  ordersTick(f) {
+    const v = f.orders.view();
+    for (const s of v.slots) {
+      if (s.order) continue;
+      const t = this.panelEl.querySelector(`.od-t[data-i="${s.idx}"]`), b = t && t.closest('.od-card').querySelector('.od-rush');
+      if (!t) continue;
+      if (b && +b.dataset.g !== s.gems) { this.refreshPanel(); return; }
+      t.textContent = fmtWait(s.wait);
+    }
+  }
+
   // Продажа — как в рюкзаке: разделы и порядок, но только то, что можно продать
-  marketSell(f, body, card, M) {
+  marketSell(f, body, M) {
     const st = f.st;
     M.stab = M.stab || 'all'; M.sort = M.sort || 'auto';
-    const tabs = h('div', 'inv-tabs c2');
-    for (const t of INV_TABS.filter((t) => SELL_TABS.includes(t.key))) {
-      const b = h('button', 'inv-tab' + (M.stab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
-      b.onclick = () => {
-        if (M.stab === t.key) return;
-        M.stab = t.key;
-        if (M.sel && t.key !== 'all' && !ITEMS[M.sel].tabs.includes(t.key)) M.sel = null;
-        this.sfx('tap'); this.refreshPanel();
-      };
-      tabs.appendChild(b);
-    }
-    body.appendChild(tabs);
-    const sorts = h('div', 'inv-sort', '<span>Порядок:</span>');
-    for (const [k, name] of [['auto', 'Обычный'], ['price', 'По цене'], ['name', 'А–Я']]) {
-      const b = h('button', 'inv-chip' + (M.sort === k ? ' on' : ''), name);
-      b.onclick = () => { if (M.sort !== k) { M.sort = k; this.refreshPanel(); } };
-      sorts.appendChild(b);
-    }
-    body.appendChild(sorts);
-    const list = Inv.listItems(st, M.stab, M.sort).filter((it) => it.sell);
+    const sellable = (tab, sort) => Inv.listItems(st, tab, sort).filter((it) => it.sell);
+    const L = this.shelf(body, 'sell', {
+      tabs: INV_TABS.filter((t) => SELL_TABS.includes(t.key)).map((t) => ({ ...t, empty: !sellable(t.key, 'auto').length })),
+      tab: M.stab,
+      onTab: (k) => { M.stab = k; if (M.sel && k !== 'all' && !ITEMS[M.sel].tabs.includes(k)) M.sel = null; },
+      sort: { val: M.sort, set: (v) => { M.sort = v; } },
+    });
+    const list = sellable(M.stab, M.sort);
     if (!list.length) {
-      body.appendChild(h('div', 'pn-empty', M.stab === 'all' ? 'Пока нечего продать. Соберите урожай с грядок или поймайте рыбу.' : 'В этом разделе пока нечего продать.'));
+      L.list.appendChild(h('div', 'pn-empty', M.stab === 'all' ? 'Пока нечего продать. Соберите урожай с грядок или поймайте рыбу.' : 'В этом разделе пока нечего продать.'));
       M.sel = null; return;
     }
     const g = h('div', 'mk-grid');
     for (const it of list) {
+      // нужен для заказа на доске — пометка в углу клетки, чтобы не продать его случайно
       const c = h('button', 'mk-cell' + (M.sel === it.key ? ' sel' : ''),
-        `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}<b>${fmtNum(Inv.count(st, it.key))}</b></i><span>${it.sell} ${this.ic('coin', 'ic-s')}</span>`);
+        `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${f.orders.need(it.key) ? this.ic('note', 'mk-need') : ''}<b>${fmtNum(Inv.count(st, it.key))}</b></i><span>${it.sell} ${this.ic('coin', 'ic-s')}</span>`);
       c.title = it.name;
-      c.onclick = () => { M.sel = M.sel === it.key ? null : it.key; this.sfx('tap'); this.refreshPanel(); };
+      c.onclick = () => this.pick(M, it.key);
       g.appendChild(c);
     }
-    body.appendChild(g);
+    L.list.appendChild(g);
     const it = M.sel && ITEMS[M.sel], n = it ? Inv.count(st, it.key) : 0;
     if (!it || !n || !it.sell) { M.sel = null; return; }
-    const box = this.mkCard(it, `${n} шт. · ${it.sell} ${this.ic('coin')} за шт.`, M);
+    const need = f.orders.need(it.key);
+    const box = this.mkCard(it, `${n} шт. · ${it.sell} ${this.ic('coin')} за шт.${need ? ` · нужно для заказа: ${need}` : ''}`, M);
     box.appendChild(this.sellRow(f, it, n));
-    card.appendChild(box);
+    L.info(box);
   }
 
-  marketBuy(f, body, card, M) {
+  marketBuy(f, body, M) {
     const st = f.st;
-    const tabs = h('div', 'inv-tabs c6');
-    for (const t of SHOP_TABS) {
-      const b = h('button', 'inv-tab' + (M.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
-      b.onclick = () => { if (M.tab !== t.key) { M.tab = t.key; M.sel = null; this.sfx('tap'); this.refreshPanel(); } };
-      tabs.appendChild(b);
-    }
-    body.appendChild(tabs);
-    const offers = SHOP.filter((o) => o.tab === M.tab);
-    if (!offers.length) { body.appendChild(h('div', 'pn-empty', 'Скоро здесь появятся товары.')); return; }
+    M.bsort = M.bsort || 'auto';
+    const L = this.shelf(body, 'buy', {
+      tabs: SHOP_TABS.map((t) => ({ ...t, empty: !SHOP.some((o) => o.tab === t.key) })),
+      tab: M.tab,
+      onTab: (k) => { M.tab = k; M.sel = null; },
+      sort: { val: M.bsort, set: (v) => { M.bsort = v; }, cheap: true },
+    });
+    const offers = sortOffers(SHOP.filter((o) => o.tab === M.tab), M.bsort, st.level);
+    if (!offers.length) { L.list.appendChild(h('div', 'pn-empty', 'Скоро здесь появятся товары.')); return; }
     const g = h('div', 'mk-grid');
     for (const o of offers) {
       const it = ITEMS[o.item], locked = o.level > st.level, cur = o.cur === 'gems' ? 'gem' : 'coin';
       const c = h('button', 'mk-cell' + (locked ? ' locked' : '') + (M.sel === o.item ? ' sel' : ''),
         `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${locked ? this.ic('lock', 'mk-lock') : ''}${o.qty > 1 ? `<b>×${o.qty}</b>` : ''}</i>` +
         `<span>${locked ? `с ${o.level} ур.` : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
-      c.onclick = () => { M.sel = M.sel === o.item ? null : o.item; this.sfx('tap'); this.refreshPanel(); };
+      c.title = it.name;
+      c.onclick = () => this.pick(M, o.item);
       g.appendChild(c);
     }
-    body.appendChild(g);
+    L.list.appendChild(g);
     const o = M.sel && offers.find((x) => x.item === M.sel);
     if (!o) { M.sel = null; return; }
     const it = ITEMS[o.item], have = Inv.count(st, it.key), pack = o.qty || 1;
@@ -1064,18 +1268,18 @@ export class UI {
       const b = h('button', 'btn-s gold', `Купить ${q * pack} шт. · ${q * o.price} ${this.ic(cur)}`);
       b.disabled = st[curKey] < q * o.price; b.onclick = () => f.buy(o, q);
       acts.appendChild(b);
-      // купленную дорожку — сразу класть: окно закрывается, включается «Кладём дорожку»
-      if (it.place === 'path' && have) {
+      // купленную дорожку — сразу класть: окно закрывается, включается «Кладём дорожку»;
+      // пруд, украшение пруда, постройку (поливалку) — ставить: выбраны в «Переставить», нажатие на клетку — предпросмотр
+      if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && have) {
         const p = h('button', 'btn-s', 'Поставить');
-        p.onclick = () => { this.closePanel(); f.mover.pave(it.key); };
+        p.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
         acts.appendChild(p);
       }
       row.appendChild(acts);
       box.appendChild(row);
     }
-    card.appendChild(box);
+    L.info(box);
   }
-
   // карточка выбранного товара на рынке (снизу окна)
   mkCard(it, facts, M) {
     const box = h('div', 'inv-info ui-layer',
@@ -1099,40 +1303,24 @@ export class UI {
     return step;
   }
 
-  // ---------- Рюкзак: клетки с разделами ----------
-  // Выбранный раздел, порядок и предмет помним между открытиями.
+  // ---------- Рюкзак: разделы слева, клетки с порядком справа ----------
+  // Выбранный раздел, порядок и предмет помним между открытиями. Энергия — в шапке окна.
   bagPanel(f) {
     const S = this.inv || (this.inv = { tab: 'all', sort: 'auto', sel: null });
     this.openPanel('bag', 'Рюкзак', (body, card) => {
       const st = f.st;
-      const full = st.energy >= f.maxEnergy;
-      body.appendChild(h('div', 'inv-en', `${this.ic('energy')}<b>${st.energy}/${f.maxEnergy}</b><span>${full ? 'энергия полная' : '+1 через ' + fmtClock(f.energyLeftSec())}</span>`));
-
-      const tabs = h('div', 'inv-tabs wrap');
-      for (const t of INV_TABS) {
-        const b = h('button', 'inv-tab' + (S.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
-        b.onclick = () => {
-          if (S.tab === t.key) return;
-          S.tab = t.key;
-          if (S.sel && t.key !== 'all' && !ITEMS[S.sel].tabs.includes(t.key)) S.sel = null; // карточка чужого раздела
-          this.sfx('tap'); this.refreshPanel();
-        };
-        tabs.appendChild(b);
-      }
-      body.appendChild(tabs);
-
-      const sorts = h('div', 'inv-sort', '<span>Порядок:</span>');
-      for (const [k, name] of [['auto', 'Обычный'], ['price', 'По цене'], ['name', 'А–Я']]) {
-        const b = h('button', 'inv-chip' + (S.sort === k ? ' on' : ''), name);
-        b.onclick = () => { if (S.sort !== k) { S.sort = k; this.refreshPanel(); } };
-        sorts.appendChild(b);
-      }
-      body.appendChild(sorts);
-
+      this.headExtra(card, h('div', 'pn-en', `${this.ic('energy')}<b>${st.energy}/${f.maxEnergy}</b><small id="bag-en">${this.bagEnergy(f)}</small>`));
+      const L = this.shelf(body, 'bag', {
+        tabs: INV_TABS.map((t) => ({ ...t, empty: !Inv.listItems(st, t.key, 'auto').length })),
+        tab: S.tab,
+        // карточка предмета из другого раздела закрывается
+        onTab: (k) => { S.tab = k; if (S.sel && k !== 'all' && !ITEMS[S.sel].tabs.includes(k)) S.sel = null; },
+        sort: { val: S.sort, set: (v) => { S.sort = v; } },
+      });
       const list = Inv.listItems(st, S.tab, S.sort);
       if (!list.length) {
-        const empty = { build: 'Постройки появятся в магазине.', decor: 'Дорожки и другой декор продаются на рынке, раздел «Декор».' };
-        body.appendChild(h('div', 'pn-empty', empty[S.tab] || 'Здесь пока пусто.'));
+        const empty = { build: 'Поливалки и другие постройки продаются на рынке, раздел «Постройки».', decor: 'Дорожки, пруды и другой декор продаются на рынке, раздел «Декор».' };
+        L.list.appendChild(h('div', 'pn-empty', empty[S.tab] || 'Здесь пока пусто.'));
       } else {
         const g = h('div', 'inv-grid');
         for (const it of list) {
@@ -1140,19 +1328,19 @@ export class UI {
           const c = h('button', 'inv-cell' + (S.sel === it.key ? ' sel' : ''),
             `${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${n ? `<b>${n}</b>` : ''}`);
           c.title = it.name;
-          c.onclick = () => { S.sel = S.sel === it.key ? null : it.key; this.sfx('tap'); this.refreshPanel(); };
+          c.onclick = () => this.pick(S, it.key);
           g.appendChild(c);
         }
-        body.appendChild(g);
+        L.list.appendChild(g);
       }
-
-      // карточка выбранного предмета — внизу окна, не прокручивается
       const it = S.sel && ITEMS[S.sel];
       if (!it || (!it.tool && !Inv.count(st, it.key))) { S.sel = null; return; }
-      card.appendChild(this.itemInfo(f, it));
+      L.info(this.itemInfo(f, it));
     });
   }
 
+  // энергия в шапке рюкзака: сколько до следующей единицы (обновляется каждую секунду, UI.tick)
+  bagEnergy(f) { return f.st.energy >= f.maxEnergy ? 'полная' : `+1 через ${fmtClock(f.energyLeftSec())}`; }
   // Продажа с выбором количества: −10 −1 [N] +1 +10, «Продать N» и «Все»
   sellRow(f, it, n) {
     const Q = this.sellQty || (this.sellQty = {}); // выбранное количество — своё у каждого предмета
@@ -1296,10 +1484,11 @@ export class UI {
       };
       acts.appendChild(b);
     }
-    // дорожки: «Поставить» закрывает рюкзак и включает «Кладём дорожку» (нажимай на траву)
-    if (it.place === 'path' && n > 0) {
+    // дорожки: «Поставить» закрывает рюкзак и включает «Кладём дорожку» (нажимай на траву);
+    // пруды, украшения прудов и постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
+    if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
-      b.onclick = () => { this.closePanel(); f.mover.pave(it.key); };
+      b.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
       acts.appendChild(b);
     }
     if (acts.children.length) box.appendChild(acts);
@@ -1331,6 +1520,16 @@ function wheelTicks(from, to, seg, dur, [x1, y1, x2, y2]) {
   }
   return out;
 }
+// Порядок товаров на рынке. Закрытые по уровню — всегда в конце. «По цене» — сначала за монеты, потом за кристаллы;
+// sort 'price' — сначала дорогие, 'cheap' — дешёвые. 'auto' — как в таблице SHOP (по уровню).
+function sortOffers(offers, sort, level) {
+  const name = (o) => ITEMS[o.item].name, gem = (o) => (o.cur === 'gems' ? 1 : 0), d = sort === 'cheap' ? 1 : -1;
+  const by = sort === 'name' ? (a, b) => name(a).localeCompare(name(b), 'ru')
+    : sort === 'price' || sort === 'cheap' ? (a, b) => gem(a) - gem(b) || d * (a.price - b.price)
+    : () => 0;
+  return offers.map((o, i) => ({ o, i, lock: o.level > level ? 1 : 0 }))
+    .sort((a, b) => a.lock - b.lock || by(a.o, b.o) || a.i - b.i).map((x) => x.o);
+}
 function fmtNum(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M';
   return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n);
@@ -1343,4 +1542,6 @@ function fmtLeft(ms) {
 // день по московскому времени (как сброс заданий): «7 ноября»
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 function fmtDay(t) { const d = new Date(t + QUEST_TZ * 3600e3); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; }
+// до нового покупателя: «4:32», дольше часа — «1 ч 5 мин»
+function fmtWait(ms) { return ms >= 3600e3 ? fmtLeft(ms) : fmtClock(Math.ceil(ms / 1000)); }
 function fmtClock(s) { s = Math.max(0, s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }

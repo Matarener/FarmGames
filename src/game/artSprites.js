@@ -2,7 +2,7 @@
 // игра не открывается, пока не загружены все картинки, чтобы в игре не было подгрузок.
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
-import { FLORA, PATHS, PATH_KEYS } from './data.js';
+import { FLORA, PATHS, PATH_KEYS, PONDS, POND_DECOR, pondDecorId, SPRINKLERS } from './data.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
@@ -18,11 +18,13 @@ const OBJ = {
 for (const [k, f] of Object.entries(FLORA)) OBJ[k] = [f.kind + '_' + k];
 
 // Иконка саженца: само растение в квадрате 64×64
+// s.icon — [x, y, w, h]: только эта часть картинки (у прудов — без пустых полей вокруг)
 function iconOf(s) {
-  const c = makeCanvas(64, 64), g = c.getContext('2d'), k = Math.min(60 / s.canvas.width, 60 / s.canvas.height);
-  const w = s.canvas.width * k, h = s.canvas.height * k;
+  const [x, y, sw, sh] = s.icon || [0, 0, s.canvas.width, s.canvas.height];
+  const c = makeCanvas(64, 64), g = c.getContext('2d'), k = Math.min(60 / sw, 60 / sh);
+  const w = sw * k, h = sh * k;
   g.imageSmoothingQuality = 'high';
-  g.drawImage(s.canvas, (64 - w) / 2, (64 - h) / 2, w, h);
+  g.drawImage(s.canvas, x, y, sw, sh, (64 - w) / 2, (64 - h) / 2, w, h);
   return c.toDataURL();
 }
 
@@ -42,6 +44,7 @@ export async function loadArt(onProgress) {
     try {
       const img = await loadImageRetry(BASE + name + '.webp?v=' + V);
       A[name] = { canvas: img, w: m.w, h: m.h, ax: m.ax, ay: m.ay, name };
+      if (m.icon) A[name].icon = m.icon;
     } catch (e) { failed.push(name); }
     tick();
   }));
@@ -81,6 +84,27 @@ export async function loadArt(onProgress) {
     return { key: k, grassy: !!p.grassy, tiles: [t, A[p.tile + '_2'] || t] };
   });
   for (const p of paths) try { floraIcons[p.key] = iconOf(p.tiles[0]); } catch (e) { /* */ }
+  // поливалки (data.js SPRINKLERS): картинка по ключу вида, иконка на рынке и в рюкзаке — сама поливалка
+  // (если художник не нарисовал отдельную ic_<вид>)
+  const sprinkler = {};
+  for (const k of Object.keys(SPRINKLERS)) {
+    if (!A[k]) continue;
+    sprinkler[k] = A[k];
+    if (!icons[k]) try { floraIcons[k] = iconOf(A[k]); } catch (e) { /* */ }
+  }
+  // пруды (data.js PONDS): одна картинка на пруд (tools/pond_art.py), иконка в рюкзаке и на рынке — сам пруд
+  const ponds = {};
+  for (const k of Object.keys(PONDS)) {
+    if (!A[k]) continue;
+    ponds[k] = A[k];
+    A[k].flat = true; // плоский, как земля: лежит в атласе земли (PixiScene.put)
+    if (!icons[k]) try { floraIcons[k] = iconOf(A[k]); } catch (e) { /* */ }
+  }
+  // украшения прудов (камыш, рогоз, камни): иконка предмета — сама картинка pond_<что>
+  for (const t of Object.keys(POND_DECOR)) {
+    const id = pondDecorId(t);
+    if (A[id] && !icons[id]) try { floraIcons[id] = iconOf(A[id]); } catch (e) { /* */ }
+  }
   // куски травяного края у дорожек (склеивает Farm.pathEdge): полосы вдоль сторон и углы
   const pathEdge = {};
   for (const name of Object.keys(A)) if (/^path_(edge|corner)_/.test(name)) pathEdge[name.slice(5)] = A[name];
@@ -101,7 +125,7 @@ export async function loadArt(onProgress) {
   // дикая высокая трава: grass_tall_0, grass_tall_1, ...
   const wildGrass = Object.keys(A).filter((n) => /^grass_tall_\d+$/.test(n)).sort().map((n) => A[n]);
   return {
-    wildGrass, fog, obj, crops, icons, flora, floraIcons,
+    wildGrass, fog, obj, crops, icons, flora, floraIcons, ponds, sprinkler,
     sprouts: { tree: A.sprout_tree, bush: A.sprout_bush }, // ростки посаженных растений
     // спрайт дерева → его пень (у дуба иногда мшистый)
     stumpOf: (tree, id) => {
@@ -117,9 +141,7 @@ export async function loadArt(onProgress) {
     paths, pathEdge, pathBlend,
     // объёмные грядки: [сухая, политая]; рисуются поверх травы
     bed: [A.bed_dry, A.bed_wet],
-    // вода: бесшовная текстура на весь пруд, берег рисуется кодом (shore.js)
-    waterTex: A.tex_water,
-    // украшения пруда (World.genDecor): у берега и на воде
+    // украшения прудов (World.genDecor): камыш, рогоз и камни (POND_DECOR); кувшинки и листья — в картинке пруда
     decor: { cattail: A.pond_cattail, reeds: A.pond_reeds, rocks: A.pond_rocks, lily: A.pond_lily, leaves: A.pond_leaves },
   };
 }

@@ -19,7 +19,7 @@
 // reward, done, claimed, frac, … }. goals — цели с прогрессом p, goal — первая невыполненная (для стрелки).
 
 import { LINES, QUESTS, QUEST_XP, PERIODIC_LEVEL, OLD_ORDER, OLD_TITLES, PERIODS, EVENTS, MAX_PINS } from './questData.js';
-import { CROPS, FISH, FLORA, FLORA_GOODS, ITEMS } from './data.js';
+import { CROPS, FISH, FLORA, FLORA_GOODS, ITEMS, SPRINKLERS } from './data.js';
 import { addItem } from './inventory.js';
 
 const H = 3600e3;
@@ -39,6 +39,7 @@ export const GROUPS = {
   fruit: (k) => !!FLORA_GOODS[k],
   // плодовые и ягодные: саженец из магазина (sap_<вид>) или посаженный вид
   orchard: (k) => { const f = FLORA[k.startsWith('sap_') ? k.slice(4) : k]; return !!(f && f.pick); },
+  sprinkler: (k) => !!SPRINKLERS[k],
 };
 
 export function matches(g, ev, key) {
@@ -79,10 +80,14 @@ export function migrateOld(st) {
   delete st.quest;
 }
 
-function life(st) {
+// Счётчики событий игры за всё время: { ev: n, 'ev:key': n } — их же читают достижения (achRules.js).
+// quest — сколько заданий выполнено (сдано или начислено само), бонусы дня и призы событий не считаются.
+export function life(st) {
   const s = st.stats || (st.stats = { cleared: 0, harvested: 0 });
   return s.ev || (s.ev = { harvest: s.harvested || 0 });
 }
+
+function countQuest(st, v) { if (!v.bonus) { const L = life(st); L.quest = (L.quest || 0) + 1; } }
 
 // ---------------- Ветки ----------------
 
@@ -394,6 +399,7 @@ export function claim(st, id, ctx) {
   const Q = questState(st), v = views(st, ctx).find((x) => x.id === id);
   if (!v || !v.done || v.claimed) return null;
   applyReward(st, v.reward);
+  countQuest(st, v);
   let next = null;
   if (v.kind === 'line') {
     Q.done[id] = 1; delete Q.prog[id]; delete Q.told[id];
@@ -414,7 +420,7 @@ export function claim(st, id, ctx) {
 // Период или событие кончились: выполненное, но не забранное, начисляется само
 function credit(st, vs) {
   let sum = null;
-  for (const v of vs) if (v && v.done && !v.claimed) { applyReward(st, v.reward); sum = addReward(sum || {}, v.reward); }
+  for (const v of vs) if (v && v.done && !v.claimed) { applyReward(st, v.reward); countQuest(st, v); sum = addReward(sum || {}, v.reward); }
   return sum;
 }
 

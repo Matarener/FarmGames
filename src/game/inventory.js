@@ -55,8 +55,8 @@ export function migrateInventory(st) {
   delete st.inv; delete st.seeds; delete st.crops;
 }
 
-// Список клеток для раздела. sort: 'auto' | 'price' | 'name'.
-// Инструменты всегда есть; остальное — только то, что лежит в рюкзаке.
+// Список клеток для раздела. sort: 'auto' | 'price' (сначала дорогие) | 'cheap' (сначала дешёвые) | 'name'.
+// Инструменты всегда есть; остальное — только то, что лежит в рюкзаке. Без цены продажи — в конце при любом порядке по цене.
 export function listItems(st, tab, sort) {
   const out = [];
   for (const it of Object.values(ITEMS)) {
@@ -65,6 +65,7 @@ export function listItems(st, tab, sort) {
     out.push(it);
   }
   if (sort === 'price') out.sort((a, b) => (b.sell || 0) - (a.sell || 0) || a.order - b.order);
+  else if (sort === 'cheap') out.sort((a, b) => !a.sell - !b.sell || (a.sell || 0) - (b.sell || 0) || a.order - b.order);
   else if (sort === 'name') out.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   else out.sort((a, b) => a.order - b.order);
   return out;
