@@ -48,7 +48,7 @@ CROP_STAGE_W = {'cabbage': [17.6, 29.65, 47.13, 56.7]}
 # Растения без подложки (2026-11-09): деревья, кусты, пни и высокая трава нарисованы без травяного
 # островка и земляного блока и стоят прямо на траве. Каждое — своя картинка <имя>.png. Размер — как
 # у прежних картинок с подложкой, мерка: ('w', ширина) — самая широкая строка в верхних 60% картинки
-# (крона, у травы — вся картинка), ('h', высота) — от верха до опоры (у пней). В мировых единицах.
+# (крона; у травы и пней — во всей картинке), ('h', высота) — от верха до опоры. В мировых единицах.
 # Опора — середина низа ствола или стеблей (foot_of), мягкую тень под растением рисует add_shadow.
 NOBASE = {
     # взрослые деревья (у вишни с ягодами и без — своя картинка), без плодов, молодые
@@ -66,9 +66,10 @@ NOBASE = {
     'bush_blueberry_young': ('w', 33.5), 'bush_raspberry_young': ('w', 30.2), 'bush_rosehip_young': ('w', 33.0),
     'bush_hydrangea_young': ('w', 34.0), 'bush_lavender_young': ('w', 31.8), 'bush_rose_young': ('w', 31.2),
     # пни (до 2026-11-09 — листы stumps, stumps2)
-    'stump_oak': ('h', 16.0), 'stump_birch': ('h', 11.9), 'stump_pine': ('h', 16.7), 'stump_oak_moss': ('h', 17.9),
-    'stump_apple': ('h', 14.4), 'stump_sakura': ('h', 14.3), 'stump_cherry': ('h', 15.7), 'stump_maple': ('h', 15.3),
-    'stump_linden': ('h', 18.8),
+    # пни: ширина всей картинки (корни, листья) — около трёх четвертей прежнего травяного ромба
+    'stump_oak': ('w', 31), 'stump_birch': ('w', 27), 'stump_pine': ('w', 31), 'stump_oak_moss': ('w', 31),
+    'stump_apple': ('w', 31), 'stump_sakura': ('w', 31), 'stump_cherry': ('w', 31), 'stump_maple': ('w', 31),
+    'stump_linden': ('w', 31),
     # дикая высокая трава (до 2026-11-09 — лист grass_tall из трёх)
     'grass_tall_0': ('w', 42), 'grass_tall_1': ('w', 46), 'grass_tall_2': ('w', 46), 'grass_tall_3': ('w', 38),
 }
@@ -320,18 +321,23 @@ def crown_px(m, frac=0.6):
 
 
 def foot_of(m):
-    """Опора растения без подложки (m — маска): x — середина низа ствола/стеблей (среднее по нижней
-    полосе 8% высоты, где корни и травинки), y — чуть выше самой нижней точки: травинки у ствола стоят
-    «пятачком» 2:1, его середина выше переднего края на четверть ширины (но не больше 4% высоты)."""
+    """Опора растения без подложки (m — маска): середина основания ствола или стеблей.
+    Ствол меряем на 10% высоты над самой нижней точкой (там уже нет травинок): x — середина этого
+    отрезка (мелкие просветы между стеблями не в счёт), y — выше нижней точки на четверть его ширины:
+    основание ствола на земле — эллипс 2:1, его середина выше переднего края (не больше 12% высоты)."""
     ys = np.where(m.any(1))[0]
     y0, yb = ys[0], ys[-1]
     h = yb - y0 + 1
     band = m[max(y0, yb - int(h * 0.08)):yb + 1]
     cols = band.sum(0).astype(float)
-    xs = np.where(cols > 0)[0]
-    x = (cols * np.arange(len(cols))).sum() / cols.sum()
-    bw = xs[-1] - xs[0]
-    return x, yb - min(bw / 4, h * 0.04)
+    cx = (cols * np.arange(len(cols))).sum() / cols.sum()  # середина низа: корни и травинки
+    row = ndimage.binary_closing(m[int(yb - h * 0.1)], np.ones(max(3, int(m.shape[1] * 0.05))))
+    lab, n = ndimage.label(row)
+    if not n: return cx, yb
+    runs = [np.where(lab == i)[0] for i in range(1, n + 1)]
+    run = min(runs, key=lambda r: 0 if r[0] <= cx <= r[-1] else min(abs(r[0] - cx), abs(r[-1] - cx)))
+    tw = run[-1] - run[0] + 1
+    return (run[0] + run[-1]) / 2, yb - min(tw / 4, h * 0.12)
 
 
 def add_shadow(img, ax, ay, crown, kind):
@@ -367,7 +373,7 @@ def nobase(name, man):
     kind = NOBASE_KIND(name)
     fx, fy = foot_of(m)
     how, size = NOBASE[name]
-    if how == 'w': k = size / crown_px(m, 1.0 if kind == 'grass' else 0.6)
+    if how == 'w': k = size / crown_px(m, 1.0 if kind in ('grass', 'stump') else 0.6)
     else: k = size / (fy - np.where(m.any(1))[0][0])
     W, H = (x1 - x0) * k, (y1 - y0) * k
     img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
