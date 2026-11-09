@@ -23,13 +23,20 @@ tree_sakura: tree_sakura__1.png — OK. (__2: extra attempt, a few small cyan po
 tree_sakura_bare: tree_sakura_bare__1.png — OK (prompt asks for no flowers, so no buds is right; __2 also fine).
 tree_sakura_young: tree_sakura_young__2.png — OK. (__1: small unkeyed cyan pocket under a blossom.)
 # From tree_sakura on, gen_art takes images only from its own Codex session folder (local patch, not committed).
-bush_blueberry: (pending retry) __1: leaf outlines keyed semi-transparent, whitish fringe on light backgrounds.
+bush_blueberry: bush_blueberry__2.png — OK. (__1: leaf outlines keyed semi-transparent, whitish fringe.)
 bush_blueberry_bare: bush_blueberry_bare__1.png — OK.
 bush_blueberry_young: bush_blueberry_young__1.png — OK (green unripe berries as in reference).
-bush_hydrangea: (pending retry) __1: bright red outline segment by the left flower cluster (keying artifact).
+bush_hydrangea: bush_hydrangea__2.png — OK. (__1: bright red outline segment by the left flower cluster.)
 bush_hydrangea_bare: bush_hydrangea_bare__1.png — OK.
 bush_hydrangea_young: bush_hydrangea_young__1.png — OK.
 bush_lavender: bush_lavender__1.png — OK.
-bush_lavender_bare: (pending retry) __1: small magenta specks in gaps between stems.
+bush_lavender_bare: (pending retry) __1, __2: small magenta specks in gaps between stems.
 bush_lavender_young: bush_lavender_young__1.png — OK.
-bush_raspberry: (pending retry) __1: leaf edges keyed semi-transparent, whitish fringe (like bush_blueberry__1).
+bush_raspberry: (pending retry) __1, __2: leaves keyed semi-transparent (~20% of the interior), whitish fringe.
+bush_raspberry_bare: bush_raspberry_bare__1.png — OK.
+bush_raspberry_young: (pending retry) __1: leaves keyed semi-transparent.
+bush_rose_bare: (pending retry) __1: leaves keyed semi-transparent.
+bush_rose_young: bush_rose_young__1.png — OK.
+bush_rosehip: (pending retry) __1: small unkeyed cyan bits between the branches.
+bush_rosehip_bare: (pending retry) __1: leaves keyed semi-transparent.
+bush_rosehip_young: bush_rosehip_young__1.png — OK.
