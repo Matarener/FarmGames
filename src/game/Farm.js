@@ -3,7 +3,7 @@
 
 import { toWorld, toGrid } from '../engine/Iso.js';
 import { makeCanvas } from '../engine/Sprite.js';
-import { World, N, CHUNK, CHUNKS, T } from './World.js';
+import { World, N, CHUNK, CHUNKS, T, pondDecorPos } from './World.js';
 import { Player } from './Player.js';
 import { makeGhostData, ROD_TIP } from './ghost.js';
 import { loadArt } from './artSprites.js';
@@ -21,7 +21,7 @@ import * as Ponds from './ponds.js';
 import * as Hints from './hints.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
-  CROPS, FISH, FISH_CATCH, OBJECTS, FLORA, FLORA_GOODS, PONDS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
+  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
   ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC,
 } from './data.js';
 
@@ -681,7 +681,22 @@ export class Farm {
   }
 
   // Картинка предмета из рюкзака на месте, куда его ставят (предпросмотр в «Переставить»)
-  placeSprite(id) { return Ponds.isPondItem(id) ? this.S.ponds[id] : null; }
+  placeSprite(id) { return Ponds.isPondItem(id) ? this.S.ponds[id] : Ponds.isDecorItem(id) ? this.S.decor[ITEMS[id].decorOf] : null; }
+
+  // Где на клетке (gx, gy) стоит украшение пруда (у берега — ближе к земле) → out = точка мира
+  decorPoint(gx, gy, out) {
+    const o = this.world.pondAt(gx, gy);
+    if (o && this.world.isWater(gx, gy)) { const [x, y] = pondDecorPos(o.type, gx - o.gx, gy - o.gy); toWorld(o.gx + x, o.gy + y, out); }
+    else toWorld(gx + 0.5, gy + 0.5, out);
+    return out;
+  }
+
+  // Украшение пруда поставили, переставили или убрали: брызги
+  decorFx(gx, gy) {
+    this.decorPoint(gx, gy, tmp);
+    this.burst(tmp.x, tmp.y, '#9fd8f5', 6);
+    this.sfx('splash');
+  }
 
   // Пруд переставили, убрали или поставили: брызги по воде
   pondFx(o) {

@@ -3,7 +3,7 @@
 // в сохранение пишется только разница.
 
 import { mulberry32, hash2 } from '../engine/Sprite.js';
-import { OBJECTS, FLORA, FLORA_GROUPS, floraByGroup, FOG, PATH_KEYS, PONDS } from './data.js';
+import { OBJECTS, FLORA, FLORA_GROUPS, floraByGroup, FOG, PATH_KEYS, PONDS, POND_DECOR } from './data.js';
 import { toWorld } from '../engine/Iso.js';
 
 export const CHUNK = 10;
@@ -27,6 +27,28 @@ export function objCells(def) {
   let r = RECTS.get(k);
   if (!r) { r = []; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) r.push([x, y]); RECTS.set(k, r); }
   return r;
+}
+
+// Украшение пруда вида k на клетке воды (dx, dy): точка (в клетках от угла пруда), где оно стоит.
+// У берега — ближе к земле (сдвиг к соседним клеткам без воды), посреди воды — в середине клетки.
+export function pondDecorPos(k, dx, dy) {
+  const c = PONDS[k].cells, wet = (x, y) => !!c[y] && c[y][x] === 'w';
+  let ox = 0, oy = 0;
+  for (const [ix, iy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!wet(dx + ix, dy + iy)) { ox += ix; oy += iy; }
+  const l = Math.hypot(ox, oy) || 1, k2 = 0.25 / l;
+  return [dx + 0.5 + ox * k2, dy + 0.5 + oy * k2];
+}
+
+// Список украшений пруда вида k ([[что, dx, dy], ...]) без ошибок: известные украшения, на воде, по одному
+// на клетку. → [годные, негодные]
+export function cleanPondDecor(k, list) {
+  const ok = [], bad = [], seen = new Set(), c = PONDS[k].cells;
+  for (const d of Array.isArray(list) ? list : []) {
+    const [t, dx, dy] = Array.isArray(d) ? d : [];
+    const good = POND_DECOR[t] && c[dy] && c[dy][dx] === 'w' && !seen.has(dx + ',' + dy);
+    if (good) { seen.add(dx + ',' + dy); ok.push([t, dx, dy]); } else if (POND_DECOR[t]) bad.push([t, dx, dy]);
+  }
+  return [ok, bad];
 }
 
 // Короткий отпечаток карты: сохранение помнит, на какой карте оно сделано
@@ -93,7 +115,10 @@ export class World {
     for (const [type, x, y] of m.objects || []) if ((OBJECTS[type] || FLORA_GROUPS[type]) && type !== 'well' && !PONDS[type]) this.add(v1 ? this.species(type) : type, x, y);
     if (Array.isArray(m.ponds)) {
       for (let i = 0; i < N * N; i++) if (this.tiles[i] === T.WATER) this.tiles[i] = T.GRASS;
-      for (const [type, x, y] of m.ponds) if (PONDS[type]) this.add(type, x, y);
+      for (const [type, x, y, decor] of m.ponds) {
+        const o = PONDS[type] && this.add(type, x, y);
+        if (o) o.decor = cleanPondDecor(type, decor)[0];
+      }
     } else this.pondsFromWater();
     this.genCount = this.objects.length;
     this.wellPos = m.well || [2 * CHUNK + 5, 2 * CHUNK + 4];
@@ -116,7 +141,7 @@ export class World {
     for (const o of this.objects) {
       if (!o) continue;
       if (o === this.well || o.type === 'well') { well = [o.gx, o.gy]; continue; }
-      if (PONDS[o.type]) { ponds.push([o.type, o.gx, o.gy]); continue; }
+      if (PONDS[o.type]) { ponds.push(o.decor.length ? [o.type, o.gx, o.gy, o.decor.map((d) => d.slice())] : [o.type, o.gx, o.gy]); continue; }
       if (o.own || o.wild || o.type === 'sapling' || o.type === 'grass') continue; // посаженное игроком — не часть карты
       objects.push([o.type === 'stump' ? (o.was || 'oak') : o.type, o.gx, o.gy]);
     }
@@ -155,6 +180,7 @@ export class World {
     toWorld(gx + w / 2, gy + h / 2, tmp);
     o.wx = tmp.x; o.wy = tmp.y;
     o.depth = gx + w / 2 + gy + h / 2;
+    if (def.pond) o.decor = []; // украшения пруда: [[что, dx, dy], ...]
     this.objects.push(o);
     for (const [dx, dy] of cells) this.occ[(gy + dy) * N + gx + dx] = o.id;
     return o;
@@ -336,6 +362,7 @@ export class World {
         if (!best) break;
         const o = this.add(best.p.key, best.gx, best.gy);
         if (!o) break;
+        o.decor = best.p.decor.map((d) => d.slice()); // камыш и камни, как у пруда стартовой карты
         for (const [dx, dy] of best.p.water) left.delete((best.gy + dy) * N + best.gx + dx);
       }
     }
@@ -366,16 +393,15 @@ export class World {
     }
   }
 
-  // Камыш, рогоз и камни у берега прудов: не объекты (их нельзя рубить и двигать), стоят по таблице
-  // своего пруда (PONDS.decor) и переезжают вместе с ним. decorV растёт, когда список поменялся.
+  // Украшения прудов (камыш, рогоз, камни — o.decor) для отрисовки: не объекты (клетку не занимают),
+  // переезжают вместе со своим прудом. decorV растёт, когда список поменялся.
   genDecor() {
     this.decor = [];
     for (const o of this.objects) {
-      const p = o && PONDS[o.type];
-      if (!p) continue;
-      for (const [type, x, y] of p.decor || []) {
-        const cx = Math.min(N - 1, o.gx + Math.floor(x)), cy = Math.min(N - 1, o.gy + Math.floor(y));
-        this.decor.push({ type, gx: cx, gy: cy, x: o.gx + x, y: o.gy + y });
+      if (!o || !PONDS[o.type] || !o.decor) continue;
+      for (const [type, dx, dy] of o.decor) {
+        const [x, y] = pondDecorPos(o.type, dx, dy);
+        this.decor.push({ type, gx: o.gx + dx, gy: o.gy + dy, x: o.gx + x, y: o.gy + y });
       }
     }
     this.decorV = (this.decorV || 0) + 1;

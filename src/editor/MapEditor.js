@@ -9,7 +9,8 @@
 // из этого файла вместо случайной генерации. Несохранённая работа держится в черновике браузера.
 
 import { World, mapText, objCells, N, CHUNK, CHUNKS, T, START_CHUNK, FOG_TREES, FOG_W } from '../game/World.js';
-import { OBJECTS, PATHS, PATH_KEYS, PONDS } from '../game/data.js';
+import { OBJECTS, PATHS, PATH_KEYS, PONDS, POND_DECOR } from '../game/data.js';
+import { decorIndex } from '../game/ponds.js';
 import { toGrid, toWorld } from '../engine/Iso.js';
 
 const DRAFT = 'farm.editor.draft';
@@ -24,6 +25,8 @@ const TOOLS = [
   // пруды — объекты по форме из PONDS (data.js): одна картинка на пруд, камыши у берега — сами
   { group: 'Пруды' },
   ...Object.keys(PONDS).map((k) => ({ id: k, name: PONDS[k].name, obj: k, pond: true })),
+  // украшения прудов — только на воду пруда (на клетку одно); ластик снимает украшение, потом сам пруд
+  ...Object.entries(POND_DECOR).map(([t, d]) => ({ id: 'decor_' + t, name: d.name, pondDecor: t, brush: true })),
   { group: 'Природа' },
   { id: 'oak', name: 'Дуб', obj: 'oak', brush: true },
   { id: 'birch', name: 'Берёза', obj: 'birch', brush: true },
@@ -229,6 +232,7 @@ export class MapEditor {
       }
       return;
     }
+    if (t.pondDecor) { for (const [x, y] of this.cells(gx, gy)) this.putDecor(t.pondDecor, x, y, drag || this.size > 1); return; }
     if (t.obj) {
       if (t.brush) { for (const [x, y] of this.cells(gx, gy)) this.place(t.obj, x, y, drag || this.size > 1); return; }
       // большой объект: нажатая клетка — его середина
@@ -276,12 +280,25 @@ export class MapEditor {
     const o = w.add(type, gx, gy);
     if (o && type === 'well') { w.well = o; w.wellPos = [gx, gy]; }
     if (o) this._changed = true;
-    if (o && def.pond) this.dirtyDecor = true; // камыши и камни у берега
+    if (o && def.pond) { o.decor = PONDS[type].decor.map((d) => d.slice()); this.dirtyDecor = true; } // камыш и камни, как у прудов карты
     return o;
+  }
+
+  // украшение пруда на клетку воды (другое украшение на ней — заменяется)
+  putDecor(type, x, y, quiet) {
+    const w = this.f.world, o = w.pondAt(x, y);
+    if (!o || !w.isWater(x, y)) { if (!quiet) this.status(`${POND_DECOR[type].name}: только на воду пруда`, true); return; }
+    const i = decorIndex(o, x - o.gx, y - o.gy);
+    if (i >= 0 && o.decor[i][0] === type) return;
+    if (i >= 0) o.decor[i][0] = type; else o.decor.push([type, x - o.gx, y - o.gy]);
+    this._changed = true; this.dirtyDecor = true;
   }
 
   erase(x, y) {
     const f = this.f, w = f.world, o = w.objectAt(x, y);
+    // на воде пруда с украшением — сначала снимается украшение
+    const di = o && OBJECTS[o.type].pond ? decorIndex(o, x - o.gx, y - o.gy) : -1;
+    if (di >= 0) { o.decor.splice(di, 1); this._changed = true; this.dirtyDecor = true; return; }
     if (o) {
       if (o === w.well) w.well = null;
       if (OBJECTS[o.type].pond) this.dirtyDecor = true;
@@ -497,6 +514,7 @@ export class MapEditor {
       if (tool.tile === T.GRASS) s = S.grass[0];
       else if (tool.tile === T.PATH) s = S.paths[tool.path || 0].tiles[0];
       else if (tool.tile === T.SOIL) s = S.bed[0];
+      else if (tool.pondDecor) s = S.decor[tool.pondDecor];
       else if (tool.obj && tool.obj !== 'forest' && tool.obj !== 'fogforest') s = f.objSprite({ type: tool.obj, id: 0 });
       else if (tool.obj === 'forest' || tool.obj === 'fogforest') s = f.objSprite({ type: 'pine', id: 1 });
     } catch { s = null; }

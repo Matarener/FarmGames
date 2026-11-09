@@ -191,7 +191,7 @@ def geo(p):
 
 
 def preview(key, p, img, geo, path):
-    """Пруд на траве (как в игре) с сеткой клеток и точками декора — для проверки."""
+    """Пруд на траве (как в игре) с сеткой клеток и точками украшений стартовой карты — для проверки."""
     gsq = grass_square(); n = gsq.shape[0]
     Hh, W = img.shape[:2]
     py, px = np.mgrid[0:Hh, 0:W].astype(np.float64)
@@ -207,6 +207,7 @@ def preview(key, p, img, geo, path):
     from PIL import ImageDraw
     dr = ImageDraw.Draw(im)
     for kind, x, y in p.get('decor', []):
+        x, y = x + 0.5, y + 0.5  # клетка воды → её середина (в игре у берега чуть ближе к земле)
         sx = ((x - y) * HW) * D + geo[2] * D - (p['w'] / 2 - p['h'] / 2) * HW * D
         sy = ((x + y) * HH) * D + geo[3] * D - (p['w'] / 2 + p['h'] / 2) * HH * D
         dr.ellipse([sx - 6, sy - 6, sx + 6, sy + 6], fill=(255, 40, 40))

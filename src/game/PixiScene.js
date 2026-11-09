@@ -293,7 +293,7 @@ export class PixiScene {
   }
 
   // украшения прудов (камыш, рогоз, камни — World.genDecor): стоят на месте, пересобираются при открытии
-  // участка (затемнение) и когда пруд переставили (World.decorV)
+  // участка (затемнение) и когда пруд или украшение переставили, убрали, поставили (World.decorV)
   syncDecor() {
     const f = this.f, w = f.world, D = f.S.decor;
     if (!this.decorSp) this.decorSp = [];
@@ -950,8 +950,9 @@ export class PixiScene {
         g.poly([tmp.x, tmp.y - HH, tmp.x + HW, tmp.y, tmp.x, tmp.y + HH, tmp.x - HW, tmp.y]).fill({ color: t.ok ? 0x6edc5a : 0xeb4632, alpha: 0.38 });
         g.poly([tmp.x, tmp.y - HH + 1, tmp.x + HW - 2, tmp.y, tmp.x, tmp.y + HH - 1, tmp.x - HW + 2, tmp.y]).stroke({ width: 2, color: t.ok ? 0x8ff06a : 0xff6a50 });
       }
-      if (s.kind === 'obj' || s.kind === 'bag') {
-        toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp);
+      if (s.kind === 'obj' || s.kind === 'bag' || s.kind === 'decor') {
+        if (s.decor) f.decorPoint(t.gx, t.gy, tmp); // украшение пруда: у берега — ближе к земле
+        else toWorld(t.gx + s.w / 2, t.gy + s.h / 2, tmp);
         const sp = s.kind === 'obj' ? f.objSprite(s.o) : f.placeSprite(s.id);
         this.moverGhost.visible = !!sp;
         if (sp) this.put(this.moverGhost, sp, tmp.x, tmp.y);

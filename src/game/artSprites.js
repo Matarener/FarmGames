@@ -2,7 +2,7 @@
 // игра не открывается, пока не загружены все картинки, чтобы в игре не было подгрузок.
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
-import { FLORA, PATHS, PATH_KEYS, PONDS } from './data.js';
+import { FLORA, PATHS, PATH_KEYS, PONDS, POND_DECOR, pondDecorId } from './data.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
@@ -92,6 +92,11 @@ export async function loadArt(onProgress) {
     A[k].flat = true; // плоский, как земля: лежит в атласе земли (PixiScene.put)
     if (!icons[k]) try { floraIcons[k] = iconOf(A[k]); } catch (e) { /* */ }
   }
+  // украшения прудов (камыш, рогоз, камни): иконка предмета — сама картинка pond_<что>
+  for (const t of Object.keys(POND_DECOR)) {
+    const id = pondDecorId(t);
+    if (A[id] && !icons[id]) try { floraIcons[id] = iconOf(A[id]); } catch (e) { /* */ }
+  }
   // куски травяного края у дорожек (склеивает Farm.pathEdge): полосы вдоль сторон и углы
   const pathEdge = {};
   for (const name of Object.keys(A)) if (/^path_(edge|corner)_/.test(name)) pathEdge[name.slice(5)] = A[name];
@@ -128,7 +133,7 @@ export async function loadArt(onProgress) {
     paths, pathEdge, pathBlend,
     // объёмные грядки: [сухая, политая]; рисуются поверх травы
     bed: [A.bed_dry, A.bed_wet],
-    // украшения прудов (World.genDecor): камыш, рогоз и камни у берега
+    // украшения прудов (World.genDecor): камыш, рогоз и камни (POND_DECOR); кувшинки и листья — в картинке пруда
     decor: { cattail: A.pond_cattail, reeds: A.pond_reeds, rocks: A.pond_rocks, lily: A.pond_lily, leaves: A.pond_leaves },
   };
 }

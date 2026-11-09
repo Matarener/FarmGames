@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as P from '../src/game/ponds.js';
 import { World, mapId, N, T, START_CHUNK, CHUNK, CHUNKS } from '../src/game/World.js';
-import { PONDS, OBJECTS, ITEMS, SHOP } from '../src/game/data.js';
+import { PONDS, OBJECTS, ITEMS, SHOP, POND_DECOR, pondDecorId } from '../src/game/data.js';
+import { pondDecorPos } from '../src/game/World.js';
 
 let tests = 0;
 const test = (name, fn) => { fn(); tests++; console.log('ok', name); };
@@ -41,13 +42,17 @@ test('стартовая карта: вода → пруды по формам, 
     if (wet(x, y)) assert.ok(w.isWater(x, y), `вода ${x},${y}`);
     else if (w.isWater(x, y)) assert.ok(wet(x - 1, y) && wet(x + 1, y) && wet(x, y - 1) && wet(x, y + 1), `островок ${x},${y}`);
   }
-  // туда-обратно: карта из редактора с прудами — та же карта
+  // у прудов стартовой карты — камыш, рогоз и камни, как в таблице вида
+  for (const o of w.objects.filter(P.isPond)) assert.deepEqual(o.decor, PONDS[o.type].decor);
+  assert.ok(w.decor.length > 0, 'камыши у прудов');
+  // туда-обратно: карта из редактора с прудами и украшениями — та же карта
   const m = w.toMap();
-  assert.deepEqual(m.ponds, list);
+  assert.deepEqual(m.ponds.map((p) => p.slice(0, 3)), list);
+  assert.ok(m.ponds.every((p) => Array.isArray(p[3])), 'украшения записаны в карту');
   const w2 = new World(1, m);
   assert.deepEqual(ponds(w2), list);
+  assert.deepEqual(w2.objects.filter(P.isPond).map((o) => o.decor), w.objects.filter(P.isPond).map((o) => o.decor));
   assert.equal(w2.genCount, w.genCount);
-  assert.ok(w.decor.length > 0, 'камыши у прудов');
 });
 
 test('кусок воды с островком: островок заливается, пруд целый', () => {
@@ -101,12 +106,59 @@ test('купленный пруд: поставить, переставить, �
   assert.deepEqual(st.ponds, [['pond_drop', c0 + 5, r0 + 4]]);
   assert.equal(w.isWater(c0 + 2, r0 + 2), false);
   assert.equal(w.walkable(c0 + 2, r0 + 2), true, 'старое место освободилось');
+  assert.deepEqual(o.decor, [], 'купленный пруд — без украшений');
   const dv = w.decorV;
-  assert.equal(P.storePond(st, w, o), 'pond_drop');
+  assert.deepEqual(P.storePond(st, w, o), [{ id: 'pond_drop', n: 1 }]);
   assert.equal(st.items.pond_drop, 1);
   assert.deepEqual(st.ponds, []);
-  assert.ok(w.decorV > dv && w.decor.length === 0, 'камыши ушли вместе с прудом');
+  assert.ok(w.decorV > dv && w.decor.length === 0);
   assert.equal(P.storePond(st, w, o), null, 'уже убран');
+});
+
+test('украшения: таблица, только на воду пруда, по одному на клетку, у берега — ближе к земле', () => {
+  for (const [t, d] of Object.entries(POND_DECOR)) {
+    const id = pondDecorId(t);
+    assert.equal(ITEMS[id].place, 'pondDecor');
+    assert.deepEqual(ITEMS[id].tabs, ['decor']);
+    const o = SHOP.find((s) => s.item === id);
+    assert.ok(o && o.tab === 'decor' && o.price === d.price && o.level === d.level, t);
+  }
+  for (const [k, p] of Object.entries(PONDS)) for (const [t, dx, dy] of p.decor) assert.ok(POND_DECOR[t] && p.cells[dy][dx] === 'w', `${k}: ${t} на воде`);
+  // точка у берега сдвинута к земле, посреди воды — середина клетки
+  assert.deepEqual(pondDecorPos('pond_big', 2, 2), [2.5, 2.5]);
+  const [lx, ly] = pondDecorPos('pond_big', 0, 2);
+  assert.ok(lx < 0.5 && ly === 2.5);
+  const w = new World(1, empty()), st = st0({ items: { pond_reeds: 2, pond_rocks: 1 } });
+  const o = w.add('pond_round', c0 + 2, r0 + 2);
+  assert.equal(P.canDecor(w, c0 + 2, r0 + 2).why, 'water', 'угол — не вода');
+  assert.equal(P.canDecor(w, c0 + 1, r0 + 1).why, 'water', 'трава');
+  assert.equal(P.placeDecor(st, w, 'pond_reeds', c0 + 7, r0 + 7), null);
+  assert.equal(P.placeDecor(st, w, 'pond_reeds', c0 + 2, r0 + 3), o);
+  assert.deepEqual(o.decor, [['reeds', 0, 1]]);
+  assert.equal(st.items.pond_reeds, 1);
+  assert.deepEqual(st.ponds, [['pond_round', c0 + 2, r0 + 2, [['reeds', 0, 1]]]]);
+  assert.equal(P.canDecor(w, c0 + 2, r0 + 3).why, 'busy');
+  assert.equal(P.placeDecor(st, w, 'pond_reeds', c0 + 2, r0 + 3), null, 'на клетке уже есть');
+  assert.equal(P.placeDecor(st, w, 'pond_small', c0 + 3, r0 + 3), null, 'пруд — не украшение');
+  assert.equal(w.decor.length, 1);
+  // перенести на другую клетку и на другой пруд
+  assert.equal(P.moveDecor(st, w, o, 0, 1, c0 + 2, r0 + 3), false, 'то же место');
+  assert.equal(P.moveDecor(st, w, o, 0, 1, c0 + 5, r0 + 4), true);
+  assert.deepEqual(o.decor, [['reeds', 3, 2]]);
+  const o2 = w.add('pond_small', c0 + 7, r0 + 7);
+  assert.equal(P.moveDecor(st, w, o, 3, 2, c0 + 8, r0 + 8), true);
+  assert.deepEqual(o.decor, []); assert.deepEqual(o2.decor, [['reeds', 1, 1]]);
+  // пруд переставили — украшение с ним
+  assert.equal(P.movePond(st, w, o2, c0 + 6, r0 + 7), true);
+  assert.deepEqual(w.decor.map((d) => [d.type, d.gx, d.gy]), [['reeds', c0 + 7, r0 + 8]]);
+  // в рюкзак: украшение отдельно, пруд — вместе со своими украшениями
+  assert.equal(P.storeDecor(st, w, o2, 0, 0), null, 'там пусто');
+  assert.equal(P.placeDecor(st, w, 'pond_rocks', c0 + 6, r0 + 7), o2);
+  assert.equal(P.storeDecor(st, w, o2, 0, 0), 'pond_rocks');
+  assert.equal(st.items.pond_rocks, 1);
+  assert.deepEqual(P.storePond(st, w, o2), [{ id: 'pond_small', n: 1 }, { id: 'pond_reeds', n: 1 }]);
+  assert.equal(st.items.pond_reeds, 2);
+  assert.equal(w.decor.length, 0);
 });
 
 test('загрузка: пруды игрока вместо прудов карты, место занято — пруд в рюкзак', () => {
@@ -118,12 +170,16 @@ test('загрузка: пруды игрока вместо прудов кар
   // игрок переставил первый пруд и купил ещё один; второй — туда, где теперь (по новой карте) дерево
   const w = new World(1, MAP);
   const x = c0 + 1, y = r0 + 1;
-  st.ponds = [[map[0][0], map[0][1], map[0][2]], ['pond_small', x, y], ['nope', 1, 1]];
+  // у первого — камыш на воде и «украшение» на углу (не вода: в рюкзак); у второго — рогоз (в рюкзак с ним)
+  st.ponds = [[map[0][0], map[0][1], map[0][2], [['reeds', 1, 1], ['rocks', 0, 0], ['nope', 1, 2]]],
+    ['pond_small', x, y, [['cattail', 0, 0]]], ['nope', 1, 1]];
   w.add('oak', x, y);
-  assert.equal(P.restorePonds(st, w), 1);
+  assert.equal(P.restorePonds(st, w), 3);
   assert.equal(st.items.pond_small, 1);
+  assert.equal(st.items.pond_rocks, 1);
+  assert.equal(st.items.pond_cattail, 1);
   assert.deepEqual(ponds(w), [map[0]]);
-  assert.deepEqual(st.ponds, [map[0]]);
+  assert.deepEqual(st.ponds, [[...map[0], [['reeds', 1, 1]]]]);
 });
 
 test('берег: нажали на середину большого пруда — ближайшая вода, у которой можно встать', () => {

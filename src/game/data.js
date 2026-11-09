@@ -120,20 +120,30 @@ for (const f of Object.values(FLORA)) {
 // их можно переставлять и убирать в рюкзак (ponds.js).
 // Старые карты (клетки воды, цифра 2) превращаются в пруды этих форм (World.pondsFromWater): капелька
 // и круглый — ровно пруды стартовой карты, поэтому карта и сохранения не меняются.
-// decor — камыш, рогоз и камни у берега (спрайты pond_<что>, рисуются отдельно, с глубиной, как деревья):
-// [что, x, y] — в клетках от левого верхнего угла пруда (как gx, gy).
+// Кувшинки и листья нарисованы в картинке пруда. Камыш, рогоз и камни — украшения POND_DECOR: игрок
+// ставит их сам, только на воду пруда. decor — какие украшения стоят у пруда стартовой карты (и у пруда,
+// поставленного в редакторе): [что, dx, dy] — клетка воды от левого верхнего угла пруда. Купленный пруд — без них.
 export const PONDS = {
   pond_small:  { name: 'Маленький пруд',   cells: ['ww', 'ww'], price: 150, level: 3,
-    decor: [['cattail', 0.2, 1.55]], desc: 'Маленький пруд на четыре клетки.' },
+    decor: [['cattail', 0, 1]], desc: 'Маленький пруд на четыре клетки.' },
   pond_drop:   { name: 'Пруд-капелька',    cells: ['ww.', 'www', 'ww.'], price: 250, level: 4,
-    decor: [['cattail', 0.25, 0.3], ['reeds', 0.2, 2.45], ['rocks', 2.55, 1.2]], desc: 'Пруд в форме капли, как у бабушкиного дома.' },
+    decor: [['cattail', 0, 0], ['reeds', 0, 2], ['rocks', 2, 1]], desc: 'Пруд в форме капли, как у бабушкиного дома.' },
   pond_long:   { name: 'Длинный пруд',     cells: ['.www.', 'wwwww', '.www.'], price: 350, level: 6,
-    decor: [['cattail', 0.3, 1.35], ['reeds', 4.6, 1.5], ['rocks', 2.5, 2.7]], desc: 'Вытянутый пруд вдоль тропинки.' },
+    decor: [['cattail', 0, 1], ['reeds', 4, 1], ['rocks', 2, 2]], desc: 'Вытянутый пруд вдоль тропинки.' },
   pond_round:  { name: 'Круглый пруд',     cells: ['.ww.', 'wwww', 'wwww', '.ww.'], price: 450, level: 7,
-    decor: [['cattail', 0.3, 1.2], ['reeds', 1.3, 3.65], ['rocks', 3.6, 2.4]], desc: 'Большой круглый пруд: рыбы в нём много.' },
+    decor: [['cattail', 0, 1], ['reeds', 1, 3], ['rocks', 3, 2]], desc: 'Большой круглый пруд: рыбы в нём много.' },
   pond_big:    { name: 'Большой пруд',     cells: ['.www.', 'wwwww', 'wwwww', 'wwwww', '.www.'], price: 600, level: 9,
-    decor: [['cattail', 0.3, 1.4], ['cattail', 3.6, 0.3], ['reeds', 1.4, 4.6], ['rocks', 4.6, 3.1]], desc: 'Самый большой пруд: рыбы в нём больше всего.' },
+    decor: [['cattail', 0, 1], ['cattail', 3, 0], ['reeds', 1, 4], ['rocks', 4, 3]], desc: 'Самый большой пруд: рыбы в нём больше всего.' },
 };
+// Украшения прудов: ставятся только на клетку воды пруда (на клетку — одно), у берега стоят ближе к земле.
+// Переезжают вместе с прудом; пруд убрали в рюкзак — его украшения тоже в рюкзак. Предмет — pond_<что>
+// (картинка pond_<что>.webp), в магазине — раздел «Декор».
+export const POND_DECOR = {
+  rocks:   { name: 'Камни у воды', price: 15, level: 3, desc: 'Несколько гладких камней у самой воды.' },
+  reeds:   { name: 'Камыш',        price: 20, level: 3, desc: 'Пучок камыша с пушистыми метёлками.' },
+  cattail: { name: 'Рогоз',        price: 25, level: 3, desc: 'Высокий рогоз с бархатными початками.' },
+};
+export const pondDecorId = (type) => 'pond_' + type;
 for (const [k, p] of Object.entries(PONDS)) {
   p.key = k;
   p.h = p.cells.length; p.w = Math.max(...p.cells.map((r) => r.length));
@@ -301,6 +311,10 @@ for (const [k, p] of Object.entries(PONDS)) ITEMS[k] = {
   key: k, name: p.name, icon: k, tabs: ['decor'], place: 'pond', pondOf: k,
   desc: `${p.desc} Ловите рыбу и набирайте воду для лейки. Нажмите «Поставить» и выберите место на траве.`,
 };
+for (const [t, d] of Object.entries(POND_DECOR)) ITEMS[pondDecorId(t)] = {
+  key: pondDecorId(t), name: d.name, icon: pondDecorId(t), tabs: ['decor'], place: 'pondDecor', decorOf: t,
+  desc: `${d.desc} Ставится только на воду пруда: нажмите «Поставить» и выберите клетку пруда.`,
+};
 for (const [k, f] of Object.entries(SHOP_FOOD)) ITEMS[k] = { key: k, name: f.name, icon: k, food: f.food, tabs: ['food'], desc: f.desc + ' Восстанавливает энергию.' };
 // порядок «по умолчанию»: как в таблице (инструменты, урожай, рыба, семена, ресурсы)
 let _ord = 0;
@@ -333,7 +347,8 @@ export const SAPLING_SHOP = {
 for (const [sp, o] of Object.entries(SAPLING_SHOP)) if (FLORA[sp] && FLORA[sp].pick) SHOP.push({ tab: 'trees', item: floraSeedId(sp), price: o.price, level: o.level });
 // Декор: дорожки, от дешёвых к дорогим
 for (const [k, p] of Object.entries(PATHS).sort((a, b) => a[1].price - b[1].price)) SHOP.push({ tab: 'decor', item: k, price: p.price, level: p.level });
-// и пруды, тоже от дешёвых к дорогим
+// украшения для прудов и пруды, тоже от дешёвых к дорогим
+for (const [t, d] of Object.entries(POND_DECOR).sort((a, b) => a[1].price - b[1].price)) SHOP.push({ tab: 'decor', item: pondDecorId(t), price: d.price, level: d.level });
 for (const [k, p] of Object.entries(PONDS).sort((a, b) => a[1].price - b[1].price)) SHOP.push({ tab: 'decor', item: k, price: p.price, level: p.level });
 SHOP.push({ tab: 'res', item: 'stone', price: 4 });
 SHOP.push({ tab: 'res', item: 'wood', price: 1, cur: 'gems', qty: 10 });

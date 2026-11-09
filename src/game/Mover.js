@@ -5,6 +5,8 @@
 // поставить обратно из рюкзака.
 // Пруд из рюкзака (кнопка «Поставить» у пруда в рюкзаке и на рынке, takeFromBag) выбран, как будто его
 // переносят: нажатие на клетку показывает, как он встанет, второе нажатие или «Поставить» — ставит.
+// Украшения прудов (камыш, рогоз, камни) — так же, но только на воду пруда; нажатие на украшение в пруду
+// выбирает его (перенести на другую клетку воды или убрать в рюкзак), на воду без украшения — сам пруд.
 // «Кладём дорожку» (pave, кнопка «Поставить» у дорожки в рюкзаке и на рынке): каждое нажатие на траву
 // кладёт клетку выбранной дорожки, нажатие на дорожку другого вида меняет её (старая — в рюкзак).
 //
@@ -12,7 +14,7 @@
 // предпросмотр (зелёный — можно, красный — нельзя и почему); «Поставить» или
 // повторное нажатие на ту же клетку переносит объект.
 
-import { OBJECTS, FLORA, ITEMS, PATHS } from './data.js';
+import { OBJECTS, FLORA, ITEMS, PATHS, pondDecorId } from './data.js';
 import * as Flora from './flora.js';
 import * as Inv from './inventory.js';
 import * as Paths from './paths.js';
@@ -63,7 +65,7 @@ export class Mover {
     }
     if (!text) {
       if (!s) text = 'Нажмите на то, что передвинуть или убрать в рюкзак. Пустая трава — поставить из рюкзака';
-      else if (!t) text = s.store ? `${s.name}: нажмите на клетку, куда поставить, или «В рюкзак»` : `${s.name}: нажмите на клетку, куда поставить`;
+      else if (!t) text = `${s.name}: нажмите на ${s.decor ? 'воду пруда' : 'клетку'}, куда поставить${s.store ? ', или «В рюкзак»' : ''}`;
       else if (t.ok) text = `${s.name}: сюда можно. Нажмите «Поставить»`;
       else { text = t.why; bad = true; }
     }
@@ -89,6 +91,12 @@ export class Mover {
     if (o) {
       if (!w.isOpen(o.gx, o.gy)) return { why: 'Этот участок ещё не открыт' };
       if (Ponds.isPond(o)) {
+        // на клетке украшение (камыш, рогоз, камни) — выбирается оно: перенести на воду или в рюкзак
+        const di = Ponds.decorIndex(o, gx - o.gx, gy - o.gy);
+        if (di >= 0) {
+          const id = pondDecorId(o.decor[di][0]);
+          return { sel: { kind: 'decor', decor: true, o, dx: gx - o.gx, dy: gy - o.gy, id, store: true, name: ITEMS[id].name, w: 1, h: 1, gx, gy } };
+        }
         if (this.busyPond(o)) return { why: 'Призрачок сейчас рыбачит или набирает воду, подождите' };
         const def = OBJECTS[o.type];
         return { sel: { kind: 'obj', o, pond: true, store: true, name: def.name, w: o.w, h: o.h, gx: o.gx, gy: o.gy, cells: objCells(def) } };
@@ -145,6 +153,7 @@ export class Mover {
   // ---------- можно ли поставить ----------
   check(gx, gy) {
     const f = this.f, w = f.world, s = this.sel, p = f.player;
+    if (s.decor) return this.checkDecor(gx, gy);
     if (gx === s.gx && gy === s.gy) return { ok: false, why: 'Объект уже стоит здесь' };
     const solid = s.kind === 'obj' || s.kind === 'bag'; // объект на клетках (не дорожка и не грядка)
     const own = this.cellSet(s.gx, s.gy);
@@ -166,6 +175,15 @@ export class Mover {
     }
     if (solid && this.cutsOff(gx, gy)) return { ok: false, why: 'Сюда нельзя: так закроется проход' };
     return { ok: true };
+  }
+
+  // Украшение пруда (из рюкзака или переносим) — только на воду пруда
+  checkDecor(gx, gy) {
+    const s = this.sel, c = Ponds.canDecor(this.f.world, gx, gy, s.kind === 'decor' ? s : null);
+    if (c.ok) return { ok: true };
+    const why = { water: 'Сюда нельзя: украшение ставится только на воду пруда', locked: 'Сюда нельзя: участок ещё не открыт',
+      busy: 'Сюда нельзя: здесь уже есть украшение', same: 'Украшение уже стоит здесь' };
+    return { ok: false, why: why[c.why] };
   }
 
   // Клетки выбранного объекта, если его левый верхний угол — (gx, gy): номера клеток (за краем карты — без них)
@@ -252,7 +270,10 @@ export class Mover {
     if (!c.ok) { t.ok = false; t.why = c.why; this.fail(c.why); return false; }
     if (s.kind === 'bed' && s.b.crop) { this.fail('На грядке уже растёт урожай'); this.cancel(); return false; }
     if (s.kind === 'bag') return this.placeFromBag(t.gx, t.gy);
-    if (s.kind === 'obj' && s.pond) {
+    if (s.kind === 'decor') {
+      if (!Ponds.moveDecor(f.st, w, s.o, s.dx, s.dy, t.gx, t.gy)) { this.cancel(); return false; }
+      f.decorFx(t.gx, t.gy);
+    } else if (s.kind === 'obj' && s.pond) {
       if (this.busyPond(s.o)) { this.fail('Призрачок сейчас рыбачит или набирает воду, подождите'); return false; }
       if (!Ponds.movePond(f.st, w, s.o, t.gx, t.gy)) { this.cancel(); return false; }
       f.pondFx(s.o);
@@ -301,14 +322,20 @@ export class Mover {
       items = [{ id: k, n: 1 }];
       f.dropFx({ wx: tmp.x, wy: tmp.y }, items);
       f.burst(tmp.x, tmp.y, PATHS[k].dust, 8);
+    } else if (s.kind === 'decor') {
+      const id = Ponds.storeDecor(f.st, w, s.o, s.dx, s.dy);
+      if (!id) { this.cancel(); return false; }
+      toWorld(s.gx + 0.5, s.gy + 0.5, tmp);
+      f.dropFx({ wx: tmp.x, wy: tmp.y }, [{ id, n: 1 }]);
+      f.decorFx(s.gx, s.gy);
     } else if (s.pond) {
       const o = s.o;
       if (w.objects[o.id] !== o) { this.cancel(); return false; }
       if (this.busyPond(o)) { this.fail('Призрачок сейчас рыбачит или набирает воду, подождите'); return false; }
-      const k = Ponds.storePond(f.st, w, o);
-      if (!k) { this.fail('Рюкзак полон'); return false; }
+      const items = Ponds.storePond(f.st, w, o);
+      if (!items) { this.fail('Рюкзак полон'); return false; }
       f.pondFx(o);
-      f.dropFx(o, [{ id: k, n: 1 }]);
+      f.dropFx(o, items);
     } else {
       const o = s.o;
       if (w.objects[o.id] !== o) { this.cancel(); return false; }
@@ -351,7 +378,7 @@ export class Mover {
     const f = this.f, w = f.world, it = ITEMS[id];
     if (!it || !Inv.count(f.st, id)) { this.brush = null; this.hint(); return false; }
     // пруд: сначала предпросмотр на этой клетке (видно, как он встанет), потом «Поставить»
-    if (it.place === 'pond') return this.takeFromBag(id, gx, gy);
+    if (it.place === 'pond' || it.place === 'pondDecor') return this.takeFromBag(id, gx, gy);
     toWorld(gx + 0.5, gy + 0.5, tmp);
     // дорожка на дорожку другого вида: меняем (старая — в рюкзак)
     const was = it.place === 'path' && w.inside(gx, gy) && w.isOpen(gx, gy) ? Paths.kindAt(w, w.idx(gx, gy)) : null;
@@ -389,12 +416,12 @@ export class Mover {
   // Пруд из рюкзака: выбран, как будто его переносят (kind 'bag'). Нажатие на клетку — предпросмотр,
   // второе нажатие или «Поставить» — ставит. gx, gy — сразу показать предпросмотр здесь.
   takeFromBag(id, gx, gy) {
-    const f = this.f, it = ITEMS[id];
-    if (!Ponds.isPondItem(id) || !Inv.count(f.st, id)) return false;
+    const f = this.f, it = ITEMS[id], decor = Ponds.isDecorItem(id);
+    if (!(Ponds.isPondItem(id) || decor) || !Inv.count(f.st, id)) return false;
     if (!this.active) this.enter();
-    const def = OBJECTS[id];
+    const def = decor ? {} : OBJECTS[id];
     this.brush = null; this.to = null;
-    this.sel = { kind: 'bag', id, name: it.name, w: def.w || 1, h: def.h || 1, gx: -9, gy: -9, cells: objCells(def) };
+    this.sel = { kind: 'bag', id, decor, name: it.name, w: def.w || 1, h: def.h || 1, gx: -9, gy: -9, cells: objCells(def) };
     if (gx != null) {
       const tx = gx - ((this.sel.w - 1) >> 1), ty = gy - ((this.sel.h - 1) >> 1), c = this.check(tx, ty);
       this.to = { gx: tx, gy: ty, ok: c.ok, why: c.why };
@@ -407,9 +434,9 @@ export class Mover {
   // Поставить выбранный из рюкзака пруд на (gx, gy) (проверено check). Есть ещё такие — выбор остаётся.
   placeFromBag(gx, gy) {
     const f = this.f, w = f.world, s = this.sel;
-    const o = Ponds.placePond(f.st, w, s.id, gx, gy);
+    const o = s.decor ? Ponds.placeDecor(f.st, w, s.id, gx, gy) : Ponds.placePond(f.st, w, s.id, gx, gy);
     if (!o) { this.to.ok = false; this.to.why = 'Сюда нельзя'; this.fail(this.to.why); return false; }
-    f.pondFx(o);
+    if (s.decor) f.decorFx(gx, gy); else f.pondFx(o);
     f.sfx('dig');
     const n = Inv.count(f.st, s.id);
     this.to = null;
