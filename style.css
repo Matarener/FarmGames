@@ -824,8 +824,13 @@ body.planting .hud-bottom, body.digging .pb-more { display: none; }
 .gf-note { font-size: 12px; padding: 0 0 4px; margin-top: -4px; }
 
 /* ---------- Колесо фортуны ---------- */
+/* окно выше обычного, чтобы колесо, кнопки и подпись помещались без прокрутки; на низком экране колесо меньше */
+.panel[data-kind="wheel"] .pn-card { max-height: 94%; }
 .wh-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.wh-box { --wh: min(280px, 74vw, 46vh); position: relative; flex: none; width: var(--wh); height: var(--wh); margin-top: calc(var(--wh) * .11); }
+.wh-box { --wh: min(280px, 74vw, calc(84vh - 210px - var(--safe-b))); position: relative; flex: none; width: var(--wh); height: var(--wh); margin-top: calc(var(--wh) * .11); }
+/* повёрнутое колесо углами вылезает за свой квадрат: без обрезки окно на ходу то получает полосу прокрутки,
+   то теряет её, и текст под колесом прыгает. Углы прозрачные — обрезать нечего, кроме пустоты */
+.wh-rot { position: absolute; inset: 0; overflow: hidden; }
 .wh-wheel { position: absolute; inset: 0; will-change: transform; }
 .wh-wheel > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .wh-prize {
@@ -843,7 +848,7 @@ body.planting .hud-bottom, body.digging .pb-more { display: none; }
 @keyframes wh-win { to { opacity: .6; } }
 .wh-ctl { width: 100%; }
 .wh-act { display: flex; gap: 8px; }
-.wh-act .btn-main { margin-top: 0; }
+.wh-act .btn-main { margin-top: 0; height: auto; min-height: 56px; } /* одна кнопка и две — одной высоты: после вращения окно не прыгает */
 .wh-btn { flex: 1 1 0; min-width: 0; height: auto; min-height: 56px; padding: 5px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 15px; }
 .wh-btn span { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .wh-btn .ic { width: 20px; height: 20px; vertical-align: 0; }
@@ -853,8 +858,12 @@ body.planting .hud-bottom, body.digging .pb-more { display: none; }
 .wh-wrap.spinning .wh-act button { filter: grayscale(.6); opacity: .6; }
 .wh-note { text-align: center; font-size: 12.5px; padding-top: 8px; }
 .wh-note .ic { width: 16px; height: 16px; vertical-align: -3px; }
+.wh-note b { font-variant-numeric: tabular-nums; }
+.wh-when { display: block; }
+.wh-nw { white-space: nowrap; }
 @media (max-height: 500px) and (orientation: landscape) {
   .wh-wrap { flex-direction: row; gap: 18px; }
+  .panel[data-kind="wheel"] .pn-card { max-height: 100%; }
   .wh-box { --wh: min(250px, calc(100vh - 120px)); margin: calc(var(--wh) * .12) 0 4px 8px; }
 }
 
