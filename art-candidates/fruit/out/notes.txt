@@ -27,3 +27,5 @@ tree_pear_bare: tree_pear_bare__1.png - OK: same oval tree as reference, no pear
 tree_pear_young: tree_pear_young__2.png - OK, small oval crown on a thin trunk (session 01a1bf8f); __1 FAILED: Codex drew a black background, key left 30% semi-transparent pixels, washed-out leaves (session 01a1bf8b)
 tree_persimmon_bare: tree_persimmon_bare__1.png - OK: same tree as reference, no fruit (session 01a1bf8d-4ceb)
 tree_persimmon_young: tree_persimmon_young__1.png - OK: thin grey trunk, small crown (session 01a1bf8e-5323)
+tree_apricot_bare: tree_apricot_bare__1.png - OK: same wide twisted tree as reference (tree_apricot__2), no apricots (session 01a1bf91-ed68)
+tree_apricot_young: tree_apricot_young__1.png - OK: thin slightly twisted trunk, small spreading crown, no fruit (session 01a1bf92-e3ff)
