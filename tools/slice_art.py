@@ -75,8 +75,8 @@ NOBASE = {
     'bush_blueberry_young': ('w', 33.5), 'bush_raspberry_young': ('w', 30.2), 'bush_rosehip_young': ('w', 33.0),
     'bush_hydrangea_young': ('w', 34.0), 'bush_lavender_young': ('w', 31.8), 'bush_rose_young': ('w', 31.2),
     # пни (до 2026-11-09 — листы stumps, stumps2)
-    # пни: ширина всей картинки (корни, листья) — около трёх четвертей прежнего травяного ромба
-    'stump_oak': ('w', 31), 'stump_birch': ('w', 27), 'stump_pine': ('w', 31), 'stump_oak_moss': ('w', 31),
+    # пни: ширина всей картинки (корни, листья); дубовые шире — у большого дуба ствол толще остальных
+    'stump_oak': ('w', 38), 'stump_birch': ('w', 27), 'stump_pine': ('w', 31), 'stump_oak_moss': ('w', 38),
     'stump_apple': ('w', 31), 'stump_sakura': ('w', 31), 'stump_cherry': ('w', 31), 'stump_maple': ('w', 31),
     'stump_linden': ('w', 31),
     # дикая высокая трава (до 2026-11-09 — лист grass_tall из трёх)
@@ -84,7 +84,7 @@ NOBASE = {
 }
 # Тень под растением: (доля ширины кроны, мин. и макс. ширина в мире, непрозрачность в середине).
 # Эллипс 2:1 как клетка, чуть вправо-вниз (свет слева сверху), края мягкие.
-SHADOW = {'tree': (0.64, 34, 66, 0.48), 'bush': (0.92, 25, 52, 0.42), 'stump': (1.2, 25, 46, 0.4),
+SHADOW = {'tree': (0.64, 34, 80, 0.48), 'bush': (0.92, 25, 52, 0.42), 'stump': (1.2, 25, 46, 0.4),
           'grass': (0.9, 20, 44, 0.3)}
 SHADOW_RGB = (28, 58, 6)
 NOBASE_KIND = lambda name: 'grass' if name.startswith('grass_') else name.split('_')[0]
