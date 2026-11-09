@@ -93,8 +93,8 @@ export function sow(st, species, x, y, now) {
   if (!FLORA[species] || !n) return null;
   if (n === 1) delete st.items[id]; else st.items[id] = n - 1;
   (st.plants || (st.plants = [])).push([x, y, species, now]);
-  // только что выросшее плодовое растение — без плодов: они появятся через regrow после взросления
-  if (FLORA[species].pick) (st.fruit || (st.fruit = {}))[x + ',' + y] = now + (FLORA[species].grow + FLORA[species].regrow) * 1000;
+  // первые плоды созревают, как только растение выросло (дальше — через regrow после каждого сбора)
+  if (FLORA[species].pick) (st.fruit || (st.fruit = {}))[x + ',' + y] = now + FLORA[species].grow * 1000;
   return { species };
 }
 
