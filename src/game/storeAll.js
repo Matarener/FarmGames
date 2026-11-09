@@ -4,7 +4,8 @@
 //
 // Группы — таблица STORE_ALL (data.js): дорожки, пустые грядки, пруды (с украшениями), декор и заборы, починенный
 // колодец, свои взрослые деревья и кусты (висящие плоды — тоже в рюкзак), свои постройки (placed.js: постройка сама
-// может отказаться, например пока строится), растущие ростки (вернутся саженцами). Каждая вещь убирается тем же
+// может отказаться, например пока строится), животные (тоже placed.js: помнят, сколько их кормили), растущие ростки
+// (вернутся саженцами). Каждая вещь убирается тем же
 // правилом, что и по одной в «Переставить»: Paths.storePaths, Beds.storeBed, Ponds.storePond, Well.storeWell,
 // Placed.storeObj, Flora.storeOwn.
 // Не трогаются: дом, грядки, где что-то растёт, сломанный колодец, дикая природа, вещи на закрытых участках и
@@ -24,13 +25,18 @@ import * as Well from './well.js';
 import { N, T, objCells } from './World.js';
 
 export const GROUPS = STORE_ALL.map((g) => g.key);
+// группы своих построек из рюкзака (placed.js): убираются Placed.storeObj
+const PLACED = new Set(['placed', 'decor', 'animals']);
 
 // В какую группу попадает объект мира (null — не свой или в рюкзак не убирается: дом, дикое)
 export function groupOf(o) {
   if (!o) return null;
   if (o.type === 'well') return 'well';
   if (Ponds.isPond(o)) return 'ponds';
-  if (Placed.isPlaced(o)) return !Placed.itemOf(o.type) ? null : OBJECTS[o.type].deco || OBJECTS[o.type].fence ? 'decor' : 'placed';
+  if (Placed.isPlaced(o)) {
+    const def = OBJECTS[o.type];
+    return !Placed.itemOf(o.type) ? null : def.deco || def.fence ? 'decor' : def.animal ? 'animals' : 'placed';
+  }
   if (!o.own) return null;
   if (o.type === 'sapling') return 'sprouts';
   return Flora.floraOf(o) ? 'plants' : null;
@@ -57,7 +63,7 @@ export function collect(st, w, ctx = {}) {
   for (const o of w.objects) {
     const g = groupOf(o);
     if (!g || !onOpen(w, o)) continue;
-    const no = ((g === 'placed' || g === 'decor') && Placed.storeWhy(st, o, ctx)) || (g === 'well' && Well.storeWhy(st, w));
+    const no = (PLACED.has(g) && Placed.storeWhy(st, o, ctx)) || (g === 'well' && Well.storeWhy(st, w));
     if (busy({ obj: o }) || no) out[g].kept++;
     else out[g].list.push(o);
   }
@@ -92,7 +98,7 @@ export function storeAll(st, w, groups, ctx = {}) {
       let items = null;
       if (g === 'well') { if (Well.storeWell(st, w)) items = [{ id: WELL_ITEM, n: 1 }]; }
       else if (g === 'ponds') items = Ponds.storePond(st, w, o);
-      else if (g === 'placed' || g === 'decor') { const r = Placed.storeObj(st, w, o, ctx); if (r.id) items = [{ id: r.id, n: 1 }]; }
+      else if (PLACED.has(g)) { const r = Placed.storeObj(st, w, o, ctx); if (r.id) items = [{ id: r.id, n: 1 }]; }
       else { const r = Flora.storeOwn(st, o, ctx.now, ctx.rng); if (r) { w.remove(o); items = r.items; } }
       if (items) put(items, g, { o });
     }

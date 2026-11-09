@@ -41,6 +41,8 @@ SINGLE = {
     # стройка каждого здания (оно же в лесах) и дом в лесах, пока идёт улучшение до этого уровня
     'site_kitchen': -132, 'site_carpentry': -132, 'site_forge': -132, 'site_stonecutter': -132,
     'house_up_2': -132, 'house_up_3': -132, 'house_up_4': -132, 'house_up_5': -132,
+    # кормоцех (корм для животных, 2026-11-09) и его стройка
+    'building_feedmill': -132, 'site_feedmill': -132,
 }
 SHEETS.update({name: [(name, w)] for name, w in SINGLE.items()})
 # Постройки без «пятачка» травы (поливалки): одна на картинку, масштаб — по высоте в мире; опора — середина
@@ -63,6 +65,18 @@ PROPS = {
     'decor_park_bench_back': {'w': 84, 'foot': True, 'lift': 4},
     'decor_stone_lamp': {'h': 50, 'lift': 5},
     'decor_table_set': {'w': 88, 'foot': True, 'lift': 4},
+}
+# Животные (src/game/animalData.js): каждая стадия — своя картинка animal_<вид>_baby, _young, animal_<вид>.
+# Масштаб — по высоте в мире (от макушки до копыт), опора — середина низа ног (нижние 15% картинки) чуть выше
+# самой нижней точки (передние ноги ниже задних), под животным — мягкая тень (SHADOW['animal']).
+# Взрослые: курица и кролик мелкие, корова — самая крупная; детёныш ~половина, молодое ~три четверти взрослого.
+ANIMAL_SPR = {
+    'animal_chicken': 26, 'animal_chicken_young': 20, 'animal_chicken_baby': 12,
+    'animal_rabbit': 22, 'animal_rabbit_young': 17, 'animal_rabbit_baby': 11,
+    'animal_goose': 34, 'animal_goose_young': 26, 'animal_goose_baby': 13,
+    'animal_pig': 30, 'animal_pig_young': 23, 'animal_pig_baby': 15,
+    'animal_sheep': 36, 'animal_sheep_young': 28, 'animal_sheep_baby': 20,
+    'animal_cow': 50, 'animal_cow_young': 39, 'animal_cow_baby': 30,
 }
 # Урожай: каждая стадия (0–3) — своя картинка crop_<культура>_<стадия>.png. Растения заполняют
 # ромб грядки: масштаб по ширине (ширина стадии в мире), опора — центр ромба.
@@ -113,7 +127,7 @@ NOBASE = {
 # Тень под растением: (доля ширины кроны, мин. и макс. ширина в мире, непрозрачность в середине).
 # Эллипс 2:1 как клетка, чуть вправо-вниз (свет слева сверху), края мягкие.
 SHADOW = {'tree': (0.64, 34, 80, 0.48), 'bush': (0.92, 25, 52, 0.42), 'stump': (1.2, 25, 46, 0.4),
-          'grass': (0.9, 20, 44, 0.3)}
+          'grass': (0.9, 20, 44, 0.3), 'animal': (0.8, 10, 56, 0.34)}
 SHADOW_RGB = (28, 58, 6)
 NOBASE_KIND = lambda name: 'grass' if name.startswith('grass_') else name.split('_')[0]
 
@@ -181,6 +195,9 @@ ICON_SHEETS = {
     'ui_craft1': ['planks', 'birch_box', 'acorn_toy', 'pine_wreath', 'crate'],
     'ui_craft2': ['iron_ingot', 'nails', 'horseshoe', 'stone_block', 'millstone'],  # колесо фортуны: кнопка в интерфейсе и пункт «Ещё» (само колесо в окне рисуется кодом)
     'ui_rotate': ['rotate'],  # «Повернуть» в «Переставить» (декор)
+    # животные (2026-11-09): корма Кормоцеха и что дают животные (src/game/animalData.js, buildData.js)
+    'ui_feed': ['feed_grain', 'feed_hay', 'feed_mash', 'feed_rabbit'],
+    'ui_animal': ['egg', 'goose_feather', 'truffle', 'wool', 'angora'],
 }
 ICON_PX = 128
 # Иконки не в квадрате 128, а по контуру картинки (без полей), длинная сторона — столько пикселей:
@@ -433,6 +450,28 @@ def nobase(name, man):
     print(f'{name:20s} {x1-x0}x{y1-y0}px -> {img.width / DENSITY:.0f}x{img.height / DENSITY:.0f} u, тень {kind}')
 
 
+def animal(name, hgt, man):
+    """Животное: масштаб по высоте hgt (мир), опора — середина низа ног, мягкая тень под ним."""
+    a = load(name)
+    boxes, lab = components(a, 1)
+    y0, y1, x0, x1, i = boxes[0]
+    crop = a[y0:y1, x0:x1].copy()
+    crop[lab[y0:y1, x0:x1] != i, 3] = 0
+    m = crop[..., 3] > 128
+    ys = np.where(m.any(1))[0]
+    yb, ht = ys[-1], ys[-1] - ys[0] + 1
+    xs = np.where(m[int(yb - ht * 0.15):].any(0))[0]  # нижние 15%: ноги и лапы
+    fx, fy = (xs[0] + xs[-1]) / 2, yb - ht * 0.05
+    k = hgt / ht  # мир на пиксель исходника
+    W, H = (x1 - x0) * k, (y1 - y0) * k
+    img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
+    s = W * DENSITY / (x1 - x0)
+    body = np.where(m[int(ys[0] + ht * 0.4):].any(0))[0]  # ширина туловища (нижние 60%)
+    img, dx, dy = add_shadow(img, fx * s, fy * s, (body[-1] - body[0]) * s, 'animal')
+    save(img, name, img.width / DENSITY, img.height / DENSITY, (fx * s + dx) / DENSITY, (fy * s + dy) / DENSITY, man)
+    print(f'{name:22s} {x1-x0}x{y1-y0}px -> {img.width / DENSITY:.0f}x{img.height / DENSITY:.0f} u')
+
+
 def main(only=None):
     """only — нарезать только эти листы SHEETS и дописать их в существующий manifest.json"""
     os.makedirs(OUT, exist_ok=True)
@@ -494,6 +533,11 @@ def main(only=None):
             ax, ay = (lx + rx) / 2 * k, (ly + ry) / 2 * k - pr.get('lift', 0)
         save(img, name, W, H, ax, ay, man)
         print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
+
+    for name, hgt in ANIMAL_SPR.items():
+        if only and name not in only: continue
+        if not os.path.exists(os.path.join(SRC, name + '.png')): continue
+        animal(name, hgt, man)
 
     # Грядки: объёмный ромб (верх + бортик). Ширина — по краям картинки, центр ромба —
     # строка самой левой точки (левый угол верхней грани).

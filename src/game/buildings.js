@@ -46,8 +46,8 @@ export class Buildings {
         this.f.float(o.wx, o.wy - 110, `${b.short || b.name}: готово!`, null);
         this.f.player.celebrate();
       }
-      // все четыре здания — «она»: кухня, мастерская, кузница
-      this.f.toast(`${b.name} построена! Нажмите на неё, чтобы ${b.verb.toLowerCase()} что-нибудь`, 'good');
+      // кухня, мастерская, кузница — «она», кормоцех — «он» (b.he)
+      this.f.toast(`${b.name} ${b.he ? 'построен' : 'построена'}! Нажмите на ${b.he ? 'него' : 'неё'}, чтобы ${b.verb.toLowerCase()} что-нибудь`, 'good');
       this.f.sfx('unlock');
       this.f.addXp(xp);
       this.f.quests.emit('build', k);
@@ -88,7 +88,7 @@ export class Buildings {
     this.f.syncBars(now);
     if (R.isBuilt(this.st, k, now)) return null;
     this.f.burst(o.wx, o.wy - 20, '#e8d9a8', 18);
-    return `Стройка началась: ${(b.short || b.name).toLowerCase()} будет готова через ${fmt(R.buildLeft(this.st, k, now))}`;
+    return `Стройка началась: ${(b.short || b.name).toLowerCase()} будет ${b.he ? 'готов' : 'готова'} через ${fmt(R.buildLeft(this.st, k, now))}`;
   }
 
   // ---------- Дом ----------

@@ -17,6 +17,8 @@ import { cropFlags } from './beds.js';
 import { GROUPS } from './questRules.js';
 import { BUILDINGS, RECIPES, bpId } from './buildData.js';
 import * as BR from './buildRules.js';
+import * as AR from './animalRules.js';
+import { ANIMALS } from './animalData.js';
 
 // Первые задания сюжета учат играть: в них стрелка видна сама. Дальше она включается только по просьбе
 // игрока (переключатель в окне задания) и держится до смены задания.
@@ -53,6 +55,10 @@ export const HINT_STEPS = {
   place: ['place'],
   build: ['building'],
   craft: ['workshop'],
+  feed: ['hungry'],
+  grow: ['hungry'],
+  adult: ['hungry'],
+  animal: ['animalReady', 'hungry'],
   expand: ['chunk'],
   well: ['well'],
   house: ['house'],
@@ -202,6 +208,10 @@ function objects(c, step, test, extra, icon) {
 }
 
 const isTree = (o) => !!(OBJECTS[o.type] && OBJECTS[o.type].stump);
+// Подходит ли вид животного sp под ключ задания: вид (chicken) или его продукт (egg)
+const animalKey = (key, sp) => key === sp || ANIMALS[sp].product === key;
+// Животное, о котором задание (без ключа — любое)
+const animalFor = (c, o) => AR.isAnimal(o) && (!c.key || animalKey(c.key, AR.infoOf(o.type).sp));
 
 // Первое, чего не хватает на цену cost, → где это добыть (null — всего хватает или добыть негде)
 function need(c, cost, depth) {
@@ -308,6 +318,25 @@ const STEP = {
   },
   // сделать товар (ключ — товар): к зданию, где его делают
   workshop: (c, depth) => madeAt(c, c.key, depth),
+
+  // животное с готовым продуктом (ключ задания — вид или продукт)
+  animalReady: (c) => objects(c, 'animalReady', (o) => animalFor(c, o) && AR.stateOf(o, c.now) === 'ready', null,
+    (o) => ANIMALS[AR.infoOf(o.type).sp].product),
+  // покормить животное: голодное и корм есть — к нему; корма нет — к Кормоцеху (нет его — построить); все едят — ждём;
+  // животных нет — поставить из рюкзака или купить на рынке
+  hungry: (c, depth) => {
+    const w = c.world, list = w.objects.filter((o) => animalFor(c, o) && w.isOpen(o.gx, o.gy));
+    if (!list.length) {
+      const has = Object.entries(c.st.items).some(([id, n]) => n > 0 && ITEMS[id] && ITEMS[id].animal && (!c.key || animalKey(c.key, ITEMS[id].animal)));
+      return { step: has ? 'place' : 'shop', kind: 'ui', ui: has ? 'bag' : 'market' };
+    }
+    const feedOf = (o) => ANIMALS[AR.infoOf(o.type).sp].feed;
+    const hungry = list.filter((o) => { const s = AR.stateOf(o, c.now); return s === 'hungry' || s === 'done'; });
+    if (!hungry.length) return WAIT;
+    const fed = hungry.filter((o) => Inv.count(c.st, feedOf(o)) > 0);
+    if (fed.length) return objects(c, 'hungry', (o) => fed.includes(o), null, feedOf);
+    return madeAt(c, feedOf(hungry[0]), depth);
+  },
 
   // бабушкин колодец: сначала то, чего не хватает на починку
   well: (c, depth) => {

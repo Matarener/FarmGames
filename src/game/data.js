@@ -1,6 +1,7 @@
 // Игровые таблицы. Все числа баланса — здесь (здания с крафтом — в buildData.js).
 
 import { BUILDINGS, CRAFT_GOODS, bpId, bldId } from './buildData.js';
+import { ANIMALS, ANIMAL_GOODS, animalType } from './animalData.js';
 
 export const CROPS = {
   carrot:     { name: 'Морковь',   level: 1,  seed: 2,   time: 120,   sell: 5,   xp: 1,  food: 3 },
@@ -130,6 +131,11 @@ for (const f of Object.values(FLORA)) {
 // Здания с крафтом (buildData.js): свои постройки игрока, ставятся из рюкзака; item — предмет, которым
 // здание убирается в рюкзак
 for (const b of Object.values(BUILDINGS)) OBJECTS[b.key] = { name: b.name, static: true, w: b.w, h: b.h, building: b.key, item: bldId(b.key) };
+// Животные (animalData.js): каждая стадия — свой тип объекта (и предмет, которым животное убирается в рюкзак).
+// rot: 2 — можно развернуть в другую сторону (зеркало картинки)
+for (const a of Object.values(ANIMALS)) a.names.forEach((name, i) => {
+  OBJECTS[animalType(a.key, i)] = { name, static: true, item: animalType(a.key, i), animal: a.key, stage: i, rot: 2 };
+});
 
 // ---------------- Пруды ----------------
 // Пруд — один объект на карте и одна картинка на весь пруд (assets/art/pond_<вид>.webp, tools/pond_art.py),
@@ -256,12 +262,13 @@ export const INV_TABS = [
   { key: 'build',  name: 'Постройки',   icon: 'build' },
   { key: 'decor',  name: 'Декор',       icon: 'decor' },
   { key: 'plants', name: 'Растения',    icon: 'seed' },
+  { key: 'animals', name: 'Животные',   icon: 'paw' },
   { key: 'food',   name: 'Еда',         icon: 'food' },
   { key: 'res',    name: 'Ресурсы',     icon: 'wood' },
 ];
 
 // Разделы на вкладке «Продать» рынка (инструменты, постройки и декор не продаются)
-export const SELL_TABS = ['all', 'plants', 'food', 'res'];
+export const SELL_TABS = ['all', 'plants', 'animals', 'food', 'res'];
 
 // Инструменты есть всегда, их не считают и не продают
 export const TOOLS = {
@@ -301,9 +308,9 @@ for (const f of Object.values(FLORA)) ITEMS[floraOwnId(f.key)] = {
   key: floraOwnId(f.key), name: f.name + (f.kind === 'tree' ? ' (взрослое)' : ' (взрослый куст)'), icon: floraOwnId(f.key), tabs: ['plants'], floraOf: f.key, grown: true, sell: f.ownSell,
   desc: `Ваше выкопанное растение. Посадите на свободную траву — встанет сразу взрослым` + (f.pick ? `, первые плоды через ${fmtMin(f.regrow)}` : '') + '. Можно и в режиме «Переставить».',
 };
-// Еда из магазина: её не выращивают и не продают, зато она даёт больше энергии
+// Еда из магазина: её не выращивают, зато она даёт больше энергии. Не продаётся — кроме молока (sell): его даёт своя корова
 export const SHOP_FOOD = {
-  milk:  { name: 'Молоко',  food: 6,  price: 10, level: 1, desc: 'Свежее молоко из деревни.' },
+  milk:  { name: 'Молоко',  food: 6,  price: 10, level: 1, sell: 8, desc: 'Свежее молоко из деревни, а от своей коровы — парное.' },
   bread: { name: 'Хлеб',    food: 10, price: 18, level: 2, desc: 'Тёплый хлеб из пекарни.' },
   pie:   { name: 'Пирожок', food: 18, price: 35, level: 4, desc: 'Пирожок с яблоками, очень сытный.' },
 };
@@ -395,7 +402,19 @@ for (const [t, d] of Object.entries(POND_DECOR)) ITEMS[pondDecorId(t)] = {
   key: pondDecorId(t), name: d.name, icon: pondDecorId(t), tabs: ['decor'], place: 'pondDecor', decorOf: t,
   desc: `${d.desc} Ставится только на воду пруда: нажмите «Поставить» и выберите клетку пруда.`,
 };
-for (const [k, f] of Object.entries(SHOP_FOOD)) ITEMS[k] = { key: k, name: f.name, icon: k, food: f.food, tabs: ['food'], desc: f.desc + ' Восстанавливает энергию.' };
+for (const [k, f] of Object.entries(SHOP_FOOD)) ITEMS[k] = { key: k, name: f.name, icon: k, food: f.food, sell: f.sell, tabs: ['food'], desc: f.desc + ' Восстанавливает энергию.' };
+// Животные в рюкзаке (каждая стадия — свой предмет) и что дают взрослые (молоко — ещё и еда из магазина)
+for (const a of Object.values(ANIMALS)) a.names.forEach((name, i) => {
+  const id = animalType(a.key, i), n = (k) => a.names[k].toLowerCase();
+  const grow = i === 0 ? `Через ${a.feeds[0]} кормления будет ${n(1)}, ещё через ${a.feeds[1]} — ${n(2)}. `
+    : i === 1 ? `Через ${a.feeds[1]} кормления будет ${n(2)}. ` : '';
+  ITEMS[id] = {
+    key: id, name, icon: id, tabs: ['animals'], place: 'obj', objOf: id, animal: a.key, stage: i,
+    desc: `${grow}${a.desc} Ставится на траву: «Поставить» (или «Ещё» → «Переставить»).`,
+  };
+});
+for (const g of Object.values(ANIMAL_GOODS)) ITEMS[g.key] = { key: g.key, name: g.name, icon: g.key, sell: g.sell, tabs: ['animals'], desc: g.desc };
+if (ITEMS.milk) ITEMS.milk.tabs = ['food', 'animals'];
 // Товары зданий с крафтом, чертежи и убранные в рюкзак здания (buildData.js)
 for (const [k, g] of Object.entries(CRAFT_GOODS)) ITEMS[k] = {
   key: k, name: g.name, icon: k, sell: g.sell, food: g.food, tabs: [g.tab], craft: true,
@@ -422,6 +441,7 @@ export const SHOP_TABS = [
   { key: 'food',  name: 'Еда',       icon: 'food' },
   { key: 'seeds', name: 'Семена',    icon: 'seed' },
   { key: 'trees', name: 'Саженцы',   icon: 'sap_apple' },
+  { key: 'animals', name: 'Животные', icon: 'paw' },
   { key: 'res',   name: 'Ресурсы',   icon: 'wood' },
   { key: 'build', name: 'Постройки', icon: 'build' },
   { key: 'decor', name: 'Декор',     icon: 'decor' },
@@ -456,7 +476,11 @@ for (const [t, d] of Object.entries(POND_DECOR).sort((a, b) => a[1].price - b[1]
 for (const [k, p] of Object.entries(PONDS).sort((a, b) => a[1].price - b[1].price)) SHOP.push({ tab: 'decor', item: k, price: p.price, level: p.level });
 // фонари, лавочки, столики и заборы (цена забора — за секцию)
 for (const [k, d] of Object.entries({ ...FENCES, ...DECOR })) SHOP.push({ tab: 'decor', item: k, price: d.price, level: d.level });
+// Животные: детёныши, от дешёвых к дорогим (animalData.js)
+for (const a of Object.values(ANIMALS).sort((x, y) => x.price - y.price)) SHOP.push({ tab: 'animals', item: animalType(a.key, 0), price: a.price, level: a.level });
 SHOP.push({ tab: 'res', item: 'stone', price: 4 });
+// сено для сенного брикета (корм коров и овец), если своей травы мало
+SHOP.push({ tab: 'res', item: 'hay', price: 3, level: 7 });
 SHOP.push({ tab: 'res', item: 'wood', price: 1, cur: 'gems', qty: 10 });
 SHOP.push({ tab: 'res', item: 'ore', price: 1, cur: 'gems', qty: 3 });
 // Чертежи зданий с крафтом: каждое здание одно на ферму (купить второй чертёж нельзя — buildRules.js)
@@ -502,5 +526,6 @@ export const STORE_ALL = [
   { key: 'well',    name: 'Колодец',              icon: WELL_ITEM,        on: true,  word: ['колодец', 'колодца', 'колодцев'],    note: 'Если он уже починен' },
   { key: 'plants',  name: 'Свои деревья и кусты', icon: 'own_apple',      on: true,  word: ['растение', 'растения', 'растений'], note: 'Висящие плоды сразу соберутся в рюкзак' },
   { key: 'placed',  name: 'Постройки',            icon: 'sprinkler_drip', on: true,  word: ['постройка', 'постройки', 'построек'], note: 'Поливалки и другие свои постройки' },
+  { key: 'animals', name: 'Животные',             icon: 'paw',            on: true,  word: ['животное', 'животных', 'животных'], note: 'Запомнят, сколько их кормили' },
   { key: 'sprouts', name: 'Растущие ростки',      icon: 'sap_oak',        on: false, word: ['росток', 'ростка', 'ростков'],      note: 'Вернутся саженцами и начнут расти заново' },
 ];
