@@ -531,21 +531,36 @@ button:disabled { cursor: default; }
 @keyframes toast-in { from { transform: translateY(8px) scale(.85); opacity: 0; } }
 
 .loading {
-  position: absolute; inset: 0; z-index: 50; display: grid; place-items: center; color: #fff; font-size: 16px;
-  background: radial-gradient(ellipse at 50% 40%, #8fd35c 0%, #5fb03a 45%, #3d7a35 100%);
+  position: absolute; inset: 0; z-index: 50; overflow: hidden; color: #fff; font-size: 16px;
+  /* фон в цветах заставки: виден, пока картинка грузится (небо сверху, трава снизу) */
+  background: linear-gradient(#86c9ee 0%, #bfe4f5 24%, #8cc955 46%, #4f9a35 74%, #3d7a35 100%);
   transition: opacity .45s;
 }
-.ld-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.ld-box { position: relative; margin-top: -22vh; display: flex; flex-direction: column; align-items: center; gap: 10px; width: min(80vw, 300px); }
-.ld-ghost { width: 96px; height: 108px; animation: ld-float 1.6s ease-in-out infinite; }
-@keyframes ld-float { 50% { transform: translateY(-8px) scale(.98, 1.03); } }
-.ld-title { font-size: 24px; line-height: 1.15; text-align: center; max-width: 280px; font-weight: 800; letter-spacing: .5px; color: #fff6e3; text-shadow: 0 2px 0 #3d2b1f, 0 0 2px #3d2b1f; }
+.ld-art, .ld-art img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ld-art img { object-fit: cover; opacity: 0; transition: opacity .4s; }
+.ld-art img.on { opacity: 1; }
+/* низ чуть темнее — полоса и подпись читаются на любой траве */
+.loading::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 30%; pointer-events: none; background: linear-gradient(transparent, rgba(30, 20, 10, .38)); }
+.ld-title {
+  position: absolute; z-index: 1; left: 16px; right: 16px; top: calc(var(--safe-t) + max(5vh, 20px));
+  text-align: center; font-size: clamp(28px, 8.4vw, 44px); line-height: 1.08; font-weight: 900; letter-spacing: .3px; color: #fff6e3;
+  text-shadow: 0 3px 0 #3d2b1f, 2px 0 0 #3d2b1f, -2px 0 0 #3d2b1f, 0 -2px 0 #3d2b1f, 2px 2px 0 #3d2b1f, -2px 2px 0 #3d2b1f, 2px -2px 0 #3d2b1f, -2px -2px 0 #3d2b1f, 0 6px 14px rgba(40, 25, 10, .45);
+}
+.ld-box {
+  position: absolute; z-index: 1; left: 50%; bottom: calc(var(--safe-b) + max(7vh, 28px)); transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(78vw, 320px);
+}
+@media (orientation: landscape) {
+  .ld-title { font-size: clamp(24px, 4.6vw, 44px); top: calc(var(--safe-t) + max(4vh, 12px)); }
+  .ld-title br { display: none; }
+  .ld-box { bottom: calc(var(--safe-b) + max(6vh, 14px)); width: min(46vw, 360px); }
+}
 .ld-bar { width: 100%; height: 14px; border-radius: 8px; background: rgba(61,43,31,.45); border: 2px solid #3d2b1f; overflow: hidden; }
 .ld-bar i { display: block; height: 100%; width: 100%; transform: scaleX(0); transform-origin: 0 50%; will-change: transform; background: linear-gradient(#ffd75a, #f2b51d); transition: transform .8s ease-out; }
 .ld-bar { position: relative; }
 .ld-bar::after { content: ''; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: ld-shine 1.3s linear infinite; will-change: transform; }
 @keyframes ld-shine { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
-.ld-text { text-align: center; font-size: 14px; font-weight: 700; color: #fff6e3; text-shadow: 0 1px 0 #3d2b1f, 0 0 2px #3d2b1f; }
+.ld-text { text-align: center; font-size: 15px; font-weight: 800; color: #fff6e3; text-shadow: 0 1px 0 #3d2b1f, 1px 0 0 #3d2b1f, -1px 0 0 #3d2b1f, 0 -1px 0 #3d2b1f, 0 2px 4px rgba(0,0,0,.4); }
 .ld-retry { margin-top: 4px; padding: 10px 22px; border-radius: 12px; border: 2px solid #3d2b1f; background: linear-gradient(#ffd75a, #f2b51d); color: #3d2b1f; font: inherit; font-weight: 800; font-size: 16px; box-shadow: 0 3px 0 #3d2b1f; }
 .loading.hide { opacity: 0; pointer-events: none; }
 /* прогрев окон за экраном загрузки (UI.warmup): без анимаций появления */
@@ -604,8 +619,6 @@ body[data-side="2"] .debug { top: calc(var(--safe-t) + 248px); }
   .qp-face { width: 52px; height: 52px; }
   .btn-main { height: 44px; }
   .set-row { padding: 5px 0 6px; }
-  .ld-box { margin-top: -6vh; }
-  .ld-ghost { width: 72px; height: 81px; }
 }
 
 /* ---------- Настройки ---------- */

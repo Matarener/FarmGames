@@ -10,4 +10,3 @@ Thumbs.db
 .pond-art/
 # картинки для проверки заборов (python tools/fence_art.py --preview)
 .fence-art/
-.gen-art/
