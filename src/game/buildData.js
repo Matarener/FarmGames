@@ -32,7 +32,7 @@ export const BUILDINGS = {
   feedmill: {
     name: 'Кормоцех', he: true, level: 4, blueprint: 60, cost: { wood: 25, stone: 10 }, time: 5 * 60, xp: 10, slots: 3, w: 2, h: 2,
     sprite: 'building_feedmill', site: 'site_feedmill', verb: 'Сделать',
-    desc: 'Делает корм для животных из урожая и сена: курам и гусям — зерносмесь, коровам и овцам — сенной брикет.',
+    desc: 'Делает корм для животных из урожая и сена: зерносмесь для кур и гусей, кроличий корм, мешанку для свиней и сенной брикет для коров и овец.',
   },
 };
 for (const [k, b] of Object.entries(BUILDINGS)) b.key = k;
@@ -96,7 +96,7 @@ export const RECIPES = {
   millstone:        { at: 'stonecutter', level: 6, need: { stone_block: 3 }, item: 'millstone', n: 1, time: 1200, xp: 5 },
   // кормоцех
   feed_grain:       { at: 'feedmill', level: 4, need: { wheat: 2 }, item: 'feed_grain', n: 3, time: 60, xp: 1 },
-  feed_rabbit:      { at: 'feedmill', level: 4, need: { carrot: 2, cabbage: 1 }, item: 'feed_rabbit', n: 2, time: 90, xp: 1 },
+  feed_rabbit:      { at: 'feedmill', level: 4, need: { carrot: 2, cabbage: 1 }, item: 'feed_rabbit', n: 2, time: 60, xp: 1 },
   feed_mash:        { at: 'feedmill', level: 6, need: { carrot: 2, beet: 1 }, item: 'feed_mash', n: 2, time: 120, xp: 1 },
   feed_hay:         { at: 'feedmill', level: 7, need: { hay: 3, wheat: 1 }, item: 'feed_hay', n: 2, time: 120, xp: 1 },
 };
