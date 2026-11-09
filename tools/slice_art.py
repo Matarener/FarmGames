@@ -54,10 +54,10 @@ NOBASE = {
     # взрослые деревья (у вишни с ягодами и без — своя картинка), без плодов, молодые
     'tree_oak': ('w', 97.8), 'tree_apple': ('w', 90.2), 'tree_sakura': ('w', 94.5), 'tree_pine': ('w', 58.2),
     'tree_cherry': ('w', 90.8), 'tree_cherry_bare': ('w', 95.2), 'tree_maple': ('w', 94.0), 'tree_birch': ('w', 97.8),
-    'tree_linden': ('w', 94.8), 'tree_apple_bare': ('w', 87.5), 'tree_sakura_bare': ('w', 90.0),
+    'tree_linden': ('h', 122.3), 'tree_apple_bare': ('w', 87.5), 'tree_sakura_bare': ('w', 90.0),
     'tree_oak_young': ('w', 47.8), 'tree_birch_young': ('w', 58.5), 'tree_sakura_young': ('w', 42.8),
     'tree_cherry_young': ('w', 47.2), 'tree_maple_young': ('w', 52.2), 'tree_apple_young': ('w', 45.5),
-    'tree_pine_young': ('w', 26.2), 'tree_linden_young': ('w', 59.8),
+    'tree_pine_young': ('w', 26.2), 'tree_linden_young': ('h', 77.2),  # липа по высоте: не выше берёзы
     # кусты: с плодами, без, молодые
     'bush_blueberry': ('w', 58.8), 'bush_raspberry': ('w', 56.5), 'bush_rosehip': ('w', 57.8),
     'bush_hydrangea': ('w', 58.5), 'bush_lavender': ('w', 53.2), 'bush_rose': ('w', 58.5),
