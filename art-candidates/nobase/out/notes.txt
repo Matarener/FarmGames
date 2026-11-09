@@ -20,6 +20,16 @@ tree_maple_young: tree_maple_young__1.png — OK.
 tree_pine_young: tree_pine_young__1.png — OK (verified it came from its own Codex session).
 # All earlier results were checked: each raw image is byte-identical to the image in its own Codex session folder, except tree_maple__1.
 tree_sakura: tree_sakura__1.png — OK. (__2: extra attempt, a few small cyan pockets.)
-tree_sakura_bare: (pending retry) __1: pink buds on the branch tips (in reference) are missing.
-tree_sakura_young: (pending retry) __1: small unkeyed cyan pocket under a blossom.
+tree_sakura_bare: tree_sakura_bare__1.png — OK (prompt asks for no flowers, so no buds is right; __2 also fine).
+tree_sakura_young: tree_sakura_young__2.png — OK. (__1: small unkeyed cyan pocket under a blossom.)
 # From tree_sakura on, gen_art takes images only from its own Codex session folder (local patch, not committed).
+bush_blueberry: (pending retry) __1: leaf outlines keyed semi-transparent, whitish fringe on light backgrounds.
+bush_blueberry_bare: bush_blueberry_bare__1.png — OK.
+bush_blueberry_young: bush_blueberry_young__1.png — OK (green unripe berries as in reference).
+bush_hydrangea: (pending retry) __1: bright red outline segment by the left flower cluster (keying artifact).
+bush_hydrangea_bare: bush_hydrangea_bare__1.png — OK.
+bush_hydrangea_young: bush_hydrangea_young__1.png — OK.
+bush_lavender: bush_lavender__1.png — OK.
+bush_lavender_bare: (pending retry) __1: small magenta specks in gaps between stems.
+bush_lavender_young: bush_lavender_young__1.png — OK.
+bush_raspberry: (pending retry) __1: leaf edges keyed semi-transparent, whitish fringe (like bush_blueberry__1).
