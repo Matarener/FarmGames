@@ -9,6 +9,7 @@ import * as R from '../game/questRules.js';
 import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ, MAX_PINS } from '../game/questData.js';
 import { GIFT_TABS, DAILY_GIFT } from '../game/giftData.js';
 import { WHEEL } from '../game/wheelData.js';
+import { ACH_GROUPS, ACH_MEDALS } from '../game/achData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 import * as Dev from '../game/devRules.js';
@@ -64,7 +65,8 @@ export class UI {
     this.refreshIcons();
     farm.onIcons = () => { clearTimeout(this._icT); this._icT = setTimeout(() => this.refreshIcons(), 30); };
     $('#btn-bag').onclick = () => this.bagPanel(farm);
-    $('#btn-market').onclick = () => this.marketPanel(farm);
+    // есть заказ, который можно сдать (цифра на кнопке), — рынок открывается на «Заказах»
+    $('#btn-market').onclick = () => this.marketPanel(farm, farm.orders.ready() ? 'orders' : null);
     $('#btn-quests').onclick = () => this.questPanel(farm);
     $('#btn-gift').onclick = () => this.giftPanel(farm, 'daily');
     $('#btn-wheel').onclick = () => this.wheelPanel(farm);
@@ -134,6 +136,8 @@ export class UI {
     const pct = Math.min(100, (st.xp / xpToNext(st.level)) * 100).toFixed(1) + '%';
     if (this.last.xp !== pct) { this.last.xp = pct; $('#hud-xp').style.width = pct; }
     this.questCards(f);
+    this.moreBadge(f);
+    this.marketBadge(f);
     this.giftTick(f, false);
     this.wheelTick(f, false);
     this.tick(f);
@@ -147,6 +151,7 @@ export class UI {
     const full = f.st.energy >= f.maxEnergy;
     this.set('hud-energy-t', full ? '' : fmtClock(f.energyLeftSec()));
     if (this.panelOpen && this.panelEl.dataset.kind === 'bag') this.set('bag-en', this.bagEnergy(f));
+    if (this.panelOpen && this.panelEl.dataset.kind === 'market' && this.mk && this.mk.mode === 'orders') this.ordersTick(f);
     this.giftTick(f, true);
     this.wheelTick(f, true);
     if (this.popupEl.classList.contains('show') && this._popupTick) this._popupTick();
@@ -442,6 +447,7 @@ export class UI {
       () => this.bagPanel(f),
       () => this.marketPanel(f),
       () => { this.mk.mode = 'buy'; this.refreshPanel(); },
+      () => { this.mk.mode = 'orders'; this.refreshPanel(); },
       () => this.questPanel(f),
       () => firstQuest && this.questPanel(f, { id: firstQuest.id }),
       () => this.plantPanel(f, null),
@@ -449,6 +455,7 @@ export class UI {
       () => this.craftPanel(f, 'kitchen'),
       () => this.giftPanel(f),
       () => this.wheelPanel(f),
+      () => this.achPanel(f),
       () => this.settingsPanel(f),
       () => { this.closePanel(); this.toggleMore(true); },
       () => { this.toggleMore(false); this.popup(this.root.clientWidth / 2, this.root.clientHeight / 2, { title: 'Дуб', text: 'Срубить', cost: { wood: 1 }, items: [{ icon: 'axe', label: 'Срубить', sub: '1', onClick() {} }] }); },
@@ -514,11 +521,11 @@ export class UI {
       { label: 'Дом', icon: 'house', open: () => this.housePanel(f) },
       { label: 'Подарки', icon: 'gift', open: () => this.giftPanel(f, 'daily'), dot: f.gifts.available() > 0 },
       { label: 'Колесо', icon: 'wheel', open: () => this.wheelPanel(f), dot: f.wheel.freeLeft() > 0 },
+      { label: 'Достижения', icon: 'trophy', open: () => this.achPanel(f), dot: f.ach.available() > 0 },
       { label: 'Настройки', icon: 'gear', open: () => this.settingsPanel(f) },
       { label: 'Животные', icon: 'paw', soon: true },
       { label: 'Мастерская', icon: 'build', soon: true },
       { label: 'Декор', icon: 'decor', soon: true },
-      { label: 'Достижения', icon: 'trophy', soon: true },
     ];
   }
 
@@ -732,7 +739,7 @@ export class UI {
   // Проверка заданий без ожидания настоящих дат (режим тестера или ?debug в адресе)
   devQuests(f, body) {
     const d = f.dev, now = f.quests.ctx().now;
-    body.appendChild(h('div', 'pn-sub', 'Проверка заданий, подарков и колеса'));
+    body.appendChild(h('div', 'pn-sub', 'Проверка заданий, подарков, колеса, заказов и достижений'));
     body.appendChild(h('div', 'pn-text', `Время заданий: ${new Date(now + QUEST_TZ * 3600e3).toISOString().slice(0, 16).replace('T', ' ')} МСК` +
       `${d.shift ? ` (сдвиг ${Math.round(d.shift / 3600e3)} ч)` : ''} · событие: ${d.event ? EVENT_NAME(d.event) : 'по датам'}`));
     const row = h('div', 'gfx-row');
@@ -743,6 +750,8 @@ export class UI {
     btn('Событие', () => { const i = EVENTS.findIndex((e) => e.id === d.event); f.setDev({ event: i + 1 < EVENTS.length ? EVENTS[i + 1].id : null }); });
     btn('Подарки заново', () => f.gifts.devReset());
     btn('Колесо заново', () => f.wheel.devReset());
+    btn('Достижения заново', () => f.ach.devReset());
+    btn('Заказы заново', () => f.orders.devReset());
     body.appendChild(row);
   }
 
@@ -961,6 +970,70 @@ export class UI {
     this.update(f);
   }
 
+  // ---------- Достижения ----------
+  // Кружок на кнопке «Ещё»: сколько достижений ждут, чтобы забрали награду (других кнопок у них нет)
+  moreBadge(f) {
+    const n = f.ach.available();
+    if (this.last.moreN === n) return;
+    this.last.moreN = n;
+    const b = $('#more-badge');
+    if (b) { b.hidden = !n; b.textContent = n; }
+  }
+
+  achTier(v, medal) {
+    this.toast(`Достижение «${v.name}»: ${ACH_MEDALS[medal - 1]} медаль!`, 'good');
+  }
+
+  // Окно «Достижения»: сверху — сколько медалей получено (и «Забрать всё», если наград несколько),
+  // ниже — достижения по разделам. В строке: медаль (цвет — забранная ступень), звёзды ступеней,
+  // цель ступени с полоской (взятой, пока её награду не забрали, иначе следующей), справа — награда и «Забрать».
+  achPanel(f) { this.openPanel('ach', 'Достижения', (body) => this.achBody(f, body)); }
+
+  achBody(f, body) {
+    const vs = f.ach.views(), S = f.ach.summary(vs);
+    const top = h('div', 'ach-sum', `${this.ic('trophy', 'ic')}<div class="ach-sum-t"><b>Медали: ${S.got} из ${S.total}</b>` +
+      `<div class="qc-bar"><i style="width:${(S.got / S.total) * 100}%"></i></div></div>`);
+    if (S.can > 1) {
+      const b = h('button', 'btn-s gold', `Забрать всё (${S.can})`);
+      b.onclick = () => this.achClaim(f, null);
+      top.appendChild(b);
+    }
+    body.appendChild(top);
+    for (const g of ACH_GROUPS) {
+      const list = vs.filter((v) => v.group === g.key);
+      if (!list.length) continue;
+      body.appendChild(h('div', 'pn-sub', g.name));
+      for (const v of list) body.appendChild(this.achRow(f, v));
+    }
+  }
+
+  achRow(f, v) {
+    const stars = Array.from({ length: v.tiers }, (_, i) => `<s class="${i < v.got ? 'on' : i < v.reached ? 'can' : ''}">★</s>`).join('');
+    const bar = v.complete ? '<div class="ach-max">Все медали получены!</div>' :
+      `<div class="qc-row"><div class="qc-bar"><i style="width:${v.frac * 100}%"></i></div><span class="qc-n">${v.can ? '✓' : `${fmtNum(v.p)}/${fmtNum(v.n)}`}</span></div>`;
+    const row = h('div', 'ql-row ach-row' + (v.can ? ' done' : '') + (v.complete ? ' max' : ''),
+      `<div class="ach-ic t${v.medal}">${this.ic(v.icon, 'ic')}</div>` +
+      `<div class="ql-t"><i>${v.name}<span class="ach-st">${stars}</span></i>` +
+      `${v.complete ? '' : `<b>${v.task.replace(/(\d+) /g, '$1 ')}</b>`}${bar}</div>`);
+    if (v.reward) {
+      const side = h('div', 'ach-side', `<div class="ach-rw">${this.rewardHtml(v.reward).replace(/ (?=<img)/g, ' ')}</div>`);
+      if (v.can) {
+        const b = h('button', 'btn-s gold ql-get', 'Забрать');
+        b.onclick = () => this.achClaim(f, v.id);
+        side.appendChild(b);
+      }
+      row.appendChild(side);
+    }
+    return row;
+  }
+
+  achClaim(f, id) {
+    const r = f.ach.claim(id);
+    if (!r) return;
+    this.toast(`${id ? `«${r.view.name}»: ` : ''}+${this.rewardHtml(r.reward)}`, 'good');
+    this.refreshPanel();
+  }
+
   // Окно дома: что даёт уровень и улучшение. Улучшение идёт по времени (houseRules.js): пока дом в лесах,
   // здесь полоска, сколько осталось, и «Достроить сейчас» за кристаллы (время идёт — houseTick).
   housePanel(f) {
@@ -1168,20 +1241,102 @@ export class UI {
   // своё в шапке окна между названием и ✕: у рынка — «Купить / Продать», у рюкзака — энергия
   headExtra(card, el) { const head = card.querySelector('.pn-head'); head.insertBefore(el, head.lastChild); }
 
-  // ---------- Рынок: «Купить» и «Продать» ----------
-  marketPanel(f) {
+  // ---------- Рынок: «Заказы», «Купить» и «Продать» ----------
+  // mode — сразу этот раздел (иначе тот, что был открыт в прошлый раз)
+  marketPanel(f, mode) {
     const M = this.mk || (this.mk = { mode: 'sell', tab: 'seeds', sel: null });
+    if (mode && mode !== M.mode) { M.mode = mode; M.sel = null; }
     this.openPanel('market', 'Рынок', (body, card) => {
-      const seg = h('div', 'mk-seg');
-      for (const [k, name] of [['buy', 'Купить'], ['sell', 'Продать']]) {
-        const b = h('button', M.mode === k ? 'on' : '', name);
-        b.onclick = () => { if (M.mode !== k) { M.mode = k; M.sel = null; this.sfx('tap'); this.refreshPanel(); } };
+      const seg = h('div', 'mk-seg n3'), ready = f.orders.ready();
+      for (const [k, name] of [['orders', 'Заказы'], ['buy', 'Купить'], ['sell', 'Продать']]) {
+        const b = h('button', M.mode === k ? 'on' : '', name + (k === 'orders' && ready ? '<i class="qt-dot"></i>' : ''));
+        b.onclick = () => { if (M.mode !== k) { M.mode = k; M.sel = null; M.skip = null; this.sfx('tap'); this.refreshPanel(); } };
         seg.appendChild(b);
       }
       this.headExtra(card, seg);
-      if (M.mode === 'sell') this.marketSell(f, body, M);
+      if (M.mode === 'orders') this.ordersBody(f, body, M);
+      else if (M.mode === 'sell') this.marketSell(f, body, M);
       else this.marketBuy(f, body, M);
     });
+  }
+
+  // Цифра на кнопке «Рынок»: сколько заказов можно сдать прямо сейчас
+  marketBadge(f) {
+    const n = f.orders.ready();
+    if (this.last.orders === n) return;
+    this.last.orders = n;
+    const b = $('#market-badge');
+    b.hidden = !n; b.textContent = n;
+  }
+
+  // ---------- Доска заказов ----------
+  // Три места: заказ (кто, что просит — есть/нужно, награда, «Отдать» и «Отказаться») или покупатель в пути
+  // (время до нового заказа и «Позвать сейчас» за кристаллы). Отказ — со второго нажатия (M.skip — id заказа).
+  ordersBody(f, body, M) {
+    body.classList.add('od-body');
+    const v = f.orders.view();
+    if (!v.open) {
+      body.appendChild(h('div', 'od-lock', `${this.ic('note', 'ic big')}<b>Доска заказов</b>` +
+        `<span>Соседи будут заказывать урожай и рыбу и платить за них больше, чем рынок. Откроется с ${v.level} уровня.</span>`));
+      return;
+    }
+    body.appendChild(h('div', 'od-head', `<span>Соседи платят больше, чем рынок</span><span>Сдано: ${fmtNum(v.done)}</span>`));
+    const list = h('div', 'od-list');
+    for (const s of v.slots) list.appendChild(s.order ? this.orderCard(f, s, M) : this.orderWait(f, s));
+    body.appendChild(list);
+  }
+
+  orderCard(f, s, M) {
+    const o = s.order, c = h('div', 'od-card' + (s.ready ? ' ready' : ''));
+    c.dataset.id = o.id;
+    const top = h('div', 'od-who', `${this.ic('friends', 'ic')}<div><b>${s.who.name}</b><span class="od-say">${s.who.text}</span></div>`);
+    const sure = M.skip === o.id;
+    const x = h('button', 'od-skip' + (sure ? ' sure' : ''), sure ? 'Точно отказаться?' : 'Отказаться');
+    x.onclick = () => {
+      if (sure) { M.skip = null; f.orders.skip(s.idx); return; }
+      M.skip = o.id; this.sfx('tap'); this.refreshPanel();
+    };
+    top.appendChild(x);
+    c.appendChild(top);
+    const goods = h('div', 'od-goods');
+    for (const l of s.lines) {
+      const it = ITEMS[l.id], ok = l.have >= l.n;
+      const g = h('div', 'od-good' + (ok ? ' ok' : ''), `<i>${this.ic(it.icon, 'ic')}${ok ? '<em>✓</em>' : ''}</i><span>${it.name}</span><b>${fmtNum(Math.min(l.have, l.n))}/${l.n}</b>`);
+      g.title = it.name;
+      goods.appendChild(g);
+    }
+    c.appendChild(goods);
+    const foot = h('div', 'od-foot', `<div class="od-pay"><b>${fmtNum(o.coins)} ${this.ic('coin')}</b><b>+${o.xp} ${this.ic('star')}</b>` +
+      `<small>на рынке ${fmtNum(o.value)} ${this.ic('coin')}</small></div>`);
+    const give = h('button', 'btn-s gold od-give', 'Отдать');
+    give.disabled = !s.ready;
+    give.onclick = () => { M.skip = null; f.orders.deliver(s.idx); };
+    foot.appendChild(give);
+    c.appendChild(foot);
+    return c;
+  }
+
+  orderWait(f, s) {
+    const c = h('div', 'od-card od-wait');
+    c.appendChild(h('div', 'od-who', `${this.ic('friends', 'ic')}<div><b>Покупатель в пути</b><span>Новый заказ через <b class="od-t" data-i="${s.idx}">${fmtWait(s.wait)}</b></span></div>`));
+    const b = h('button', 'btn-s od-rush', `Позвать сейчас · ${s.gems} ${this.ic('gem')}`);
+    b.dataset.g = s.gems;
+    b.disabled = f.st.gems < s.gems;
+    b.onclick = () => f.orders.rush(s.idx);
+    c.appendChild(b);
+    return c;
+  }
+
+  // Раз в секунду, пока открыты «Заказы»: идёт время до покупателя (цена «Позвать сейчас» поменялась — окно заново)
+  ordersTick(f) {
+    const v = f.orders.view();
+    for (const s of v.slots) {
+      if (s.order) continue;
+      const t = this.panelEl.querySelector(`.od-t[data-i="${s.idx}"]`), b = t && t.closest('.od-card').querySelector('.od-rush');
+      if (!t) continue;
+      if (b && +b.dataset.g !== s.gems) { this.refreshPanel(); return; }
+      t.textContent = fmtWait(s.wait);
+    }
   }
 
   // Продажа — как в рюкзаке: разделы и порядок, но только то, что можно продать
@@ -1202,8 +1357,9 @@ export class UI {
     }
     const g = h('div', 'mk-grid');
     for (const it of list) {
+      // нужен для заказа на доске — пометка в углу клетки, чтобы не продать его случайно
       const c = h('button', 'mk-cell' + (M.sel === it.key ? ' sel' : ''),
-        `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}<b>${fmtNum(Inv.count(st, it.key))}</b></i><span>${it.sell} ${this.ic('coin', 'ic-s')}</span>`);
+        `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${f.orders.need(it.key) ? this.ic('note', 'mk-need') : ''}<b>${fmtNum(Inv.count(st, it.key))}</b></i><span>${it.sell} ${this.ic('coin', 'ic-s')}</span>`);
       c.title = it.name;
       c.onclick = () => this.pick(M, it.key);
       g.appendChild(c);
@@ -1211,7 +1367,8 @@ export class UI {
     L.list.appendChild(g);
     const it = M.sel && ITEMS[M.sel], n = it ? Inv.count(st, it.key) : 0;
     if (!it || !n || !it.sell) { M.sel = null; return; }
-    const box = this.mkCard(it, `${n} шт. · ${it.sell} ${this.ic('coin')} за шт.`, M);
+    const need = f.orders.need(it.key);
+    const box = this.mkCard(it, `${n} шт. · ${it.sell} ${this.ic('coin')} за шт.${need ? ` · нужно для заказа: ${need}` : ''}`, M);
     box.appendChild(this.sellRow(f, it, n));
     L.info(box);
   }
@@ -1259,8 +1416,8 @@ export class UI {
       b.disabled = st[curKey] < q * o.price; b.onclick = () => f.buy(o, q);
       acts.appendChild(b);
       // купленную дорожку — сразу класть: окно закрывается, включается «Кладём дорожку»;
-      // постройку (поливалку) — ставить: она выбрана в «Переставить», нажатие на клетку — предпросмотр
-      if ((it.place === 'path' || it.place === 'obj') && have) {
+      // пруд, украшение пруда, постройку (поливалку) — ставить: выбраны в «Переставить», нажатие на клетку — предпросмотр
+      if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && have) {
         const p = h('button', 'btn-s', 'Поставить');
         p.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
         acts.appendChild(p);
@@ -1335,7 +1492,7 @@ export class UI {
       });
       const list = Inv.listItems(st, S.tab, S.sort);
       if (!list.length) {
-        const empty = { build: 'Поливалки и другие постройки продаются на рынке, раздел «Постройки».', decor: 'Дорожки и другой декор продаются на рынке, раздел «Декор».' };
+        const empty = { build: 'Поливалки и другие постройки продаются на рынке, раздел «Постройки».', decor: 'Дорожки, пруды и другой декор продаются на рынке, раздел «Декор».' };
         L.list.appendChild(h('div', 'pn-empty', empty[S.tab] || 'Здесь пока пусто.'));
       } else {
         const g = h('div', 'inv-grid');
@@ -1502,11 +1659,11 @@ export class UI {
     }
     // чертёж здания: что нужно на стройку и «Построить»;
     // дорожки: «Поставить» закрывает рюкзак и включает «Кладём дорожку» (нажимай на траву);
-    // постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
+    // пруды, украшения прудов и постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
     if (it.blueprint && n > 0) {
       box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(BUILDINGS[it.blueprint].cost, f)));
       acts.appendChild(this.buildBtn(f, it));
-    } else if ((it.place === 'path' || it.place === 'obj') && n > 0) {
+    } else if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
       b.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
       acts.appendChild(b);
@@ -1562,6 +1719,8 @@ function fmtLeft(ms) {
 // день по московскому времени (как сброс заданий): «7 ноября»
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 function fmtDay(t) { const d = new Date(t + QUEST_TZ * 3600e3); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; }
+// до нового покупателя: «4:32», дольше часа — «1 ч 5 мин»
+function fmtWait(ms) { return ms >= 3600e3 ? fmtLeft(ms) : fmtClock(Math.ceil(ms / 1000)); }
 function fmtClock(s) { s = Math.max(0, s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
 // сколько осталось сделать (секунды): до часа — «4:05», дольше — «1 ч 10 мин»
 function leftText(sec) { return sec < 3600 ? fmtClock(Math.ceil(sec)) : fmtLeft(sec * 1000); }

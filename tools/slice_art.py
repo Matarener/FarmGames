@@ -92,7 +92,7 @@ GRID_SHEETS = {
 }
 # грядки: сухая и политая; вторая пара — с травяной каймой (не используется)
 BED_SHEETS = {'beds': [('bed_dry', 62), ('bed_wet', 62), None, None]}
-WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)
+WATER_GAIN, WATER_LIFT = 1.15, (30, 45, 55)  # вода прудов светлее и сочнее (tools/pond_art.py)
 # плитки земли: каждая — своя картинка с одним ромбом. Трава собирается бесшовной из двух картинок
 # (tile_grass.png, tile_grass_flowers.png) в 4 варианта; отзеркаливать их в игре нельзя
 GRASS_TILES = ['tile_grass', 'tile_grass_2', 'tile_grass_flowers', 'tile_grass_flowers_2']
@@ -447,17 +447,6 @@ def main(only=None):
             img = Image.fromarray(crop).resize((round(W * DENSITY), round(H * DENSITY)), Image.LANCZOS)
             save(img, name, W, H, ax, ay, man)
             print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
-
-    # Текстура воды: бесшовная, вид сверху. Игра кладёт её на весь пруд по координатам карты
-    # (128 px на клетку). Делаем светлее и сочнее под общий стиль.
-    src = os.path.join(SRC, 'tex_water.png')
-    if os.path.exists(src):
-        t = np.array(Image.open(src).convert('RGB')).astype(np.float32)
-        t = np.clip(t * WATER_GAIN + np.array(WATER_LIFT), 0, 255).astype(np.uint8)
-        img = Image.fromarray(t)
-        img = img.resize((img.width // 2, img.height // 2), Image.LANCZOS)
-        save(img, 'tex_water', img.width, img.height, 0, 0, man)
-        print('tex_water', img.size)
 
     with open(os.path.join(OUT, 'manifest.json'), 'w') as f:
         json.dump(man, f, indent=1)

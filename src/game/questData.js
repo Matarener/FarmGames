@@ -6,7 +6,7 @@
 //   who    — 'ghost' говорит призрачок, 'note' — записка бабушки Марфы
 //   goal   — { ev, key?, group?, n } — счётчик событий игры (Farm → quests.emit):
 //            harvest, plant, water, fish, chop, stump, mine, dig, mow, pick, sow, sell, earn (монеты с рынка),
-//            buy, expand, place (свою постройку из рюкзака: key — её тип),
+//            buy, expand, order (сдан заказ с доски на рынке), place (свою постройку из рюкзака: key — её тип),
 //            build (стройка здания кончилась: key — здание), craft (забрали товар из здания: key — товар).
 //            key — точный ключ (культура, рыба, вид дерева), group — группа ключей (GROUPS в questRules.js)
 //            { state, n } — значение из состояния: house (уровень дома), well (колодец), level (уровень игрока)

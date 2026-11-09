@@ -3,15 +3,16 @@
 
 import { toWorld, toGrid } from '../engine/Iso.js';
 import { makeCanvas } from '../engine/Sprite.js';
-import { World, N, CHUNK, CHUNKS, T } from './World.js';
+import { World, N, CHUNK, CHUNKS, T, pondDecorPos } from './World.js';
 import { Player } from './Player.js';
 import { makeGhostData, ROD_TIP } from './ghost.js';
-import { shoreTile } from './shore.js';
 import { loadArt } from './artSprites.js';
 import { Quests } from './quests.js';
 import { Gifts } from './gifts.js';
 import { Wheel } from './wheel.js';
 import { Buildings } from './buildings.js';
+import { Achievements } from './achievements.js';
+import { Orders } from './orders.js';
 import { Mover } from './Mover.js';
 import * as Inv from './inventory.js';
 import * as Wild from './wild.js';
@@ -21,10 +22,11 @@ import * as Plant from './planting.js';
 import * as Paths from './paths.js';
 import * as Placed from './placed.js';
 import * as Spr from './sprinklers.js';
+import * as Ponds from './ponds.js';
 import * as Hints from './hints.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
-  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, SPRINKLERS, floraSeedId, floraOwnId, seedId, WELL_COST,
+  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, SPRINKLERS, floraSeedId, floraOwnId, seedId, WELL_COST,
   ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC,
 } from './data.js';
 
@@ -46,6 +48,8 @@ export class Farm {
     this.gifts = new Gifts(this);
     this.wheel = new Wheel(this);
     this.builds = new Buildings(this); // здания с крафтом: кухня, мастерские, кузница
+    this.ach = new Achievements(this);
+    this.orders = new Orders(this);
     // Режим тестера (окно «Настройки»): монеты, кристаллы, предметы, энергия и проверка заданий —
     // сдвиг часов заданий и событие. Включается ?debug в адресе или нажатиями по строке версии.
     this.urlDebug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
@@ -56,8 +60,8 @@ export class Farm {
     this.mover = new Mover(this);
     this.groundV = 0; // растёт, когда меняются клетки земли
     // Спрайты и иконки — из картинок художника. Пока они грузятся, игра не запущена (экран загрузки),
-    // поэтому до applyArt здесь пусто. water — берега прудов, рисуются кодом по мере надобности.
-    this.S = { water: new Map() };
+    // поэтому до applyArt здесь пусто.
+    this.S = {};
     this.icons = {}; // имя → адрес картинки (для <img> в интерфейсе)
     this.iconImg = {}; // имя → загруженная картинка (для текстур сцены)
     this.artReady = loadArt((k) => this.onArtProgress && this.onArtProgress(k)).then((a) => this.applyArt(a));
@@ -68,7 +72,7 @@ export class Farm {
   // Картинки художника загружены (artSprites.loadArt): раскладываем их в спрайты игры и иконки
   applyArt(a) {
     Object.assign(this.S, {
-      grass: a.grass, paths: a.paths, pathParts: a.pathEdge, pathBlend: a.pathBlend, pathEdge: new Map(), bed: a.bed, waterTex: a.waterTex, decor: a.decor,
+      grass: a.grass, paths: a.paths, pathParts: a.pathEdge, pathBlend: a.pathBlend, pathEdge: new Map(), bed: a.bed, ponds: a.ponds, decor: a.decor,
       objArt: a.obj, stumpOf: a.stumpOf, flora: a.flora, sprouts: a.sprouts, wildGrass: a.wildGrass,
       house: a.house, well: a.well, crops: a.crops, fog: a.fog.clouds.length ? a.fog : null, sprinkler: a.sprinkler,
       buildings: a.buildings, sites: a.sites, houseUp: a.houseUp,
@@ -94,37 +98,6 @@ export class Farm {
       im.src = url;
     }));
     return Promise.all(fl).then(() => { this.onIcons && this.onIcons(); });
-  }
-
-  // средний цвет травы (у арта свой оттенок) — им рисуется травяной край берега
-  grassColor() {
-    const g0 = this.S.grass && this.S.grass[0];
-    if (!g0 || !g0.canvas) return null;
-    if (this._gcOf === g0) return this._gc;
-    const c = makeCanvas(1, 1), x = c.getContext('2d');
-    x.drawImage(g0.canvas, g0.canvas.width * 0.3, g0.canvas.height * 0.3, g0.canvas.width * 0.4, g0.canvas.height * 0.4, 0, 0, 1, 1);
-    const d = x.getImageData(0, 0, 1, 1).data;
-    this._gcOf = g0; this._gc = `rgb(${d[0]},${d[1]},${d[2]})`;
-    return this._gc;
-  }
-
-  // Спрайт берега для клетки воды (сама вода — общая текстура, её кладёт PixiScene).
-  // Посреди пруда берега нет: у такого спрайта empty = true.
-  waterSprite(x, y) {
-    const w = this.world;
-    const land = (xx, yy) => (!w.inside(xx, yy) || w.tile(xx, yy) !== T.WATER ? 1 : 0);
-    const mask = land(x, y - 1) | (land(x + 1, y) << 1) | (land(x, y + 1) << 2) | (land(x - 1, y) << 3);
-    // суша только по диагонали (угол тайла): углы T, R, B, L
-    const dg = (land(x - 1, y - 1) && !(mask & 9) ? 1 : 0) | (land(x + 1, y - 1) && !(mask & 3) ? 2 : 0) |
-      (land(x + 1, y + 1) && !(mask & 6) ? 4 : 0) | (land(x - 1, y + 1) && !(mask & 12) ? 8 : 0);
-    const key = dg * 16 + mask;
-    let s = this.S.water.get(key);
-    if (!s) {
-      s = shoreTile(mask, dg, this.grassColor());
-      s.empty = !mask && !dg;
-      this.S.water.set(key, s);
-    }
-    return s;
   }
 
   // Край клетки дорожки (x, y): там, где рядом трава (вода, грядка, «камни в траве»), на дорожку чуть
@@ -175,6 +148,7 @@ export class Farm {
     }
     if (o.bare && S.flora[o.type]) return S.flora[o.type].bare; // плоды собраны
     if (OBJECTS[o.type] && OBJECTS[o.type].building) return this.builds.sprite(o); // здание или его стройка
+    if (S.ponds[o.type]) return S.ponds[o.type];
     const v = S.objArt[o.type];
     if (v && v.length) return v[o.id % v.length];
     if (S.sprinkler && S.sprinkler[o.type]) return S.sprinkler[o.type];
@@ -186,9 +160,12 @@ export class Farm {
     return S.objArt.rock[0];
   }
 
-  // Картинка постройки, которой ещё нет на карте (предпросмотр «поставить из рюкзака»): itemId — предмет
-  // в рюкзаке (placed.js). Объект-заготовка с o.item и o.preview — свои правила картинки могут их учесть.
+  // Картинка предмета из рюкзака на месте, куда его ставят (предпросмотр в «Переставить»): пруд, украшение
+  // пруда или своя постройка (placed.js). У постройки — объект-заготовка с o.item и o.preview: свои правила
+  // картинки могут их учесть.
   placeSprite(itemId) {
+    if (Ponds.isPondItem(itemId)) return this.S.ponds[itemId];
+    if (Ponds.isDecorItem(itemId)) return this.S.decor[ITEMS[itemId].decorOf];
     const type = Placed.objOf(itemId);
     return type ? this.objSprite({ type, id: 0, gx: -1, gy: -1, item: itemId, preview: true }) : null;
   }
@@ -222,6 +199,8 @@ export class Farm {
       // свои дорожки тоже остаются (их покупают): место занято — дорожка вернётся в рюкзак
       if (!sameMap) { delete this.st.pos; delete this.st.movedBeds; delete this.st.wild; }
       if (saved.objects && saved.v !== 2 && sameMap) w.importObjects(saved.objects);
+      // пруды переставляли, убирали или ставили купленные: берём их из сохранения
+      Ponds.restorePonds(this.st, w);
       if (saved.chunks) for (const c of saved.chunks) w.unlocked[c] = 1;
       // грядки переносили: стартовые клетки — трава, все грядки берём из сохранения
       if (this.st.movedBeds) for (const i of w.startBeds) w.tiles[i] = T.GRASS;
@@ -424,7 +403,7 @@ export class Farm {
     };
   }
 
-  changed() { this.syncBars(); this.quests.check(); this.syncHint(); this.ui.update(this); this.save.schedule(() => this.serialize()); }
+  changed() { this.syncBars(); this.quests.check(); this.ach.check(); this.syncHint(); this.ui.update(this); this.save.schedule(() => this.serialize()); }
 
   // Подсказка к заданию (hints.js): куда показать стрелку. Считается после каждого действия и раз
   // в секунду; this.hint — цель или null, hintV растёт, когда цель сменилась (сцена начинает новый прыжок).
@@ -632,11 +611,11 @@ export class Farm {
     let o = w.objectAt(gx, gy);
     if (!o) {
       o = this.pick(tmp.x, tmp.y);
-      // крона соседнего дерева над открытой клеткой: если дерево за забором или под пальцем вода —
-      // важнее сама клетка (иначе вместо пруда открывалось «Новый участок»)
-      if (o && w.inside(gx, gy) && w.isOpen(gx, gy) && (!w.isOpen(o.gx, o.gy) || w.tile(gx, gy) === T.WATER)) o = null;
+      // крона соседнего дерева над открытой клеткой: если дерево за забором — важнее сама клетка
+      // (иначе вместо тропинки открывалось «Новый участок»). Пруд — объект, его нашёл objectAt.
+      if (o && w.inside(gx, gy) && w.isOpen(gx, gy) && !w.isOpen(o.gx, o.gy)) o = null;
     }
-    if (o) this.tapObject(o, sx, sy);
+    if (o) this.tapObject(o, sx, sy, gx, gy);
     else this.tapTile(gx, gy, sx, sy);
   }
 
@@ -653,7 +632,7 @@ export class Farm {
   pick(wx, wy) {
     let best = null;
     for (const o of this.world.objects) {
-      if (!o) continue;
+      if (!o || OBJECTS[o.type].flat) continue; // пруд плоский: нажатие по нему — по клеткам (objectAt)
       const s = this.objSprite(o);
       const big = o.type === 'house' || o.type === 'boulder' || (o.w || 1) > 1;
       const kx = big ? 0.9 : 0.62;
@@ -664,9 +643,10 @@ export class Farm {
     return best;
   }
 
-  tapObject(o, sx, sy) {
+  tapObject(o, sx, sy, gx = o.gx, gy = o.gy) {
     const w = this.world;
     if (!w.isOpen(o.gx, o.gy)) return this.expandPopup(w.chunkOf(o.gx, o.gy), sx, sy);
+    if (Ponds.isPond(o)) return this.pondPopup(o, gx, gy, sx, sy);
     if (o.type === 'house') return this.ui.housePanel(this);
     if (o.type === 'well') return this.wellPopup(o, sx, sy);
     const def = OBJECTS[o.type];
@@ -778,12 +758,6 @@ export class Farm {
     if (!w.inside(x, y)) return;
     if (!w.isOpen(x, y)) return this.expandPopup(w.chunkOf(x, y), sx, sy);
     const t = w.tile(x, y);
-    if (t === T.WATER) {
-      return this.ui.popup(sx, sy, { items: [
-        { icon: 'water', label: 'Набрать воды', sub: `${this.st.can}/${this.canMax}`, disabled: this.st.can >= this.canMax, onClick: () => this.queue({ kind: 'fill', x, y }) },
-        { icon: 'fish', label: 'Рыбачить', sub: `⚡ ${ENERGY.fish}`, onClick: () => this.queue({ kind: 'fish', x, y }) },
-      ] });
-    }
     if (t === T.SOIL) return this.tapBed(this.bedAt(w.idx(x, y)), sx, sy);
     if (w.occ[w.idx(x, y)] >= 0) return;
     // Свободная трава: в режиме «Копаем» — новая грядка, в режиме посадки саженцев — росток,
@@ -792,6 +766,18 @@ export class Farm {
     if (t === T.GRASS && P && P.dig) return this.digTap(x, y);
     if (t === T.GRASS && P && P.species) return this.sowTap(x, y);
     this.queue({ kind: 'walk', x, y });
+  }
+
+  // Пруд: набрать воды или рыбачить. Нажали на середину большого пруда — призрак
+  // идёт к ближнему берегу (клетка воды, у которой можно встать)
+  pondPopup(o, gx, gy, sx, sy) {
+    const c = Ponds.shoreCell(this.world, o, gx, gy);
+    if (!c) return this.toast('К этому пруду не подойти');
+    const { x, y } = c;
+    this.ui.popup(sx, sy, { title: OBJECTS[o.type].name, items: [
+      { icon: 'water', label: 'Набрать воды', sub: `${this.st.can}/${this.canMax}`, disabled: this.st.can >= this.canMax, onClick: () => this.queue({ kind: 'fill', x, y }) },
+      { icon: 'fish', label: 'Рыбачить', sub: `⚡ ${ENERGY.fish}`, onClick: () => this.queue({ kind: 'fish', x, y }) },
+    ] });
   }
 
   wellPopup(o, sx, sy) {
@@ -817,6 +803,31 @@ export class Farm {
     this.player.celebrate();
     this.changed();
     return true;
+  }
+
+  // Где на клетке (gx, gy) стоит украшение пруда (у берега — ближе к земле) → out = точка мира
+  decorPoint(gx, gy, out) {
+    const o = this.world.pondAt(gx, gy);
+    if (o && this.world.isWater(gx, gy)) { const [x, y] = pondDecorPos(o.type, gx - o.gx, gy - o.gy); toWorld(o.gx + x, o.gy + y, out); }
+    else toWorld(gx + 0.5, gy + 0.5, out);
+    return out;
+  }
+
+  // Украшение пруда поставили, переставили или убрали: брызги
+  decorFx(gx, gy) {
+    this.decorPoint(gx, gy, tmp);
+    this.burst(tmp.x, tmp.y, '#9fd8f5', 6);
+    this.sfx('splash');
+  }
+
+  // Пруд переставили, убрали или поставили: брызги по воде
+  pondFx(o) {
+    for (const [dx, dy] of PONDS[o.type].water) {
+      if ((dx + dy) % 2) continue;
+      toWorld(o.gx + dx + 0.5, o.gy + dy + 0.5, tmp);
+      this.burst(tmp.x, tmp.y, '#9fd8f5', 4);
+    }
+    this.sfx('splash');
   }
 
   isWell(x, y) { const o = this.world.well; return !!o && this.st.well > 0 && o.gx === x && o.gy === y; }
@@ -1024,9 +1035,8 @@ export class Farm {
   nearestWater() {
     const w = this.world, p = this.player;
     let best = null, bd = Infinity;
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      if (w.tiles[y * N + x] !== T.WATER || !w.isOpen(x, y)) continue;
-      const d = Math.hypot(x - p.x, y - p.y);
+    for (const { x, y } of Ponds.shoreCells(w)) {
+      const d = Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y);
       if (d < bd) { bd = d; best = { x, y }; }
     }
     const o = w.well;
@@ -1069,8 +1079,8 @@ export class Farm {
       case 'harvest': { const b = this.bedAt(w.idx(a.x, a.y)); return !!b.crop && this.cropInfo(b).ready; }
       case 'fill':
         if (st.can >= this.canMax) { this.toast('Лейка уже полная'); return false; }
-        return t === T.WATER || this.isWell(a.x, a.y);
-      case 'fish': return t === T.WATER;
+        return w.isWater(a.x, a.y) || this.isWell(a.x, a.y);
+      case 'fish': return w.isWater(a.x, a.y);
     }
     return true;
   }
@@ -1126,7 +1136,8 @@ export class Farm {
         const o = this.plantOwn(a.species, a.x, a.y, a.grown);
         if (!o) return false;
         this.burst(o.wx, o.wy, '#7ccf4f', 8);
-        this.quests.emit('sow', a.species);
+        // своё взрослое растение из рюкзака пересадили — это не посадка ростка (задания и «Лесник» не считают)
+        this.quests.emit(a.grown ? 'replant' : 'sow', a.species);
         this.sfx('plant');
         this.addXp(1);
         this.changed();
@@ -1347,6 +1358,8 @@ export class Farm {
       this.wildTick(now); t = pf.part('поросль', t);
       this.builds.tick(now); t = pf.part('здания', t);
       this.quests.tick(); t = pf.part('задания', t);
+      this.ach.tick(); t = pf.part('достижения', t);
+      this.orders.tick(); t = pf.part('заказы', t);
       this.syncHint(); t = pf.part('подсказка', t);
       this.ui.tick(this); t = pf.part('интерфейс', t);
     }
