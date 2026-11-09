@@ -690,6 +690,7 @@ export class UI {
       toggle('Выключить весь звук', A.s.muted, (v) => { A.unlock(); A.set('muted', v); if (!v) A.play('tap'); });
       body.appendChild(h('div', 'pn-sub', 'Экран'));
       toggle('Показывать FPS и время кадра', f.perf.showFps, (v) => { f.perf.showFps = v; });
+      toggle('Животные двигаются', f.animals.moves, (v) => { f.animals.moves = v; });
       {
         const row = h('div', 'gfx-row');
         row.appendChild(h('span', 'gfx-cap', 'Графика'));

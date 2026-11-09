@@ -672,6 +672,14 @@ export class PixiScene {
       const al = o.fade ? 1 - 0.62 * o.fade : 1;
       if (e.alpha !== al) e.alpha = al;
       this.put(e, s, o.wx + sh, o.wy + hop);
+      // движение животного (animals.js pose): наклон и сжатие вокруг точки опоры
+      const A = o.anim && f.animals.pose(o);
+      if (A || e.posed) {
+        const t = e.texture;
+        e.scale.set((s.w / t.width) * (A ? A.sx : 1), (s.h / t.height) * (A ? A.sy : 1));
+        e.rotation = A ? A.rot : 0;
+        e.posed = !!A;
+      }
       const z = Z(o.depth, o.wy);
       if (e.zIndex !== z) e.zIndex = z;
     };

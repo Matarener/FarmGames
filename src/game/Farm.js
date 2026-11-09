@@ -1479,6 +1479,7 @@ export class Farm {
       if (o.shake > 0) o.shake = Math.max(0, o.shake - dt);
       if (o.hop > 0) o.hop = Math.max(0, o.hop - dt); // прыжок животного (покормили, подросло)
     }
+    this.animals.update(dt); // короткие движения животных
     const P = this.particles;
     for (let i = P.length - 1; i >= 0; i--) {
       const p = P[i];
@@ -1492,7 +1493,7 @@ export class Farm {
 
   isIdle() {
     // стрелка подсказки подпрыгивает изредка: только во время прыжка нужны частые кадры
-    return !this.mover.active && this.player.idleTime > 2 && !this.particles.length && !this.floaters.length && !this.tapFx && !this.cam.animating && !this.hover &&
+    return !this.mover.active && this.player.idleTime > 2 && !this.particles.length && !this.floaters.length && !this.tapFx && !this.cam.animating && !this.hover && !this.animals.moving &&
       !(this.scene && (this.scene.hintMoving || this.scene.ringsMoving));
   }
 

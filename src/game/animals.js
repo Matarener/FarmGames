@@ -1,6 +1,7 @@
 // Животные в игре: связывает правила (animalRules.js) с фермой — нажатие на животное (покормить, забрать
 // продукт, меню «ест ещё…»), прыжок и крошки корма, «+1» над животным, полоска «ест» и пузыри «хочу есть» /
 // «готово», звуки, задания и сохранение. Где стоит животное — общий список своих объектов (placed.js).
+// Короткие движения (клюёт, щиплет траву, оборачивается…) — только картинка: на правила и сохранение не влияют.
 
 import * as R from './animalRules.js';
 import { ANIMALS, ANIMAL_GOODS } from './animalData.js';
@@ -13,17 +14,104 @@ import { fmt } from './buildings.js';
 // цвет крошек корма (кормят) и брызг продукта (забирают)
 const FEED_COLOR = { feed_grain: '#e8c25a', feed_rabbit: '#f08a2c', feed_mash: '#b9733f', feed_hay: '#d9b44a' };
 
+// Движения: длительность (с). У каждого животного свой круг движений (animalData.js moves) и свои паузы
+// между ними MOVE_GAP, поэтому все двигаются вразнобой. turn — обернулось на TURN секунд и обратно.
+const MOVE_T = { peck: 0.55, graze: 1.6, sniff: 0.7, breathe: 1.1, shake: 0.55 };
+const MOVE_GAP = [3, 8];
+const TURN = [3, 6];
+const rnd = (r) => r[0] + Math.random() * (r[1] - r[0]);
+const ease = (x) => x * x * (3 - 2 * x);
+
 export class Animals {
-  constructor(farm) { this.f = farm; }
+  constructor(farm) {
+    this.f = farm;
+    this.live = new Set(); // кто сейчас двигается или стоит обернувшись
+    try { this._moves = localStorage.getItem('farm.animalMoves') !== '0'; } catch { this._moves = true; }
+  }
+
+  // Двигаются ли животные (настройки → «Экран»); хранится в браузере, как счётчик FPS
+  get moves() { return this._moves; }
+  set moves(v) {
+    this._moves = !!v;
+    try { localStorage.setItem('farm.animalMoves', this._moves ? '1' : '0'); } catch { /* без хранилища — до перезапуска */ }
+    if (!this._moves) this.still();
+  }
 
   get st() { return this.f.st; }
 
   is(o) { return R.isAnimal(o); }
 
-  // Картинка: своей стадии и стороны (rot 1 — зеркало)
+  // Картинка: своей стадии и стороны (rot 1 — зеркало; обернулось на время — другая сторона)
   sprite(o) {
     const v = this.f.S.animal && this.f.S.animal[o.type];
-    return v ? v[o.rot || 0] || v[0] : null;
+    return v ? v[(o.rot || 0) ^ (o.turn > 0 ? 1 : 0)] || v[0] : null;
+  }
+
+  // ---------------- Движения (только картинка) ----------------
+  // Каждый кадр (Farm.update): идут движения, животные на экране по очереди начинают следующее из своего круга.
+  // Пока что-то переставляют — все стоят и смотрят, как поставлены.
+  update(dt) {
+    const f = this.f, L = this.live;
+    for (const o of L) {
+      if (o.anim && (o.anim.t += dt) >= o.anim.d) o.anim = null;
+      if (o.turn > 0 && (o.turn -= dt) <= 0) { o.turn = 0; o.hop = HOP; }
+      if (!o.anim && !o.turn && !(o.hop > 0)) L.delete(o);
+    }
+    if (!this._moves || !f.scene) return;
+    if (f.mover.active) { if (L.size) this.still(); return; }
+    const w = f.world, OB = w.objects, E = f.scene.objs;
+    for (let i = 0; i < OB.length; i++) {
+      const o = OB[i];
+      if (!o || !R.isAnimal(o) || o.anim) continue;
+      const e = E.get(o);
+      if (!e || !e.visible || !w.isOpen(o.gx, o.gy)) continue;
+      if (o.moveIn === undefined) o.moveIn = Math.random() * MOVE_GAP[1]; // первое — в случайный момент
+      if ((o.moveIn -= dt) > 0) continue;
+      o.moveIn = rnd(MOVE_GAP);
+      this.move(o);
+    }
+  }
+
+  // Следующее движение из круга вида
+  move(o) {
+    const M = ANIMALS[R.infoOf(o.type).sp].moves;
+    o.moveN = ((o.moveN === undefined ? Math.floor(Math.random() * M.length) : o.moveN) + 1) % M.length;
+    const k = M[o.moveN];
+    if (k === 'turn') { if (o.turn > 0) return; o.turn = rnd(TURN); o.hop = HOP; }
+    else if (k === 'hop') o.hop = HOP;
+    else o.anim = { k, t: 0, d: MOVE_T[k] };
+    this.live.add(o);
+  }
+
+  // Все стоят как поставлены (выключили движения, начали переставлять)
+  still() {
+    for (const o of this.live) { o.anim = null; o.turn = 0; }
+    this.live.clear();
+  }
+
+  // Нужны частые кадры (Farm.isIdle): кто-то в движении или в прыжке. Обернувшееся стоит — кадры не нужны.
+  get moving() {
+    for (const o of this.live) if (o.anim || o.hop > 0) return true;
+    return false;
+  }
+
+  // Картинка в движении: { rot (радианы), sx, sy } вокруг точки опоры (между ног) или null (PixiScene).
+  // Нарисованы мордой влево: наклон «головой вниз» — против часовой, у повёрнутого — по часовой.
+  pose(o) {
+    const A = o.anim;
+    if (!A) return null;
+    const u = Math.min(1, A.t / A.d), dir = (o.rot || 0) ^ (o.turn > 0 ? 1 : 0) ? 1 : -1, P = Math.PI;
+    switch (A.k) {
+      case 'peck': return { rot: dir * 0.17 * Math.sin(P * ((u * 2) % 1)), sx: 1, sy: 1 }; // два быстрых клевка
+      case 'graze': { // наклонилось, жуёт, поднялось
+        const env = u < 0.3 ? ease(u / 0.3) : u > 0.75 ? ease((1 - u) / 0.25) : 1;
+        return { rot: dir * env * (0.08 + 0.012 * Math.sin(A.t * 18)), sx: 1, sy: 1 };
+      }
+      case 'sniff': return { rot: dir * 0.035 * Math.sin(u * 6 * P) * Math.sin(P * u), sx: 1, sy: 1 };
+      case 'breathe': { const b = Math.sin(P * u); return { rot: 0, sx: 1 - 0.025 * b, sy: 1 + 0.05 * b }; }
+      case 'shake': { const b = Math.sin(u * 8 * P) * (1 - u); return { rot: 0.07 * b, sx: 1 + 0.02 * Math.abs(b), sy: 1 }; }
+    }
+    return null;
   }
 
   // Раз в секунду и при входе: кто доел — подрос (брызги, надпись, опыт) или приготовил продукт (пузырь).

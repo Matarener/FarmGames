@@ -5,6 +5,7 @@ import * as A from '../src/game/animalRules.js';
 import * as P from '../src/game/placed.js';
 import * as BR from '../src/game/buildRules.js';
 import * as SA from '../src/game/storeAll.js';
+import { Animals } from '../src/game/animals.js';
 import { ANIMALS, ANIMAL_GOODS, animalType, FEED_XP } from '../src/game/animalData.js';
 import { BUILDINGS, RECIPES } from '../src/game/buildData.js';
 import { World, N, START_CHUNK, CHUNK, CHUNKS } from '../src/game/World.js';
@@ -184,6 +185,43 @@ test('«Убрать всё»: животные — своей строкой', 
   assert.equal(st.items.animal_chicken, 1);
   assert.ok(st.animalBag.animal_chicken.length === 1);
   assert.equal(A.count(w).all, 0);
+});
+
+test('движения: все животные на экране по своему кругу, вразнобой; выключаются; при перестановке стоят', () => {
+  const w = world(), st = st0({ items: { animal_chicken: 1, animal_cow_baby: 1, animal_pig_young: 1 } });
+  const objs = new Map(), mover = { active: false };
+  const f = { st, world: w, S: { animal: {} }, scene: { objs }, mover };
+  const os = ['animal_chicken', 'animal_cow_baby', 'animal_pig_young'].map((t, i) => P.placeObj(st, w, t, x0 + 2 + i * 2, y0 + 2, { now: 0 }).o);
+  os.forEach((o, i) => objs.set(o, { visible: i < 2 })); // свинья за краем экрана
+  const an = new Animals(f);
+  an.moves = true;
+  const seen = os.map(() => new Set());
+  let moving = 0, turned = 0;
+  for (let i = 0; i < 60 * 60; i++) { // минута по 1/60 с
+    an.update(1 / 60);
+    for (const o of os) if (o.hop > 0) o.hop = Math.max(0, o.hop - 1 / 60);
+    os.forEach((o, j) => { if (o.anim) seen[j].add(o.anim.k); if (o.turn > 0) seen[j].add('turn'); if (o.hop > 0) seen[j].add('hop'); });
+    if (an.moving) moving++;
+    if (os[0].turn > 0) turned++;
+    const p = an.pose(os[0]);
+    if (p) assert.ok(Math.abs(p.rot) <= 0.18 && p.sx > 0.9 && p.sy < 1.1, 'движения маленькие');
+  }
+  assert.ok(seen[0].has('peck') && seen[0].has('turn'), 'курица клюёт и оборачивается: ' + [...seen[0]]);
+  assert.ok(seen[1].has('graze') && seen[1].has('breathe'), 'телёнок щиплет траву и дышит: ' + [...seen[1]]);
+  assert.equal(seen[2].size, 0, 'за краем экрана не двигается');
+  assert.ok(moving > 0 && moving < 60 * 60 * 0.8, 'между движениями — паузы');
+  assert.ok(turned > 0);
+  assert.equal(os[0].rot || 0, 0, 'поворот, выбранный игроком, не меняется');
+  assert.ok(!st.placed.some((r) => r[4] && ('anim' in r[4] || 'turn' in r[4])), 'в сохранение движения не попадают');
+  // переставляют — все стоят как поставлены
+  os[0].turn = 2; an.live.add(os[0]);
+  mover.active = true; an.update(1 / 60);
+  assert.ok(!os[0].turn && !os[0].anim && !an.live.size);
+  mover.active = false;
+  // выключили в настройках — ни одного движения
+  an.moves = false;
+  for (let i = 0; i < 600; i++) an.update(1 / 60);
+  assert.ok(os.every((o) => !o.anim && !o.turn) && !an.moving);
 });
 
 console.log(`\nвсе проверки прошли: ${tests}`);
