@@ -1,0 +1,182 @@
+[
+ {
+  "name": "tree_bird_cherry",
+  "refs": [
+   "art-candidates/fruit/refs/style_tree_m.jpg"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "A single new fruit tree for a cozy isometric farm game, drawn in exactly the same art style as the reference apple tree: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Same size and proportions as the reference: a trunk about as tall and a crown about as wide. It must clearly be a bird cherry tree, not an apple tree: a bird cherry tree (Prunus padus): a slender dark grey-brown trunk dotted with small pale lenticels, splitting low into two or three stems, a tall oval, slightly drooping crown of dark-green finely serrated elliptic leaves, with many long hanging clusters (racemes) of small round glossy black berries. Nothing must be under the tree: no ground, no soil, no lawn, no grass island, no flowers, no stones, no fallen fruit, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
+ },
+ {
+  "name": "stump_bird_cherry",
+  "refs": [
+   "art-candidates/fruit/refs/style_stump_m.jpg"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One stump of a cut bird cherry tree for a cozy isometric farm game, in exactly the same style, size, proportions and angle as the reference stump: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Bird cherry stump: slender stump with dark grey-brown bark dotted with small pale lenticels, a pale cream cut top with thin growth rings, a small twig with dark-green serrated leaves and a tiny cluster of black berries growing from its side. Nothing must be under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
+ },
+ {
+  "name": "ui_bird_cherry",
+  "refs": [
+   "assets/source/ui_flora1.png"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One inventory icon for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, glossy highlight): a small hanging cluster of round glossy black bird cherry berries on thin green stalks, with one dark-green serrated leaf. Front view, centered, filling most of the image. No text, nothing else."
+ },
+ {
+  "name": "ui_sap_bird_cherry",
+  "refs": [
+   "assets/source/ui_saplings1.png"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One inventory icon for a mobile farm game, in the same style as the sapling icons in the reference: a young bird cherry sapling with a thin dark grey-brown stem, a few dark-green serrated leaves and one tiny hanging cluster of black berries, planted in the same tied burlap root-ball sack as in the reference. Centered, filling most of the image. No text, nothing else."
+ },
+ {
+  "name": "tree_plum",
+  "refs": [
+   "art-candidates/fruit/refs/style_tree_c.jpg"
+  ],
+  "size": "1024x1024",
+  "key": "#00FFFF",
+  "prompt": "A single new fruit tree for a cozy isometric farm game, drawn in exactly the same art style as the reference apple tree: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Same size and proportions as the reference: a trunk about as tall and a crown about as wide. It must clearly be a plum tree, not an apple tree: a plum tree: a dark reddish-brown trunk, a rounded, slightly spreading crown of mid-green oval leaves, with many oval dark purple-blue plums covered with a soft pale dusty bloom and small highlights. Nothing must be under the tree: no ground, no soil, no lawn, no grass island, no flowers, no stones, no fallen fruit, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
+ },
+ {
+  "name": "stump_plum",
+  "refs": [
+   "art-candidates/fruit/refs/style_stump_m.jpg"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One stump of a cut plum tree for a cozy isometric farm game, in exactly the same style, size, proportions and angle as the reference stump: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Plum stump: stump with dark reddish-brown bark, a pinkish-cream cut top with growth rings and a darker reddish core, a small twig with oval green leaves growing from its side. Nothing must be under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
+ },
+ {
+  "name": "ui_plum",
+  "refs": [
+   "assets/source/ui_flora1.png"
+  ],
+  "size": "1024x1024",
+  "key": "#00FFFF",
+  "prompt": "One inventory icon for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, glossy highlight): two oval dark purple-blue plums with a pale dusty bloom and a soft highlight, a short brown stalk and one green leaf. Front view, centered, filling most of the image. No text, nothing else."
+ },
+ {
+  "name": "ui_sap_plum",
+  "refs": [
+   "assets/source/ui_saplings1.png"
+  ],
+  "size": "1024x1024",
+  "key": "#00FFFF",
+  "prompt": "One inventory icon for a mobile farm game, in the same style as the sapling icons in the reference: a young plum sapling with a thin reddish-brown stem, a few oval green leaves and two tiny dark purple-blue plums, planted in the same tied burlap root-ball sack as in the reference. Centered, filling most of the image. No text, nothing else."
+ },
+ {
+  "name": "tree_pear",
+  "refs": [
+   "art-candidates/fruit/refs/style_tree_m.jpg"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "A single new fruit tree for a cozy isometric farm game, drawn in exactly the same art style as the reference apple tree: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Same size and proportions as the reference: a trunk about as tall and a crown about as wide. It must clearly be a pear tree, not an apple tree: a pear tree: a straight grey-brown trunk with fissured bark, a tall upright egg-shaped crown, narrower than the apple tree crown, of glossy dark-green oval leaves, with many classic pear-shaped yellow-green pears with a soft red blush hanging on short stalks. Nothing must be under the tree: no ground, no soil, no lawn, no grass island, no flowers, no stones, no fallen fruit, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
+ },
+ {
+  "name": "stump_pear",
+  "refs": [
+   "art-candidates/fruit/refs/style_stump_m.jpg"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One stump of a cut pear tree for a cozy isometric farm game, in exactly the same style, size, proportions and angle as the reference stump: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Pear stump: stump with grey-brown fissured bark, a light cream cut top with growth rings, a small twig with glossy dark-green oval leaves growing from its side. Nothing must be under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
+ },
+ {
+  "name": "ui_pear",
+  "refs": [
+   "assets/source/ui_flora1.png"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One inventory icon for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, glossy highlight): one yellow-green pear with a soft red blush, a short brown stalk and one glossy green leaf. Front view, centered, filling most of the image. No text, nothing else."
+ },
+ {
+  "name": "ui_sap_pear",
+  "refs": [
+   "assets/source/ui_saplings1.png"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One inventory icon for a mobile farm game, in the same style as the sapling icons in the reference: a young pear sapling with a thin grey-brown stem, a few glossy dark-green leaves and two tiny yellow-green pears, planted in the same tied burlap root-ball sack as in the reference. Centered, filling most of the image. No text, nothing else."
+ },
+ {
+  "name": "tree_apricot",
+  "refs": [
+   "art-candidates/fruit/refs/style_tree_m.jpg"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "A single new fruit tree for a cozy isometric farm game, drawn in exactly the same art style as the reference apple tree: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Same size and proportions as the reference: a trunk about as tall and a crown about as wide. It must clearly be a apricot tree, not an apple tree: an apricot tree: a brown, slightly twisted trunk with reddish bark, a wide umbrella-like rounded crown of fresh light-green round leaves with pointed tips, with many round orange apricots with a soft red blush. Nothing must be under the tree: no ground, no soil, no lawn, no grass island, no flowers, no stones, no fallen fruit, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
+ },
+ {
+  "name": "stump_apricot",
+  "refs": [
+   "art-candidates/fruit/refs/style_stump_m.jpg"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One stump of a cut apricot tree for a cozy isometric farm game, in exactly the same style, size, proportions and angle as the reference stump: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Apricot stump: stump with reddish-brown bark, a warm light-orange cut top with growth rings, a small twig with round light-green leaves growing from its side. Nothing must be under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
+ },
+ {
+  "name": "ui_apricot",
+  "refs": [
+   "assets/source/ui_flora1.png"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One inventory icon for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, glossy highlight): two round orange apricots with a soft red blush and a visible groove line, and one green leaf. Front view, centered, filling most of the image. No text, nothing else."
+ },
+ {
+  "name": "ui_sap_apricot",
+  "refs": [
+   "assets/source/ui_saplings1.png"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One inventory icon for a mobile farm game, in the same style as the sapling icons in the reference: a young apricot sapling with a thin reddish-brown stem, a few round light-green leaves and two tiny orange apricots, planted in the same tied burlap root-ball sack as in the reference. Centered, filling most of the image. No text, nothing else."
+ },
+ {
+  "name": "tree_persimmon",
+  "refs": [
+   "art-candidates/fruit/refs/style_tree_m.jpg"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "A single new fruit tree for a cozy isometric farm game, drawn in exactly the same art style as the reference apple tree: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Same size and proportions as the reference: a trunk about as tall and a crown about as wide. It must clearly be a persimmon tree, not an apple tree: a persimmon tree: a dark grey trunk with chunky blocky bark, a broad rounded crown of large glossy dark-green oval leaves, with many round, slightly flattened bright orange persimmons, each with a green four-lobed leafy cap on top. Nothing must be under the tree: no ground, no soil, no lawn, no grass island, no flowers, no stones, no fallen fruit, no shadow. The trunk ends at the ground line with short, slightly flared roots, and 3 to 5 small soft grass tufts grow right at the foot of the trunk. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the tree can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
+ },
+ {
+  "name": "stump_persimmon",
+  "refs": [
+   "art-candidates/fruit/refs/style_stump_m.jpg"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One stump of a cut persimmon tree for a cozy isometric farm game, in exactly the same style, size, proportions and angle as the reference stump: same cozy hand-painted game art style with smooth clean dark-brown outlines and crisp details, lighting from the top-left and the same 3/4 isometric viewing angle. No visible pixel blocks, no stair-step edges, no blur, no noise. Persimmon stump: stump with dark grey blocky bark, a cream cut top with growth rings and a dark, nearly black heartwood core, a small twig with glossy dark-green oval leaves growing from its side. Nothing must be under the stump: no ground, no soil, no lawn, no flowers, no stones, no shadow. The roots spread on the ground line and end there, and 3 to 4 small soft grass tufts grow right at the foot of the stump. These few tufts are tiny and only touch the base; do not draw a grass patch. They use the bright lime-green colors of the game lawn: mostly #7EBB09 and #6BAB06, lighter #9BC80C tips, darker #509705 in the shade, so the stump can stand directly on that lawn in the game. One object only, centered, filling most of the image, with an empty margin around it."
+ },
+ {
+  "name": "ui_persimmon",
+  "refs": [
+   "assets/source/ui_flora1.png"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One inventory icon for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, glossy highlight): one round, slightly flattened bright orange persimmon with a green four-lobed leafy cap and a short stalk on top. Front view, centered, filling most of the image. No text, nothing else."
+ },
+ {
+  "name": "ui_sap_persimmon",
+  "refs": [
+   "assets/source/ui_saplings1.png"
+  ],
+  "size": "1024x1024",
+  "key": "magenta",
+  "prompt": "One inventory icon for a mobile farm game, in the same style as the sapling icons in the reference: a young persimmon sapling with a thin dark grey stem, a few large glossy dark-green leaves and two tiny orange persimmons, planted in the same tied burlap root-ball sack as in the reference. Centered, filling most of the image. No text, nothing else."
+ }
+]
