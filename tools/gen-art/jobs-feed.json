@@ -1,0 +1,45 @@
+[
+  {
+    "name": "building_feedmill",
+    "replace": true,
+    "size": "1024x1024",
+    "count": 2,
+    "refs": [
+      "assets/source/building_kitchen.png",
+      "assets/source/building_carpentry.png"
+    ],
+    "prompt": "A small farm feed mill (a barn where animal feed is made) for an isometric farm game, in exactly the same art style, 3/4 isometric view angle and scale as the reference images: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights, standing on the same diamond-shaped isometric grass base patch with a few tiny flowers and pebbles; the footprint is 2 by 2 tiles, the grass diamond is exactly twice as wide as it is tall, like under the reference buildings. A cozy wooden barn with warm red-brown plank walls and white trim, a wooden shingle roof with a small cupola and a rooster weathervane on top, a big double barn door half open showing burlap sacks of grain inside, a small wooden hand-cranked grain grinder with a little millstone under a tiny awning by the side wall, a few stacked burlap feed sacks and one hay bale in front, a small wooden feeding trough, a little hanging sign showing a wheat ear. Smaller and lower than a two-storey house, about the size of the reference buildings. One building, centered, nothing else, no text, no people, no animals."
+  },
+  {
+    "name": "site_feedmill",
+    "replace": true,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/building_feedmill.png",
+      "assets/source/site_kitchen.png"
+    ],
+    "prompt": "A construction site for an isometric farm game, in exactly the same art style, 3/4 isometric view angle and scale as the reference images: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights, standing on the same diamond-shaped isometric grass base patch with a few tiny flowers and pebbles; the footprint is 2 by 2 tiles, the grass diamond is exactly twice as wide as it is tall, like under the reference buildings. The construction site of the feed mill barn shown in the first reference image (the second reference is another construction site, use it only for the scaffolding style): a low stone footing and the bare wooden frame of that same barn, half of the red-brown plank walls already boarded, the barn door frame visible, no roof yet, only bare rafters; light wooden scaffolding with a ladder along one wall, a stack of fresh planks, a few wooden shingles, a wheelbarrow. It should be recognisable as the future feed mill, about the same size. It must read clearly as 'under construction'. One construction site, centered, nothing else, no text, no people."
+  },
+  {
+    "name": "ui_feed",
+    "replace": true,
+    "size": "1536x1024",
+    "count": 1,
+    "refs": [
+      "assets/source/ui_food.png",
+      "assets/source/ui_hay.png"
+    ],
+    "prompt": "Inventory icons for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, smooth clean outlines, warm saturated colors, glossy highlight). Separate objects in one row, each centered in its own equal cell, front view, filling most of its cell, no text, no plates or frames unless described:\n1) poultry feed: a small open burlap sack full of mixed golden grain, wheat kernels and yellow corn kernels, a few grains spilled in front;\n2) a hay feed brick: a compact rectangular bale of pressed green-gold hay tied with two strings, a sprig of clover with tiny flowers on top;\n3) pig mash: a small wooden bucket full of chunky mash of chopped orange carrots, red beet pieces and grain;\n4) rabbit food: a small woven basket with two orange carrots with green tops and a few fresh green cabbage leaves."
+  },
+  {
+    "name": "ui_animal",
+    "replace": true,
+    "size": "1536x1024",
+    "count": 1,
+    "refs": [
+      "assets/source/ui_food.png",
+      "assets/source/ui_flora1.png"
+    ],
+    "prompt": "Inventory icons for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, smooth clean outlines, warm saturated colors, glossy highlight). Separate objects in one row, each centered in its own equal cell, front view, filling most of its cell, no text, no plates or frames unless described:\n1) eggs: two light-brown hen eggs side by side, smooth and glossy;\n2) a goose feather: one large soft white goose feather with a light-grey quill, slightly curved;\n3) a truffle: one dark-brown knobbly truffle mushroom with a small cut showing a marbled inside, a green leaf beside it;\n4) wool: a big fluffy cream-white tuft of soft raw sheep wool, like a little cloud;\n5) angora fluff: a small woven basket filled with soft pale-grey fluffy rabbit down."
+  }
+]

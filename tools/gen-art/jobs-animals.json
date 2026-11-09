@@ -1,0 +1,68 @@
+[
+  {
+    "name": "animal_chicken",
+    "replace": true,
+    "size": "1024x1024",
+    "key": "magenta",
+    "refs": [
+      "assets/source/decor_bench.png",
+      "assets/source/well.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights. Cute and friendly, slightly stylized cozy proportions (not chibi, not realistic).\nOne adult farm hen: a plump round body with warm reddish-brown (rust) feathers, darker brown tail feathers sticking up, a bright red comb and wattles, a small yellow beak, yellow legs with three toes.\nSeen in the same 3/4 isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally). IMPORTANT direction: the animal's body runs along the isometric diagonal, its HEAD toward the LOWER-LEFT of the image (facing the viewer and to the left) and its tail toward the upper-right, so we see the side of its body, a bit of its back and its face. All its legs or feet are visible, standing on an invisible flat ground. Calm standing pose, eyes open, gentle friendly face. No ground, no grass, no shadow, no text, no frame. One animal, centered, filling about two thirds of the image height."
+  },
+  {
+    "name": "animal_goose",
+    "replace": true,
+    "size": "1024x1024",
+    "key": "magenta",
+    "refs": [
+      "assets/source/decor_bench.png",
+      "assets/source/well.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights. Cute and friendly, slightly stylized cozy proportions (not chibi, not realistic).\nOne adult white domestic goose: white plumage with soft light-grey shading on the folded wings, a long elegant curved neck, an orange beak, orange webbed feet.\nSeen in the same 3/4 isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally). IMPORTANT direction: the animal's body runs along the isometric diagonal, its HEAD toward the LOWER-LEFT of the image (facing the viewer and to the left) and its tail toward the upper-right, so we see the side of its body, a bit of its back and its face. All its legs or feet are visible, standing on an invisible flat ground. Calm standing pose, eyes open, gentle friendly face. No ground, no grass, no shadow, no text, no frame. One animal, centered, filling about two thirds of the image height."
+  },
+  {
+    "name": "animal_cow",
+    "replace": true,
+    "size": "1024x1024",
+    "key": "magenta",
+    "refs": [
+      "assets/source/decor_bench.png",
+      "assets/source/well.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights. Cute and friendly, slightly stylized cozy proportions (not chibi, not realistic).\nOne adult dairy cow: a black-and-white spotted coat, a pink muzzle, two small light-cream horns, a pink udder, a long tail with a black tuft, a small brass bell on a brown leather collar.\nSeen in the same 3/4 isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally). IMPORTANT direction: the animal's body runs along the isometric diagonal, its HEAD toward the LOWER-LEFT of the image (facing the viewer and to the left) and its tail toward the upper-right, so we see the side of its body, a bit of its back and its face. All its legs or feet are visible, standing on an invisible flat ground. Calm standing pose, eyes open, gentle friendly face. No ground, no grass, no shadow, no text, no frame. One animal, centered, filling about two thirds of the image height."
+  },
+  {
+    "name": "animal_pig",
+    "replace": true,
+    "size": "1024x1024",
+    "key": "green",
+    "refs": [
+      "assets/source/decor_bench.png",
+      "assets/source/well.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights. Cute and friendly, slightly stylized cozy proportions (not chibi, not realistic).\nOne adult farm pig: a plump round pink body, a big pink snout, floppy pink ears, a curly tail, small dark-pink hooves, a couple of light-brown mud spots on its legs.\nSeen in the same 3/4 isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally). IMPORTANT direction: the animal's body runs along the isometric diagonal, its HEAD toward the LOWER-LEFT of the image (facing the viewer and to the left) and its tail toward the upper-right, so we see the side of its body, a bit of its back and its face. All its legs or feet are visible, standing on an invisible flat ground. Calm standing pose, eyes open, gentle friendly face. No ground, no grass, no shadow, no text, no frame. One animal, centered, filling about two thirds of the image height."
+  },
+  {
+    "name": "animal_sheep",
+    "replace": true,
+    "size": "1024x1024",
+    "key": "magenta",
+    "refs": [
+      "assets/source/decor_bench.png",
+      "assets/source/well.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights. Cute and friendly, slightly stylized cozy proportions (not chibi, not realistic).\nOne adult sheep: a thick fluffy cream-white wool fleece like a cloud covering the body, a dark brown-grey face and thin dark legs, small dark ears sticking out sideways.\nSeen in the same 3/4 isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally). IMPORTANT direction: the animal's body runs along the isometric diagonal, its HEAD toward the LOWER-LEFT of the image (facing the viewer and to the left) and its tail toward the upper-right, so we see the side of its body, a bit of its back and its face. All its legs or feet are visible, standing on an invisible flat ground. Calm standing pose, eyes open, gentle friendly face. No ground, no grass, no shadow, no text, no frame. One animal, centered, filling about two thirds of the image height."
+  },
+  {
+    "name": "animal_rabbit",
+    "replace": true,
+    "size": "1024x1024",
+    "key": "magenta",
+    "refs": [
+      "assets/source/decor_bench.png",
+      "assets/source/well.png"
+    ],
+    "prompt": "Cozy farm game sprite, same art style as the reference: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights. Cute and friendly, slightly stylized cozy proportions (not chibi, not realistic).\nOne adult farm rabbit: soft fluffy fur, light grey-brown on the back with a cream belly, long upright ears with pink insides, a round fluffy white tail, big dark shiny eyes, sitting calmly with all four paws on the ground.\nSeen in the same 3/4 isometric view as the reference objects (camera about 30 degrees above the ground, looking diagonally). IMPORTANT direction: the animal's body runs along the isometric diagonal, its HEAD toward the LOWER-LEFT of the image (facing the viewer and to the left) and its tail toward the upper-right, so we see the side of its body, a bit of its back and its face. All its legs or feet are visible, standing on an invisible flat ground. Calm standing pose, eyes open, gentle friendly face. No ground, no grass, no shadow, no text, no frame. One animal, centered, filling about two thirds of the image height."
+  }
+]
