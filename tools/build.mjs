@@ -22,6 +22,11 @@ const ART = join(ROOT, 'assets', 'art');
 const ASSET_V = hash(Buffer.concat(readdirSync(ART).sort().map((f) => readFileSync(join(ART, f)))));
 cpSync(ART, join(DIST, 'assets', 'art'), { recursive: true });
 
+// Заставка экрана загрузки (tools/splash_art.py): своя версия, чтобы новая картинка не ждала кэша Pages
+const SPLASH = join(ROOT, 'assets', 'splash');
+const SPLASH_V = hash(Buffer.concat(readdirSync(SPLASH).sort().map((f) => readFileSync(join(SPLASH, f)))));
+cpSync(SPLASH, join(DIST, 'assets', 'splash'), { recursive: true });
+
 // Стартовая карта (assets/map.json, её пишет редактор карты) вшивается в код: если бы файл карты
 // не загрузился по сети, игра собрала бы случайный мир, и сохранение игрока потеряло бы тропинки,
 // посадки и перестановки. Файла нет — null: мир генерируется случайно.
@@ -68,6 +73,7 @@ writeFileSync(join(DIST, cssName), cssCode);
 let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
 html = html.replace('href="style.css"', `href="${cssName}"`)
   .replace('<script type="module" src="src/main.js"></script>', `<script defer src="${jsName}"></script>`)
+  .replace(/(assets\/splash\/[\w.-]+\.webp)/g, `$1?v=${SPLASH_V}`)
   .replace(/\n\s*\n/g, '\n');
 writeFileSync(join(DIST, 'index.html'), html);
 
