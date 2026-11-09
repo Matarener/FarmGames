@@ -13,6 +13,7 @@ import { ACH_GROUPS, ACH_MEDALS } from '../game/achData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 import * as Dev from '../game/devRules.js';
+import { Mover } from '../game/Mover.js';
 
 // версия сборки (tools/build.mjs); при локальном запуске — «локально»
 const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'локально';
@@ -594,10 +595,15 @@ export class UI {
         if (cnt) row.onclick = () => { S.on[g.key] = !S.on[g.key]; this.sfx('tap'); this.refreshPanel(); };
         body.appendChild(row);
       }
-      if (S.on.ponds && list.ponds.list.length && !f.st.well) {
-        body.appendChild(h('div', 'pn-text sa-warn', 'Колодец ещё не починен: без прудов воду для лейки набрать будет негде, пока не поставите пруд обратно.'));
+      // после уборки не останется ни пруда, ни колодца — воду для лейки набрать будет негде
+      const gone = (g) => S.on[g] && list[g].list.length > 0;
+      const pondsLeft = (gone('ponds') ? 0 : list.ponds.list.length) + list.ponds.kept;
+      const wellLeft = !!f.world.well && f.st.well > 0 && !gone('well');
+      if ((gone('ponds') || gone('well')) && !pondsLeft && !wellLeft) {
+        body.appendChild(h('div', 'pn-text sa-warn', 'Воду для лейки будет негде набрать, пока не поставите обратно пруд или колодец.'));
       }
-      body.appendChild(h('div', 'pn-text sa-stay', 'Останутся на месте: дом, колодец, грядки и дикие растения.'));
+      const stay = f.world.well && !f.st.well ? 'дом, сломанный колодец (сначала почините его), грядки с посадками и дикие растения' : 'дом, грядки с посадками и дикие растения';
+      body.appendChild(h('div', 'pn-text sa-stay', `Останутся на месте: ${stay}.`));
       const b = h('button', 'btn-main', n ? `Убрать в рюкзак (${n})` : 'Убирать нечего');
       b.disabled = !n;
       b.onclick = () => {
@@ -1317,9 +1323,9 @@ export class UI {
       acts.appendChild(b);
       // купленную дорожку — сразу класть: окно закрывается, включается «Кладём дорожку»;
       // пруд, украшение пруда, постройку (поливалку) — ставить: выбраны в «Переставить», нажатие на клетку — предпросмотр
-      if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && have) {
+      if (Mover.placeable(it) && have) {
         const p = h('button', 'btn-s', 'Поставить');
-        p.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
+        p.onclick = () => { this.closePanel(); f.mover.useItem(it.key); };
         acts.appendChild(p);
       }
       row.appendChild(acts);
@@ -1533,9 +1539,9 @@ export class UI {
     }
     // дорожки: «Поставить» закрывает рюкзак и включает «Кладём дорожку» (нажимай на траву);
     // пруды, украшения прудов и постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
-    if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && n > 0) {
+    if (Mover.placeable(it) && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
-      b.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
+      b.onclick = () => { this.closePanel(); f.mover.useItem(it.key); };
       acts.appendChild(b);
     }
     if (acts.children.length) box.appendChild(acts);

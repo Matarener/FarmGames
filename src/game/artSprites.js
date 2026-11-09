@@ -2,7 +2,7 @@
 // игра не открывается, пока не загружены все картинки, чтобы в игре не было подгрузок.
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
-import { FLORA, PATHS, PATH_KEYS, PONDS, POND_DECOR, pondDecorId, SPRINKLERS } from './data.js';
+import { FLORA, PATHS, PATH_KEYS, PONDS, POND_DECOR, pondDecorId, SPRINKLERS, BED_ITEM, WELL_ITEM } from './data.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
 const V = typeof __ASSET_V__ !== 'undefined' ? __ASSET_V__ : String(Date.now());
@@ -105,6 +105,8 @@ export async function loadArt(onProgress) {
     const id = pondDecorId(t);
     if (A[id] && !icons[id]) try { floraIcons[id] = iconOf(A[id]); } catch (e) { /* */ }
   }
+  // грядка и колодец в рюкзаке: иконка — сама пустая грядка и починенный колодец
+  for (const [id, s] of [[BED_ITEM, A.bed_dry], [WELL_ITEM, A.well_fixed]]) if (s && !icons[id]) try { floraIcons[id] = iconOf(s); } catch (e) { /* */ }
   // куски травяного края у дорожек (склеивает Farm.pathEdge): полосы вдоль сторон и углы
   const pathEdge = {};
   for (const name of Object.keys(A)) if (/^path_(edge|corner)_/.test(name)) pathEdge[name.slice(5)] = A[name];

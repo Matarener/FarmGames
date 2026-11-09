@@ -22,10 +22,11 @@ import * as Paths from './paths.js';
 import * as Placed from './placed.js';
 import * as Spr from './sprinklers.js';
 import * as Ponds from './ponds.js';
+import * as Well from './well.js';
 import * as Hints from './hints.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
-  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, PATHS, SPRINKLERS, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
+  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, PATHS, SPRINKLERS, WELL_ITEM, floraSeedId, floraOwnId, seedId, WELL_COST, houseNeedChunks,
   ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC,
 } from './data.js';
 
@@ -160,6 +161,7 @@ export class Farm {
   // пруда или своя постройка (placed.js). У постройки — объект-заготовка с o.item и o.preview: свои правила
   // картинки могут их учесть.
   placeSprite(itemId) {
+    if (itemId === WELL_ITEM) return this.S.well[1];
     if (Ponds.isPondItem(itemId)) return this.S.ponds[itemId];
     if (Ponds.isDecorItem(itemId)) return this.S.decor[ITEMS[itemId].decorOf];
     const type = Placed.objOf(itemId);
@@ -232,7 +234,8 @@ export class Farm {
       else if (w.freeFor(o, home[k][0], home[k][1])) w.put(o, home[k][0], home[k][1]);
       // иначе объект остался снятым: колодец найдёт место сам (fixWell)
     });
-    w.fixWell();
+    // колодец убран в рюкзак (well.js) — на карте его нет; иначе он на своей траве (старые сохранения: рядом с домом)
+    if (Well.inBag(this.st)) { if (w.well) w.remove(w.well); w.well = null; } else w.fixWell();
     this.restorePlants();
     Placed.restorePlaced(this.st, w); // свои постройки (поливалки): место занято — в рюкзак
     this.restoreWild();
@@ -823,13 +826,13 @@ export class Farm {
   storeAllFx(r) {
     const n = Math.max(2, Math.min(8, Math.floor(140 / Math.max(1, r.spots.length))));
     for (const s of r.spots) {
-      if (s.g === 'paths') { toWorld(s.x + 0.5, s.y + 0.5, tmp); this.burst(tmp.x, tmp.y, PATHS[s.id].dust, n); }
+      if (s.g === 'paths' || s.g === 'beds') { toWorld(s.x + 0.5, s.y + 0.5, tmp); this.burst(tmp.x, tmp.y, s.id ? PATHS[s.id].dust : '#8a5a30', n); }
       else if (s.g === 'ponds') {
         const water = PONDS[s.o.type].water, step = Math.max(1, Math.round(water.length / 4));
         for (let k = 0; k < water.length; k += step) { toWorld(s.o.gx + water[k][0] + 0.5, s.o.gy + water[k][1] + 0.5, tmp); this.burst(tmp.x, tmp.y, '#9fd8f5', Math.max(2, n >> 1)); }
-      } else this.burst(s.o.wx, s.o.wy - 4, s.g === 'placed' ? '#e8d9a8' : '#8a5a30', n);
+      } else this.burst(s.o.wx, s.o.wy - 4, s.g === 'placed' || s.g === 'well' ? '#e8d9a8' : '#8a5a30', n);
     }
-    if (r.done.paths) this.groundV++;
+    if (r.done.paths || r.done.beds) this.groundV++;
     toWorld(this.player.x, this.player.y, tmp);
     this.dropFx({ wx: tmp.x, wy: tmp.y }, [...r.items].sort((a, b) => b.n - a.n).slice(0, 6));
     this.sfx('dig');
