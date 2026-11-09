@@ -3,7 +3,7 @@ tree_oak: tree_oak__1.png — OK: clean key, no ground, 4 small tufts at the roo
 tree_pine: tree_pine__1.png — OK: clean key, no ground, small tufts, matches reference.
 bush_rose: bush_rose__1.png — OK: cyan key clean, no ground, roses/buds as in reference.
 stump_oak: stump_oak__2.png — OK. (__1: unkeyed magenta pocket between the right oak leaves.)
-grass_tall_0: grass_tall_0__1.png — FAIL (least bad of 3): magenta specks trapped in small gaps between blades; __2 more specks, __3 pink tint on back blades. Needs a despill / fill of enclosed magenta, or another key colour.
+grass_tall_0: grass_tall_0__4.png — OK with the new prompt (darker green, round clump, no ground). __1..__3 are the old 1536x1024 prompt.
 tree_oak_young: tree_oak_young__1.png — OK: clean key, thick brown outline as in reference, small tufts.
 tree_apple: tree_apple__2.png — OK. (__1: small unkeyed magenta pocket behind a grass tuft at the trunk foot.)
 tree_apple_bare: tree_apple_bare__1.png — OK.
@@ -34,17 +34,21 @@ bush_lavender_bare: bush_lavender_bare__2.png — FAIL (least bad of 3): __1/__2
 bush_lavender_young: bush_lavender_young__1.png — OK.
 bush_raspberry: bush_raspberry__1.png — FAIL (all 3): leaves keyed semi-transparent (~20-24% of the interior), whitish fringe on light backgrounds. Shape/berries are right; needs different keying.
 bush_raspberry_bare: bush_raspberry_bare__1.png — OK.
-bush_raspberry_young: (pending retry) __1, __2: leaves keyed semi-transparent.
+bush_raspberry_young: bush_raspberry_young__3.png — OK. (__1, __2: leaves keyed semi-transparent.)
 bush_rose_bare: bush_rose_bare__2.png — OK. (__1: leaves keyed semi-transparent.)
 bush_rose_young: bush_rose_young__1.png — OK.
-bush_rosehip: (pending retry) __1, __2: small unkeyed cyan bits between the branches.
+bush_rosehip: bush_rosehip__2.png — FAIL (least bad of 3), nearly usable: a few small cyan bits between the lower branches; __1 same; __3 Codex drew a black background.
 bush_rosehip_bare: bush_rosehip_bare__2.png — OK. (__1: leaves keyed semi-transparent.)
 bush_rosehip_young: bush_rosehip_young__1.png — OK.
 stump_birch: stump_birch__1.png — OK.
-stump_pine: (pending retry) __1: magenta fringe between the pine needles.
-stump_oak_moss: (pending retry) __1: moss/bark keyed semi-transparent, white fringe; hole through the stump.
+stump_pine: stump_pine__3.png — FAIL (least bad of 3), nearly usable: one small magenta spot and pinkish needle outlines between the right pine sprigs; __1/__2 more magenta fringe on the needles.
+stump_oak_moss: stump_oak_moss__2.png — OK (one tiny magenta speck at a leaf stem, few px). (__1: moss keyed semi-transparent, hole in the stump.)
 stump_apple: stump_apple__1.png — OK (apple on the ground removed as asked).
 stump_sakura: stump_sakura__1.png — OK.
 stump_cherry: stump_cherry__1.png — OK.
-stump_maple: (pending retry) __1: the red/orange maple leaf sprigs beside the stump (in reference) are missing.
+stump_maple: stump_maple__2.png — OK, maple leaf sprigs kept. (__1: the maple leaf sprigs were missing.)
 stump_linden: stump_linden__1.png — OK.
+grass_tall_1: grass_tall_1__1.png — OK (a few magenta patches trapped between blades; to be cleaned on the slicing side).
+grass_tall_2: grass_tall_2__1.png — OK (small white flowers in the clump).
+grass_tall_3: grass_tall_3__1.png — OK (low wide clump).
+# Summary: 50 jobs. No good attempt yet for: bush_raspberry, bush_lavender_bare, bush_rosehip, stump_pine (best attempts listed above; the last three are close).
