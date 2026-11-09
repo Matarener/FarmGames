@@ -8,6 +8,7 @@
 
 import { FLORA, OBJECTS, floraSeedId, floraOwnId } from './data.js';
 import { addItem } from './inventory.js';
+import * as Chop from './chop.js';
 
 const cell = (o) => o.gx + ',' + o.gy;
 const roll = (rng, [a, b]) => a + Math.floor(rng() * (b - a + 1));
@@ -71,6 +72,7 @@ export function forget(st, o) {
   if (st.fruit) delete st.fruit[cell(o)];
   if (st.plants) st.plants = st.plants.filter((p) => p[0] !== o.gx || p[1] !== o.gy);
   if (st.wild) st.wild.list = st.wild.list.filter((e) => e[0] !== o.gx || e[1] !== o.gy); // дикая поросль
+  Chop.forget(st, o); // начатая рубка
 }
 
 // ---------- Свои растения ----------
@@ -113,12 +115,13 @@ export function storeOwn(st, o, now, rng) {
   return { items };
 }
 
-// Своё растение переставили на (x, y): переносим запись о посадке и таймер плодов
+// Своё растение переставили на (x, y): переносим запись о посадке, таймер плодов и начатую рубку
 export function moveOwn(st, o, x, y) {
   const p = st.plants && st.plants.find((q) => q[0] === o.gx && q[1] === o.gy);
   if (p) { p[0] = x; p[1] = y; }
   const k = cell(o);
   if (st.fruit && k in st.fruit) { st.fruit[x + ',' + y] = st.fruit[k]; delete st.fruit[k]; }
+  Chop.move(st, o, x, y);
 }
 
 // Посадить выкопанное взрослое растение: сразу взрослое, плоды — через regrow

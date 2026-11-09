@@ -191,7 +191,7 @@ export class World {
       const x = gx + dx, y = gy + dy;
       if (!this.inside(x, y) || this.occ[y * N + x] >= 0 || this.tiles[y * N + x] !== T.GRASS) return null;
     }
-    const o = { id: this.objects.length, type, gx, gy, w, h, hp: def.hp || 0, state: 0, shake: 0 };
+    const o = { id: this.objects.length, type, gx, gy, w, h, state: 0, shake: 0 }; // прочность — chop.js
     if (rot) o.rot = rot;
     toWorld(gx + w / 2, gy + h / 2, tmp);
     o.wx = tmp.x; o.wy = tmp.y;
@@ -495,7 +495,7 @@ export class World {
       const o = this.objects[i];
       if (!o) continue;
       if (s === 2) this.remove(o);
-      else if (s === 1) { o.was = o.type; o.type = 'stump'; o.hp = OBJECTS.stump.hp; }
+      else if (s === 1) { o.was = o.type; o.type = 'stump'; }
     }
     this.version++;
   }

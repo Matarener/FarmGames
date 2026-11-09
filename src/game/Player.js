@@ -5,13 +5,13 @@ import { AnimationState } from '../skeleton/Animation.js';
 import { toWorld } from '../engine/Iso.js';
 import { findPath } from '../engine/Pathfinding.js';
 import { N } from './World.js';
+import { QUEUE_MAX } from './data.js';
 
 const TOOL_ANIM = {
   chop: ['swing', 'axe'], mine: ['swing', 'pickaxe'], dig: ['swing', 'hoe'],
   water: ['water', 'can'], fish: ['fish', 'rod'], fill: ['pick', 'can'], plant: ['pick', 'seedbag'], harvest: ['pick', null],
   pick: ['pick', null], sow: ['pick', 'seedbag'], mow: ['pick', null],
 };
-const MAX_QUEUE = 6;
 
 export class Player {
   constructor(world, data, x, y) {
@@ -36,18 +36,33 @@ export class Player {
   get ty() { return Math.floor(this.y); }
   get busy() { return this.state !== 'idle' || this.queue.length > 0; }
 
-  enqueue(action) {
-    if (this.queue.length >= MAX_QUEUE) return false;
+  // То же дело (тот же вид действия, тот же объект или клетка), что уже делается или ждёт в очереди, или null
+  find(action) {
     const key = actionKey(action);
-    if ((this.current && actionKey(this.current) === key) || this.queue.some((a) => actionKey(a) === key)) return false;
+    if (this.current && actionKey(this.current) === key) return this.current;
+    return this.queue.find((a) => actionKey(a) === key) || null;
+  }
+
+  // Поставить дело в конец очереди. → 'ok' | 'dup' (такое уже есть) | 'full' (очередь заполнена, QUEUE_MAX)
+  enqueue(action) {
+    if (this.find(action)) return 'dup';
+    if (this.queue.length >= QUEUE_MAX) return 'full';
     this.queue.push(action);
-    return true;
+    return 'ok';
+  }
+
+  // Сколько дел у призрачка: текущее и в очереди (просто идёт куда-то — не дело)
+  get tasks() {
+    let n = this.current && this.current.kind !== 'walk' ? 1 : 0;
+    for (const a of this.queue) if (a.kind !== 'walk') n++;
+    return n;
   }
 
   // Действие, которое нужно выполнить перед текущим (например, набрать воды).
   pushFront(action) { this.queue.unshift(action); }
 
-  clear() { this.queue.length = 0; this.current = null; this.path = []; this.state = 'idle'; this.sk.override.tool = null; this.anim.play('idle'); }
+  // Отменить все дела, и текущее тоже: призрачок сразу останавливается (кнопка «Отменить всё»)
+  clear() { this.queue.length = 0; this.current = null; this.path = []; this.state = 'idle'; this.sk.override.tool = null; this.anim.play('idle', { mix: 0.2 }); }
 
   celebrate() { if (this.state === 'idle') this.anim.play('happy', { restart: true, loop: false }); }
 

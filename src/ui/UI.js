@@ -94,6 +94,7 @@ export class UI {
       if (P.species) this.sowPanel(farm, null, null); else this.plantPanel(farm, null);
     };
     $('#btn-beds').onclick = () => farm.pickBeds();
+    $('#btn-cancel').onclick = () => farm.cancelAll();
     $('#pb-x').onclick = () => farm.stopPlanting();
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && farm.mover.active) farm.mover.exit(); });
   }
@@ -129,6 +130,14 @@ export class UI {
     const b = Math.min(nav ? nav.top : R.bottom, fab ? fab.top : R.bottom) - R.top - 4;
     this._safe = { l: 6, t, r: R.width - 6, b: Math.max(t + 40, b) };
     return this._safe;
+  }
+
+  // Кнопка «Отменить всё»: n — сколько дел у призрачка (0 — кнопки нет)
+  queueBtn(n) {
+    const b = $('#btn-cancel', this.root);
+    if (!b) return;
+    b.hidden = !n;
+    if (n) $('#cancel-badge', this.root).textContent = n;
   }
 
   ic(name, cls = 'ic') { return `<img class="${cls}" src="${this.icons[name] || ''}" alt="">`; }

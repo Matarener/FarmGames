@@ -16,7 +16,13 @@ const QBADGE_R = 6.5, QBADGE_RES = 12;
 // Стрелка подсказки: прыжок раз в HINT_HOP с длиной HINT_HOP_T с (между прыжками стоит — игра может
 // уйти в покой с редкими кадрами), высота прыжка; после того как призрак освободился — пауза HINT_WAIT с
 const HINT_HOP = 2.4, HINT_HOP_T = 0.6, HINT_HOP_H = 9, HINT_WAIT = 0.35;
-const QUEUE_SHOW = 7; // сколько номеров очереди готовить заранее (Player: 6 в очереди + текущее дело)
+// сколько номеров очереди готовить заранее; остальные (до QUEUE_MAX + 1) рисуются, когда понадобятся:
+// нажатие добавляет не больше одного дела, так что за кадр — не больше одной новой маленькой картинки
+const QUEUE_SHOW = 7;
+// Кольцо прочности над тем, что рубят (Farm.rings, chop.js): радиусы в мировых единицах (внутри помещается
+// номер очереди QBADGE_R — он закрывает середину кольца), картинка 256×256 (степень двойки: мип-карты есть и на WebGL 1),
+// сколько секунд кольцо видно после последнего удара и за сколько угасает, скорость заливки (долей в секунду)
+const RING_RO = 11.8, RING_RI = 6.3, RING_PX = 256, RING_HOLD = 2.2, RING_FADE = 0.35, RING_SPEED = 4.5;
 const ATLAS = 2048, PAD = 6;
 const Z = (depth, wy) => depth * 1e4 + wy * 0.1; // порядок отрисовки: глубина клетки, затем y
 
@@ -162,6 +168,7 @@ export class PixiScene {
     this.marks = new PIXI.Graphics(); this.over.addChild(this.marks);
     this.bubbles = new PIXI.Container(); this.over.addChild(this.bubbles);
     this.barsG = new PIXI.Graphics(); this.over.addChild(this.barsG); this.barsKey = { v: -1, x0: 0, y0: 0, x1: 0, y1: 0 };
+    this.ringC = new PIXI.Container(); this.over.addChild(this.ringC); this.rings = []; // кольца прочности (syncRings)
     this.queueC = new PIXI.Container(); this.over.addChild(this.queueC);
     this.signsC = new PIXI.Container(); this.over.addChild(this.signsC);
     this.hintArrow = new PIXI.Sprite(); this.hintArrow.visible = false; this.over.addChild(this.hintArrow); // стрелка над целью задания
@@ -502,9 +509,11 @@ export class PixiScene {
     this.atlas.sealed = this.groundAtlas.sealed = true; this.atlas.perf = this.groundAtlas.perf = f.perf;
     const R = this.app.renderer;
     for (const p of [...this.atlas.list, ...this.groundAtlas.list]) R.texture?.initSource?.(p.source);
-    // номера очереди дел (до 6 в очереди + текущее) — картинки рисуются и уходят в видеокарту сейчас,
+    // первые номера очереди дел — картинки рисуются и уходят в видеокарту сейчас,
     // а не когда игрок впервые поставит несколько дел подряд
     for (let n = 1; n <= QUEUE_SHOW; n++) for (const cur of [false, true]) R.texture?.initSource?.(this.queueTex(n, cur).source);
+    // кольца прочности: пара картинок заранее (рубят обычно одно-два дерева сразу)
+    for (let i = 0; i < 2; i++) { const r = this.ring(i); this.drawRing(r, 5, 2.5, 1); R.texture?.initSource?.(r.source); r.sp.visible = false; }
     // первые кадры (сборка сцены, загрузка в видеокарту, сборка шейдеров для всех видов
     // отрисовки: надписи, частицы, рамки) — ещё за экраном загрузки
     const cam = f.cam, z0 = cam.zoom, x0 = cam.x, y0 = cam.y;
@@ -748,6 +757,7 @@ export class PixiScene {
     if (f.tapFx) outline(f.tapFx.x, f.tapFx.y, 0xfffac8, Math.min(1, f.tapFx.t * 2.4), 2.5);
     if (f.editor) f.editor.overlay(g, outline);
 
+    this.syncRings();
     this.syncQueue();
     this.syncHint();
     this.syncMover(outline);
@@ -930,6 +940,75 @@ export class PixiScene {
     g.fillText(t, o, o + 0.5);
     const source = new PIXI.CanvasSource({ resource: c, autoGenerateMipmaps: true, scaleMode: 'linear', mipmapFilter: 'linear', alphaMode: 'premultiply-alpha-on-upload' });
     return (this._qTex[key] = new PIXI.Texture({ source }));
+  }
+
+  // ---------- кольцо прочности ----------
+  // Над деревом, кустом, пнём, камнем, по которому заказаны удары (Farm.rings): кольцо из долей по
+  // прочности, сделанные удары залиты (после удара заливка плавно идёт по кругу), заказанные — светлые,
+  // остальные — тусклые. В середине — номер очереди. Ударов не заказано — кольцо ещё RING_HOLD секунд
+  // видно и угасает. Своя картинка на кольцо, перерисовывается, только когда на ней что-то поменялось.
+  syncRings() {
+    const f = this.f, p = f.player, R = f.rings, t = f.time;
+    const dt = Math.min(0.1, Math.max(0, t - (this._rT ?? t))); this._rT = t;
+    // сколько ударов ещё заказано по каждому объекту: текущее дело и очередь
+    const ord = this._rOrd || (this._rOrd = new Map());
+    ord.clear();
+    if (p.current && p.current.n) ord.set(p.current.obj, p.current.n);
+    for (const a of p.queue) if (a.n) ord.set(a.obj, (ord.get(a.obj) || 0) + a.n);
+    let k = 0, moving = false;
+    for (const [o, e] of R) {
+      const live = !e.last && o.type === e.type && f.world.objects[o.id] === o;
+      const n = live ? ord.get(o) || 0 : 0, age = t - e.t;
+      if (!n && age > RING_HOLD + RING_FADE) { R.delete(o); continue; }
+      if (e.shown !== e.done) { e.shown = e.shown < e.done ? Math.min(e.done, e.shown + dt * RING_SPEED) : e.done; moving = true; }
+      if (!n) moving = true; // угасание — нужны кадры
+      // там же, где номер очереди (syncQueue); срубленное — где было
+      if (live || e.x == null) { const s = f.objSprite(o); e.x = o.wx; e.y = o.wy - Math.min(s.ay * 0.7, 60) - 6; }
+      const r = this.ring(k++);
+      // светлые доли: заказанные удары и сделанные, до которых заливка ещё не дошла
+      const key = e.total + '|' + Math.round(e.shown * 48) + '|' + (e.done + n);
+      if (r.key !== key) { this.drawRing(r, e.total, e.shown, e.done + n - Math.floor(e.shown)); r.key = key; }
+      r.sp.visible = true;
+      r.sp.position.set(e.x, e.y);
+      r.sp.alpha = n || age < RING_HOLD ? 1 : Math.max(0, 1 - (age - RING_HOLD) / RING_FADE);
+    }
+    for (let i = k; i < this.rings.length; i++) this.rings[i].sp.visible = false;
+    this.ringsMoving = moving;
+  }
+
+  // i-я картинка кольца (свой холст, своя текстура, свой спрайт)
+  ring(i) {
+    let r = this.rings[i];
+    if (r) return r;
+    const c = document.createElement('canvas'); c.width = c.height = RING_PX;
+    const source = new PIXI.CanvasSource({ resource: c, autoGenerateMipmaps: true, scaleMode: 'linear', mipmapFilter: 'linear', alphaMode: 'premultiply-alpha-on-upload' });
+    const sp = new PIXI.Sprite(new PIXI.Texture({ source }));
+    const k = RING_PX / ((RING_RO + 1.6) * 2); // пикселей на мировую единицу
+    sp.anchor.set(0.5); sp.scale.set(1 / k);
+    this.ringC.addChild(sp);
+    r = this.rings[i] = { c, g: c.getContext('2d'), source, sp, k, key: '' };
+    return r;
+  }
+
+  // Нарисовать кольцо: total долей, shown — сколько залито (дробное — заливка в пути), light — сколько долей
+  // после залитых светлые (удары заказаны). Начало сверху, по часовой стрелке.
+  drawRing(r, total, shown, light) {
+    const g = r.g, k = r.k, m = RING_PX / 2 / k, rm = (RING_RO + RING_RI) / 2, lw = RING_RO - RING_RI;
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, RING_PX, RING_PX);
+    g.setTransform(k, 0, 0, k, 0, 0);
+    g.lineCap = 'butt';
+    const arc = (y, a0, a1) => { g.beginPath(); g.arc(m, y, rm, a0, a1); g.stroke(); };
+    g.lineWidth = lw; g.strokeStyle = 'rgba(0,0,0,.22)'; arc(m + 0.9, 0, Math.PI * 2); // тень
+    g.strokeStyle = '#3d2b1f'; arc(m, 0, Math.PI * 2); // тёмная подложка — как ободок номера очереди
+    const step = Math.PI * 2 / total, gap = total > 1 ? 1.15 / rm : 0, top = -Math.PI / 2, full = Math.floor(shown);
+    g.lineWidth = lw - 1.5;
+    for (let s = 0; s < total; s++) {
+      const a0 = top + s * step + gap / 2, a1 = top + (s + 1) * step - gap / 2;
+      const fr = Math.max(0, Math.min(1, shown - s));
+      if (fr < 1) { g.strokeStyle = s < full + light ? '#fff1cf' : 'rgba(255,241,207,.3)'; arc(m, fr ? a0 + (a1 - a0) * fr : a0, a1); }
+      if (fr > 0) { g.strokeStyle = '#ffa62b'; arc(m, a0, a0 + (a1 - a0) * fr); } // тёплый цвет: виден и на зелёной кроне
+    }
+    r.source.update();
   }
 
   syncQueue() {
