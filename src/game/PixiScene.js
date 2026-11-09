@@ -23,6 +23,10 @@ const QUEUE_SHOW = 7;
 // номер очереди QBADGE_R — он закрывает середину кольца), картинка 256×256 (степень двойки: мип-карты есть и на WebGL 1),
 // сколько секунд кольцо видно после последнего удара и за сколько угасает, скорость заливки (долей в секунду)
 const RING_RO = 11.8, RING_RI = 6.3, RING_PX = 256, RING_HOLD = 0.45, RING_FADE = 0.25, RING_SPEED = 4.5;
+// Прозрачность того, что закрывает фермера или цель: непрозрачность 1 − FADE_A·fade (fade 1 → 0,38).
+// В «Переставить» все высокие объекты (картинка от MOVER_TALL единиц: деревья, кусты, постройки)
+// гаснут на MOVER_FADE (непрозрачность ≈ 0,57) — видно землю и грядки за ними
+const FADE_A = 0.62, MOVER_TALL = 56, MOVER_FADE = 0.7;
 const ATLAS = 2048, PAD = 6;
 const Z = (depth, wy) => depth * 1e4 + wy * 0.1; // порядок отрисовки: глубина клетки, затем y
 
@@ -629,15 +633,32 @@ export class PixiScene {
     toWorld(p.x, p.y, tmp);
     const pdepth = p.x + p.y, pwy = tmp.y;
     const F = f.focus; F.length = 0;
-    const fo = this._fo || (this._fo = [{}, {}, {}]); // переиспользуем, чтобы не плодить мусор
-    const foc = (i, x0, y0, x1, y1, depth, gx, gy) => { const q = fo[i]; q.x0 = x0; q.y0 = y0; q.x1 = x1; q.y1 = y1; q.depth = depth; q.gx = gx; q.gy = gy; q.hit = false; F.push(q); };
-    foc(0, tmp.x - 11, tmp.y - 50, tmp.x + 11, tmp.y, pdepth, -1, -1);
-    for (let ti = 0; ti < 2; ti++) {
-      const t = ti ? f.tapFx : f.hover;
-      if (!t || !w.inside(t.x, t.y)) continue;
-      toWorld(t.x + 0.5, t.y + 0.5, tmp);
-      foc(F.length, tmp.x - HW + 6, tmp.y - HH + 3, tmp.x + HW - 6, tmp.y + HH - 3, t.x + t.y + 1, t.x, t.y);
-    }
+    const fo = this._fo || (this._fo = []); // переиспользуем, чтобы не плодить мусор
+    const foc = (x0, y0, x1, y1, depth, gx, gy) => {
+      const q = fo[F.length] || (fo[F.length] = {});
+      q.x0 = x0; q.y0 = y0; q.x1 = x1; q.y1 = y1; q.depth = depth; q.gx = gx; q.gy = gy; q.hit = false; F.push(q);
+    };
+    // место w×h клеток с углом (gx, gy): рамка — ромб места, чуть меньше; gx, gy — сам объект там не гаснет
+    const focArea = (gx, gy, cw, ch, sgx, sgy) => {
+      toWorld(gx + cw / 2, gy + ch / 2, tmp);
+      const k = (cw + ch) / 2;
+      foc(tmp.x - HW * k + 6, tmp.y - HH * k + 3, tmp.x + HW * k - 6, tmp.y + HH * k - 3, gx + cw / 2 + gy + ch / 2, sgx, sgy);
+    };
+    // цель: дело в очереди или последнее нажатие ({ obj } или { x, y })
+    const focAim = (a) => {
+      const o = a.obj;
+      if (o) { if (w.objects[o.id] === o) focArea(o.gx, o.gy, o.w, o.h, o.gx, o.gy); } else if (w.inside(a.x, a.y)) focArea(a.x, a.y, 1, 1, a.x, a.y);
+    };
+    foc(tmp.x - 11, tmp.y - 50, tmp.x + 11, tmp.y, pdepth, -1, -1); // F[0] — фермер (его силуэт поверх, ghost2)
+    if (f.hover) focAim(f.hover); // клетка под мышкой (ПК)
+    // На телефоне наведения нет: прозрачным остаётся то, что закрывает место последнего нажатия
+    // (пока открыто его меню, Farm.look) и цели очереди дел — пока призрачок туда идёт и работает
+    if (f.look) focAim(f.look);
+    if (p.current) focAim(p.current);
+    for (let i = 0; i < p.queue.length; i++) focAim(p.queue[i]);
+    // «Переставить»: все высокие объекты полупрозрачны, а то, что закрывает место, куда ставим, — как обычно
+    const mv = f.mover.active ? f.mover : null, mvSel = mv && mv.sel && mv.sel.kind === 'obj' ? mv.sel.o : null;
+    if (mv && mv.sel && mv.to) focArea(mv.to.gx, mv.to.gy, mv.sel.w || 1, mv.sel.h || 1, -1, -1);
 
     // объекты
     const P = this.f.perf;
@@ -661,15 +682,17 @@ export class PixiScene {
         this.put(e, s, o.wx, o.wy);
         return;
       }
-      if (!w.isOpen(o.gx, o.gy)) s = dimSprite(s);
+      const open = w.isOpen(o.gx, o.gy);
+      if (!open) s = dimSprite(s);
       const sh = o.shake > 0 ? Math.sin(f.time * 70) * 2.2 * (o.shake / 0.25) : 0;
       // прыжок животного (animals.js HOP = 0,35 с): вверх на 5 единиц и обратно
       const hop = o.hop > 0 ? -Math.sin((1 - o.hop / 0.35) * Math.PI) * 5 : 0;
-      const fade = f.occludes(o, s, F);
+      let fade = o === mvSel ? 0 : f.occludes(o, s, F); // то, что переставляем, не гаснет: оно подсвечено
+      if (mv && !fade && open && o !== mvSel && s.h >= MOVER_TALL) fade = MOVER_FADE;
       o.fade = (o.fade || 0) + (fade - (o.fade || 0)) * 0.3;
       if (o.fade < 0.02) o.fade = 0;
       if (fade && F[0].hit) playerHidden = true;
-      const al = o.fade ? 1 - 0.62 * o.fade : 1;
+      const al = o.fade ? 1 - FADE_A * o.fade : 1;
       if (e.alpha !== al) e.alpha = al;
       this.put(e, s, o.wx + sh, o.wy + hop);
       const z = Z(o.depth, o.wy);

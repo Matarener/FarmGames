@@ -35,6 +35,8 @@ import {
 } from './data.js';
 
 const tmp = { x: 0, y: 0 }, tmp2 = { x: 0, y: 0 };
+// сколько секунд после нажатия держится прозрачность того, что закрывает выбранное место (Farm.look)
+const LOOK_HOLD = 1.2;
 
 export const BG = '#3d7a35';
 
@@ -48,6 +50,7 @@ export class Farm {
     this.hover = null;
     this.focus = [];
     this.tapFx = null;
+    this.look = null; // последнее нажатие по карте: { x, y } или { obj }, t — сколько ещё держать (onTap)
     this.time = 0;
     this.quests = new Quests(this);
     this.gifts = new Gifts(this);
@@ -649,8 +652,13 @@ export class Farm {
       o = this.pick(tmp.x, tmp.y);
       // крона соседнего дерева над открытой клеткой: если дерево за забором — важнее сама клетка
       // (иначе вместо тропинки открывалось «Новый участок»). Пруд — объект, его нашёл objectAt.
-      if (o && w.inside(gx, gy) && w.isOpen(gx, gy) && !w.isOpen(o.gx, o.gy)) o = null;
+      // Грядка за деревом или домом: нажатие достаётся ей, а не кроне/крыше перед ней — та станет
+      // прозрачной (look ниже). Меню самого дерева — нажатием по его клетке (стволу).
+      if (o && w.inside(gx, gy) && w.isOpen(gx, gy) && (!w.isOpen(o.gx, o.gy) || w.tile(gx, gy) === T.SOIL)) o = null;
     }
+    // Куда смотрит игрок: то, что это закрывает, остаётся прозрачным, пока открыто меню, и ещё
+    // немного после (на телефоне нет наведения мыши). У объекта — он сам, чтобы не гасла его же крона.
+    this.look = o ? { obj: o, t: LOOK_HOLD } : { x: gx, y: gy, t: LOOK_HOLD };
     if (o) this.tapObject(o, sx, sy, gx, gy);
     else this.tapTile(gx, gy, sx, sy);
   }
@@ -1488,6 +1496,9 @@ export class Farm {
     const F = this.floaters;
     for (let i = F.length - 1; i >= 0; i--) { F[i].t += dt; if (F[i].t > 1.3) F.splice(i, 1); }
     if (this.tapFx) { this.tapFx.t -= dt; if (this.tapFx.t <= 0) this.tapFx = null; }
+    // пока открыто меню у точки или окно (выбор семян для грядки) — время не идёт;
+    // закрыли — прозрачность ещё чуть держится и гаснет
+    if (this.look && !this.ui.popupShown && !this.ui.panelOpen && (this.look.t -= dt) <= 0) this.look = null;
   }
 
   isIdle() {

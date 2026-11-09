@@ -457,6 +457,7 @@ export class UI {
   }
 
   closePopup() { this.popupEl.classList.remove('show'); this._popupTick = null; this.toggleMore(false); }
+  get popupShown() { return this.popupEl.classList.contains('show'); }
 
   // ---------- Окна ----------
   // music: false — музыка фермы не сменяется на музыку меню (короткие окна выбора у грядки)
