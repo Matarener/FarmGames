@@ -10,6 +10,8 @@
 // выбирает его (перенести на другую клетку воды или убрать в рюкзак), на воду без украшения — сам пруд.
 // «Кладём дорожку» (pave, кнопка «Поставить» у дорожки в рюкзаке и на рынке): каждое нажатие на траву
 // кладёт клетку выбранной дорожки, нажатие на дорожку другого вида меняет её (старая — в рюкзак).
+// «Убрать всё» (пока ничего не выбрано): окно с группами своих вещей (UI.storeAllPanel), после него всё
+// отмеченное разом уходит в рюкзак (storeAll.js), режим перестановки остаётся.
 //
 // Как работает: нажали на объект — он выбран; нажали на клетку — там появляется
 // предпросмотр (зелёный — можно, красный — нельзя и почему); «Поставить» или
@@ -21,6 +23,7 @@ import * as Inv from './inventory.js';
 import * as Paths from './paths.js';
 import * as Placed from './placed.js';
 import * as Ponds from './ponds.js';
+import * as StoreAll from './storeAll.js';
 import { N, T, objCells } from './World.js';
 import { toWorld } from '../engine/Iso.js';
 
@@ -71,7 +74,7 @@ export class Mover {
       else if (t.ok) text = `${s.name}: сюда можно. Нажмите «Поставить»`;
       else { text = t.why; bad = true; }
     }
-    this.f.ui.moveBar({ text, bad: !!bad, canPlace: !!(t && t.ok), selected: !!s, canStore: !!(s && s.store) });
+    this.f.ui.moveBar({ text, bad: !!bad, canPlace: !!(t && t.ok), selected: !!s, canStore: !!(s && s.store), canStoreAll: !s });
   }
 
   // причина показывается в панели внизу (красным, панель вздрагивает)
@@ -369,6 +372,29 @@ export class Mover {
     this.hint(`${s.name}: в рюкзаке. Поставить обратно — нажмите на пустую траву`);
     f.changed();
     return true;
+  }
+
+  // ---------- «Убрать всё» ----------
+  // Призрачок сейчас работает здесь (или рыбачит, набирает воду в этом пруду) — это остаётся на месте
+  storeAllCtx() {
+    return { now: Date.now(), rng: Math.random, busy: (q) => this.busy(q) || (!!q.obj && Ponds.isPond(q.obj) && this.busyPond(q.obj)) };
+  }
+
+  // Что уберётся «Убрать всё»: { группа: { list, kept } } (окно подтверждения)
+  storeAllList() { return StoreAll.collect(this.f.st, this.f.world, this.storeAllCtx()); }
+
+  // Убрать в рюкзак всё своё из групп groups (ключи STORE_ALL). Режим перестановки остаётся: пустую траву
+  // можно сразу заполнять заново. → итог storeAll
+  storeAll(groups) {
+    const f = this.f;
+    if (!this.active) this.enter();
+    this.sel = null; this.to = null; this.brush = null;
+    const r = StoreAll.storeAll(f.st, f.world, groups, this.storeAllCtx());
+    if (!r.total) { this.fail('Убирать нечего'); return r; }
+    f.storeAllFx(r);
+    this.hint(`В рюкзаке: ${StoreAll.summary(r.done)}. Пустая трава — поставить обратно`);
+    f.changed();
+    return r;
   }
 
   // Что из рюкзака можно поставить в этом режиме: дорожки (и потом другой декор) и свои выкопанные растения
