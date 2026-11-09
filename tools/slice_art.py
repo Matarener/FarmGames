@@ -58,6 +58,9 @@ SINGLE = {
     'bush_hydrangea_young': 40, 'bush_lavender_young': 40, 'bush_rose_young': 40,
     # дом по уровням
     'house_1': -132, 'house_2': -132, 'house_3': -132, 'house_4': -132, 'house_5': -132,
+    # здания с крафтом (2×2, как дом) и стройка — леса, одни на все здания (src/game/buildData.js)
+    'building_kitchen': -132, 'building_carpentry': -132, 'building_forge': -132, 'building_stonecutter': -132,
+    'construction_site': -132,
 }
 SHEETS.update({name: [(name, w)] for name, w in SINGLE.items()})
 # молодое растение по высоте взрослого: по умолчанию — <имя без _young>
@@ -120,7 +123,12 @@ ICON_SHEETS = {
     'ui_hints': ['hint_arrow', 'hint_ring', 'hint_badge'],
     # подарки: кнопка в интерфейсе, вкладки окна «Подарки», сундук 7-го дня
     'ui_gifts': ['gift', 'calendar', 'friends', 'invite', 'event', 'chest'],
-    'ui_wheel': ['wheel'],  # колесо фортуны: кнопка в интерфейсе и пункт «Ещё» (само колесо в окне рисуется кодом)
+    'ui_wheel': ['wheel'],
+    # здания с крафтом: блюда кухни, значок чертежа, товары мастерских (src/game/buildData.js CRAFT_GOODS)
+    'ui_dishes1': ['carrot_salad', 'linden_tea', 'fish_soup', 'raspberry_jam'],
+    'ui_dishes2': ['borscht', 'pumpkin_porridge', 'strawberry_cake', 'blueprint'],
+    'ui_craft1': ['planks', 'birch_box', 'acorn_toy', 'pine_wreath', 'crate'],
+    'ui_craft2': ['iron_ingot', 'nails', 'horseshoe', 'stone_block', 'millstone'],  # колесо фортуны: кнопка в интерфейсе и пункт «Ещё» (само колесо в окне рисуется кодом)
 }
 ICON_PX = 128
 # Иконки не в квадрате 128, а по контуру картинки (без полей), длинная сторона — столько пикселей:

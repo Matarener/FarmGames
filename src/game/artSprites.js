@@ -92,14 +92,13 @@ export async function loadArt(onProgress) {
   }
   // здания с крафтом (buildData.js): картинка готового здания и общая стройка (леса). Иконка здания
   // и его чертежа в рюкзаке — само здание (если нет отдельной ic_bld_<здание>).
-  // ВРЕМЕННО, пока нет арта: вместо здания — дом, вместо лесов — старый дом (убрать, когда арт будет)
   const buildings = {};
   for (const b of Object.values(BUILDINGS)) {
-    const sp = A[b.sprite] || A.house_2;
+    const sp = A[b.sprite];
     buildings[b.key] = sp;
     if (sp && !icons[bldId(b.key)]) try { floraIcons[bldId(b.key)] = iconOf(sp); } catch (e) { /* */ }
   }
-  const site = A[SITE_SPRITE] || A.house_1;
+  const site = A[SITE_SPRITE];
   // куски травяного края у дорожек (склеивает Farm.pathEdge): полосы вдоль сторон и углы
   const pathEdge = {};
   for (const name of Object.keys(A)) if (/^path_(edge|corner)_/.test(name)) pathEdge[name.slice(5)] = A[name];
