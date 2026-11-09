@@ -238,21 +238,47 @@ button:disabled { cursor: default; }
 .btn-s.gold { background: linear-gradient(#ffe48a, #f2b51d); }
 .btn-s:disabled { opacity: .45; }
 
-/* ---------- Рюкзак: клетки ---------- */
-.inv-en { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; }
-.inv-en span { font-size: 12px; font-weight: 500; color: #6b5442; }
-/* разделы переносятся на вторую строку, а не прокручиваются: на компьютере мышью вбок не прокрутить */
-.inv-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-bottom: 6px; }
-.inv-tabs.c2 { grid-template-columns: repeat(2, 1fr); }
-@media (min-width: 700px) { .inv-tabs.c2 { grid-template-columns: repeat(4, 1fr); } .inv-tabs.c6 { grid-template-columns: repeat(6, 1fr); } }
-/* разделы рюкзака (7 шт.): по ширине надписей, строки заполняются целиком */
-.inv-tabs.wrap { display: flex; flex-wrap: wrap; }
-.inv-tabs.wrap .inv-tab { flex: 1 1 auto; }
-.inv-tab {
-  min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 36px; padding: 0 6px; white-space: nowrap; border-radius: 18px;
-  background: var(--paper-2); border: 2px solid transparent; font-size: 13px; color: #5a4434;
+/* ---------- Рюкзак, рынок, выдача тестера: разделы слева, предметы справа (UI.shelf) ---------- */
+/* окно постоянной высоты: при смене раздела не прыгает; прокручиваются сами разделы и список */
+.panel[data-kind="bag"] .pn-card, .panel[data-kind="market"] .pn-card, .panel[data-kind="devitems"] .pn-card { height: 86%; max-height: none; }
+.pn-body.sh-body { flex: 1; min-height: 0; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.sh {
+  flex: 1; min-height: 0; display: grid;
+  grid-template-columns: 84px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
 }
-.inv-tab.on { background: #fff; border-color: var(--ink); color: var(--ink); }
+.sh-rail {
+  grid-row: 1; display: flex; flex-direction: column; gap: 4px; padding: 8px 0 10px 6px; overflow-y: auto; touch-action: pan-y;
+  background: var(--paper-2); border-right: 2px solid rgba(61,43,31,.16); scrollbar-width: none;
+}
+.sh-rail::-webkit-scrollbar { display: none; }
+/* выбранный раздел — «вкладка папки»: закрывает границу и сливается со списком справа */
+.sh-tab {
+  position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; margin-right: -2px; padding: 7px 2px 6px;
+  border: 2px solid transparent; border-right: 0; border-radius: 14px 0 0 14px;
+  font-size: 10.5px; line-height: 1.15; letter-spacing: -.15px; color: #6b5442;
+}
+.sh-tab .ic { width: 30px; height: 30px; object-fit: contain; vertical-align: 0; }
+.sh-tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-tab.on { background: var(--paper); border-color: rgba(61,43,31,.16); color: var(--ink); font-weight: 800; }
+.sh-tab.on::before { content: ""; position: absolute; left: -2px; top: 10px; bottom: 10px; width: 4px; border-radius: 0 3px 3px 0; background: var(--gold); }
+.sh-tab:not(.on):active { background: rgba(255,255,255,.45); }
+.sh-tab.empty:not(.on) .ic { opacity: .45; filter: grayscale(.7); }
+.sh-tab.empty:not(.on) span { opacity: .6; }
+.sh-main { grid-row: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.sh-sort { flex: none; display: flex; gap: 2px; margin: 8px 10px 6px; padding: 3px; border-radius: 12px; background: var(--paper-2); }
+.sh-sort button { flex: 1 1 0; min-width: 0; height: 30px; border-radius: 9px; font-size: 12px; color: #6b5442; white-space: nowrap; }
+.sh-sort button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 0 rgba(61,43,31,.25); }
+.sh-bulk { flex: none; margin: 8px 10px 6px; }
+.sh-list { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; padding: 2px 10px 14px; }
+.sh .inv-grid, .sh .mk-grid { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 7px 6px; }
+.sh .pn-empty { padding: 10px 2px; }
+/* карточка выбранного предмета — снизу во всю ширину окна */
+.sh-info { grid-column: 1 / -1; grid-row: 2; }
+.sh-none { display: none; }
+/* в шапке окна: энергия рюкзака и «Купить / Продать» рынка */
+.pn-head > b { margin-right: auto; }
+.pn-en { display: flex; align-items: center; gap: 4px; margin-right: 8px; padding: 0 10px 0 6px; height: 32px; border-radius: 16px; background: rgba(0,0,0,.2); font-size: 14px; }
+.pn-en small { font-size: 11.5px; font-weight: 600; opacity: .9; font-variant-numeric: tabular-nums; }
 .inv-sort { display: flex; align-items: center; gap: 6px; margin: 4px 0 10px; font-size: 12px; color: #8a6a50; }
 .inv-chip { height: 28px; padding: 0 10px; border-radius: 14px; background: transparent; border: 1.5px solid rgba(61,43,31,.3); font-size: 12px; color: #5a4434; }
 .inv-chip.on { background: #ffe48a; border-color: rgba(61,43,31,.6); }
@@ -315,10 +341,9 @@ button:disabled { cursor: default; }
 .cr-need { width: 100%; padding: 0; }
 
 /* ---------- Рынок ---------- */
-.panel[data-kind="market"] .pn-card { max-height: 94%; }
-.mk-seg { display: flex; background: var(--paper-2); border-radius: 14px; padding: 3px; margin-bottom: 10px; }
-.mk-seg button { flex: 1; height: 40px; border-radius: 11px; font-size: 15px; color: #6b5442; }
-.mk-seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 0 rgba(61,43,31,.25); }
+.mk-seg { display: flex; gap: 2px; margin-right: 8px; padding: 3px; border-radius: 13px; background: rgba(0,0,0,.22); }
+.mk-seg button { min-width: 82px; height: 32px; padding: 0 10px; border-radius: 10px; font-size: 14px; color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.mk-seg button.on { background: var(--paper); color: var(--ink); text-shadow: none; box-shadow: 0 1px 0 rgba(0,0,0,.25); }
 .mk-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 4px; }
 .mk-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0; background: none; }
 .mk-cell i {
@@ -695,7 +720,7 @@ body.digging .fab-dig { background: linear-gradient(#ffe48a, #f2b51d); }
 .ng-row { display: flex; gap: 8px; }
 .ng-row .btn-s { flex: 1; justify-content: center; min-height: 42px; font-size: 13.5px; }
 .ng-yes { background: linear-gradient(#f08a6a, #c9452b); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
-@media (max-width: 380px) { .inv-tab { font-size: 12px; gap: 3px; padding: 0 4px; } .inv-tab .ic { width: 15px; height: 15px; } }
+@media (max-width: 340px) { .mk-seg button { min-width: 0; padding: 0 8px; font-size: 13px; } .pn-en small { display: none; } }
 @media (max-width: 350px) { .qt-tab { font-size: 9.5px; } .qt-tab .ic { width: 18px; height: 18px; } }
 
 /* Режим тестера (Настройки → нажатия по версии) */
@@ -705,3 +730,36 @@ body.digging .fab-dig { background: linear-gradient(#ffe48a, #f2b51d); }
 .dev-num { min-width: 0; width: 100%; height: 38px; padding: 0 8px; border-radius: 10px; border: 2px solid rgba(61,43,31,.5); background: #fff; font: inherit; font-size: 14px; color: var(--ink); }
 .dev-acts .dev-num { flex: 0 0 96px; }
 .inv-cell.dev-none { opacity: .55; }
+
+/* ---------- Рюкзак и рынок на других экранах (UI.shelf) ---------- */
+/* планшет: окно шире, клетки крупнее */
+@media (min-width: 700px) and (min-height: 500px) {
+  .panel[data-kind="bag"] .pn-card, .panel[data-kind="market"] .pn-card, .panel[data-kind="devitems"] .pn-card { width: min(620px, 92vw); height: min(82%, 760px); }
+  .sh { grid-template-columns: 92px minmax(0, 1fr); }
+  .sh-tab { font-size: 12px; }
+  .sh-tab .ic { width: 34px; height: 34px; }
+  .sh .inv-grid, .sh .mk-grid { grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); }
+}
+/* горизонтальный телефон и широкий экран: карточка предмета — колонкой справа, а не под клетками */
+@media (max-height: 500px) and (orientation: landscape), (min-width: 900px) and (min-height: 500px) {
+  .sh { grid-template-columns: 84px minmax(0, 1fr) 240px; grid-template-rows: minmax(0, 1fr); }
+  .sh-info { grid-column: 3; grid-row: 1; align-content: flex-start; overflow-y: auto; touch-action: pan-y; padding: 10px 12px 12px; border-top: 0; border-left: 2px solid rgba(61,43,31,.16); }
+  .sh-none {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px;
+    text-align: center; font-size: 12.5px; font-weight: 600; color: #8a6a50; background: var(--paper-2);
+  }
+  .sh-none .ic { opacity: .35; filter: grayscale(.6); }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .panel[data-kind="bag"] .pn-card, .panel[data-kind="market"] .pn-card, .panel[data-kind="devitems"] .pn-card { width: min(820px, 100%); height: 100%; }
+  .sh-rail { gap: 2px; padding-top: 6px; }
+  .sh-tab { padding: 4px 2px; font-size: 10px; }
+  .sh-tab .ic { width: 24px; height: 24px; }
+  .sh-sort { margin: 6px 10px 4px; }
+  .sh-sort button { height: 26px; }
+  .mk-seg button, .pn-en { height: 28px; }
+}
+@media (min-width: 900px) and (min-height: 500px) {
+  .panel[data-kind="bag"] .pn-card, .panel[data-kind="market"] .pn-card, .panel[data-kind="devitems"] .pn-card { width: min(860px, 92vw); }
+  .sh { grid-template-columns: 92px minmax(0, 1fr) 280px; }
+}
