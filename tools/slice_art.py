@@ -71,9 +71,9 @@ NOBASE = {
     # абрикос (крона низкая и широкая). Черёмуха без плодов — в цвету.
     'tree_pear': ('h', 90), 'tree_pear_bare': ('h', 90), 'tree_bird_cherry': ('h', 88), 'tree_bird_cherry_bare': ('h', 88),
     'tree_persimmon': ('h', 84), 'tree_persimmon_bare': ('h', 84), 'tree_plum': ('h', 80), 'tree_plum_bare': ('h', 80),
-    'tree_apricot': ('h', 76), 'tree_apricot_bare': ('h', 76),
+    'tree_apricot': ('h', 70), 'tree_apricot_bare': ('h', 70),
     'tree_pear_young': ('h', 54), 'tree_bird_cherry_young': ('h', 53), 'tree_persimmon_young': ('h', 50),
-    'tree_plum_young': ('h', 48), 'tree_apricot_young': ('h', 46),
+    'tree_plum_young': ('h', 48), 'tree_apricot_young': ('h', 42),
     # кусты: с плодами, без, молодые
     'bush_blueberry': ('w', 58.8), 'bush_raspberry': ('w', 56.5), 'bush_rosehip': ('w', 57.8),
     'bush_hydrangea': ('w', 58.5), 'bush_lavender': ('w', 53.2), 'bush_rose': ('w', 58.5),
@@ -85,8 +85,10 @@ NOBASE = {
     # пни: ширина всей картинки (корни, листья); дубовые шире — у большого дуба ствол толще остальных
     'stump_oak': ('w', 38), 'stump_birch': ('w', 27), 'stump_pine': ('w', 31), 'stump_oak_moss': ('w', 38),
     'stump_apple': ('w', 31), 'stump_sakura': ('w', 31), 'stump_cherry': ('w', 31), 'stump_maple': ('w', 31),
-    'stump_linden': ('w', 31), 'stump_bird_cherry': ('w', 31), 'stump_plum': ('w', 31), 'stump_pear': ('w', 31),
-    'stump_apricot': ('w', 31), 'stump_persimmon': ('w', 31),
+    'stump_linden': ('w', 31),
+    # пни новых плодовых: их пни выше и без широких веток с цветами по бокам — чуть уже, чтобы ствол был как у яблони
+    'stump_bird_cherry': ('w', 25), 'stump_plum': ('w', 28), 'stump_pear': ('w', 26), 'stump_apricot': ('w', 28),
+    'stump_persimmon': ('w', 28),
     # дикая высокая трава (до 2026-11-09 — лист grass_tall из трёх)
     'grass_tall_0': ('w', 42), 'grass_tall_1': ('w', 46), 'grass_tall_2': ('w', 46), 'grass_tall_3': ('w', 38),
 }
