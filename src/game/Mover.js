@@ -482,7 +482,7 @@ export class Mover {
       f.sfx('dig');
       const n = Inv.count(f.st, id);
       if (this.brush && !n) this.brush = null;
-      this.hint(this.brush ? null : n ? `${it.name}: поставлено` : `${it.name}: больше нет в рюкзаке`);
+      this.hint(this.brush ? null : n ? `${it.name}: поставлено` : 'Грядок в рюкзаке больше нет. Ещё — на рынке, раздел «Постройки»');
       f.changed();
       return true;
     } else {

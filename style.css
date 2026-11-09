@@ -642,19 +642,23 @@ body.planting .hud-bottom, body.digging .pb-more { display: none; }
 .fab img { width: 30px; height: 30px; }
 .fab:active { transform: translateY(2px); }
 .more-menu:not([hidden]) ~ .fab, body.moving .fab { display: none; }
-/* лопата над кнопкой «К фермеру»: режим «Копаем грядки»; в режиме — жёлтая, нажатие выключает */
-.fab-dig { bottom: calc(var(--safe-b) + 140px); }
-body.digging .fab-dig { background: linear-gradient(#ffe48a, #f2b51d); }
+/* «Грядки» над кнопкой «К фермеру»: ставить грядки из рюкзака (цифра — сколько их там), нет — рынок */
+.fab-beds { bottom: calc(var(--safe-b) + 140px); }
+.fab-badge {
+  position: absolute; top: -5px; right: -5px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px;
+  background: #e5483b; color: #fff; border: 2px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3);
+  font: 800 11px/15px system-ui, sans-serif; font-style: normal; text-align: center;
+}
 .fab.hint::after { right: calc(100% + 6px); top: 50%; margin-top: -15px; animation: hint-right 1.2s ease-in-out infinite; }
 @keyframes hint-right { 0%, 100% { transform: rotate(-90deg) translateY(0); } 50% { transform: rotate(-90deg) translateY(-7px); } }
 @media (min-width: 700px) and (min-height: 500px) {
   .fab { bottom: calc(var(--safe-b) + 92px); width: 54px; height: 54px; }
-  .fab-dig { bottom: calc(var(--safe-b) + 156px); }
+  .fab-beds { bottom: calc(var(--safe-b) + 156px); }
   .more-menu { bottom: calc(var(--safe-b) + 90px); }
 }
 @media (max-height: 500px) and (orientation: landscape) {
   .fab { bottom: calc(var(--safe-b) + 64px); width: 42px; height: 42px; }
-  .fab-dig { bottom: calc(var(--safe-b) + 114px); }
+  .fab-beds { bottom: calc(var(--safe-b) + 114px); }
   .fab img { width: 26px; height: 26px; }
   .more-menu { bottom: calc(var(--safe-b) + 62px); grid-template-columns: repeat(4, 1fr); width: min(400px, calc(100% - 16px)); }
 }

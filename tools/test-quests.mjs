@@ -42,12 +42,19 @@ test('story counts life, branches count from opening', () => {
   // «Водичка» засчитана сразу: поливы были раньше
   assert.ok(R.views(st, c).find((v) => v.id === 'story.water').done);
   R.check(st, c); R.claim(st, 'story.water', c);
-  // открылся Огород; копали раньше — не считается
+  // открылся Огород: «Новые грядки» считают грядки, которые есть (ctx.stats даёт мир), а не события
   assert.equal(R.lineState(st, 'garden').status, 'open');
-  const g = R.views(st, c).find((v) => v.id === 'garden.beds');
-  assert.equal(g.goals[0].p, 0);
-  R.onEvent(st, 'dig', null, 1, c);
-  assert.equal(R.views(st, c).find((v) => v.id === 'garden.beds').goals[0].p, 1);
+  const beds = (n, all) => R.views(st, { ...c, stats: { beds: n, bedsAll: all } }).find((v) => v.id === 'garden.beds');
+  assert.deepEqual(beds(2, 2).goals.map((g) => g.p), [2, 2]);
+  assert.equal(beds(2, 2).done, false);
+  // купили 2 — в рюкзаке; поставили — на ферме
+  assert.deepEqual(beds(2, 4).goals.map((g) => g.p), [4, 2]);
+  assert.equal(beds(2, 4).done, false);
+  assert.equal(beds(4, 4).done, true);
+  // старое сохранение: грядок вскопано больше — засчитано сразу
+  assert.equal(beds(9, 9).done, true);
+  // без мира (окно до загрузки) — ноль, а не ошибка
+  assert.equal(R.views(st, c).find((v) => v.id === 'garden.beds').goals[0].p, 0);
 });
 
 test('state goals and multi goals', () => {
@@ -94,7 +101,8 @@ test('migration from every old step', () => {
         const id = OLD_ORDER[i];
         assert.ok(vs.find((v) => v.id === id), `current ${id} visible at ${i}: ${ids(vs)}`);
         if (told) assert.ok(Q.told[id]);
-        else if (!R.QUEST_BY_ID[id].q.goal.state) assert.equal(vs.find((v) => v.id === id).goals[0].p, Math.min(1, R.QUEST_BY_ID[id].q.goal.n));
+        const q = R.QUEST_BY_ID[id].q, g0 = q.goal || q.goals[0]; // «Новые грядки»: цели — сколько грядок есть, счётчик не нужен
+        if (!told && !g0.state) assert.equal(vs.find((v) => v.id === id).goals[0].p, Math.min(1, g0.n));
       }
       R.check(st, c); R.refresh(st, c);
     }
@@ -210,8 +218,7 @@ test('cards on screen: pins (up to 3) and story', () => {
   assert.deepEqual(cards(), ['garden.beds', 'day:0', 'week:0'], 'story hidden when 3 pinned');
   assert.equal(R.setPin(st, 'month:0', true, c), false, 'no 4th pin');
   // сдали закреплённое — на его месте следующее задание ветки
-  R.onEvent(st, 'dig', null, 2, c);
-  R.claim(st, 'garden.beds', c);
+  R.claim(st, 'garden.beds', { ...c, stats: { beds: 4, bedsAll: 4 } });
   assert.deepEqual(Q.pins, ['garden.first', 'day:0', 'week:0']);
   assert.ok(R.setPin(st, 'day:0', false, c));
   assert.deepEqual(cards(), ['garden.first', 'week:0', 'story.fishing']);
@@ -241,10 +248,11 @@ test('task texts: number and word agree', () => {
 test('full playthrough of branches', () => {
   const st = fresh(), Q = R.questState(st);
   let c = at('2026-11-07T12:00:00Z');
-  const evs = ['harvest', 'plant', 'water', 'fish', 'chop', 'stump', 'mine', 'dig', 'mow', 'pick', 'sow', 'sell', 'earn', 'buy', 'expand', 'place'];
+  const evs = ['harvest', 'plant', 'water', 'fish', 'chop', 'stump', 'mine', 'mow', 'pick', 'sow', 'sell', 'earn', 'buy', 'expand', 'place'];
   const keys = { harvest: ['carrot', 'wheat', 'beet', 'cabbage', 'tomato', 'corn', 'pumpkin'], plant: ['carrot'], fish: ['fish_carp', 'fish_perch', 'fish_gold'], mine: ['rock', 'boulder'], pick: ['apple', 'cherry'], sell: ['carrot', 'fish_carp'], buy: ['seed_carrot', 'sap_apple', 'sprinkler_drip'], sow: ['apple'], chop: ['oak', 'pine'], place: ['sprinkler_drip'] };
   for (let round = 0; round < 60; round++) {
     st.level = Math.min(15, 1 + round); st.house = Math.min(5, 1 + (round >> 2)); st.well = round > 3 ? 1 : 0;
+    c = { ...c, stats: { beds: 2 + 2 * round, bedsAll: 2 + 2 * round } }; // грядок прибавляется
     for (const e of evs) for (const k of keys[e] || [null]) R.onEvent(st, e, k, e === 'earn' ? 100 : 3, c);
     R.refresh(st, c);
     for (const v of R.views(st, c)) if (v.done && !v.claimed) assert.ok(R.claim(st, v.id, c), v.id);

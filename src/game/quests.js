@@ -13,9 +13,10 @@ export class Quests {
   get st() { return R.questState(this.farm.st); }
 
   // Время заданий. В настройках разработчика можно сдвинуть часы и включить событие (farm.dev).
+  // stats — сколько грядок (цели «Пусть на ферме будет N грядок»): это знает только мир
   ctx() {
-    const d = this.farm.dev || {};
-    return { now: Date.now() + (d.shift || 0), tz: QUEST_TZ, rng: Math.random, force: d.event || null };
+    const f = this.farm, d = f.dev || {};
+    return { now: Date.now() + (d.shift || 0), tz: QUEST_TZ, rng: Math.random, force: d.event || null, stats: f.world ? f.bedCounts() : null };
   }
 
   views() { return R.views(this.farm.st, this.ctx()); }
