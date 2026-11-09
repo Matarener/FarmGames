@@ -61,7 +61,8 @@ export class UI {
     this.refreshIcons();
     farm.onIcons = () => { clearTimeout(this._icT); this._icT = setTimeout(() => this.refreshIcons(), 30); };
     $('#btn-bag').onclick = () => this.bagPanel(farm);
-    $('#btn-market').onclick = () => this.marketPanel(farm);
+    // есть заказ, который можно сдать (цифра на кнопке), — рынок открывается на «Заказах»
+    $('#btn-market').onclick = () => this.marketPanel(farm, farm.orders.ready() ? 'orders' : null);
     $('#btn-quests').onclick = () => this.questPanel(farm);
     $('#btn-gift').onclick = () => this.giftPanel(farm, 'daily');
     $('#btn-wheel').onclick = () => this.wheelPanel(farm);
@@ -131,6 +132,7 @@ export class UI {
     const pct = Math.min(100, (st.xp / xpToNext(st.level)) * 100).toFixed(1) + '%';
     if (this.last.xp !== pct) { this.last.xp = pct; $('#hud-xp').style.width = pct; }
     this.questCards(f);
+    this.marketBadge(f);
     this.giftTick(f, false);
     this.wheelTick(f, false);
     this.tick(f);
@@ -144,6 +146,7 @@ export class UI {
     const full = f.st.energy >= f.maxEnergy;
     this.set('hud-energy-t', full ? '' : fmtClock(f.energyLeftSec()));
     if (this.panelOpen && this.panelEl.dataset.kind === 'bag') this.set('bag-en', this.bagEnergy(f));
+    if (this.panelOpen && this.panelEl.dataset.kind === 'market' && this.mk && this.mk.mode === 'orders') this.ordersTick(f);
     this.giftTick(f, true);
     this.wheelTick(f, true);
     if (this.popupEl.classList.contains('show') && this._popupTick) this._popupTick();
@@ -437,6 +440,7 @@ export class UI {
       () => this.bagPanel(f),
       () => this.marketPanel(f),
       () => { this.mk.mode = 'buy'; this.refreshPanel(); },
+      () => { this.mk.mode = 'orders'; this.refreshPanel(); },
       () => this.questPanel(f),
       () => firstQuest && this.questPanel(f, { id: firstQuest.id }),
       () => this.plantPanel(f, null),
@@ -726,7 +730,7 @@ export class UI {
   // Проверка заданий без ожидания настоящих дат (режим тестера или ?debug в адресе)
   devQuests(f, body) {
     const d = f.dev, now = f.quests.ctx().now;
-    body.appendChild(h('div', 'pn-sub', 'Проверка заданий, подарков и колеса'));
+    body.appendChild(h('div', 'pn-sub', 'Проверка заданий, подарков, колеса и заказов'));
     body.appendChild(h('div', 'pn-text', `Время заданий: ${new Date(now + QUEST_TZ * 3600e3).toISOString().slice(0, 16).replace('T', ' ')} МСК` +
       `${d.shift ? ` (сдвиг ${Math.round(d.shift / 3600e3)} ч)` : ''} · событие: ${d.event ? EVENT_NAME(d.event) : 'по датам'}`));
     const row = h('div', 'gfx-row');
@@ -737,6 +741,7 @@ export class UI {
     btn('Событие', () => { const i = EVENTS.findIndex((e) => e.id === d.event); f.setDev({ event: i + 1 < EVENTS.length ? EVENTS[i + 1].id : null }); });
     btn('Подарки заново', () => f.gifts.devReset());
     btn('Колесо заново', () => f.wheel.devReset());
+    btn('Заказы заново', () => f.orders.devReset());
     body.appendChild(row);
   }
 
@@ -1024,20 +1029,102 @@ export class UI {
   // своё в шапке окна между названием и ✕: у рынка — «Купить / Продать», у рюкзака — энергия
   headExtra(card, el) { const head = card.querySelector('.pn-head'); head.insertBefore(el, head.lastChild); }
 
-  // ---------- Рынок: «Купить» и «Продать» ----------
-  marketPanel(f) {
+  // ---------- Рынок: «Заказы», «Купить» и «Продать» ----------
+  // mode — сразу этот раздел (иначе тот, что был открыт в прошлый раз)
+  marketPanel(f, mode) {
     const M = this.mk || (this.mk = { mode: 'sell', tab: 'seeds', sel: null });
+    if (mode && mode !== M.mode) { M.mode = mode; M.sel = null; }
     this.openPanel('market', 'Рынок', (body, card) => {
-      const seg = h('div', 'mk-seg');
-      for (const [k, name] of [['buy', 'Купить'], ['sell', 'Продать']]) {
-        const b = h('button', M.mode === k ? 'on' : '', name);
-        b.onclick = () => { if (M.mode !== k) { M.mode = k; M.sel = null; this.sfx('tap'); this.refreshPanel(); } };
+      const seg = h('div', 'mk-seg n3'), ready = f.orders.ready();
+      for (const [k, name] of [['orders', 'Заказы'], ['buy', 'Купить'], ['sell', 'Продать']]) {
+        const b = h('button', M.mode === k ? 'on' : '', name + (k === 'orders' && ready ? '<i class="qt-dot"></i>' : ''));
+        b.onclick = () => { if (M.mode !== k) { M.mode = k; M.sel = null; M.skip = null; this.sfx('tap'); this.refreshPanel(); } };
         seg.appendChild(b);
       }
       this.headExtra(card, seg);
-      if (M.mode === 'sell') this.marketSell(f, body, M);
+      if (M.mode === 'orders') this.ordersBody(f, body, M);
+      else if (M.mode === 'sell') this.marketSell(f, body, M);
       else this.marketBuy(f, body, M);
     });
+  }
+
+  // Цифра на кнопке «Рынок»: сколько заказов можно сдать прямо сейчас
+  marketBadge(f) {
+    const n = f.orders.ready();
+    if (this.last.orders === n) return;
+    this.last.orders = n;
+    const b = $('#market-badge');
+    b.hidden = !n; b.textContent = n;
+  }
+
+  // ---------- Доска заказов ----------
+  // Три места: заказ (кто, что просит — есть/нужно, награда, «Отдать» и «Отказаться») или покупатель в пути
+  // (время до нового заказа и «Позвать сейчас» за кристаллы). Отказ — со второго нажатия (M.skip — id заказа).
+  ordersBody(f, body, M) {
+    body.classList.add('od-body');
+    const v = f.orders.view();
+    if (!v.open) {
+      body.appendChild(h('div', 'od-lock', `${this.ic('note', 'ic big')}<b>Доска заказов</b>` +
+        `<span>Соседи будут заказывать урожай и рыбу и платить за них больше, чем рынок. Откроется с ${v.level} уровня.</span>`));
+      return;
+    }
+    body.appendChild(h('div', 'od-head', `<span>Соседи платят больше, чем рынок</span><span>Сдано: ${fmtNum(v.done)}</span>`));
+    const list = h('div', 'od-list');
+    for (const s of v.slots) list.appendChild(s.order ? this.orderCard(f, s, M) : this.orderWait(f, s));
+    body.appendChild(list);
+  }
+
+  orderCard(f, s, M) {
+    const o = s.order, c = h('div', 'od-card' + (s.ready ? ' ready' : ''));
+    c.dataset.id = o.id;
+    const top = h('div', 'od-who', `${this.ic('friends', 'ic')}<div><b>${s.who.name}</b><span class="od-say">${s.who.text}</span></div>`);
+    const sure = M.skip === o.id;
+    const x = h('button', 'od-skip' + (sure ? ' sure' : ''), sure ? 'Точно отказаться?' : 'Отказаться');
+    x.onclick = () => {
+      if (sure) { M.skip = null; f.orders.skip(s.idx); return; }
+      M.skip = o.id; this.sfx('tap'); this.refreshPanel();
+    };
+    top.appendChild(x);
+    c.appendChild(top);
+    const goods = h('div', 'od-goods');
+    for (const l of s.lines) {
+      const it = ITEMS[l.id], ok = l.have >= l.n;
+      const g = h('div', 'od-good' + (ok ? ' ok' : ''), `<i>${this.ic(it.icon, 'ic')}${ok ? '<em>✓</em>' : ''}</i><span>${it.name}</span><b>${fmtNum(Math.min(l.have, l.n))}/${l.n}</b>`);
+      g.title = it.name;
+      goods.appendChild(g);
+    }
+    c.appendChild(goods);
+    const foot = h('div', 'od-foot', `<div class="od-pay"><b>${fmtNum(o.coins)} ${this.ic('coin')}</b><b>+${o.xp} ${this.ic('star')}</b>` +
+      `<small>на рынке ${fmtNum(o.value)} ${this.ic('coin')}</small></div>`);
+    const give = h('button', 'btn-s gold od-give', 'Отдать');
+    give.disabled = !s.ready;
+    give.onclick = () => { M.skip = null; f.orders.deliver(s.idx); };
+    foot.appendChild(give);
+    c.appendChild(foot);
+    return c;
+  }
+
+  orderWait(f, s) {
+    const c = h('div', 'od-card od-wait');
+    c.appendChild(h('div', 'od-who', `${this.ic('friends', 'ic')}<div><b>Покупатель в пути</b><span>Новый заказ через <b class="od-t" data-i="${s.idx}">${fmtWait(s.wait)}</b></span></div>`));
+    const b = h('button', 'btn-s od-rush', `Позвать сейчас · ${s.gems} ${this.ic('gem')}`);
+    b.dataset.g = s.gems;
+    b.disabled = f.st.gems < s.gems;
+    b.onclick = () => f.orders.rush(s.idx);
+    c.appendChild(b);
+    return c;
+  }
+
+  // Раз в секунду, пока открыты «Заказы»: идёт время до покупателя (цена «Позвать сейчас» поменялась — окно заново)
+  ordersTick(f) {
+    const v = f.orders.view();
+    for (const s of v.slots) {
+      if (s.order) continue;
+      const t = this.panelEl.querySelector(`.od-t[data-i="${s.idx}"]`), b = t && t.closest('.od-card').querySelector('.od-rush');
+      if (!t) continue;
+      if (b && +b.dataset.g !== s.gems) { this.refreshPanel(); return; }
+      t.textContent = fmtWait(s.wait);
+    }
   }
 
   // Продажа — как в рюкзаке: разделы и порядок, но только то, что можно продать
@@ -1058,8 +1145,9 @@ export class UI {
     }
     const g = h('div', 'mk-grid');
     for (const it of list) {
+      // нужен для заказа на доске — пометка в углу клетки, чтобы не продать его случайно
       const c = h('button', 'mk-cell' + (M.sel === it.key ? ' sel' : ''),
-        `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}<b>${fmtNum(Inv.count(st, it.key))}</b></i><span>${it.sell} ${this.ic('coin', 'ic-s')}</span>`);
+        `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${f.orders.need(it.key) ? this.ic('note', 'mk-need') : ''}<b>${fmtNum(Inv.count(st, it.key))}</b></i><span>${it.sell} ${this.ic('coin', 'ic-s')}</span>`);
       c.title = it.name;
       c.onclick = () => this.pick(M, it.key);
       g.appendChild(c);
@@ -1067,7 +1155,8 @@ export class UI {
     L.list.appendChild(g);
     const it = M.sel && ITEMS[M.sel], n = it ? Inv.count(st, it.key) : 0;
     if (!it || !n || !it.sell) { M.sel = null; return; }
-    const box = this.mkCard(it, `${n} шт. · ${it.sell} ${this.ic('coin')} за шт.`, M);
+    const need = f.orders.need(it.key);
+    const box = this.mkCard(it, `${n} шт. · ${it.sell} ${this.ic('coin')} за шт.${need ? ` · нужно для заказа: ${need}` : ''}`, M);
     box.appendChild(this.sellRow(f, it, n));
     L.info(box);
   }
@@ -1383,4 +1472,6 @@ function fmtLeft(ms) {
 // день по московскому времени (как сброс заданий): «7 ноября»
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 function fmtDay(t) { const d = new Date(t + QUEST_TZ * 3600e3); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; }
+// до нового покупателя: «4:32», дольше часа — «1 ч 5 мин»
+function fmtWait(ms) { return ms >= 3600e3 ? fmtLeft(ms) : fmtClock(Math.ceil(ms / 1000)); }
 function fmtClock(s) { s = Math.max(0, s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
