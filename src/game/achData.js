@@ -7,7 +7,7 @@
 //             { ev, key? }     — счётчик событий игры, тот же, что у заданий (Farm → quests.emit):
 //                                harvest, fish, chop, mine, mow, pick, sow, sell, earn, quest (сданные задания),
 //                                feed (покормили животное), animal (забрали продукт у животного),
-//                                tool (инструмент доковался в кузнице);
+//                                tool (инструмент доделан в кузнице или домике рыболова);
 //                                key — точный ключ (культура, рыба)
 //             { kinds, group } — сколько разных ключей группы было в событии kinds (разные культуры урожая;
 //                                группы — GROUPS в questRules.js)
@@ -56,6 +56,11 @@ export const ACH = [
     task: 'Поймай {n} {рыбу|рыбы|рыб}', goal: { ev: 'fish' }, tiers: [10, 50, 200, 750, 2000] },
   { id: 'gold', group: 'fishing', name: 'Золотая рыбка', icon: 'fish_gold',
     task: 'Поймай {n} {золотую рыбку|золотые рыбки|золотых рыбок}', goal: { ev: 'fish', key: 'fish_gold' }, tiers: [1, 5, 20, 75, 200] },
+  // рыб всего 6 (FISH в data.js): лещ, щука и сом — на свою наживку и крепкую удочку (домик рыболова)
+  { id: 'fishkinds', group: 'fishing', name: 'Знаток рыб', icon: 'fish_pike',
+    task: 'Поймай {n} {разную рыбу|разные рыбы|разных рыб}', goal: { kinds: 'fish', group: 'fish' }, tiers: [2, 3, 4, 5, 6] },
+  { id: 'catfish', group: 'fishing', name: 'Сом-великан', icon: 'fish_catfish',
+    task: 'Поймай {n} {сома|сомов|сомов}', goal: { ev: 'fish', key: 'fish_catfish' }, tiers: [1, 5, 20, 60, 150] },
 
   // ---- Животные ----
   { id: 'feed', group: 'animals', name: 'Заботливый хозяин', icon: 'feed_grain',
@@ -82,9 +87,9 @@ export const ACH = [
     task: 'Расширь ферму до {n} {участка|участков|участков}', goal: { stat: 'chunks' }, tiers: [3, 6, 10, 16, 25] },
   { id: 'house', group: 'build', name: 'Свой дом', icon: 'house',
     task: 'Улучши дом до {n} уровня', goal: { stat: 'house' }, tiers: [2, 3, 4, 5] },
-  // улучшений всего 9: топор, кирка и лейка × 3 уровня (toolData.js)
+  // улучшений всего 12: топор, кирка, лейка (кузница) и удочка (домик рыболова) × 3 уровня (toolData.js)
   { id: 'tools', group: 'build', name: 'Мастер на все руки', icon: 'pick',
-    task: 'Улучши инструменты в кузнице {n} {раз|раза|раз}', goal: { ev: 'tool' }, tiers: [1, 3, 5, 7, 9] },
+    task: 'Улучши инструменты {n} {раз|раза|раз}', goal: { ev: 'tool' }, tiers: [1, 3, 5, 7, 9] },
 
   // ---- Торговля ----
   { id: 'sell', group: 'trade', name: 'Торговец', icon: 'market',

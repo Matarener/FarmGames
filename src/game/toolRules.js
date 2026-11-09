@@ -1,14 +1,17 @@
 // Улучшение инструментов: чистые функции над состоянием фермы st (без DOM, звуков, Date.now и Math.random),
 // как houseRules.js. Время (now, мс) и случайность (rng) приходят снаружи, чтобы потом эти же функции
-// выполнял сервер. Эффекты (искры над кузницей, тосты, окно) — tools.js и UI.
+// выполнял сервер. Эффекты (искры над зданием, тосты, окно) — tools.js и UI.
 //
-// Состояние: st.tools = { axe: 2, pick: 3, can: 1 } — уровни инструментов (нет записи — 1);
-// st.toolUp = { t, to, end } — что сейчас куётся: инструмент, до какого уровня, когда будет готово (мс).
-// Нет st.toolUp — наковальня свободна. Монеты и материалы списываются сразу, отмены нет (как у дома).
-// Таблицы (цены, время, бонусы) — toolData.js.
+// Состояние: st.tools = { axe: 2, pick: 3, can: 1, rod: 2 } — уровни инструментов (нет записи — 1).
+// Что сейчас улучшается — по зданию (у каждого одно место): { t, to, end } — инструмент, до какого уровня,
+// когда будет готово (мс). Кузница хранит это в st.toolUp (так было с самого начала), другие здания —
+// в st.toolUps = { fisher: {…} }. Нет записи — место свободно. Монеты и материалы списываются сразу,
+// отмены нет (как у дома). Таблицы (цены, время, бонусы) — toolData.js, удочка — ещё и fishData.js.
 
 import { TOOL_UP, TOOL_MAX, TOOL_PERKS, CAN_AREA, TOOL_AT } from './toolData.js';
-import { OBJECTS, HOUSE } from './data.js';
+import { ROD } from './fishData.js';
+import { OBJECTS, HOUSE, FISH } from './data.js';
+import { BUILDINGS } from './buildData.js';
 import * as Inv from './inventory.js';
 import { missing, missText, gemsFor, isBuilt } from './buildRules.js';
 import { plural } from './questRules.js';
@@ -17,12 +20,15 @@ const S = 1000;
 
 // ---------------- Уровни ----------------
 
-// Уровень инструмента t (axe | pick | can): 1–4
+// Уровень инструмента t (axe | pick | can | rod): 1–4
 export const toolLevel = (st, t) => Math.min(TOOL_MAX, Math.max(1, (st && st.tools && st.tools[t]) || 1));
 // Название инструмента на уровне lv (по умолчанию — на нынешнем): «Стальной топор»
 export const toolName = (st, t, lv = toolLevel(st, t)) => TOOL_UP[t].names[lv - 1];
-// Какой инструмент — предмет рюкзака id (tool_axe → axe); удочка не улучшается — null
+// Какой инструмент — предмет рюкзака id (tool_axe → axe, tool_rod → rod)
 export const toolOfItem = (id) => Object.keys(TOOL_UP).find((k) => TOOL_UP[k].item === id) || null;
+// Где улучшают инструмент t (здание) и какие инструменты улучшают в здании at
+export const atOf = (t) => (TOOL_UP[t] && TOOL_UP[t].at) || TOOL_AT;
+export const toolsAt = (at) => Object.keys(TOOL_UP).filter((t) => atOf(t) === at);
 // Следующее улучшение инструмента t: { level, time, cost } или null (уровень уже последний)
 export const nextUp = (st, t) => (TOOL_UP[t] && TOOL_UP[t].up[toolLevel(st, t)]) || null;
 // Сколько улучшений сделано всего (достижение, задания)
@@ -30,23 +36,36 @@ export const upgradesDone = (st) => Object.keys(TOOL_UP).reduce((s, t) => s + to
 
 // ---------------- Улучшение по времени ----------------
 
-export const toolUp = (st) => st.toolUp || null;
-export const upLeft = (st, now) => (st.toolUp ? Math.max(0, (st.toolUp.end - now) / S) : 0);
-// Доля готовности 0..1 (полоска над кузницей и в окне)
-export function upPart(st, now) {
-  const u = st.toolUp, d = u && TOOL_UP[u.t] && TOOL_UP[u.t].up[u.to - 1], t = d ? d.time : 0;
-  return !u ? 0 : t > 0 ? Math.max(0, Math.min(1, 1 - upLeft(st, now) / t)) : 1;
+// Что улучшается в здании at: { t, to, end } или null
+export function toolUp(st, at = TOOL_AT) {
+  return (at === TOOL_AT ? st.toolUp : st.toolUps && st.toolUps[at]) || null;
+}
+function setUp(st, at, v) {
+  if (at === TOOL_AT) { if (v) st.toolUp = v; else delete st.toolUp; return; }
+  const U = st.toolUps || (st.toolUps = {});
+  if (v) U[at] = v; else delete U[at];
+  if (!Object.keys(U).length) delete st.toolUps;
+}
+// Здания, где сейчас что-то улучшается: [at, …]
+export const busyAt = (st) => [...(st.toolUp ? [TOOL_AT] : []), ...Object.keys(st.toolUps || {})];
+
+export const upLeft = (st, now, at = TOOL_AT) => { const u = toolUp(st, at); return u ? Math.max(0, (u.end - now) / S) : 0; };
+// Доля готовности 0..1 (полоска над зданием и в окне)
+export function upPart(st, now, at = TOOL_AT) {
+  const u = toolUp(st, at), d = u && TOOL_UP[u.t] && TOOL_UP[u.t].up[u.to - 1], t = d ? d.time : 0;
+  return !u ? 0 : t > 0 ? Math.max(0, Math.min(1, 1 - upLeft(st, now, at) / t)) : 1;
 }
 
-// Можно ли начать улучшение инструмента t: null или причина { why, max?, forge?, busy?, locked?, lack? }
+// Можно ли начать улучшение инструмента t: null или причина { why, max?, bld?, busy?, locked?, lack? }
+// (bld — здания ещё нет: сначала построить)
 export function upBlock(st, t, now) {
   const T = TOOL_UP[t];
   if (!T) return { why: 'Этот инструмент не улучшается' };
-  const lv = toolLevel(st, t), next = T.up[lv];
+  const lv = toolLevel(st, t), next = T.up[lv], at = atOf(t), B = BUILDINGS[at];
   if (!next) return { why: `${T.names[lv - 1]}: лучше уже не сделать`, max: true };
-  if (!isBuilt(st, TOOL_AT, now)) return { why: 'Инструменты улучшают в кузнице: сначала постройте её', forge: true };
-  const u = st.toolUp;
-  if (u) return { why: u.t === t ? 'Уже куётся' : `Наковальня занята: куётся ${toolName(st, u.t, u.to).toLowerCase()}`, busy: true };
+  if (!isBuilt(st, at, now)) return { why: `${T.names[0]}: улучшают ${B.tools.in}, сначала постройте ${B.he ? 'его' : 'её'}`, bld: at };
+  const u = toolUp(st, at);
+  if (u) return { why: u.t === t ? `Уже ${B.tools.doing}` : `${B.tools.busy}: ${B.tools.doing} ${toolName(st, u.t, u.to).toLowerCase()}`, busy: true };
   if (st.level < next.level) return { why: `Откроется с ${next.level} уровня`, locked: true };
   const miss = missing(st, next.cost);
   if (miss.length) return { why: `Не хватает: ${missText(miss)}`, lack: miss };
@@ -60,29 +79,34 @@ export function startUp(st, t, now) {
   for (const [id, n] of Object.entries(next.cost)) {
     if (id === 'coins' || id === 'gems') st[id] -= n; else Inv.takeItem(st, id, n);
   }
-  st.toolUp = { t, to, end: now + next.time * S };
-  return { ...st.toolUp };
+  const u = { t, to, end: now + next.time * S };
+  setUp(st, atOf(t), u);
+  return { ...u };
 }
 
-// Кончилось ли улучшение (раз в секунду и при входе): инструмент получает новый уровень. → { t, to } или null
+// Кончилось ли улучшение в каком-нибудь здании (раз в секунду и при входе): инструмент получает новый уровень.
+// → { t, to } или null (если кончились сразу два — второй отдаст следующий вызов)
 export function upTick(st, now) {
-  const u = st.toolUp;
-  if (!u || u.end > now) return null;
-  delete st.toolUp;
-  if (!TOOL_UP[u.t] || u.to <= toolLevel(st, u.t)) return null;
-  (st.tools || (st.tools = {}))[u.t] = Math.min(TOOL_MAX, u.to);
-  if (u.t === 'can') st.can = canMax(st); // новая лейка приходит полной
-  return { t: u.t, to: st.tools[u.t] };
+  for (const at of busyAt(st)) {
+    const u = toolUp(st, at);
+    if (u.end > now) continue;
+    setUp(st, at, null);
+    if (!TOOL_UP[u.t] || u.to <= toolLevel(st, u.t)) continue;
+    (st.tools || (st.tools = {}))[u.t] = Math.min(TOOL_MAX, u.to);
+    if (u.t === 'can') st.can = canMax(st); // новая лейка приходит полной
+    return { t: u.t, to: st.tools[u.t] };
+  }
+  return null;
 }
 
-// Доковать сейчас за кристаллы (1 кристалл за 10 минут, как здания). → { gems } или null
-export function speedUp(st, now) {
-  const left = upLeft(st, now);
-  if (!st.toolUp || left <= 0) return null;
+// Доделать сейчас за кристаллы (1 кристалл за 10 минут, как здания). → { gems } или null
+export function speedUp(st, now, at = TOOL_AT) {
+  const left = upLeft(st, now, at), u = toolUp(st, at);
+  if (!u || left <= 0) return null;
   const gems = gemsFor(left);
   if (st.gems < gems) return null;
   st.gems -= gems;
-  st.toolUp.end = now;
+  u.end = now;
   return { gems };
 }
 
@@ -91,7 +115,8 @@ export function setLevel(st, t, lv) {
   if (!TOOL_UP[t]) return false;
   lv = Math.max(1, Math.min(TOOL_MAX, lv | 0));
   if (lv === 1) { if (st.tools) delete st.tools[t]; } else (st.tools || (st.tools = {}))[t] = lv;
-  if (st.toolUp && st.toolUp.t === t) delete st.toolUp;
+  const u = toolUp(st, atOf(t));
+  if (u && u.t === t) setUp(st, atOf(t), null);
   if (t === 'can' && st.can > canMax(st)) st.can = canMax(st); // лейку сделали меньше
   return true;
 }
@@ -166,6 +191,13 @@ export function perkRows(st, t, lv) {
   if (t === 'can') {
     out.push({ key: 'cap', label: 'Поливов в лейке', val: String((HOUSE[st.house] ? HOUSE[st.house].can : 0) + canBonus(st, lv)) });
     out.push({ key: 'area', label: 'Одно нажатие поливает', val: AREA_TEXT[TOOL_PERKS.can.area[lv - 1]] });
+  }
+  if (t === 'rod') {
+    out.push({ key: 'bites', label: 'Поклёвок в запасе', val: String(ROD.bites[lv - 1]) });
+    out.push({ key: 'regen', label: 'Новая поклёвка', val: `раз в ${Math.round(ROD.regen[lv - 1] / 60)} мин` });
+    out.push({ key: 'hold', label: 'Рыба срывается', val: `${Math.round((1 - ROD.hold[lv - 1]) * 100)}%` });
+    const big = Object.values(FISH).filter((f) => f.rod > 1 && f.rod <= lv).map((f) => f.name.toLowerCase());
+    out.push({ key: 'big', label: 'Крупная рыба', val: big.length ? big.join(', ') : 'срывается' });
   }
   return out;
 }

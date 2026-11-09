@@ -9,9 +9,9 @@
 //   PACE='{"xp":[30,2],"exp":[80,2]}' node tools/balance-sim.mjs — примерить другие числа темпа (см. PACE ниже)
 //   node tools/balance-sim.mjs --seeds 10 --days 150 --profile normal --log
 //   node tools/balance-sim.mjs --json out.json      — сырые данные для графиков
-//   TOOLS=off node tools/balance-sim.mjs            — без улучшения инструментов в кузнице (сравнить)
+//   TOOLS=off node tools/balance-sim.mjs            — без улучшения инструментов (кузница, домик рыболова)
 //
-// Бот не жульничает: не рыбачит ради денег (кроме профиля «Абузер»), кристаллы тратит только на выход из тупика
+// Бот не жульничает: не рыбачит ради денег (кроме профилей «Абузер» и «Рыбак»), кристаллы тратит только на выход из тупика
 // (руда, дерево за кристаллы на рынке) — такие траты считаются отдельно, это и есть мягкий тупик.
 
 import fs from 'fs';
@@ -31,7 +31,8 @@ import * as Ord from '../src/game/orderRules.js';
 import * as Ach from '../src/game/achRules.js';
 import * as Fish from '../src/game/fishRules.js';
 import * as Tool from '../src/game/toolRules.js';
-import { TOOL_UP, TOOL_PERKS, TOOL_AT } from '../src/game/toolData.js';
+import { TOOL_UP, TOOL_PERKS } from '../src/game/toolData.js';
+import { ROD, BAITS } from '../src/game/fishData.js';
 import { QUEST_TZ } from '../src/game/questData.js';
 import { ORDERS } from '../src/game/orderData.js';
 import { WHEEL } from '../src/game/wheelData.js';
@@ -68,14 +69,13 @@ if (PACE) {
   if (PACE.exp) { const [k, pw] = PACE.exp; SIM_FN.expansionCost = (n) => ({ ...D.expansionCost(n), coins: r5(k * Math.pow(n, pw)) }); }
   if (PACE.beds) Object.assign(D.BEDS.limit, PACE.beds);
 }
-const FISHING = D.FISHING;
-
-// ---------------- Улучшение инструментов в кузнице (toolRules.js, toolData.js) ----------------
-// Бот улучшает кирку, топор и лейку по порядку TOOL_ORDER, как только открыто по уровню и монет хватает
-// (не больше TOOL_SHARE от свободных). Лейка поливает область: грядки бота — список без клеток, поэтому
+// ---------------- Улучшение инструментов (toolRules.js, toolData.js) ----------------
+// Бот улучшает кирку, топор и лейку в кузнице по порядку TOOL_ORDER, как только открыто по уровню и монет хватает
+// (не больше TOOL_SHARE от свободных). Удочку (домик рыболова, своё место — параллельно с кузницей) — только
+// рыбак (профиль с bait) или по заданию. Лейка поливает область: грядки бота — список без клеток, поэтому
 // за одно нажатие считаем столько грядок, сколько в среднем попадает в область (CAN_PER_TAP).
 const TOOLS_ON = process.env.TOOLS !== 'off';
-const TOOL_ORDER = ['pick', 'axe', 'can'], TOOL_SHARE = 0.5;
+const TOOL_ORDER = ['pick', 'axe', 'can', 'rod'], TOOL_SHARE = 0.5;
 const CAN_PER_TAP = { one: 1, cross: 3, square: 5 };
 
 const r5 = (v) => Math.max(5, Math.round(v / 5) * 5);
@@ -90,12 +90,13 @@ const T0 = Date.UTC(2026, 10, 8, 21, 0);
 // ---------------- Профили игроков ----------------
 // sessions — [час, минута, длина в минутах] по Москве, каждый день; skip — доля пропущенных заходов,
 // jitter — на сколько минут заход сдвигается (бот планирует посадки по обычному расписанию и не знает о сдвигах).
-// fish — рыбачит всё свободное время.
+// fish — рыбачит всё свободное время; bait — ещё и на наживку (самую выгодную из открытых) и улучшает удочку.
 const PROFILES = {
   casual: { name: 'Казуальный (2 захода по 8 мин в день)', sessions: [[9, 0, 8], [21, 0, 8]], skip: 0.2, jitter: 60 },
   normal: { name: 'Обычный (4 захода, ~40 мин в день)', sessions: [[8, 30, 10], [13, 0, 10], [18, 30, 12], [22, 0, 10]], skip: 0.15, jitter: 45 },
   active: { name: 'Активный (7 заходов, ~1.7 ч в день)', sessions: [[8, 0, 15], [10, 30, 12], [13, 0, 15], [15, 30, 12], [18, 0, 20], [20, 30, 15], [22, 30, 15]], skip: 0.1, jitter: 30 },
   abuser: { name: 'Абузер рыбалки (как «Обычный», но всё время рыбачит)', sessions: [[8, 30, 10], [13, 0, 10], [18, 30, 12], [22, 0, 10]], skip: 0.15, jitter: 45, fish: true },
+  fisher: { name: 'Рыбак (как «Абузер», но с наживкой и лучшей удочкой из домика рыболова)', sessions: [[8, 30, 10], [13, 0, 10], [18, 30, 12], [22, 0, 10]], skip: 0.15, jitter: 45, fish: true, bait: true },
 };
 
 // Сколько секунд призрачок тратит на действие (полёт + анимация)
@@ -125,6 +126,13 @@ const neighbors = (c) => {
 // =====================================================================================
 // 1) ПЕТЛИ: что даёт каждое повторяемое действие и можно ли крутить его без конца
 // =====================================================================================
+// Цена одной наживки: из лавки — монеты, своя — сырьё по цене рынка (что недополучил, не продав его)
+function baitCost(b) {
+  const o = Fish.shopOffer(b), r = RECIPES[b];
+  if (o) return o.price / o.qty;
+  return r ? Object.entries(r.need).reduce((s, [id, n]) => s + n * ((ITEMS[id] && ITEMS[id].sell) || 0), 0) / r.n : 0;
+}
+
 export function scanLoops() {
   const out = [];
   const add = (sev, what, detail) => out.push({ sev, what, detail });
@@ -135,14 +143,25 @@ export function scanLoops() {
   const cheapSell = sellE.reduce((a, b) => (b.c < a.c ? b : a));
 
   // --- рыбалка ---
-  const list = Object.values(FISH), tot = list.reduce((s, f) => s + f.chance, 0);
-  const per = (k) => list.reduce((s, f) => s + (f.chance / tot) * (f[k] || 0), 0) * D.FISH_CATCH;
-  const fE = per('food') / ENERGY.fish, fC = per('sell') / ENERGY.fish, fX = per('xp') / ENERGY.fish;
-  const gate = FISHING ? `клёв: ${FISHING.bites} поклёвок, +1 раз в ${FISHING.regen / 60} мин` : 'нет: рыбачить можно без остановки';
-  add(fE >= 1 || (!FISHING && fC > cheapShop.c) ? 'КРИТИЧНО' : 'ok', 'Рыбалка',
-    `заброс = ${ENERGY.fish} эн. → в среднем ${fE.toFixed(2)} энергии едой, ${fC.toFixed(1)} монет, ${fX.toFixed(2)} опыта. Ограничение: ${gate}. ` +
-    (fE >= 1 ? 'Съел рыбу — энергии больше, чем потратил: вечный двигатель (монеты, опыт → уровни → кристаллы). ' : '') +
-    (!FISHING && fC > cheapShop.c ? `Даже без еды: 1 энергия на рынке стоит ${cheapShop.c.toFixed(2)} мон. (${ITEMS[cheapShop.k].name}), а рыба приносит ${fC.toFixed(1)} мон. на 1 энергию.` : ''));
+  // без наживки — на каждой удочке (I–IV); на наживку — на лучшей удочке, за вычетом цены наживки
+  const LV = ROD.bites.length, rods = Array.from({ length: LV }, (_, i) => i + 1);
+  const cast = (bait, lv) => {
+    const os = Fish.odds({}, bait, lv), sum = (k) => os.reduce((s, o) => s + o.p * (FISH[o.fish][k] || 0), 0);
+    return { e: sum('food') / ENERGY.fish, c: sum('sell') / ENERGY.fish, x: sum('xp') / ENERGY.fish, cost: bait ? baitCost(bait) : 0 };
+  };
+  const nb = rods.map((lv) => cast(null, lv)), fE = Math.max(...nb.map((r) => r.e));
+  const gate = `клёв: ${ROD.bites.join('/')} поклёвок, +1 раз в ${ROD.regen.map((x) => x / 60).join('/')} мин (удочка I–IV)`;
+  add(fE >= 1 ? 'КРИТИЧНО' : 'ok', 'Рыбалка без наживки',
+    `заброс = ${ENERGY.fish} эн. → едой ${nb.map((r) => r.e.toFixed(2)).join('/')} энергии, ${nb.map((r) => r.c.toFixed(1)).join('/')} монет, ` +
+    `${nb[0].x.toFixed(2)}–${nb[LV - 1].x.toFixed(2)} опыта. Ограничение: ${gate}. ` +
+    (fE >= 1 ? 'Съел рыбу — энергии больше, чем потратил: вечный двигатель (монеты, опыт → уровни → кристаллы). ' : ''));
+  for (const b of Object.keys(BAITS)) {
+    const r = cast(b, LV), extra = r.e - 1, perE = extra > 0 ? r.cost / extra : Infinity;
+    // энергия на наживку дешевле еды из магазина — рыбалка на неё выгоднее похода на рынок за едой
+    add(perE < cheapShop.c ? 'ВАЖНО' : 'ok', `Рыбалка ${BAITS[b].short}`,
+      `наживка ≈ ${r.cost.toFixed(1)} мон.; заброс → едой ${r.e.toFixed(2)} энергии, ${r.c.toFixed(1)} монет, ${r.x.toFixed(2)} опыта (удочка ${LV}). ` +
+      (extra > 0 ? `Энергии больше, чем потратил: +${extra.toFixed(2)} за ${r.cost.toFixed(1)} мон. (${perE.toFixed(2)} мон. за 1 эн.; в магазине — ${cheapShop.c.toFixed(2)}). Ограничено клёвом и ценой наживки.` : ''));
+  }
 
   // --- урожай на еду ---
   for (const c of Object.values(CROPS)) {
@@ -153,7 +172,7 @@ export function scanLoops() {
   // --- кухня: энергия в блюде против энергии в продуктах ---
   const embodied = (id) => { // сколько энергии стоит добыть 1 штуку (грубо): урожай — 2 полива, рыба — забросы, плоды — 1 сбор на 3 шт
     if (CROPS[id]) return 2 * ENERGY.water;
-    if (FISH[id]) { const p = (FISH[id].chance / tot) * D.FISH_CATCH; return ENERGY.fish / p; }
+    if (FISH[id]) { const p = (Fish.odds({}, null, 1).find((o) => o.fish === id) || { p: 0 }).p; return p ? ENERGY.fish / p : Infinity; }
     if (FLORA_GOODS[id]) return ENERGY.pick / 3;
     return 0;
   };
@@ -163,7 +182,7 @@ export function scanLoops() {
     const inE = Object.entries(r.need).reduce((s, [id, n]) => s + n * embodied(id), 0);
     const inC = Object.entries(r.need).reduce((s, [id, n]) => s + n * (ITEMS[id] && ITEMS[id].sell || 0), 0);
     const gain = g.food * r.n - inE;
-    add(gain > 0 && FISH[Object.keys(r.need)[0]] && !FISHING ? 'ВАЖНО' : gain > 4 ? 'инфо' : 'ok', `Кухня: ${g.name}`,
+    add(gain > 4 ? 'инфо' : 'ok', `Кухня: ${g.name}`,
       `сырьё ≈ ${inE.toFixed(1)} эн. и ${inC} мон. → ${g.food * r.n} эн. (${gain >= 0 ? '+' : ''}${gain.toFixed(1)} эн. за ${r.time / 60} мин кухни)`);
   }
   // --- рынок: купить и продать ---
@@ -203,8 +222,7 @@ export function scanLoops() {
   add('ok', 'Колесо фортуны', `в среднем ${ev('coins').toFixed(1)} мон. + ${ev('gems').toFixed(2)} крист. + ${ev('wood').toFixed(1)} дерева + ${ev('ore').toFixed(2)} руды ≈ ${evC.toFixed(0)} мон. за вращение; ` +
     `за монеты ${WHEEL.coins.join('/')} (в день ${WHEEL.coins.length}), за кристаллы ${WHEEL.gems} — без ограничения, но в минус по кристаллам (${ev('gems').toFixed(2)} назад)`);
   // --- заказы ---
-  add('ok', 'Доска заказов', `платит ${ORDERS.pay}× цены рынка + опыт; товары (урожай, рыба, плоды) на рынке не купить — перепродажи нет. ` +
-    (!FISHING ? 'Но рыба в заказах — ещё один выход для бесконечной рыбалки.' : ''));
+  add('ok', 'Доска заказов', `платит ${ORDERS.pay}× цены рынка + опыт; товары (урожай, рыба, плоды) на рынке не купить — перепродажи нет.`);
   // --- животные ---
   for (const a of Object.values(ANIMALS)) {
     const prod = ITEMS[a.product].sell * a.n, feedR = Object.values(RECIPES).find((r) => r.item === a.feed);
@@ -242,6 +260,7 @@ class Sim {
     this.gemRescue = { ore: 0, wood: 0, gems: 0 };
     this.spent = { energy: 0, eaten: 0 };
     this.toolSpent = { coins: 0 }; this.oreGot = 0;
+    this.baitSpent = 0; this.casts = { bait: 0, none: 0 };
     this.lvIncome = [0, 0];
     this.oreAt = {};
     this.gemsIn = { levels: 0, quests: 0, ach: 0, gifts: 0 };
@@ -395,6 +414,7 @@ class Sim {
       if (lack) for (const [k, m] of Object.entries(r.need)) add(k, Math.ceil(lack / r.n) * m);
     }
     for (const [k, m] of Object.entries(this.kitchenNeed())) add(k, m);
+    for (const [k, m] of Object.entries(this.extraNeed())) add(k, m);
     for (const k of Object.keys(need)) {
       let have = Inv.count(this.st, k);
       for (const b of this.beds) if (b.crop === k) have++;
@@ -431,6 +451,7 @@ class Sim {
     if (O) for (const s of O.slots) if (s && s.items) for (const [id, n] of Object.entries(s.items)) add(id, n);
     for (const [id, n] of Object.entries(this.feedTargets())) { const r = RECIPES[id]; for (const [k, m] of Object.entries(r.need)) add(k, Math.ceil(n / r.n) * m); }
     for (const [k, m] of Object.entries(this.kitchenNeed())) add(k, m);
+    for (const [k, m] of Object.entries(this.extraNeed())) add(k, m);
     for (const { g } of this.goals()) {
       if (g.ev === 'craft' && RECIPES[g.key]) for (const [k, m] of Object.entries(RECIPES[g.key].need)) add(k, m * (g.n - g.p));
       if (g.ev === 'sell' && g.group === 'fish') for (const f of Object.keys(FISH)) add(f, 0);
@@ -477,7 +498,7 @@ class Sim {
     }
   }
   canGet(id) {
-    if (FISH[id]) return this.P.fish || this.goals().some(({ g }) => g.ev === 'fish');
+    if (FISH[id]) return (this.P.fish || this.goals().some(({ g }) => g.ev === 'fish')) && (FISH[id].chance > 0 || !!this.P.bait);
     if (FLORA_GOODS[id]) return this.orchard.some((o) => FLORA[o.sp].fruit === id);
     return false;
   }
@@ -602,26 +623,41 @@ class Sim {
     const r = Tool.upTick(this.st, this.now);
     if (r) { this.ev('tool', r.t + r.to); this.mark('tool_' + r.t + r.to); this.note(`инструмент ${r.t} → ${r.to}`); }
   }
-  // следующее улучшение, открытое по уровню (порядок — TOOL_ORDER, сначала самые низкие уровни). → { t, next } или null
-  nextTool() {
-    const st = this.st;
-    if (!TOOLS_ON || st.toolUp || !Build.isBuilt(st, TOOL_AT, this.now)) return null;
-    let best = null;
+  // улучшать ли инструмент t: кирку, топор, лейку — всегда; удочку — рыбак или по заданию
+  wantsTool(t) { return t !== 'rod' || !!this.P.bait || this.goals().some(({ g }) => g.ev === 'tool' && /^rod/.test(g.key || '')); }
+  // следующие улучшения, открытые по уровню: по одному на здание (кузница, домик рыболова), где место свободно
+  // (порядок — TOOL_ORDER, сначала самые низкие уровни). → [{ t, next }]
+  nextTools() {
+    const st = this.st, best = new Map();
+    if (!TOOLS_ON) return [];
     for (const t of TOOL_ORDER) {
+      const at = Tool.atOf(t);
+      if (Tool.toolUp(st, at) || !Build.isBuilt(st, at, this.now) || !this.wantsTool(t)) continue;
       const next = Tool.nextUp(st, t);
       if (!next || next.level > st.level) continue;
-      if (!best || Tool.toolLevel(st, t) < Tool.toolLevel(st, best.t)) best = { t, next };
+      const b = best.get(at);
+      if (!b || Tool.toolLevel(st, t) < Tool.toolLevel(st, b.t)) best.set(at, { t, next });
     }
-    return best;
+    return [...best.values()];
   }
-  // отдать инструмент в кузницу: всё есть и монет не больше TOOL_SHARE от свободных
+  // отдать инструмент на улучшение: всё есть и монет не больше TOOL_SHARE от свободных
   toolBuy(free) {
-    const n = this.nextTool();
-    if (!n || Tool.upBlock(this.st, n.t, this.now) || (n.next.cost.coins || 0) > free() * TOOL_SHARE) return;
-    const r = Tool.startUp(this.st, n.t, this.now);
-    if (!r) return;
-    this.toolSpent.coins += n.next.cost.coins || 0;
-    this.note(`кузница: ${n.t} → ${r.to}`);
+    for (const n of this.nextTools()) {
+      if (Tool.upBlock(this.st, n.t, this.now) || (n.next.cost.coins || 0) > free() * TOOL_SHARE) continue;
+      const r = Tool.startUp(this.st, n.t, this.now);
+      if (!r) continue;
+      this.toolSpent.coins += n.next.cost.coins || 0;
+      this.note(`${BUILDINGS[Tool.atOf(n.t)].name}: ${n.t} → ${r.to}`);
+    }
+  }
+  // что держать про запас и для чего растить (кроме заданий и заказов): материалы на следующие улучшения
+  // инструментов (хлопок и золотые рыбки на удочку) и сырьё на свою наживку (пшеница на тесто, караси на живца)
+  extraNeed() {
+    const out = {}, add = (k, n) => { if (n > 0) out[k] = (out[k] || 0) + n; };
+    for (const nt of this.nextTools()) for (const [id, n] of Object.entries(nt.next.cost)) if (id !== 'coins' && id !== 'gems' && !RECIPES[id]) add(id, n);
+    const b = this.baitWant(), r = b && RECIPES[b];
+    if (r) for (const [k, m] of Object.entries(r.need)) add(k, Math.ceil(Math.max(0, this.baitStockN() - Inv.count(this.st, b)) / r.n) * m);
+    return out;
   }
   lackNone(cost) { return !Object.keys(this.lack(cost)).length; }
   pay(cost) { for (const [k, v] of Object.entries(cost)) { if (k === 'coins' || k === 'gems') this.st[k] -= v; else Inv.takeItem(this.st, k, v); } }
@@ -649,6 +685,7 @@ class Sim {
         const o = SHOP.filter((x) => (D.DECOR[x.item] || D.FENCES[x.item]) && (!x.level || x.level <= st.level)).sort((a, b) => a.price - b.price)[0];
         if (o && st.coins >= o.price * 2) { for (let i = 0; i < g.n - g.p; i++) if (this.buy(o.item)) { this.ev('place', o.item); this.decor++; } }
       }
+      if (g.ev === 'buy' && BAITS[g.key]) this.buyBait(g.key, g.n - g.p);
       if (g.ev === 'buy' && g.group === 'seed') { const n = g.n - g.p; if (st.coins >= n * 2 + 20) this.buy(D.seedId('carrot'), n); }
       if ((g.ev === 'buy' || g.ev === 'sow') && g.group === 'orchard') {
         const o = SHOP.filter((x) => x.tab === 'trees' && (!x.level || x.level <= st.level)).sort((a, b) => a.price - b.price)[0];
@@ -719,8 +756,10 @@ class Sim {
     // материалы для зданий, которые скоро понадобятся (по заданиям «Мастерские»)
     for (const { g } of this.goals()) if (g.ev === 'build' && BUILDINGS[g.key]) for (const [id, n] of Object.entries(BUILDINGS[g.key].cost)) if (RECIPES[id]) add(id, n - Inv.count(st, id));
     // материалы на следующее улучшение инструмента
-    const nt = this.nextTool();
-    if (nt) for (const [id, n] of Object.entries(nt.next.cost)) if (RECIPES[id]) add(id, n - Inv.count(st, id));
+    for (const nt of this.nextTools()) for (const [id, n] of Object.entries(nt.next.cost)) if (RECIPES[id]) add(id, n - Inv.count(st, id));
+    // своя наживка про запас (тесто, мормышка, живец) — домик рыболова
+    const bw = this.baitWant();
+    if (bw && RECIPES[bw]) add(bw, this.baitStockN() - Inv.count(st, bw));
     // гвозди → слитки, доски для ящиков не делаем
     if (want.nails) add('iron_ingot', Math.ceil(want.nails / RECIPES.nails.n) - Inv.count(st, 'iron_ingot'));
     for (const [id, n] of Object.entries(want)) {
@@ -764,8 +803,62 @@ class Sim {
     if (!Fish.bitesView(st, this.now).n) return false; // клёв кончился
     if (!this.spend(ENERGY.fish)) return false;
     const r = Fish.cast(st, { now: this.now, rng: this.rng });
+    if (r.bait) { this.ev('bait', r.bait); this.casts.bait++; } else this.casts.none++;
     if (r.fish) { Inv.addItem(st, r.fish, 1); this.ev('fish', r.fish); this.addXp(FISH[r.fish].xp); }
     return true;
+  }
+  // наживка открыта на этом уровне (в лавке домика или рецептом в нём)
+  baitOpen(b) {
+    const o = Fish.shopOffer(b), r = RECIPES[b];
+    return o ? this.st.level >= o.level : !!r && this.st.level >= r.level;
+  }
+  // сколько монет в среднем приносит заброс на наживку b (null — без неё) нынешней удочкой, за вычетом цены наживки
+  baitValue(b) {
+    return Fish.odds(this.st, b).reduce((s, o) => s + o.p * (ITEMS[o.fish].sell || 0), 0) - (b ? baitCost(b) : 0);
+  }
+  // на что ловить: задание «порыбачь на …», «поймай леща» (удочка уже держит) — эту наживку;
+  // у рыбака — самую выгодную из открытых, если она выгоднее, чем без наживки. → id или null
+  baitWant() {
+    const st = this.st;
+    if (!Build.isBuilt(st, 'fisher', this.now) && !Object.keys(BAITS).some((b) => Inv.count(st, b))) return null;
+    for (const { g } of this.goals()) {
+      if (g.ev === 'bait' && BAITS[g.key]) return g.key;
+      const f = g.ev === 'fish' && FISH[g.key];
+      if (f && !f.chance && f.rod <= Fish.rodLevel(st)) { const b = Object.keys(BAITS).find((x) => BAITS[x].pool[g.key] && this.baitOpen(x)); if (b) return b; }
+    }
+    if (!this.P.bait) return null;
+    // заказ на доске просит рыбу, которой не хватает: самая выгодная наживка из тех, на которые она клюёт (или без наживки)
+    const O = st.orders, open = [null, ...Object.keys(BAITS).filter((x) => this.baitOpen(x))];
+    if (O) for (const sl of O.slots) for (const [id, n] of Object.entries((sl && sl.items) || {})) {
+      if (!FISH[id] || Inv.count(st, id) >= n) continue;
+      const ok = open.filter((x) => Fish.odds(st, x).some((o) => o.fish === id && o.p > 0));
+      if (ok.length) return ok.reduce((m, x) => (this.baitValue(x) > this.baitValue(m) ? x : m));
+    }
+    let best = null, bv = this.baitValue(null);
+    for (const b of Object.keys(BAITS)) {
+      if (!this.baitOpen(b)) continue;
+      const v = this.baitValue(b);
+      if (v > bv) { bv = v; best = b; }
+    }
+    return best;
+  }
+  // сколько наживки держать: на полный клёв и ещё немного
+  baitStockN() { return Fish.rod(this.st).bites + 5; }
+  // купить наживку b в лавке домика, n штук (пачками), пока монет с запасом
+  buyBait(b, n) {
+    const o = Fish.shopOffer(b);
+    if (!o) return;
+    for (let k = 0; k < Math.ceil(n / o.qty) && this.st.coins >= o.price * 4; k++) {
+      const r = Fish.buyBait(this.st, b, this.now);
+      if (r.why) break;
+      this.ev('buy', b, r.n); this.baitSpent += r.cost;
+    }
+  }
+  // перед рыбалкой: выбрать наживку (выбор запоминается, как в игре) и докупить, если она из лавки
+  baitReady() {
+    const st = this.st, b = this.baitWant();
+    Fish.setBait(st, b);
+    if (b && Fish.shopOffer(b)) this.buyBait(b, this.baitStockN() - Inv.count(st, b));
   }
 
   // ---------- расчистка ----------
@@ -948,13 +1041,14 @@ class Sim {
       budget -= s;
     }
     // рыбалка: для заданий, а у абузера — всё оставшееся время (ест рыбу и рыбачит дальше)
-    const fishGoal = this.goals().some(({ g }) => g.ev === 'fish');
-    if (this.P.fish || fishGoal) {
+    const fishGoal = () => this.goals().some(({ g }) => g.ev === 'fish' || g.ev === 'bait');
+    if ((this.P.fish || fishGoal()) && budget > ACT.fish && Fish.bitesView(st, this.now).n) {
+      this.baitReady();
       while (budget > ACT.fish) {
         if (st.energy < ENERGY.fish) { if (!this.eatFor(ENERGY.fish + 1)) break; }
         if (!this.fishOnce()) break;
         budget -= ACT.fish;
-        if (!this.P.fish && !this.goals().some(({ g }) => g.ev === 'fish')) break;
+        if (!this.P.fish && !fishGoal()) break;
       }
     }
     // учёт: чего ждём
@@ -1095,6 +1189,7 @@ function report() {
       }
       p(`Инструменты (медиана дня, когда доковался): ${tl.join(', ')}`);
     }
+    if (R.P.fish) p(`Рыбалка: забросов на наживку ${Math.round(S.reduce((a, s) => a + s.casts.bait, 0) / S.length)}, без наживки ${Math.round(S.reduce((a, s) => a + s.casts.none, 0) / S.length)}; на наживку из лавки потрачено монет ${Math.round(S.reduce((a, s) => a + s.baitSpent, 0) / S.length)}`);
     p(`На инструменты потрачено монет ${Math.round(S.reduce((a, s) => a + s.toolSpent.coins, 0) / S.length)}; руды добыто ${Math.round(S.reduce((a, s) => a + s.oreGot, 0) / S.length)}; энергии потрачено ${Math.round(S.reduce((a, s) => a + s.spent.energy, 0) / S.length)}, еды съедено ${Math.round(S.reduce((a, s) => a + s.spent.eaten, 0) / S.length)}`);
     const last = S[0];
     p(`Конец прогона 1: день ${last.day().toFixed(1)}, ур. ${last.st.level}, дом ${last.st.house}, участков ${last.open.size}, грядок ${last.beds.length}, монет ${last.st.coins}, кристаллов ${last.st.gems}, руды ${Inv.count(last.st, 'ore')}, дерева ${Inv.count(last.st, 'wood')}, камня ${Inv.count(last.st, 'stone')}`);

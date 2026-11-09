@@ -6,6 +6,7 @@ import * as B from '../src/game/buildRules.js';
 import * as Chop from '../src/game/chop.js';
 import { TOOL_UP, TOOL_MAX, TOOL_PERKS, TOOL_AT, TOOL_TINT, TOOL_ROMAN } from '../src/game/toolData.js';
 import { BUILDINGS, bpId } from '../src/game/buildData.js';
+import { FISHER } from '../src/game/fishData.js';
 import { ITEMS, OBJECTS, FLORA, HOUSE, TOOLS, GEM_SPEEDUP_SEC } from '../src/game/data.js';
 import { questHint } from '../src/game/hints.js';
 
@@ -13,21 +14,27 @@ const T0 = Date.parse('2026-11-09T09:00:00Z'), S = 1000;
 const fresh = (o = {}) => ({ coins: 50000, gems: 50, xp: 0, level: 20, house: 1, can: 0, items: {}, stats: { cleared: 0, harvested: 0 }, ...o });
 let tests = 0;
 const test = (name, fn) => { fn(); tests++; console.log('ok', name); };
-// кузница построена
-const forge = (st, now = T0) => {
-  st.items[bpId(TOOL_AT)] = 1;
-  for (const [id, n] of Object.entries(BUILDINGS[TOOL_AT].cost)) st.items[id] = (st.items[id] || 0) + n;
-  assert.ok(B.startBuild(st, TOOL_AT, now));
-  B.speedBuild(st, TOOL_AT, now);
+// здание at построено (по умолчанию кузница)
+const built = (st, at, now = T0) => {
+  st.items[bpId(at)] = 1;
+  for (const [id, n] of Object.entries(BUILDINGS[at].cost)) st.items[id] = (st.items[id] || 0) + n;
+  assert.ok(B.startBuild(st, at, now));
+  B.speedBuild(st, at, now);
   B.buildTick(st, now);
 };
+const forge = (st, now = T0) => built(st, TOOL_AT, now);
 // материалы на улучшение t до следующего уровня
 const stock = (st, t) => { for (const [id, n] of Object.entries(TR.nextUp(st, t).cost)) if (id !== 'coins' && id !== 'gems') st.items[id] = (st.items[id] || 0) + n; };
 
 test('tables: tools, items, levels, names', () => {
-  assert.deepEqual(Object.keys(TOOL_UP), ['axe', 'pick', 'can']); // удочка не улучшается
-  assert.equal(TR.toolOfItem('tool_rod'), null);
+  assert.deepEqual(Object.keys(TOOL_UP), ['axe', 'pick', 'can', 'rod']);
+  assert.equal(TR.toolOfItem('tool_rod'), 'rod');
+  assert.equal(TR.toolOfItem('wood'), null);
+  // топор, кирку и лейку куют в кузнице, удочку улучшают в домике рыболова
+  assert.deepEqual(TR.toolsAt(TOOL_AT), ['axe', 'pick', 'can']);
+  assert.deepEqual(TR.toolsAt(FISHER), ['rod']);
   for (const [k, T] of Object.entries(TOOL_UP)) {
+    assert.ok(BUILDINGS[T.at] && BUILDINGS[T.at].tools, `${k}: ${T.at}`);
     assert.ok(TOOLS[T.item] && ITEMS[T.item], `${k}: ${T.item}`);
     assert.equal(TR.toolOfItem(T.item), k);
     assert.equal(T.names.length, TOOL_MAX);
@@ -60,7 +67,7 @@ test('level: default 1, names, next upgrade', () => {
 
 test('block: forge, level, materials, max', () => {
   const st = fresh({ level: 4 });
-  assert.ok(TR.upBlock(st, 'axe', T0).forge);
+  assert.equal(TR.upBlock(st, 'axe', T0).bld, TOOL_AT);
   forge(st);
   assert.ok(TR.upBlock(st, 'axe', T0).locked);
   st.level = 5;
@@ -71,7 +78,7 @@ test('block: forge, level, materials, max', () => {
   assert.equal(TR.upBlock(st, 'axe', T0), null);
   st.tools = { axe: 4 };
   assert.ok(TR.upBlock(st, 'axe', T0).max);
-  assert.ok(TR.upBlock(st, 'rod', T0));
+  assert.equal(TR.upBlock(st, 'rod', T0).bld, FISHER); // удочку — в домике рыболова
 });
 
 test('upgrade: pay up front, one at a time, finishes by time', () => {
@@ -125,7 +132,55 @@ test('tester: set level, drops the running upgrade of that tool', () => {
   assert.equal(st.toolUp, undefined);
   TR.setLevel(st, 'axe', 1);
   assert.equal(st.tools.axe, undefined);
-  assert.equal(TR.setLevel(st, 'rod', 2), false);
+  assert.equal(TR.setLevel(st, 'net', 2), false);
+  assert.ok(TR.setLevel(st, 'rod', 2));
+  assert.equal(TR.toolLevel(st, 'rod'), 2);
+});
+
+test('rod: own slot in the fisher hut, works in parallel with the anvil', () => {
+  const st = fresh({ level: 8 });
+  forge(st);
+  assert.match(TR.upBlock(st, 'rod', T0).why, /домике рыболова/);
+  built(st, FISHER);
+  stock(st, 'rod'); stock(st, 'axe');
+  assert.equal(TR.upBlock(st, 'rod', T0), null);
+  const r = TR.startUp(st, 'rod', T0);
+  assert.equal(r.t, 'rod'); assert.equal(r.to, 2);
+  assert.equal(st.toolUp, undefined); // наковальня свободна: старое место только у кузницы
+  assert.equal(st.toolUps[FISHER].t, 'rod');
+  assert.ok(TR.upBlock(st, 'rod', T0).busy);
+  assert.match(TR.upBlock(st, 'rod', T0).why, /в работе/);
+  assert.equal(TR.upBlock(st, 'axe', T0), null); // а топор куётся в это же время
+  TR.startUp(st, 'axe', T0 + 60 * S);
+  assert.deepEqual(TR.busyAt(st).sort(), [FISHER, TOOL_AT].sort());
+  assert.equal(TR.upLeft(st, T0 + 60 * S, FISHER), TOOL_UP.rod.up[1].time - 60);
+  assert.equal(TR.upLeft(st, T0 + 60 * S), TOOL_UP.axe.up[1].time);
+  // кончилось в обоих зданиях: upTick отдаёт по одному
+  const end = T0 + 3600 * S, got = [TR.upTick(st, end), TR.upTick(st, end), TR.upTick(st, end)];
+  assert.deepEqual(got.filter(Boolean).map((x) => x.t).sort(), ['axe', 'rod']);
+  assert.equal(got[2], null);
+  assert.equal(TR.toolLevel(st, 'rod'), 2);
+  assert.equal(TR.toolName(st, 'rod'), 'Бамбуковая удочка');
+  assert.deepEqual(TR.busyAt(st), []);
+  // ускорить за кристаллы — только то, что в этом здании
+  st.level = 12; stock(st, 'rod');
+  TR.startUp(st, 'rod', end);
+  assert.equal(TR.speedUp(st, end), null);
+  assert.ok(TR.speedUp(st, end, FISHER));
+  assert.deepEqual(TR.upTick(st, end), { t: 'rod', to: 3 });
+});
+
+test('rod rows: bites, regen, escapes, big fish', () => {
+  const st = fresh();
+  const rows = (lv) => Object.fromEntries(TR.perkRows(st, 'rod', lv).map((r) => [r.key, r.val]));
+  assert.equal(rows(1).bites, '10');
+  assert.equal(rows(4).bites, '20');
+  assert.equal(rows(1).regen, 'раз в 6 мин');
+  assert.equal(rows(3).regen, 'раз в 5 мин');
+  assert.equal(rows(1).hold, '25%');
+  assert.equal(rows(2).big, 'лещ');
+  assert.equal(rows(4).big, 'лещ, щука, сом');
+  assert.deepEqual(TR.upNews(st, 'rod', 2).map((r) => r.key).sort(), ['big', 'bites', 'hold'].sort());
 });
 
 test('hits: oak 5→4→3→2, rocks 2→2→1→1, boulder 5→4→3→2', () => {

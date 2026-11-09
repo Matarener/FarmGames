@@ -2,7 +2,7 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, BED_ITEM, BEDS, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS, STORE_ALL } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FISH, FLORA, BED_ITEM, BEDS, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS, STORE_ALL } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
 import * as Beds from '../game/beds.js';
 import * as Plant from '../game/planting.js';
@@ -19,7 +19,9 @@ import { ANIMALS } from '../game/animalData.js';
 import * as BR from '../game/buildRules.js';
 import * as HR from '../game/houseRules.js';
 import * as TR from '../game/toolRules.js';
-import { TOOL_UP, TOOL_AT, TOOL_TINT, TOOL_ROMAN } from '../game/toolData.js';
+import { TOOL_UP, TOOL_TINT, TOOL_ROMAN } from '../game/toolData.js';
+import * as Fish from '../game/fishRules.js';
+import { BAITS, BAIT_SHOP } from '../game/fishData.js';
 import { Mover } from '../game/Mover.js';
 
 // версия сборки (tools/build.mjs); при локальном запуске — «локально»
@@ -447,7 +449,9 @@ export class UI {
     if (cost) p.appendChild(h('div', 'pp-cost', this.costHtml(cost, this.farm)));
     const list = h('div', 'pp-list');
     for (const it of items) {
-      const b = h('button', 'pp-btn', `${this.ic(it.icon)}<span class="pp-l">${it.label}</span>${it.sub ? `<span class="pp-s">${it.sub}</span>` : ''}`);
+      // note — вторая строка под названием (переносится), sub — коротко справа
+      const note = it.note ? `<small class="pp-n">${it.note}</small>` : '';
+      const b = h('button', 'pp-btn', `${this.ic(it.icon)}<span class="pp-l">${it.label}${note}</span>${it.sub ? `<span class="pp-s">${it.sub}</span>` : ''}`);
       b.disabled = !!it.disabled;
       b.onclick = () => { this.closePopup(); it.onClick(); };
       list.appendChild(b);
@@ -770,7 +774,7 @@ export class UI {
       row.append(inp, b);
       body.appendChild(row);
     }
-    // уровни инструментов из кузницы — сразу, без цены и времени (то, что куётся, пропадает)
+    // уровни инструментов (кузница, удочка) — сразу, без цены и времени (то, что улучшается, пропадает)
     for (const t of Object.keys(TOOL_UP)) {
       const row = h('div', 'dev-row dev-tool', `${this.ic(ITEMS[TOOL_UP[t].item].icon)}<span>${TOOL_UP[t].names[0]}</span>`);
       const lv = TR.toolLevel(f.st, t), chips = h('div', 'dev-lv');
@@ -1204,27 +1208,29 @@ export class UI {
   // ---------- Здание с крафтом: очередь и рецепты ----------
   // Сверху — очередь (готовое, что делается, что ждёт, свободные места), под ней — рецепты сеткой.
   // Выбранный рецепт — карточка снизу: что уйдёт и кнопка. Время в очереди идёт каждую секунду
-  // (craftTick); товар доделался — окно пересобирается. У кузницы две вкладки: «Ковка» (товары)
-  // и «Инструменты» (улучшение топора, кирки и лейки — forgeTools); tab — открыть сразу на ней, tool — с этим
-  // инструментом.
+  // (craftTick); товар доделался — окно пересобирается. У некоторых зданий несколько вкладок (BUILDINGS[].tabs):
+  // у кузницы «Ковка» (товары) и «Инструменты» (улучшение топора, кирки и лейки — toolsTab), у домика рыболова
+  // «Наживка» (товары), «Лавка» (покупка наживки — baitShop) и «Удочка» (toolsTab). tab — открыть сразу на
+  // вкладке, tool — с этим инструментом.
   craftPanel(f, k, tab, tool) {
     const b = BUILDINGS[k];
-    if (!this.cr || this.cr.k !== k) this.cr = { k, sel: null, tab: 'craft', tool: null };
+    if (!this.cr || this.cr.k !== k) this.cr = { k, sel: null, tab: 'craft', tool: null, shop: null };
     const S = this.cr;
     if (tab) S.tab = tab;
     if (tool) S.tool = tool;
     this.openPanel('craft', b.name, (body, card) => {
       const st = f.st, now = Date.now(), v = BR.queueView(st, k, now);
       S.key = this.craftKey(f, k, now);
-      if (k === TOOL_AT) {
+      if (b.tabs) {
         const chips = h('div', 'pl-chips');
-        for (const [key, name] of [['craft', 'Ковка'], ['tools', 'Инструменты']]) {
+        for (const [key, name] of b.tabs) {
           const c = h('button', 'inv-chip' + (S.tab === key ? ' on' : ''), name);
           c.onclick = () => { if (S.tab !== key) { S.tab = key; this.sfx('tap'); this.refreshPanel(); } };
           chips.appendChild(c);
         }
         body.appendChild(chips);
-        if (S.tab === 'tools') return this.forgeTools(f, body, card);
+        if (S.tab === 'tools') return this.toolsTab(f, k, body, card);
+        if (S.tab === 'shop') return this.baitShop(f, k, body, card);
       }
       body.appendChild(h('div', 'pn-hero', `${this.ic(bldId(k), 'ic big')}<div><span>${b.desc}</span></div>`));
       body.appendChild(h('div', 'pn-sub', `Очередь · ${v.jobs.length} из ${b.slots}`));
@@ -1254,39 +1260,88 @@ export class UI {
     });
   }
 
-  // ---------- Кузница: улучшение инструментов ----------
-  // Сверху — наковальня (что куётся, полоска, «Доковать сейчас»), под ней — топор, кирка и лейка строками:
-  // нынешний уровень и что дальше. Выбранный инструмент — карточка снизу: что станет лучше (нынешнее → новое),
-  // что уйдёт и кнопка «Улучшить · 5 мин». Удочка здесь не улучшается.
-  forgeTools(f, body, card) {
-    const S = this.cr, st = f.st, now = Date.now(), u = TR.toolUp(st);
-    body.appendChild(h('div', 'pn-hero', `${this.ic(bldId(TOOL_AT), 'ic big')}<div><span>Кузнец делает инструменты лучше: топор и кирка бьют сильнее, лейка вмещает больше и поливает сразу несколько грядок. Пока инструмент куётся, им можно работать.</span></div>`));
-    body.appendChild(h('div', 'pn-sub', 'Наковальня'));
+  // ---------- Улучшение инструментов (кузница, домик рыболова) ----------
+  // Сверху — место, где улучшают (наковальня, верстак: что делается, полоска, «Доделать сейчас»), под ним —
+  // инструменты этого здания строками: нынешний уровень и что дальше. Выбранный инструмент — карточка снизу:
+  // что станет лучше (нынешнее → новое), что уйдёт и кнопка «Улучшить · 5 мин».
+  toolsTab(f, k, body, card) {
+    const S = this.cr, st = f.st, now = Date.now(), u = TR.toolUp(st, k), W = BUILDINGS[k].tools, list = TR.toolsAt(k);
+    body.appendChild(h('div', 'pn-hero', `${this.ic(bldId(k), 'ic big')}<div><span>${W.hero}</span></div>`));
+    body.appendChild(h('div', 'pn-sub', W.slot));
     if (u) {
-      const left = TR.upLeft(st, now), gems = BR.gemsFor(left);
+      const left = TR.upLeft(st, now, k), gems = BR.gemsFor(left);
       const a = h('div', 'tl-anvil',
         `<i>${this.toolIc(u.t, u.to)}</i><div class="tl-a-t"><b>${TR.toolName(st, u.t, u.to)}</b>` +
-        `<div class="cr-bar"><u style="width:${(TR.upPart(st, now) * 100).toFixed(1)}%"></u></div><span>Осталось <b class="tl-left">${leftText(left)}</b></span></div>`);
+        `<div class="cr-bar"><u style="width:${(TR.upPart(st, now, k) * 100).toFixed(1)}%"></u></div><span>Осталось <b class="tl-left">${leftText(left)}</b></span></div>`);
       const sp = h('button', 'btn-s gold tl-speed', `<span>${gems} ${this.ic('gem', 'ic-s')}</span>`);
-      sp.title = 'Доковать сейчас';
-      sp.dataset.g = gems; sp.disabled = st.gems < gems; sp.onclick = () => f.tools.speed();
+      sp.title = 'Доделать сейчас';
+      sp.dataset.g = gems; sp.disabled = st.gems < gems; sp.onclick = () => f.tools.speed(k);
       a.appendChild(sp);
       body.appendChild(a);
-    } else body.appendChild(h('div', 'tl-anvil empty', '<span>Свободна: выберите инструмент, который улучшить</span>'));
-    body.appendChild(h('div', 'pn-sub', 'Инструменты'));
-    if (!S.tool) S.tool = u ? u.t : Object.keys(TOOL_UP).find((t) => TR.nextUp(st, t)) || 'axe';
-    const list = h('div', 'tl-list');
-    for (const t of Object.keys(TOOL_UP)) {
+    } else body.appendChild(h('div', 'tl-anvil empty', `<span>${W.free}: ${list.length > 1 ? 'выберите инструмент, который улучшить' : 'можно улучшать'}</span>`));
+    body.appendChild(h('div', 'pn-sub', list.length > 1 ? 'Инструменты' : 'Инструмент'));
+    if (!S.tool || !list.includes(S.tool)) S.tool = u ? u.t : list.find((t) => TR.nextUp(st, t)) || list[0];
+    const rows = h('div', 'tl-list');
+    for (const t of list) {
       const lv = TR.toolLevel(st, t), next = TR.nextUp(st, t), why = TR.upBlock(st, t, now);
-      const sub = u && u.t === t ? 'куётся' : !next ? 'лучше уже не сделать' : why && why.locked ? `дальше — с ${next.level} ур.` : why && why.busy ? 'наковальня занята' : 'можно улучшить';
+      const sub = u && u.t === t ? W.doing : !next ? 'лучше уже не сделать' : why && why.locked ? `дальше — с ${next.level} ур.` : why && why.busy ? W.busy.toLowerCase() : 'можно улучшить';
       const row = h('button', 'tl-row' + (S.tool === t ? ' sel' : '') + (!why ? ' can' : ''),
         `<i>${this.toolIc(t, lv)}</i><div><b>${TR.toolName(st, t)}</b><span>${TOOL_ROMAN[lv - 1]} из ${TOOL_ROMAN.length} · ${sub}</span></div>`);
       row.onclick = () => { S.tool = t; this.sfx('tap'); this.refreshPanel(); };
-      list.appendChild(row);
+      rows.appendChild(row);
     }
-    body.appendChild(list);
+    body.appendChild(rows);
     card.appendChild(this.toolCard(f, S.tool, now));
     card.classList.add('with-info');
+  }
+
+  // ---------- Домик рыболова: лавка наживки ----------
+  // Пачки наживки строками (сколько штук, цена, кто клюёт); выбранная — карточка снизу: кто клюёт с какой
+  // удочкой (крупная рыба со слабой удочкой срывается), сколько в рюкзаке и «Купить».
+  baitShop(f, k, body, card) {
+    const S = this.cr, st = f.st, now = Date.now();
+    body.appendChild(h('div', 'pn-hero', `${this.ic(bldId(k), 'ic big')}<div><span>Рыболов продаёт наживку: червяков — на окуня, выползков — на сома. Тесто, мормышку и живца он делает сам — вкладка «Наживка».</span></div>`));
+    body.appendChild(h('div', 'pn-sub', 'Лавка'));
+    if (!S.shop || !Fish.shopOffer(S.shop)) S.shop = BAIT_SHOP[0].item;
+    const rows = h('div', 'tl-list');
+    for (const o of BAIT_SHOP) {
+      const it = ITEMS[o.item], lock = st.level < o.level;
+      const row = h('button', 'tl-row' + (S.shop === o.item ? ' sel' : '') + (lock ? ' locked' : ''),
+        `<i>${this.ic(it.icon, 'ic')}${lock ? this.ic('lock', 'mk-lock') : ''}</i><div><b>${it.name} ×${o.qty}</b>` +
+        `<span>${lock ? `с ${o.level} ур.` : `${o.price} ${this.ic('coin', 'ic-s')} · в рюкзаке ${fmtNum(Inv.count(st, o.item))}`}</span></div>`);
+      row.onclick = () => { S.shop = o.item; this.sfx('tap'); this.refreshPanel(); };
+      rows.appendChild(row);
+    }
+    body.appendChild(rows);
+    card.appendChild(this.baitCard(f, S.shop, now));
+    card.classList.add('with-info');
+  }
+
+  // Кто клюёт на наживку bait (null — без наживки) с нынешней удочкой: строки «Лещ — 47%»
+  baitOdds(f, bait) {
+    const st = f.st;
+    return Fish.odds(st, bait).sort((a, b) => b.p - a.p || a.big - b.big).map((r) => {
+      const fish = FISH[r.fish];
+      const val = r.big ? `нужна ${TR.toolName(st, 'rod', fish.rod).toLowerCase()}` : `${Math.round(r.p * 100)}%`;
+      return `<div class="stat${r.big ? ' off' : ''}"><span>${this.ic(r.fish, 'ic-s')} ${fish.name}</span><b>${val}</b></div>`;
+    }).join('');
+  }
+
+  // Карточка пачки наживки в лавке
+  baitCard(f, id, now) {
+    const st = f.st, o = Fish.shopOffer(id), it = ITEMS[id], why = Fish.buyBlock(st, id, now);
+    const box = h('div', 'inv-info ui-layer tl-card',
+      `<div class="ii-ic">${this.ic(it.icon, 'ic big')}</div>` +
+      `<div class="ii-t"><b>${it.name} ×${o.qty}</b><span>${BAITS[id].desc}</span><span class="ii-f">в рюкзаке ${fmtNum(Inv.count(st, id))} · шанс за заброс</span></div>`);
+    box.appendChild(h('div', 'stats tl-stats', this.baitOdds(f, id)));
+    if (st.level < o.level) { box.appendChild(h('div', 'ii-note', `Откроется с ${o.level} уровня.`)); return box; }
+    if (why && why !== 'Не хватает монет') box.appendChild(h('div', 'ii-note', why + '.'));
+    const acts = h('div', 'ii-a');
+    const go = h('button', 'btn-s gold', `Купить · ${o.price} ${this.ic('coin', 'ic-s')}`);
+    go.disabled = !!why; go.onclick = () => f.buyBait(id);
+    acts.appendChild(go);
+    box.appendChild(acts);
+    return box;
   }
 
   // Иконка инструмента t с уровнем lv: картинка из рюкзака и значок уровня в углу (II, III, IV — цветом металла)
@@ -1298,12 +1353,12 @@ export class UI {
 
   // Карточка инструмента в кузнице: что даёт нынешний уровень и следующий, цена, кнопка
   toolCard(f, t, now) {
-    const st = f.st, lv = TR.toolLevel(st, t), next = TR.nextUp(st, t), u = TR.toolUp(st), why = TR.upBlock(st, t, now);
+    const st = f.st, lv = TR.toolLevel(st, t), next = TR.nextUp(st, t), at = TR.atOf(t), u = TR.toolUp(st, at), why = TR.upBlock(st, t, now), W = BUILDINGS[at].tools;
     const cur = TR.perkRows(st, t, lv), nx = next ? TR.perkRows(st, t, lv + 1) : null;
     // заголовок — что получится; ниже — из чего и сколько ковать
     const box = h('div', 'inv-info ui-layer tl-card',
       `<div class="ii-ic">${this.toolIc(t, next ? lv + 1 : lv, 'ic big')}</div>` +
-      `<div class="ii-t"><b>${TR.toolName(st, t, next ? lv + 1 : lv)}</b><span>${next ? `Уровень ${TOOL_ROMAN[lv]} · сейчас: ${TR.toolName(st, t).toLowerCase()} · ковать ${fmtShort(next.time)}` : 'Лучший инструмент: улучшать больше некуда'}</span></div>`);
+      `<div class="ii-t"><b>${TR.toolName(st, t, next ? lv + 1 : lv)}</b><span>${next ? `Уровень ${TOOL_ROMAN[lv]} · сейчас: ${TR.toolName(st, t).toLowerCase()} · ${W.make} ${fmtShort(next.time)}` : 'Лучший инструмент: улучшать больше некуда'}</span></div>`);
     const stats = cur.map((r, i) => {
       const b = nx && nx[i] && nx[i].val !== r.val ? nx[i].val : null;
       return `<div class="stat${b ? ' up' : ''}"><span>${r.label}</span><b>${r.val}${b ? ` <i>→ ${b}</i>` : ''}</b></div>`;
@@ -1311,7 +1366,7 @@ export class UI {
     box.appendChild(h('div', 'stats tl-stats', stats));
     if (!next) return box;
     box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(next.cost, f)));
-    if (u && u.t === t) { box.appendChild(h('div', 'ii-note', `Куётся: будет готово через <b class="tl-left">${leftText(TR.upLeft(st, now))}</b>.`)); return box; }
+    if (u && u.t === t) { box.appendChild(h('div', 'ii-note', `${W.doing[0].toUpperCase()}${W.doing.slice(1)}: будет готово через <b class="tl-left">${leftText(TR.upLeft(st, now, at))}</b>.`)); return box; }
     if (why && !why.lack) box.appendChild(h('div', 'ii-note', why.why + '.'));
     const acts = h('div', 'ii-a');
     const go = h('button', 'btn-s gold', `Улучшить · ${fmtShort(next.time)}`);
@@ -1321,12 +1376,12 @@ export class UI {
     return box;
   }
 
-  // Раз в секунду на вкладке «Инструменты»: полоска и время на наковальне
-  anvilTick(f, now) {
+  // Раз в секунду на вкладке улучшения: полоска и время на наковальне (верстаке) здания k
+  anvilTick(f, k, now) {
     const el = this.panelEl.querySelector('.tl-anvil'), st = f.st;
-    if (!el || !TR.toolUp(st)) return;
-    const left = TR.upLeft(st, now), gems = BR.gemsFor(left);
-    el.querySelector('.cr-bar u').style.width = (TR.upPart(st, now) * 100).toFixed(1) + '%';
+    if (!el || !TR.toolUp(st, k)) return;
+    const left = TR.upLeft(st, now, k), gems = BR.gemsFor(left);
+    el.querySelector('.cr-bar u').style.width = (TR.upPart(st, now, k) * 100).toFixed(1) + '%';
     for (const e of this.panelEl.querySelectorAll('.tl-left')) e.textContent = leftText(left);
     const sp = el.querySelector('.tl-speed');
     if (sp.dataset.g !== String(gems)) { sp.dataset.g = gems; sp.innerHTML = `<span>${gems} ${this.ic('gem', 'ic-s')}</span>`; }
@@ -1372,6 +1427,7 @@ export class UI {
       `<div class="ii-t"><b>${it.name}${r.n > 1 ? ` ×${r.n}` : ''}</b><span>${it.desc}</span><span class="ii-f">${facts}</span></div>`);
     const x = h('button', 'ii-x', '✕'); x.onclick = () => { this.cr.sel = null; this.refreshPanel(); };
     box.appendChild(x);
+    if (it.bait) box.appendChild(h('div', 'stats tl-stats', this.baitOdds(f, it.key))); // наживка: кто на неё клюёт
     box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(r.need, f)));
     if (st.level < r.level) { box.appendChild(h('div', 'ii-note', `Откроется с ${r.level} уровня.`)); return box; }
     if (block && !/^Не хватает/.test(block)) box.appendChild(h('div', 'ii-note', block));
@@ -1383,12 +1439,12 @@ export class UI {
     return box;
   }
 
-  // Что в очереди здания (вид каждого места): сменилось — окно пересобирается. У кузницы — и наковальня
-  // с уровнями инструментов.
+  // Что в очереди здания (вид каждого места): сменилось — окно пересобирается. У зданий, где улучшают
+  // инструменты, — и наковальня (верстак) с уровнями инструментов.
   craftKey(f, k, now) {
-    const st = f.st, u = k === TOOL_AT && TR.toolUp(st);
+    const st = f.st, list = TR.toolsAt(k), u = list.length && TR.toolUp(st, k);
     return BR.queueView(st, k, now).jobs.map((j) => (j.done ? 'd' : j.running ? 'r' : 'w') + j.id).join(',') + '|' + (BR.isBuilt(st, k, now) ? 1 : 0) +
-      (k === TOOL_AT ? `|${u ? u.t + u.to : ''}|${Object.keys(TOOL_UP).map((t) => TR.toolLevel(st, t)).join('')}` : '');
+      (list.length ? `|${u ? u.t + u.to : ''}|${list.map((t) => TR.toolLevel(st, t)).join('')}` : '');
   }
 
   // Раз в секунду, пока открыто окно здания: время и полоска у того, что делается сейчас
@@ -1397,7 +1453,7 @@ export class UI {
     if (!S) return;
     const now = Date.now();
     if (this.craftKey(f, S.k, now) !== S.key) return this.refreshPanel();
-    if (S.k === TOOL_AT && S.tab === 'tools') return this.anvilTick(f, now);
+    if (S.tab === 'tools' && TR.toolsAt(S.k).length) return this.anvilTick(f, S.k, now);
     const j = BR.queueView(f.st, S.k, now).jobs.find((x) => x.running), el = this.panelEl.querySelector('.cr-slot.run');
     if (!j || !el) return;
     el.querySelector('.cr-bar u').style.width = (j.k * 100).toFixed(1) + '%';
@@ -1890,20 +1946,22 @@ export class UI {
     const x = h('button', 'ii-x', '✕'); x.onclick = () => { this.inv.sel = null; this.refreshPanel(); };
     box.appendChild(x);
     const acts = h('div', 'ii-a');
-    // топор, кирка, лейка: улучшают в кузнице — кнопка открывает её вкладку «Инструменты»
+    // топор, кирка, лейка: улучшают в кузнице, удочку — в домике рыболова; кнопка открывает вкладку улучшения
     if (tl) {
-      const next = TR.nextUp(st, tl), u = TR.toolUp(st), why = TR.upBlock(st, tl, Date.now());
-      const note = !next ? 'Лучше уже не сделать.' : u && u.t === tl ? `Куётся в кузнице: ${TR.toolName(st, tl, u.to).toLowerCase()} будет готов${TOOL_UP[tl].fem ? 'а' : ''} через ${leftText(TR.upLeft(st, Date.now()))}.`
-        : why && why.forge ? `Улучшают в кузнице: сначала постройте её (чертёж — на рынке, с ${BUILDINGS[TOOL_AT].level} ур.).`
-          : why && why.locked ? `Следующий уровень — ${TR.toolName(st, tl, lv + 1).toLowerCase()} — в кузнице с ${next.level} ур.`
-            : `В кузнице можно сделать ${TR.toolName(st, tl, lv + 1).toLowerCase()}.`;
+      const at = TR.atOf(tl), W = BUILDINGS[at].tools, next = TR.nextUp(st, tl), u = TR.toolUp(st, at), why = TR.upBlock(st, tl, Date.now());
+      const note = !next ? 'Лучше уже не сделать.' : u && u.t === tl ? `${TR.toolName(st, tl, u.to)} ${W.in}: будет готов${TOOL_UP[tl].fem ? 'а' : ''} через ${leftText(TR.upLeft(st, Date.now(), at))}.`
+        : why && why.bld ? `Улучшают ${W.in}: сначала постройте ${BUILDINGS[at].he ? 'его' : 'её'} (чертёж — на рынке, с ${BUILDINGS[at].level} ур.).`
+          : why && why.locked ? `Следующий уровень — ${TR.toolName(st, tl, lv + 1).toLowerCase()} — ${W.in} с ${next.level} ур.`
+            : `${W.in[0].toUpperCase()}${W.in.slice(1)} можно сделать ${TR.toolName(st, tl, lv + 1).toLowerCase()}.`;
       box.appendChild(h('div', 'ii-note', note));
-      if (next && !(why && why.forge)) {
-        const b = h('button', 'btn-s gold', `${this.ic(bldId(TOOL_AT))} В кузницу`);
-        b.onclick = () => this.craftPanel(f, TOOL_AT, 'tools', tl);
+      if (next && !(why && why.bld)) {
+        const b = h('button', 'btn-s gold', `${this.ic(bldId(at))} ${W.to}`);
+        b.onclick = () => this.craftPanel(f, at, 'tools', tl);
         acts.appendChild(b);
       }
     }
+    // наживка: кто на неё клюёт с нынешней удочкой
+    if (it.bait) box.appendChild(h('div', 'stats tl-stats', this.baitOdds(f, it.key)));
     if (it.food) {
       const b = h('button', 'btn-s', `Съесть +${it.food} ${this.ic('energy')}`);
       b.disabled = st.energy >= f.maxEnergy; b.onclick = () => f.eat(it.key);

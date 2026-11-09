@@ -2,6 +2,8 @@
 
 import { BUILDINGS, CRAFT_GOODS, bpId, bldId } from './buildData.js';
 import { ANIMALS, ANIMAL_GOODS, animalType } from './animalData.js';
+import { BAITS } from './fishData.js';
+import { TOOL_UP } from './toolData.js';
 
 export const CROPS = {
   carrot:     { name: 'Морковь',   level: 1,  seed: 2,   time: 120,   sell: 5,   xp: 1,  food: 3 },
@@ -21,20 +23,20 @@ for (const [k, v] of Object.entries(CROPS)) v.key = k;
 // закрытых по уровню культур в конце сетки — не больше locked, ближайших по уровню.
 export const PLANT_PICK = { fast: 1800, locked: 4 };
 
-// Рыба из пруда: хранится вместе с урожаем, её можно съесть или продать.
-// Сытость рыбы меньше энергии на заброс (в среднем 0,9 энергии с заброса), иначе рыбалка — вечный двигатель:
-// поел рыбы — энергии больше, чем потратил (проверено ботом баланса tools/balance-sim.mjs).
+// Рыба из пруда: хранится вместе с урожаем, её можно съесть или продать. chance — как часто клюёт без наживки
+// (новые рыбы без наживки не клюют: chance 0), rod — уровень удочки, который нужен (со слабой крупная рыба
+// клюёт, но срывается), fem — «она» (щука сорвалась). Что клюёт на какую наживку, клёв и удочка по уровням — fishData.js.
+// Сытость рыбы меньше энергии на заброс (без наживки в среднем 0,9 энергии с заброса), иначе рыбалка — вечный
+// двигатель: поел рыбы — энергии больше, чем потратил (проверено ботом баланса tools/balance-sim.mjs).
 export const FISH = {
-  fish_carp:   { name: 'Карась',        chance: 60, sell: 4,  food: 1, xp: 1 },
-  fish_perch:  { name: 'Окунь',         chance: 30, sell: 8,  food: 1, xp: 2 },
-  fish_gold:   { name: 'Золотая рыбка', chance: 10, sell: 40, food: 3, xp: 5 },
+  fish_carp:    { name: 'Карась',        chance: 60, sell: 4,  food: 1, xp: 1 },
+  fish_perch:   { name: 'Окунь',         chance: 30, sell: 8,  food: 1, xp: 2 },
+  fish_gold:    { name: 'Золотая рыбка', chance: 10, sell: 40, food: 3, xp: 5, fem: true },
+  fish_bream:   { name: 'Лещ',           chance: 0,  sell: 15, food: 2, xp: 2, rod: 2 },
+  fish_pike:    { name: 'Щука',          chance: 0,  sell: 28, food: 3, xp: 3, rod: 3, fem: true },
+  fish_catfish: { name: 'Сом',           chance: 0,  sell: 50, food: 4, xp: 5, rod: 4 },
 };
-for (const [k, v] of Object.entries(FISH)) v.key = k;
-export const FISH_CATCH = 0.75; // шанс, что рыба не сорвётся
-
-// Клёв: поклёвок в запасе на всю ферму не больше bites, новая — каждые regen секунд.
-// Без поклёвок рыбачить нельзя: рыбалка — пара минут в заход, а не бесконечный заработок. Правила — fishRules.js.
-export const FISHING = { bites: 10, regen: 6 * 60 };
+for (const [k, v] of Object.entries(FISH)) { v.key = k; v.rod = v.rod || 1; }
 
 export const RESOURCES = {
   wood: { name: 'Дерево' },
@@ -288,7 +290,7 @@ export const TOOLS = {
   tool_axe:    { name: 'Топор',  icon: 'axe',  desc: 'Рубит деревья, кусты и пни. Удар стоит 1 энергию.' },
   tool_pick:   { name: 'Кирка',  icon: 'pick', desc: 'Разбивает камни и валуны, иногда попадается руда.' },
   tool_can:    { name: 'Лейка',  icon: 'can',  desc: 'Поливает грядки. Набрать воду можно в пруду или у колодца.', can: true },
-  tool_rod:    { name: 'Удочка', icon: 'fish', desc: 'Ловит рыбу в пруду. Рыбу можно съесть или продать.' },
+  tool_rod:    { name: 'Удочка', icon: 'fish', desc: 'Ловит рыбу в пруду. Рыбу можно съесть или продать. Удочку улучшают в домике рыболова: в запасе больше поклёвок, а крупная рыба не срывается.' },
 };
 
 export const seedId = (crop) => 'seed_' + crop;
@@ -303,7 +305,15 @@ for (const c of Object.values(CROPS)) ITEMS[c.key] = {
   tabs: c.food ? ['food', 'plants'] : ['plants'],
   desc: c.food ? 'Урожай с грядки. Можно съесть или продать.' : 'Урожай с грядки. Несъедобно, но хорошо продаётся.',
 };
-for (const f of Object.values(FISH)) ITEMS[f.key] = { key: f.key, name: f.name, icon: f.key, sell: f.sell, food: f.food, tabs: ['food'], desc: 'Рыба из пруда. Можно съесть или продать.' };
+// крупная рыба: на какую наживку клюёт и какая нужна удочка
+const fishDesc = (f) => {
+  if (f.rod <= 1) return 'Рыба из пруда. Можно съесть или продать.';
+  const on = Object.values(BAITS).filter((b) => b.pool[f.key]).map((b) => b.short).join(' и ');
+  return `Крупная рыба: клюёт ${on}, а удержит ${f.fem ? 'её' : 'его'} ${TOOL_UP.rod.names[f.rod - 1].toLowerCase()} или лучше. Можно съесть или продать.`;
+};
+for (const f of Object.values(FISH)) ITEMS[f.key] = { key: f.key, name: f.name, icon: f.key, sell: f.sell, food: f.food, tabs: ['food'], desc: fishDesc(f) };
+// Наживка (fishData.js) лежит в «Инструментах» рядом с удочкой; её не продают
+for (const b of Object.values(BAITS)) ITEMS[b.key] = { key: b.key, name: b.name, icon: b.key, tabs: ['tools'], bait: true, desc: b.desc + ' Одна наживка — один заброс: выберите её в окне пруда.' };
 for (const c of Object.values(CROPS)) ITEMS[seedId(c.key)] = {
   key: seedId(c.key), name: 'Семена: ' + c.name.toLowerCase(), icon: c.key, badge: 'seed', tabs: ['plants'], seedOf: c.key,
   desc: `Посадите на пустую грядку. Растёт ${fmtMin(c.time)}, доступно с ${c.level} уровня.`,

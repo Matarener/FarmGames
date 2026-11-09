@@ -248,11 +248,13 @@ test('task texts: number and word agree', () => {
 test('full playthrough of branches', () => {
   const st = fresh(), Q = R.questState(st);
   let c = at('2026-11-07T12:00:00Z');
-  const evs = ['harvest', 'plant', 'water', 'fish', 'chop', 'stump', 'mine', 'mow', 'pick', 'sow', 'sell', 'earn', 'buy', 'expand', 'place', 'build', 'craft', 'feed', 'animal', 'tool'];
-  const keys = { harvest: ['carrot', 'wheat', 'beet', 'cabbage', 'tomato', 'corn', 'pumpkin'], plant: ['carrot'], fish: ['fish_carp', 'fish_perch', 'fish_gold'], mine: ['rock', 'boulder'], pick: ['apple', 'cherry'], sell: ['carrot', 'fish_carp'], buy: ['seed_carrot', 'sap_apple', 'sprinkler_drip', 'bp_kitchen', 'decor_bench', 'bp_feedmill', 'animal_chicken_baby'], sow: ['apple'], chop: ['oak', 'pine'], place: ['sprinkler_drip', 'decor_bench', 'animal_chicken_baby'],
-    build: ['kitchen', 'carpentry', 'forge', 'stonecutter', 'feedmill'], craft: ['carrot_salad', 'planks', 'nails', 'borscht', 'stone_block'],
+  const evs = ['harvest', 'plant', 'water', 'fish', 'chop', 'stump', 'mine', 'mow', 'pick', 'sow', 'sell', 'earn', 'buy', 'expand', 'place', 'build', 'craft', 'feed', 'animal', 'tool', 'bait'];
+  const keys = { harvest: ['carrot', 'wheat', 'beet', 'cabbage', 'tomato', 'corn', 'pumpkin'], plant: ['carrot'], fish: ['fish_carp', 'fish_perch', 'fish_gold', 'fish_bream', 'fish_pike', 'fish_catfish'], mine: ['rock', 'boulder'], pick: ['apple', 'cherry'], sell: ['carrot', 'fish_carp'], buy: ['seed_carrot', 'sap_apple', 'sprinkler_drip', 'bp_kitchen', 'decor_bench', 'bp_feedmill', 'animal_chicken_baby', 'bp_fisher', 'bait_worm'], sow: ['apple'], chop: ['oak', 'pine'], place: ['sprinkler_drip', 'decor_bench', 'animal_chicken_baby'],
+    build: ['kitchen', 'carpentry', 'forge', 'stonecutter', 'feedmill', 'fisher'],
+    craft: ['carrot_salad', 'planks', 'nails', 'borscht', 'stone_block', 'bait_dough', 'bait_jig', 'bait_live'],
     feed: ['chicken'], animal: ['egg', 'angora', 'goose_feather', 'truffle', 'wool', 'milk', 'milk', 'milk', 'milk'],
-    tool: ['axe2', 'pick2', 'can2', 'axe3', 'pick3', 'can3', 'axe4', 'pick4', 'can4'] };
+    tool: ['axe2', 'pick2', 'can2', 'axe3', 'pick3', 'can3', 'axe4', 'pick4', 'can4', 'rod2', 'rod3', 'rod4'],
+    bait: ['bait_worm'] };
   for (let round = 0; round < 60; round++) {
     st.level = Math.min(17, 1 + round); st.house = Math.min(5, 1 + (round >> 2)); st.well = round > 3 ? 1 : 0;
     c = { ...c, stats: { beds: 2 + 2 * round, bedsAll: 2 + 2 * round } }; // грядок прибавляется

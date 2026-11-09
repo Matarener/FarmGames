@@ -7,6 +7,10 @@
 // можно делать товары по рецептам RECIPES, по одному за раз, в очереди до slots мест.
 // sprite — картинка готового здания, site — его же стройка в лесах (assets/art), xp — опыт за постройку.
 // he — название мужского рода («Кормоцех построен», «нажмите на него»); без него — женского («Кухня построена»).
+// tabs — вкладки окна, если их несколько: craft — очередь и рецепты, tools — улучшение инструментов (toolData.js,
+// у каких инструментов at — это здание), shop — лавка (у домика рыболова — наживка, fishData.js BAIT_SHOP).
+// tools — слова для вкладки улучшения: slot — где делают (заголовок), free / busy — «Свободна» / «Наковальня занята», in — «в кузнице», to — кнопка «В кузницу»,
+// doing — «куётся», make — «ковать 5 мин», old — чем можно работать, пока делают, hero — текст сверху.
 export const BUILDINGS = {
   kitchen: {
     name: 'Кухня', level: 3, blueprint: 50, cost: { wood: 20, stone: 15 }, time: 5 * 60, xp: 10, slots: 3, w: 2, h: 2,
@@ -22,6 +26,11 @@ export const BUILDINGS = {
     name: 'Кузница', level: 5, blueprint: 150, cost: { planks: 10, stone: 25, ore: 4 }, time: 20 * 60, xp: 20, slots: 3, w: 2, h: 2,
     sprite: 'building_forge', site: 'site_forge', verb: 'Выковать',
     desc: 'Плавит руду в слитки и куёт из них гвозди и подковы.',
+    tabs: [['craft', 'Ковка'], ['tools', 'Инструменты']],
+    tools: {
+      slot: 'Наковальня', free: 'Свободна', busy: 'Наковальня занята', in: 'в кузнице', to: 'В кузницу', doing: 'куётся', make: 'ковать', old: 'работать старым',
+      hero: 'Кузнец делает инструменты лучше: топор и кирка бьют сильнее, лейка вмещает больше и поливает сразу несколько грядок. Пока инструмент куётся, им можно работать.',
+    },
   },
   stonecutter: {
     name: 'Камнерезная мастерская', short: 'Камнерезная', level: 6, blueprint: 200, cost: { planks: 12, nails: 10, stone: 15 }, time: 30 * 60, xp: 25, slots: 3, w: 2, h: 2,
@@ -33,6 +42,17 @@ export const BUILDINGS = {
     name: 'Кормоцех', he: true, level: 4, blueprint: 60, cost: { wood: 25, stone: 10 }, time: 5 * 60, xp: 10, slots: 3, w: 2, h: 2,
     sprite: 'building_feedmill', site: 'site_feedmill', verb: 'Сделать',
     desc: 'Делает корм для животных из урожая и сена: зерносмесь для кур и гусей, кроличий корм, мешанку для свиней и сенной брикет для коров и овец.',
+  },
+  // наживка и удочка (fishData.js): тесто, мормышку и живца делают здесь, червей и выползков продаёт лавка
+  fisher: {
+    name: 'Домик рыболова', he: true, level: 7, blueprint: 200, cost: { planks: 15, nails: 6, stone: 10 }, time: 15 * 60, xp: 20, slots: 3, w: 2, h: 2,
+    sprite: 'building_fisher', site: 'site_fisher', verb: 'Сделать',
+    desc: 'Делает и продаёт наживку и улучшает удочку. На свою наживку клюёт крупная рыба: лещ, щука и сом.',
+    tabs: [['craft', 'Наживка'], ['shop', 'Лавка'], ['tools', 'Удочка']],
+    tools: {
+      slot: 'Верстак', free: 'Свободен', busy: 'Верстак занят', in: 'в домике рыболова', to: 'В домик рыболова', doing: 'в работе', make: 'делать', old: 'рыбачить старой',
+      hero: 'Рыболов делает удочку лучше: в запасе больше поклёвок, рыба реже срывается, а крепкая удочка удержит крупную рыбу. Пока удочка в работе, ей можно рыбачить.',
+    },
   },
 };
 for (const [k, b] of Object.entries(BUILDINGS)) b.key = k;
@@ -99,6 +119,10 @@ export const RECIPES = {
   feed_rabbit:      { at: 'feedmill', level: 4, need: { carrot: 2, cabbage: 1 }, item: 'feed_rabbit', n: 2, time: 60, xp: 1 },
   feed_mash:        { at: 'feedmill', level: 6, need: { carrot: 2, beet: 1 }, item: 'feed_mash', n: 2, time: 120, xp: 1 },
   feed_hay:         { at: 'feedmill', level: 7, need: { hay: 3, wheat: 1 }, item: 'feed_hay', n: 2, time: 120, xp: 1 },
+  // домик рыболова: наживка (fishData.js BAITS)
+  bait_dough:       { at: 'fisher', level: 8,  need: { wheat: 2 }, item: 'bait_dough', n: 5, time: 60, xp: 1 },
+  bait_jig:         { at: 'fisher', level: 10, need: { horseshoe: 1 }, item: 'bait_jig', n: 3, time: 600, xp: 2 },
+  bait_live:        { at: 'fisher', level: 12, need: { fish_carp: 1 }, item: 'bait_live', n: 2, time: 120, xp: 1 },
 };
 for (const [k, r] of Object.entries(RECIPES)) r.key = k;
 
