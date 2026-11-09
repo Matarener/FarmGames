@@ -362,15 +362,29 @@ def add_shadow(img, ax, ay, crown, kind):
     return out, -x0, -y0
 
 
+def unspill(a):
+    """Трава: доочистка от пурпурного фона Codex, застрявшего между травинками. У зелёной травы нет
+    пикселей, где и красный, и синий заметно выше зелёного: такие — фон (гасим), полупрозрачные — без
+    оттенка фона. Только для травы: у красных ягод и яблок синий тоже бывает выше зелёного."""
+    a = a.astype(np.float32)
+    m = np.clip(np.minimum(a[..., 0], a[..., 2]) - a[..., 1], 0, None)
+    a[..., 3] *= 1 - np.where(m > 18, np.clip(m / 200, 0, 1), 0)
+    for c in (0, 2): a[..., c] = np.clip(a[..., c] - m * (m > 6), 0, 255)
+    a[a[..., 3] < 40, 3] = 0
+    a[a[..., 3] == 0, :3] = 0
+    return a.round().astype(np.uint8)
+
+
 def nobase(name, man):
     """Растение без подложки: размер по мерке NOBASE, опора — низ ствола, тень под ним."""
+    kind = NOBASE_KIND(name)
     a = load(name)
+    if kind == 'grass': a = unspill(a)
     boxes, lab = components(a, 1)
     y0, y1, x0, x1, i = boxes[0]
     crop = a[y0:y1, x0:x1].copy()
     crop[lab[y0:y1, x0:x1] != i, 3] = 0
     m = crop[..., 3] > 128
-    kind = NOBASE_KIND(name)
     fx, fy = foot_of(m)
     how, size = NOBASE[name]
     if how == 'w': k = size / crown_px(m, 1.0 if kind in ('grass', 'stump') else 0.6)
