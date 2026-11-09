@@ -1,0 +1,6 @@
+# job: best attempt — note   (OK = passes the check; FAIL = no good attempt)
+tree_oak: tree_oak__1.png — OK: clean key, no ground, 4 small tufts at the roots, matches reference.
+tree_pine: tree_pine__1.png — OK: clean key, no ground, small tufts, matches reference.
+bush_rose: bush_rose__1.png — OK: cyan key clean, no ground, roses/buds as in reference.
+stump_oak: stump_oak__2.png — OK. (__1: unkeyed magenta pocket between the right oak leaves.)
+grass_tall_0: grass_tall_0__1.png — FAIL (least bad of 3): magenta specks trapped in small gaps between blades; __2 more specks, __3 pink tint on back blades. Needs a despill / fill of enclosed magenta, or another key colour.
