@@ -353,25 +353,12 @@ export class Farm {
     this.save.schedule(() => this.serialize());
   }
 
-  // Куда призрак может подойти: клетка рядом с проходимой, до которой есть путь от него.
-  // Считается лениво (только когда пора что-то вырастить) и заново после каждого появления.
+  // Куда призрак может подойти: клетка рядом со свободной клеткой открытой земли (долететь он может
+  // до любой такой, Player.pass)
   reachFn() {
-    const w = this.world, p = this.player;
-    let seen = null, ver = -1;
-    const fill = () => {
-      seen = new Uint8Array(N * N); ver = w.version;
-      const q = [p.ty * N + p.tx]; seen[q[0]] = 1;
-      while (q.length) {
-        const i = q.pop(), x = i % N, y = (i / N) | 0;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const nx = x + dx, ny = y + dy, j = ny * N + nx;
-          if (w.inside(nx, ny) && !seen[j] && w.walkable(nx, ny)) { seen[j] = 1; q.push(j); }
-        }
-      }
-    };
+    const w = this.world;
     return (x, y) => {
-      if (!seen || ver !== w.version) fill();
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if ((dx || dy) && w.inside(nx, ny) && seen[ny * N + nx]) return true; }
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && w.walkable(x + dx, y + dy)) return true;
       return false;
     };
   }

@@ -29,7 +29,7 @@ import * as Placed from './placed.js';
 import * as Ponds from './ponds.js';
 import * as StoreAll from './storeAll.js';
 import * as Well from './well.js';
-import { N, T, objCells, normRot } from './World.js';
+import { T, objCells, normRot } from './World.js';
 import { toWorld } from '../engine/Iso.js';
 
 const tmp = { x: 0, y: 0 };
@@ -192,7 +192,6 @@ export class Mover {
       if (solid && ((x === p.tx && y === p.ty) || (next && x === next[0] && y === next[1]))) return { ok: false, why: 'Сюда нельзя: здесь стоит призрачок' };
       if (a && !a.obj && a.x === x && a.y === y) return { ok: false, why: 'Сюда нельзя: призрачок здесь работает' };
     }
-    if (solid && this.cutsOff(gx, gy)) return { ok: false, why: 'Сюда нельзя: так закроется проход' };
     // правила самой постройки (например, не хватает материалов) — placed.js
     if (s.kind === 'bag' && Placed.objOf(s.id)) { const why = Placed.placeWhy(f.st, w, s.id, gx, gy, { now: Date.now() }, s.rot); if (why) return { ok: false, why }; }
     return { ok: true };
@@ -219,37 +218,6 @@ export class Mover {
   curCells() {
     const s = this.sel;
     return s && s.o && OBJECTS[s.o.type] && !s.decor ? objCells(OBJECTS[s.o.type], s.o.rot) : objCells(s);
-  }
-
-  // Не отрежет ли постройка часть открытой земли от призрачка
-  cutsOff(gx, gy) {
-    const f = this.f, w = f.world, s = this.sel, p = f.player;
-    const nw = this.cellSet(gx, gy), old = this.cellSet(s.gx, s.gy, this.curCells());
-    const inNew = (x, y) => nw.has(w.idx(x, y));
-    const inOld = (x, y) => old.has(w.idx(x, y));
-    const count = (walk) => {
-      const seen = new Uint8Array(N * N), st = [[p.tx, p.ty]];
-      seen[w.idx(p.tx, p.ty)] = 1;
-      let n = 0;
-      while (st.length) {
-        const [x, y] = st.pop(); n++;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const nx = x + dx, ny = y + dy;
-          if (!w.inside(nx, ny) || seen[w.idx(nx, ny)] || !walk(nx, ny)) continue;
-          seen[w.idx(nx, ny)] = 1; st.push([nx, ny]);
-        }
-      }
-      return n;
-    };
-    const before = count((x, y) => w.walkable(x, y));
-    const after = count((x, y) => {
-      if (inNew(x, y)) return false;
-      if (inOld(x, y)) return w.isOpen(x, y) && w.tile(x, y) !== T.WATER;
-      return w.walkable(x, y);
-    });
-    // старое место освобождается (+площадь), новое занимается (−площадь);
-    // ставим из рюкзака (старого места нет) — земли честно становится меньше на площадь
-    return after < before - (s.gx < 0 ? nw.size : 0);
   }
 
   // ---------- нажатия ----------
