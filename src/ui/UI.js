@@ -34,6 +34,9 @@ const QTABS = [
   { key: 'event', name: 'Событие', icon: 'decor' },
 ];
 const tabOf = (v) => (v.kind === 'line' ? 'main' : v.kind);
+// горизонтальный телефон и широкий экран: у окон с разделами слева справа есть колонка карточки
+// (style.css, «Рюкзак и рынок на других экранах»); задание открывается в ней, а не вместо списка
+const WIDE = window.matchMedia('(max-height: 500px) and (orientation: landscape), (min-width: 900px) and (min-height: 500px)');
 const EVENT_NAME = (id) => { const e = EVENTS.find((x) => x.id === id); return e ? e.name : 'Событие'; };
 
 export class UI {
@@ -59,6 +62,9 @@ export class UI {
       if (e.detail && this._downT <= this._openT && e.target.closest('#popup, #panel')) { e.stopPropagation(); e.preventDefault(); }
     }, true);
     window.addEventListener('resize', () => { this._safe = null; });
+    // повернули телефон: открытое задание переезжает из колонки справа на место списка и обратно
+    const onWide = () => { if (this.panelOpen && this.panelEl.dataset.kind === 'quest') this.refreshPanel(); };
+    if (WIDE.addEventListener) WIDE.addEventListener('change', onWide); else WIDE.addListener(onWide);
   }
 
   bind(farm, icons) {
@@ -239,44 +245,51 @@ export class UI {
       ...Object.entries(r.items || {}).map(([id, n]) => `${n} ${this.ic(ITEMS[id] ? ITEMS[id].icon : id)}`)].filter(Boolean).join(' ');
   }
 
-  // Окно «Задания»: вкладки Основные / День / Неделя / Месяц / Событие, в каждой — список,
-  // нажатие на задание открывает его целиком (текст, цели, награда, стрелка, «на экран»).
-  // id — сразу это задание (нажали на карточку). Вкладку помним.
+  // Окно «Задания» — как рюкзак: разделы слева (Основные / День / Неделя / Месяц / Событие), справа — список.
+  // Нажали на задание — оно открывается целиком (текст, цели, награда, стрелка, «на экран»): на телефоне —
+  // вместо списка, в горизонтали и на широком экране — колонкой справа от списка. Разделы слева видны всегда,
+  // и из любого задания (в том числе открытого с карточки на экране) один шаг до любого списка заданий.
+  // id — сразу это задание (нажали на карточку). Раздел помним.
   questPanel(f, { id } = {}) {
-    const S = this.qp || (this.qp = { tab: 'main', sel: null });
+    const S = this.qp || (this.qp = { tab: 'main', sel: null, back: null });
     S.sel = id || null;
     this.openPanel('quest', 'Задания', (body) => this.questBody(f, body, S));
   }
 
   questBody(f, body, S) {
-    const Q = f.quests, vs = Q.views();
-    if (S.sel) {
-      const v = vs.find((x) => x.id === S.sel);
-      if (v) { S.tab = tabOf(v); return this.questDetail(f, body, S, v); }
-      S.sel = null;
-    }
-    const ctx = Q.ctx(), events = R.eventRows(f.st, ctx), per = f.st.quests.per;
-    const tabs = QTABS.filter((t) => t.key === 'main' || (t.key === 'event' ? events.length : per[t.key] && f.st.level >= PERIODIC_LEVEL));
+    const Q = f.quests, vs = Q.views(), ctx = Q.ctx(), events = R.eventRows(f.st, ctx), per = f.st.quests.per;
+    const v = S.sel && vs.find((x) => x.id === S.sel);
+    if (v) S.tab = tabOf(v); else S.sel = null;
+    // задания дня, недели и месяца — с PERIODIC_LEVEL: до этого их разделы бледные, а внутри — с какого уровня
+    const open = (k) => k === 'main' || k === 'event' || (f.st.level >= PERIODIC_LEVEL && !!per[k]);
+    const tabs = QTABS.filter((t) => t.key !== 'event' || events.length).map((t) => ({
+      ...t, empty: !open(t.key), dot: vs.some((x) => x.done && !x.claimed && tabOf(x) === t.key),
+    }));
     if (!tabs.some((t) => t.key === S.tab)) S.tab = 'main';
-    if (tabs.length > 1) {
-      const row = h('div', 'qt-tabs');
-      for (const t of tabs) {
-        const dot = vs.some((v) => v.done && !v.claimed && tabOf(v) === t.key);
-        const b = h('button', 'qt-tab' + (S.tab === t.key ? ' on' : ''), `${this.ic(t.icon)}<span>${t.name}</span>${dot ? '<i class="qt-dot"></i>' : ''}`);
-        b.onclick = () => { if (S.tab !== t.key) { S.tab = t.key; this.sfx('tap'); this.refreshPanel(); } };
-        row.appendChild(b);
-      }
-      body.appendChild(row);
+    const L = this.shelf(body, 'quest', {
+      tabs, tab: S.tab, retap: true, // нажатие по разделу открытого задания — назад к списку
+      onTab: (k) => { S.tab = k; S.sel = null; },
+      none: { icon: 'note', text: 'Нажмите на задание, чтобы узнать о нём больше' },
+    });
+    if (v && !WIDE.matches) {
+      L.list.dataset.scroll = `quest:${v.id}`; // задание открывается сверху, а прокрутка списка не теряется
+      return this.questDetail(f, L.list, S, v);
     }
-    if (S.tab === 'main') this.questLines(f, body, S);
-    else if (S.tab === 'event') this.questEvents(f, body, S, events);
-    else this.questPeriod(f, body, S, S.tab, ctx);
+    const list = L.list;
+    if (!open(S.tab)) list.appendChild(h('div', 'pn-empty', `${PERIODS[S.tab].title} откроются с ${PERIODIC_LEVEL} уровня.`));
+    else if (S.tab === 'main') this.questLines(f, list, S);
+    else if (S.tab === 'event') this.questEvents(f, list, S, events);
+    else this.questPeriod(f, list, S, S.tab, ctx);
+    // вернулись из задания — список там же, где его оставили
+    if (S.back && S.back.tab === S.tab) list.scrollTop = S.back.top;
+    S.back = null;
+    if (v) { const box = h('div', 'qp-card'); this.questDetail(f, box, S, v); L.info(box); }
   }
 
   // Строка задания в списке: иконка, подпись, цель с полоской, справа «Забрать» или ›
   questRow(f, S, v, cap) {
     const g = v.goal, pct = (v.done ? 1 : g.p / g.n) * 100, pin = f.quests.isPinned(v.id);
-    const row = h('div', 'ql-row' + (v.claimed ? ' got' : v.done ? ' done' : '') + (pin ? ' pin' : ''),
+    const row = h('div', 'ql-row' + (v.claimed ? ' got' : v.done ? ' done' : '') + (pin ? ' pin' : '') + (S.sel === v.id ? ' sel' : ''),
       `${this.ic(v.icon, 'ic')}<div class="ql-t"><i>${cap}${pin ? ' · на экране' : ''}</i><b>${(v.done ? v.task : g.task || v.task).replace(/(\d+) /g, '$1 ')}</b>` +
       `<div class="qc-row"><div class="qc-bar"><i style="width:${pct}%"></i></div><span class="qc-n">${v.done ? '✓' : `${fmtNum(g.p)}/${fmtNum(g.n)}`}</span></div></div>`);
     if (v.done && !v.claimed) {
@@ -284,7 +297,17 @@ export class UI {
       b.onclick = (e) => { e.stopPropagation(); this.questClaim(f, S, v, false); };
       row.appendChild(b);
     } else row.appendChild(h('span', 'ql-go', v.claimed ? '' : '›'));
-    if (!v.claimed) row.onclick = () => { S.sel = v.id; this.sfx('tap'); this.refreshPanel(); };
+    if (!v.claimed) {
+      row.onclick = () => {
+        // в горизонтали задание открыто справа: повторное нажатие его закрывает
+        if (S.sel === v.id && WIDE.matches) S.sel = null;
+        else {
+          const l = row.closest('.sh-list');
+          S.sel = v.id; S.back = l && !WIDE.matches ? { tab: S.tab, top: l.scrollTop } : null;
+        }
+        this.sfx('tap'); this.refreshPanel();
+      };
+    }
     return row;
   }
 
@@ -329,12 +352,16 @@ export class UI {
     }
   }
 
-  // Задание целиком
+  // Задание целиком. На телефоне оно вместо списка — сверху «‹ Все задания» (к списку его раздела);
+  // в горизонтали список рядом, кнопка не нужна.
   questDetail(f, body, S, v) {
     const Q = f.quests;
-    const back = h('button', 'qp-back', '‹ Все задания');
-    back.onclick = () => { S.sel = null; this.sfx('tap'); this.refreshPanel(); };
-    body.appendChild(back);
+    if (!WIDE.matches) {
+      const to = S.tab === 'main' ? 'Все задания' : S.tab === 'event' ? 'Задания события' : PERIODS[S.tab].title;
+      const back = h('button', 'qp-back', `‹ ${to}`);
+      back.onclick = () => { S.sel = null; this.sfx('tap'); this.refreshPanel(); };
+      body.appendChild(back);
+    }
     if (v.text) {
       if (v.line === 'story') Q.st.seen = v.id;
       const note = v.who === 'note';
@@ -1249,26 +1276,31 @@ export class UI {
     sp.disabled = f.st.gems < gems;
   }
 
-  // ---------- Окно «разделы слева, предметы справа» (рюкзак, рынок, выдача тестера) ----------
-  // tabs — [{ key, name, icon, empty }] (пустой раздел бледнее, но открывается), tab — выбранный, onTab(key) меняет
-  // состояние окна (окно пересоберётся само). sort — { val, set(v), cheap } — порядок над списком (cheap: «По цене»
-  // сначала дешёвые), top — свой элемент над списком. Возвращает { list, info(box) }: list — куда класть клетки,
-  // info(box) — карточка выбранного предмета (на телефоне — внизу во всю ширину, в горизонтали — колонкой справа).
-  shelf(body, id, { tabs, tab, onTab, sort, top }) {
+  // ---------- Окно «разделы слева, предметы справа» (рюкзак, рынок, выдача тестера, задания) ----------
+  // tabs — [{ key, name, icon, empty, dot }] (пустой раздел бледнее, но открывается; dot — красная точка: есть
+  // награда), tab — выбранный, onTab(key) меняет состояние окна (окно пересоберётся само); retap — нажатие
+  // по уже выбранному разделу тоже вызывает onTab (задания: из открытого задания — к списку раздела).
+  // sort — { val, set(v), cheap } — порядок над списком (cheap: «По цене» сначала дешёвые), top — свой элемент
+  // над списком, none — { icon, text } подсказки, пока ничего не выбрано. Возвращает { list, info(box) }:
+  // list — куда класть клетки, info(box) — карточка выбранного (на телефоне — внизу во всю ширину,
+  // в горизонтали — колонкой справа).
+  shelf(body, id, { tabs, tab, onTab, retap, sort, top, none: hint }) {
     body.classList.add('sh-body');
     const sh = h('div', 'sh'), rail = h('div', 'sh-rail'), main = h('div', 'sh-main'), list = h('div', 'sh-list');
     rail.dataset.scroll = `rail:${id}`;
     list.dataset.scroll = `list:${id}:${tab}`;
     for (const t of tabs) {
-      const b = h('button', 'sh-tab' + (t.key === tab ? ' on' : '') + (t.empty ? ' empty' : ''), `${this.ic(t.icon)}<span>${t.name}</span>`);
-      b.onclick = () => { if (t.key !== tab) { onTab(t.key); this.sfx('tap'); this.refreshPanel(); } };
+      const b = h('button', 'sh-tab' + (t.key === tab ? ' on' : '') + (t.empty ? ' empty' : ''),
+        `${this.ic(t.icon)}<span>${t.name}</span>${t.dot ? '<i class="qt-dot"></i>' : ''}`);
+      b.onclick = () => { if (t.key !== tab || retap) { onTab(t.key); this.sfx('tap'); this.refreshPanel(); } };
       rail.appendChild(b);
     }
     if (sort) main.appendChild(this.sortBar(sort));
     if (top) main.appendChild(top);
     main.appendChild(list);
     // в горизонтали колонка карточки есть всегда (иначе клетки перестраиваются при выборе): пока пусто — подсказка
-    const none = h('div', 'sh-info sh-none', `${this.ic(id === 'buy' || id === 'sell' ? 'market' : 'bag', 'ic big')}<span>Нажмите на предмет, чтобы узнать о нём больше</span>`);
+    const { icon, text } = hint || { icon: id === 'buy' || id === 'sell' ? 'market' : 'bag', text: 'Нажмите на предмет, чтобы узнать о нём больше' };
+    const none = h('div', 'sh-info sh-none', `${this.ic(icon, 'ic big')}<span>${text}</span>`);
     sh.append(rail, main, none);
     body.appendChild(sh);
     return { list, info: (box) => { box.classList.add('sh-info'); none.replaceWith(box); } };
