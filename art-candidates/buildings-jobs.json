@@ -1,0 +1,92 @@
+[
+  {
+    "name": "building_kitchen",
+    "count": 3,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/house_2.png",
+      "assets/source/house_3.png"
+    ],
+    "prompt": "A small cozy farm kitchen building for an isometric farm game, in exactly the same art style, 3/4 isometric view angle and scale as the reference houses: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights, standing on the same diamond-shaped isometric grass base patch with a few tiny flowers and pebbles; the footprint is 2 by 2 tiles, the grass diamond is exactly twice as wide as it is tall, like under the reference houses. A one-storey cottage with whitewashed stone walls and a warm red tile roof, a big brick chimney with a soft puff of light smoke, a wide open window with a fresh golden pie cooling on the sill, a wooden door under a small awning with a hanging sign showing a steaming cooking pot, a small woodpile and a clay pot with herbs by the wall. Smaller and lower than the two-storey reference house, about the size of the one-storey house. One building, centered, nothing else, no text."
+  },
+  {
+    "name": "building_carpentry",
+    "count": 3,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/house_2.png",
+      "assets/source/house_3.png"
+    ],
+    "prompt": "A carpenter's workshop for an isometric farm game, in exactly the same art style, 3/4 isometric view angle and scale as the reference houses: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights, standing on the same diamond-shaped isometric grass base patch with a few tiny flowers and pebbles; the footprint is 2 by 2 tiles, the grass diamond is exactly twice as wide as it is tall, like under the reference houses. A warm wooden timber shed with a wooden shingle roof; one side is an open front on thick wooden posts showing a workbench with a hand saw and a plane, neat stacks of fresh light planks and a few logs along the side wall, a sawhorse with a log in front, a small wooden sign with a hammer and a saw above the entrance. Smaller and lower than the two-storey reference house, about the size of the one-storey house. One building, centered, nothing else, no text."
+  },
+  {
+    "name": "building_forge",
+    "count": 3,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/house_2.png",
+      "assets/source/house_3.png"
+    ],
+    "prompt": "A village blacksmith's forge for an isometric farm game, in exactly the same art style, 3/4 isometric view angle and scale as the reference houses: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights, standing on the same diamond-shaped isometric grass base patch with a few tiny flowers and pebbles; the footprint is 2 by 2 tiles, the grass diamond is exactly twice as wide as it is tall, like under the reference houses. Thick grey fieldstone walls, a dark slate roof, a tall stone chimney with a little smoke, an open front with a glowing orange hearth fire inside, a black iron anvil on a wooden stump in front, a hammer and tongs, a wooden water barrel, a small hanging sign with a horseshoe. Smaller and lower than the two-storey reference house, about the size of the one-storey house. One building, centered, nothing else, no text."
+  },
+  {
+    "name": "building_stonecutter",
+    "count": 3,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/house_2.png",
+      "assets/source/house_3.png"
+    ],
+    "prompt": "A stonecutter's workshop for an isometric farm game, in exactly the same art style, 3/4 isometric view angle and scale as the reference houses: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights, standing on the same diamond-shaped isometric grass base patch with a few tiny flowers and pebbles; the footprint is 2 by 2 tiles, the grass diamond is exactly twice as wide as it is tall, like under the reference houses. A sturdy wooden canopy on thick posts with a grey slate roof over a stone-cutting yard: a big wooden workbench with a chisel and a mallet, a rough grey boulder being cut, neat stacks of smooth cut grey stone blocks, a round millstone leaning against a post, a small hanging sign with a pickaxe. Smaller and lower than the two-storey reference house, about the size of the one-storey house. One building, centered, nothing else, no text."
+  },
+  {
+    "name": "construction_site",
+    "count": 3,
+    "size": "1024x1024",
+    "refs": [
+      "assets/source/house_2.png",
+      "assets/source/house_3.png"
+    ],
+    "prompt": "A construction site of a small farm building for an isometric farm game, in exactly the same art style, 3/4 isometric view angle and scale as the reference houses: soft painted look, thick dark-brown outline, smooth clean outlines with no visible pixel steps (not pixel art), warm saturated colors, gentle highlights, standing on the same diamond-shaped isometric grass base patch with a few tiny flowers and pebbles; the footprint is 2 by 2 tiles, the grass diamond is exactly twice as wide as it is tall, like under the reference houses. On the grass diamond: a low grey stone foundation, the bare wooden frame of a small one-storey house without a roof yet, light wooden scaffolding with two ladders around it, a few stacked planks, a small pile of stones, a wheelbarrow and a hammer. It must read clearly as 'under construction'. About the size of the one-storey house. One construction site, centered, nothing else, no text."
+  },
+  {
+    "name": "ui_dishes1",
+    "count": 2,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/ui_food.png",
+      "assets/source/ui_flora1.png"
+    ],
+    "prompt": "Inventory icons for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, smooth clean outlines, warm saturated colors, glossy highlight). Separate objects in one row, each centered in its own equal cell, front view, filling most of its cell, no text, no plates or frames unless described:\n1) a carrot salad: a small round wooden bowl full of bright orange grated carrot with a sprig of green parsley;\n2) linden tea: a white porcelain cup of golden tea on a saucer with a small sprig of pale-yellow linden blossom beside it, a little steam;\n3) fish soup: a brown clay bowl of clear golden fish soup with pieces of fish, carrot slices and dill, a wooden spoon, a little steam;\n4) raspberry jam: a small glass jar of dark red raspberry jam with a red-and-white checkered cloth lid tied with string, two raspberries beside it."
+  },
+  {
+    "name": "ui_dishes2",
+    "count": 2,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/ui_food.png",
+      "assets/source/ui_flora1.png"
+    ],
+    "prompt": "Inventory icons for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, smooth clean outlines, warm saturated colors, glossy highlight). Separate objects in one row, each centered in its own equal cell, front view, filling most of its cell, no text, no plates or frames unless described:\n1) borscht: a white bowl of deep red beet soup with a spoon of white sour cream and green dill on top, a little steam;\n2) pumpkin porridge: a small round orange pumpkin hollowed out as a bowl, filled with creamy orange porridge with a pat of butter, a wooden spoon;\n3) strawberry cake: a round two-layer sponge cake with white cream and many fresh red strawberries on top, on a small plate;\n4) a blueprint: a rolled-up sheet of blue blueprint paper with white technical lines of a little house, half unrolled, tied with a red ribbon."
+  },
+  {
+    "name": "ui_craft1",
+    "count": 2,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/ui_res.png",
+      "assets/source/ui_flora1.png"
+    ],
+    "prompt": "Inventory icons for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, smooth clean outlines, warm saturated colors, glossy highlight). Separate objects in one row, each centered in its own equal cell, front view, filling most of its cell, no text, no plates or frames unless described:\n1) planks: a neat stack of three light sawn wooden planks;\n2) a birch-bark box: a small round lidded basket-box woven from white birch bark with dark stripes;\n3) an acorn toy: a cute little figure made of acorns and twigs, an acorn body with an acorn-cap hat, tiny twig arms and legs, smiling;\n4) a pinecone wreath: a round wreath of pinecones and orange maple leaves tied with a red ribbon bow;\n5) a wooden crate: a sturdy wooden crate of planks with iron corner brackets and nails."
+  },
+  {
+    "name": "ui_craft2",
+    "count": 2,
+    "size": "1536x1024",
+    "refs": [
+      "assets/source/ui_res.png",
+      "assets/source/ui_tools.png"
+    ],
+    "prompt": "Inventory icons for a mobile farm game, in the same style as the reference icons (soft painted, thick dark-brown outline, smooth clean outlines, warm saturated colors, glossy highlight). Separate objects in one row, each centered in its own equal cell, front view, filling most of its cell, no text, no plates or frames unless described:\n1) an iron ingot: a shiny dark-grey iron bar in the classic trapezoid ingot shape;\n2) nails: a small bunch of five iron nails with flat heads;\n3) a lucky horseshoe: a shiny iron horseshoe pointing up with nail holes and a tiny sparkle;\n4) a stone block: one neat smooth cut grey stone block, a cube with chiselled edges;\n5) a millstone: a round flat grey millstone with a square hole in the centre and carved grooves."
+  }
+]
