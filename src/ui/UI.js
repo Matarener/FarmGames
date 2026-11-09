@@ -535,8 +535,6 @@ export class UI {
       { label: 'Достижения', icon: 'trophy', open: () => this.achPanel(f), dot: f.ach.available() > 0 },
       { label: 'Настройки', icon: 'gear', open: () => this.settingsPanel(f) },
       { label: 'Животные', icon: 'paw', soon: true },
-      { label: 'Мастерская', icon: 'build', soon: true },
-      { label: 'Декор', icon: 'decor', soon: true },
     ];
   }
 
