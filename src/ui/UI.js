@@ -2,8 +2,9 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS, STORE_ALL } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, BED_ITEM, BEDS, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS, STORE_ALL } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
+import * as Beds from '../game/beds.js';
 import * as Plant from '../game/planting.js';
 import * as R from '../game/questRules.js';
 import { PERIODS, EVENTS, PERIODIC_LEVEL, QUEST_TZ, MAX_PINS } from '../game/questData.js';
@@ -25,7 +26,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const RES_NAMES = { wood: 'Дерево', stone: 'Камень', ore: 'Руда', coins: 'Монеты', gems: 'Кристаллы' };
 // кнопки, к которым может показать стрелка-подсказка (UI.hint)
-const HINT_EL = { quest: '#btn-quests', market: '#btn-market', dig: '#btn-dig', bag: '#btn-bag' };
+const HINT_EL = { quest: '#btn-quests', market: '#btn-market', beds: '#btn-beds', bag: '#btn-bag' };
 // вкладки окна «Задания»: периодические появляются с PERIODIC_LEVEL, «Событие» — пока оно идёт
 const QTABS = [
   { key: 'main', name: 'Основные', icon: 'star' },
@@ -81,10 +82,10 @@ export class UI {
     $('#mb-all').onclick = () => this.storeAllPanel(farm);
     $('#pb-pick').onclick = () => {
       const P = farm.planting;
-      if (!P || P.dig) return;
+      if (!P) return;
       if (P.species) this.sowPanel(farm, null, null); else this.plantPanel(farm, null);
     };
-    $('#btn-dig').onclick = () => farm.pickDig();
+    $('#btn-beds').onclick = () => farm.pickBeds();
     $('#pb-x').onclick = () => farm.stopPlanting();
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && farm.mover.active) farm.mover.exit(); });
   }
@@ -140,6 +141,7 @@ export class UI {
     this.questCards(f);
     this.moreBadge(f);
     this.marketBadge(f);
+    this.bedsBadge(f);
     this.giftTick(f, false);
     this.wheelTick(f, false);
     this.tick(f);
@@ -296,7 +298,7 @@ export class UI {
   }
 
   questLines(f, body, S) {
-    for (const r of R.lineRows(f.st)) {
+    for (const r of R.lineRows(f.st, f.quests.ctx())) {
       const L = r.line;
       if (r.view) { body.appendChild(this.questRow(f, S, r.view, L.key === 'story' ? `${L.name} · ${r.view.title}` : L.name)); continue; }
       const sub = r.status === 'lock' ? `Откроется после задания «${r.after.title}»` :
@@ -1296,9 +1298,12 @@ export class UI {
 
   // ---------- Рынок: «Заказы», «Купить» и «Продать» ----------
   // mode — сразу этот раздел (иначе тот, что был открыт в прошлый раз)
-  marketPanel(f, mode) {
+  // mode — сразу этот режим ('orders' | 'buy' | 'sell'); item — сразу этот товар на «Купить» (кнопка «Грядки»)
+  marketPanel(f, mode, item) {
     const M = this.mk || (this.mk = { mode: 'sell', tab: 'seeds', sel: null });
     if (mode && mode !== M.mode) { M.mode = mode; M.sel = null; }
+    const o = item && SHOP.find((x) => x.item === item);
+    if (o) { M.mode = 'buy'; M.tab = o.tab; M.sel = item; M.skip = null; }
     this.openPanel('market', 'Рынок', (body, card) => {
       const seg = h('div', 'mk-seg n3'), ready = f.orders.ready();
       for (const [k, name] of [['orders', 'Заказы'], ['buy', 'Купить'], ['sell', 'Продать']]) {
@@ -1311,6 +1316,15 @@ export class UI {
       else if (M.mode === 'sell') this.marketSell(f, body, M);
       else this.marketBuy(f, body, M);
     });
+  }
+
+  // Цифра на кнопке «Грядки»: сколько грядок ждёт в рюкзаке (нет — кнопка ведёт на рынок)
+  bedsBadge(f) {
+    const n = Inv.count(f.st, BED_ITEM);
+    if (this.last.bedsBag === n) return;
+    this.last.bedsBag = n;
+    const b = $('#beds-badge');
+    b.hidden = !n; b.textContent = n > 99 ? '99+' : n;
   }
 
   // Цифра на кнопке «Рынок»: сколько заказов можно сдать прямо сейчас
@@ -1435,7 +1449,10 @@ export class UI {
       onTab: (k) => { M.tab = k; M.sel = null; },
       sort: { val: M.bsort, set: (v) => { M.bsort = v; }, cheap: true },
     });
-    const offers = sortOffers(SHOP.filter((o) => o.tab === M.tab), M.bsort, st.level);
+    // грядка: цена растёт с каждой, предел — по уровню (beds.js); закрыта предел, как товар «с N ур.»
+    const bed = SHOP.some((o) => o.bed && o.tab === M.tab) ? Beds.bedOffer(st, f.bedCounts().bedsAll) : null;
+    const live = (o) => (o.bed ? { ...o, price: bed.price, level: bed.can ? 1 : bed.level || Infinity } : o);
+    const offers = sortOffers(SHOP.filter((o) => o.tab === M.tab).map(live), M.bsort, st.level);
     if (!offers.length) { L.list.appendChild(h('div', 'pn-empty', 'Скоро здесь появятся товары.')); return; }
     const g = h('div', 'mk-grid');
     for (const o of offers) {
@@ -1443,7 +1460,7 @@ export class UI {
       const own = it.blueprint && BR.owned(st, it.blueprint); // здание уже есть — чертёж больше не нужен
       const c = h('button', 'mk-cell' + (locked ? ' locked' : '') + (M.sel === o.item ? ' sel' : ''),
         `<i>${this.ic(it.icon, 'ic')}${it.badge ? this.ic(it.badge, 'inv-badge') : ''}${locked ? this.ic('lock', 'mk-lock') : ''}${o.qty > 1 ? `<b>×${o.qty}</b>` : ''}</i>` +
-        `<span>${locked ? `с ${o.level} ур.` : own ? 'построено' : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
+        `<span>${locked ? (o.level === Infinity ? 'всё' : `с ${o.level} ур.`) : own ? 'построено' : `${o.price} ${this.ic(cur, 'ic-s')}`}</span>`);
       c.title = it.name;
       c.onclick = () => this.pick(M, o.item);
       g.appendChild(c);
@@ -1455,23 +1472,28 @@ export class UI {
     const curKey = o.cur || 'coins', cur = curKey === 'gems' ? 'gem' : 'coin';
     const per = it.blueprint ? `${o.price} ${this.ic(cur)} · стройка ${fmtShort(BUILDINGS[it.blueprint].time)}`
       : pack > 1 ? `${o.price} ${this.ic(cur)} за ${pack} шт.` : `${o.price} ${this.ic(cur)} за шт.`;
-    const box = this.mkCard(it, `${per}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${it.floraOf && FLORA[it.floraOf].pick ? ` · плоды: ${ITEMS[FLORA[it.floraOf].fruit].name.toLowerCase()} по ${ITEMS[FLORA[it.floraOf].fruit].sell} ${this.ic('coin')}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
-    if (o.level > st.level) box.appendChild(h('div', 'ii-note', `Откроется с ${o.level} уровня.`));
-    else if (it.blueprint) this.blueprintBuy(f, box, o, it);
-    else {
-      const max = Math.min(99, Math.floor(st[curKey] / o.price));
-      const Q = this.buyQty || (this.buyQty = {});
-      const q = Q[o.item] = Math.max(1, Math.min(Math.max(1, max), Q[o.item] || 1));
-      const row = h('div', 'ii-sell');
-      if (max > 1) row.appendChild(this.stepper(q, max, (v) => { Q[o.item] = v; this.refreshPanel(); }));
-      const acts = h('div', 'ii-a');
-      const b = h('button', 'btn-s gold', `Купить ${q * pack} шт. · ${q * o.price} ${this.ic(cur)}`);
-      b.disabled = st[curKey] < q * o.price; b.onclick = () => f.buy(o, q);
-      acts.appendChild(b);
-      // купленную дорожку — сразу класть: окно закрывается, включается «Кладём дорожку»;
+    const box = this.mkCard(it, `${per}${it.food ? ` · +${it.food} ${this.ic('energy')}` : ''}${it.floraOf && FLORA[it.floraOf].pick ? ` · плоды: ${ITEMS[FLORA[it.floraOf].fruit].name.toLowerCase()} по ${ITEMS[FLORA[it.floraOf].fruit].sell} ${this.ic('coin')}` : ''}${o.bed ? ` · грядок ${bed.owned} из ${Math.max(bed.owned, bed.limit)}` : ''}${have ? ` · в рюкзаке ${have}` : ''}`, M);
+    if (o.bed) box.appendChild(h('div', 'ii-note', this.bedNote(bed, st.level)));
+    const locked = o.level > st.level;
+    if (locked && !o.bed) box.appendChild(h('div', 'ii-note', `Откроется с ${o.level} уровня.`));
+    else if (!locked && it.blueprint) this.blueprintBuy(f, box, o, it);
+    // грядки упёрлись в предел: купить нельзя, а поставить те, что в рюкзаке, — можно
+    if (!it.blueprint && (!locked || (o.bed && have))) {
+      const row = h('div', 'ii-sell'), acts = h('div', 'ii-a');
+      if (!locked) {
+        // грядку — по одной: следующая уже дороже
+        const max = o.bed ? Math.min(1, Math.floor(st[curKey] / o.price)) : Math.min(99, Math.floor(st[curKey] / o.price));
+        const Q = this.buyQty || (this.buyQty = {});
+        const q = Q[o.item] = Math.max(1, Math.min(Math.max(1, max), Q[o.item] || 1));
+        if (max > 1) row.appendChild(this.stepper(q, max, (v) => { Q[o.item] = v; this.refreshPanel(); }));
+        const b = h('button', 'btn-s gold', `Купить ${q * pack} шт. · ${q * o.price} ${this.ic(cur)}`);
+        b.disabled = st[curKey] < q * o.price; b.onclick = () => f.buy(o, q);
+        acts.appendChild(b);
+      }
+      // купленную дорожку (и грядку) — сразу класть: окно закрывается, включается «Кладём дорожку»;
       // пруд, украшение пруда, постройку (поливалку) — ставить: выбраны в «Переставить», нажатие на клетку — предпросмотр
       if (Mover.placeable(it) && have) {
-        const p = h('button', 'btn-s', 'Поставить');
+        const p = h('button', locked ? 'btn-s gold' : 'btn-s', 'Поставить');
         p.onclick = () => { this.closePanel(); f.mover.useItem(it.key); };
         acts.appendChild(p);
       }
@@ -1479,6 +1501,13 @@ export class UI {
       box.appendChild(row);
     }
     L.info(box);
+  }
+  // Строка про предел грядок в карточке грядки на рынке
+  bedNote(b, level) {
+    if (!b.can) return b.level ? `Грядок уже ${b.owned}: столько можно на ${level} уровне. Следующую можно купить с ${b.level} уровня.`
+      : `Грядок уже ${b.owned}: больше не бывает.`;
+    const max = BEDS.limit.max, more = b.limit - b.owned;
+    return `Ещё можно купить ${more} ${R.plural(more, ['грядку', 'грядки', 'грядок'])}${b.limit < max ? `, с уровнем предел растёт до ${max}` : ''}. Каждая следующая дороже.`;
   }
 
   // Чертёж здания на рынке: материалы на стройку; купить можно один, пока здания нет на ферме.
@@ -1647,18 +1676,7 @@ export class UI {
   plantBar(f) {
     const P = f.planting, on = !!P, body = document.body;
     if (body.classList.contains('planting') !== on) { body.classList.toggle('planting', on); $('#plant-bar').hidden = !on; this._safe = null; }
-    body.classList.toggle('digging', !!(P && P.dig));
     if (!on) { this.last.pb = null; return; }
-    if (P.dig) {
-      // режим «Копаем грядки»: менять нечего, только ✕
-      const key = `dig:${f.st.energy}:${this.icons.dig ? 1 : 0}`;
-      if (this.last.pb === key) return;
-      this.last.pb = key;
-      $('#pb-ic').src = this.icons.dig || '';
-      $('#pb-name').textContent = 'Копаем грядки';
-      $('#pb-sub').innerHTML = `${ENERGY.dig} ${this.ic('energy', 'ic-s')} за грядку · нажимай на траву`;
-      return;
-    }
     if (P.species) {
       // саженец или своё растение на свободную траву
       const fl = FLORA[P.species], id = (P.grown ? floraOwnId : floraSeedId)(P.species), it = ITEMS[id], n = Inv.count(f.st, id);

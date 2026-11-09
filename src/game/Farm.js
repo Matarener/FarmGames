@@ -27,7 +27,7 @@ import * as Well from './well.js';
 import * as Hints from './hints.js';
 import { BAR_KIND, barTop } from './bars.js';
 import {
-  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, PATHS, SPRINKLERS, WELL_ITEM, floraSeedId, floraOwnId, seedId, WELL_COST,
+  CROPS, FISH, FISH_CATCH, OBJECTS, ITEMS, FLORA, FLORA_GOODS, PONDS, PATHS, SPRINKLERS, WELL_ITEM, BED_ITEM, floraSeedId, floraOwnId, seedId, WELL_COST,
   ENERGY, ENERGY_REGEN_SEC, HOUSE, START, xpToNext, expansionCost, GEM_SPEEDUP_SEC,
 } from './data.js';
 
@@ -763,10 +763,9 @@ export class Farm {
     const t = w.tile(x, y);
     if (t === T.SOIL) return this.tapBed(this.bedAt(w.idx(x, y)), sx, sy);
     if (w.occ[w.idx(x, y)] >= 0) return;
-    // Свободная трава: в режиме «Копаем» — новая грядка, в режиме посадки саженцев — росток,
-    // иначе призрак просто идёт сюда (меню на каждое нажатие по земле было лишним)
+    // Свободная трава: в режиме посадки саженцев — росток, иначе призрак просто идёт сюда
+    // (меню на каждое нажатие по земле было лишним). Грядки ставят из рюкзака (кнопка «Грядки», Mover).
     const P = this.planting;
-    if (t === T.GRASS && P && P.dig) return this.digTap(x, y);
     if (t === T.GRASS && P && P.species) return this.sowTap(x, y);
     this.queue({ kind: 'walk', x, y });
   }
@@ -892,27 +891,19 @@ export class Farm {
     else this.ui.plantBar(this);
   }
 
-  // Режим «Копаем грядки» (кнопка-лопата): каждое нажатие по свободной траве — новая грядка,
-  // пока не нажмут ✕ или лопату ещё раз или не кончится энергия
-  pickDig() {
-    if (this.planting && this.planting.dig) return this.stopPlanting();
-    if (!Plant.digLeft(this.st, ENERGY.dig, this.pendingDigs())) return this.toast('Не хватает энергии. Съешьте что-нибудь из рюкзака или подождите.', 'warn');
-    this.planting = { dig: true };
-    this.ui.plantBar(this);
+  // ---------------- Грядки ----------------
+  // Грядки не копают: их покупают на рынке и получают за задания (beds.js, BEDS в data.js).
+  // Кнопка «Грядки»: есть грядки в рюкзаке — ставим их (каждое нажатие на траву — грядка, Mover.pave),
+  // нет — рынок, сразу на грядке.
+  pickBeds() {
+    if (Inv.count(this.st, BED_ITEM) > 0) return this.mover.pave(BED_ITEM);
+    this.ui.marketPanel(this, 'buy', BED_ITEM);
   }
 
-  digTap(x, y) {
-    if (!Plant.digLeft(this.st, ENERGY.dig, this.pendingDigs())) return this.stopPlanting(true);
-    this.queue({ kind: 'dig', x, y });
-    if (!Plant.digLeft(this.st, ENERGY.dig, this.pendingDigs())) this.stopPlanting(true);
-    else this.ui.plantBar(this);
-  }
-
-  pendingDigs() {
-    const p = this.player;
-    let n = p.current && p.current.kind === 'dig' ? 1 : 0;
-    for (const a of p.queue) if (a.kind === 'dig') n++;
-    return n;
+  // Сколько грядок: на ферме и всего (на ферме и в рюкзаке) — для заданий, достижения и рынка
+  bedCounts() {
+    const beds = Beds.countBeds(this.world);
+    return { beds, bedsAll: Beds.ownedBeds(this.st, beds) };
   }
 
   // Саженец вида species (grown — своё выкопанное растение) из рюкзака: дальше нажатия по траве сажают его
@@ -937,8 +928,12 @@ export class Farm {
     return n;
   }
 
-  // Какой режим посадки включён: 'dig' | 'sow' | 'crop' | null (для подсказок к заданиям)
-  plantMode() { const P = this.planting; return !P ? null : P.dig ? 'dig' : P.species ? 'sow' : 'crop'; }
+  // Какой режим посадки включён: 'bed' (ставим грядки из рюкзака) | 'sow' | 'crop' | null (для подсказок к заданиям)
+  plantMode() {
+    const P = this.planting;
+    if (!P) return this.mover && this.mover.active && this.mover.brush === BED_ITEM ? 'bed' : null;
+    return P.species ? 'sow' : 'crop';
+  }
 
   // Сколько посадок культуры key уже ждут в очереди призрака
   pendingPlants(key) {
@@ -954,8 +949,7 @@ export class Farm {
     this.planting = null;
     this.ui.plantBar(this);
     if (!out) return;
-    if (P.dig) this.toast('Энергия кончилась. Съешьте что-нибудь из рюкзака или подождите.', 'warn');
-    else if (P.crop) this.toast(`Семена «${CROPS[P.crop].name.toLowerCase()}» закончились, а на новые не хватает монет`, 'warn');
+    if (P.crop) this.toast(`Семена «${CROPS[P.crop].name.toLowerCase()}» закончились, а на новые не хватает монет`, 'warn');
     else this.toast(`${P.grown ? 'Растения' : 'Саженцы'} «${FLORA[P.species].name.toLowerCase()}» в рюкзаке закончились`);
   }
 
@@ -1021,10 +1015,11 @@ export class Farm {
   }
 
   buy(offer, n) {
-    // чертёж здания — один на ферму (buildRules.js)
+    // грядка — по одной: цена растёт с каждой, предел по уровню (beds.js); чертёж здания — один на ферму (buildRules.js)
     const bp = ITEMS[offer.item] && ITEMS[offer.item].blueprint;
-    const r = bp ? this.builds.buyBlueprint(bp, offer) : Inv.buyItem(this.st, offer, n);
+    const r = offer.bed ? Beds.buyBed(this.st, this.bedCounts().bedsAll) : bp ? this.builds.buyBlueprint(bp, offer) : Inv.buyItem(this.st, offer, n);
     if (!r) return;
+    if (r.limit != null) return this.toast(r.limit ? `Больше грядок — с ${r.limit} уровня` : 'Грядок уже столько, сколько можно', 'warn');
     if (r.why) return this.toast(r.why, 'warn');
     if (r.locked) return this.toast(`Откроется с ${offer.level} уровня`, 'warn');
     if (r.poor) return this.toast(r.poor === 'gems' ? 'Не хватает кристаллов' : 'Не хватает монет', 'warn');
@@ -1077,7 +1072,6 @@ export class Farm {
     if (cost && st.energy < cost) { this.spend(cost); this.player.queue.length = 0; return false; }
     const t = a.obj ? -1 : w.tile(a.x, a.y);
     switch (a.kind) {
-      case 'dig': return t === T.GRASS && w.occ[w.idx(a.x, a.y)] < 0;
       case 'sow': return t === T.GRASS && w.occ[w.idx(a.x, a.y)] < 0 && Inv.count(st, (a.grown ? floraOwnId : floraSeedId)(a.species)) > 0;
       case 'plant': {
         const b = this.bedAt(w.idx(a.x, a.y));
@@ -1160,18 +1154,6 @@ export class Farm {
         // своё взрослое растение из рюкзака пересадили — это не посадка ростка (задания и «Лесник» не считают)
         this.quests.emit(a.grown ? 'replant' : 'sow', a.species);
         this.sfx('plant');
-        this.addXp(1);
-        this.changed();
-        return false;
-      }
-      case 'dig': {
-        if (w.tiles[w.idx(a.x, a.y)] !== T.GRASS || w.occ[w.idx(a.x, a.y)] >= 0) return false;
-        if (!this.spend(ENERGY.dig)) return false;
-        w.tiles[w.idx(a.x, a.y)] = T.SOIL; this.groundV++;
-        const b = this.bedAt(w.idx(a.x, a.y)); b.crop = null; b.p = 0; b.w = 0;
-        this.burst(b.wx, b.wy, '#8a5a30', 8);
-        this.quests.emit('dig');
-        this.sfx('dig');
         this.addXp(1);
         this.changed();
         return false;
