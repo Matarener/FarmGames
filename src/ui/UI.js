@@ -2,7 +2,7 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS, STORE_ALL } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
 import * as Plant from '../game/planting.js';
 import * as R from '../game/questRules.js';
@@ -16,6 +16,7 @@ import * as Dev from '../game/devRules.js';
 import { BUILDINGS, RECIPES, bldId } from '../game/buildData.js';
 import * as BR from '../game/buildRules.js';
 import * as HR from '../game/houseRules.js';
+import { Mover } from '../game/Mover.js';
 
 // версия сборки (tools/build.mjs); при локальном запуске — «локально»
 const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'локально';
@@ -77,6 +78,7 @@ export class UI {
     $('#mb-cancel').onclick = () => farm.mover.cancel();
     $('#mb-place').onclick = () => farm.mover.place();
     $('#mb-store').onclick = () => farm.mover.store();
+    $('#mb-all').onclick = () => this.storeAllPanel(farm);
     $('#pb-pick').onclick = () => {
       const P = farm.planting;
       if (!P || P.dig) return;
@@ -420,6 +422,7 @@ export class UI {
   // music: false — музыка фермы не сменяется на музыку меню (короткие окна выбора у грядки)
   openPanel(kind, title, build, { music = true } = {}) {
     if (this.farm && this.farm.mover && this.farm.mover.active) this.farm.mover.exit();
+    this._onClose = null; // окно сменилось другим — прежнее «после закрытия» не нужно
     const p = this.panelEl;
     p.dataset.kind = kind;
     this._build = build;
@@ -457,6 +460,7 @@ export class UI {
       () => this.wheelPanel(f),
       () => this.achPanel(f),
       () => this.settingsPanel(f),
+      () => { this.storeAllPanel(f); this._onClose = null; },
       () => { this.closePanel(); this.toggleMore(true); },
       () => { this.toggleMore(false); this.popup(this.root.clientWidth / 2, this.root.clientHeight / 2, { title: 'Дуб', text: 'Срубить', cost: { wood: 1 }, items: [{ icon: 'axe', label: 'Срубить', sub: '1', onClick() {} }] }); },
     ];
@@ -471,7 +475,7 @@ export class UI {
     } finally {
       this.closePanel(); this.closePopup(); this.toggleMore(false);
       Q.seen = seen; // окно задания сюжета помечает его прочитанным — возвращаем как было
-      this.qp = this.mk = this.inv = this.pl = this.gp = this.cr = null; // вкладки и выбор в окнах — по умолчанию
+      this.qp = this.mk = this.inv = this.pl = this.gp = this.sa = this.cr = null; // вкладки и выбор в окнах — по умолчанию
       this._openT = -1;
       void this.root.offsetHeight; // окна закрылись ещё без анимации
       this.root.classList.remove('warming');
@@ -511,6 +515,10 @@ export class UI {
     if (this.panelOpen) this.sfx('close');
     this.panelEl.classList.remove('show'); this.panelEl.dataset.kind = '';
     if (this.farm && this.farm.audio) this.farm.audio.setTheme('farm');
+    // окно, открытое из режима перестановки («Убрать всё»), возвращает в него
+    const back = this._onClose;
+    this._onClose = null;
+    if (back) back();
   }
 
   // ---------- Меню «Ещё» ----------
@@ -562,11 +570,56 @@ export class UI {
     $('#mb-cancel').hidden = !st.selected;
     $('#mb-place').hidden = !st.selected || !!st.brush; // «Кладём дорожку»: клетка кладётся сразу по нажатию
     $('#mb-store').hidden = !st.canStore;
+    $('#mb-all').hidden = !st.canStoreAll;
   }
 
   moveBarShake() {
     const bar = $('#move-bar');
     bar.classList.remove('shake'); void bar.offsetWidth; bar.classList.add('shake');
+  }
+
+  // «Убрать всё» из режима перестановки: окно подтверждения — группы своих вещей (STORE_ALL) с переключателями
+  // и числом вещей; «Убрать в рюкзак» убирает отмеченное (Mover.storeAll). Закрыли окно или убрали —
+  // снова режим перестановки. Переключатели помнятся до перезапуска игры.
+  storeAllPanel(f) {
+    const S = this.sa || (this.sa = { on: Object.fromEntries(STORE_ALL.map((g) => [g.key, g.on])) });
+    this.openPanel('storeall', 'Убрать в рюкзак', (body) => {
+      const list = f.mover.storeAllList();
+      body.appendChild(h('div', 'pn-text', 'Отмеченное уйдёт в рюкзак. Поставить обратно можно здесь же, в «Переставить»: нажмите на пустую траву.'));
+      let n = 0;
+      for (const g of STORE_ALL) {
+        const c = list[g.key], cnt = c.list.length, on = !!S.on[g.key] && cnt > 0;
+        if (on) n += cnt;
+        // что-то из группы занято (там работает призрачок, постройка ещё строится) — остаётся
+        const note = g.note + (c.kept ? `. Ещё ${c.kept} останется на месте` : '');
+        const row = h('div', 'set-row tog sa-row' + (cnt ? '' : ' off'),
+          `${this.ic(g.icon, 'ic')}<span class="sa-l"><span>${g.name}</span><i>${note}</i></span><b>${cnt}</b>`);
+        const sw = h('button', 'switch' + (on ? ' on' : ''), '<i></i>');
+        sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', on);
+        sw.disabled = !cnt;
+        row.appendChild(sw);
+        if (cnt) row.onclick = () => { S.on[g.key] = !S.on[g.key]; this.sfx('tap'); this.refreshPanel(); };
+        body.appendChild(row);
+      }
+      // после уборки не останется ни пруда, ни колодца — воду для лейки набрать будет негде
+      const gone = (g) => S.on[g] && list[g].list.length > 0;
+      const pondsLeft = (gone('ponds') ? 0 : list.ponds.list.length) + list.ponds.kept;
+      const wellLeft = !!f.world.well && f.st.well > 0 && !gone('well');
+      if ((gone('ponds') || gone('well')) && !pondsLeft && !wellLeft) {
+        body.appendChild(h('div', 'pn-text sa-warn', 'Воду для лейки будет негде набрать, пока не поставите обратно пруд или колодец.'));
+      }
+      const stay = f.world.well && !f.st.well ? 'дом, сломанный колодец (сначала почините его), грядки с посадками и дикие растения' : 'дом, грядки с посадками и дикие растения';
+      body.appendChild(h('div', 'pn-text sa-stay', `Останутся на месте: ${stay}.`));
+      const b = h('button', 'btn-main', n ? `Убрать в рюкзак (${n})` : 'Убирать нечего');
+      b.disabled = !n;
+      b.onclick = () => {
+        this._onClose = null;
+        this.closePanel();
+        f.mover.storeAll(STORE_ALL.filter((g) => S.on[g.key]).map((g) => g.key));
+      };
+      body.appendChild(b);
+    }, { music: false });
+    this._onClose = () => f.mover.enter();
   }
 
   // ---------- Настройки ----------
@@ -1417,9 +1470,9 @@ export class UI {
       acts.appendChild(b);
       // купленную дорожку — сразу класть: окно закрывается, включается «Кладём дорожку»;
       // пруд, украшение пруда, постройку (поливалку) — ставить: выбраны в «Переставить», нажатие на клетку — предпросмотр
-      if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && have) {
+      if (Mover.placeable(it) && have) {
         const p = h('button', 'btn-s', 'Поставить');
-        p.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
+        p.onclick = () => { this.closePanel(); f.mover.useItem(it.key); };
         acts.appendChild(p);
       }
       row.appendChild(acts);
@@ -1663,9 +1716,9 @@ export class UI {
     if (it.blueprint && n > 0) {
       box.appendChild(h('div', 'pp-cost cr-need', this.costHtml(BUILDINGS[it.blueprint].cost, f)));
       acts.appendChild(this.buildBtn(f, it));
-    } else if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && n > 0) {
+    } else if (Mover.placeable(it) && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
-      b.onclick = () => { this.closePanel(); if (it.place === 'path') f.mover.pave(it.key); else f.mover.takeFromBag(it.key); };
+      b.onclick = () => { this.closePanel(); f.mover.useItem(it.key); };
       acts.appendChild(b);
     }
     if (acts.children.length) box.appendChild(acts);

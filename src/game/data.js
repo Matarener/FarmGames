@@ -53,6 +53,12 @@ export const FLORA = {
   apple:     { name: 'Яблоня',    kind: 'tree', fruit: 'apple',        n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 18, ownSell: 54, grow: 4 * 3600, pick: true, regrow: 3 * 3600 },
   pine:      { name: 'Ель',       kind: 'tree', fruit: 'pinecone',     n: [1, 3], wood: [3, 5], hp: 4, xp: 3, seedChop: 0.25, sapSell: 6, ownSell: 18, grow: 3 * 3600 },
   linden:    { name: 'Липа',      kind: 'tree', fruit: 'linden_blossom', n: [2, 3], wood: [2, 4], hp: 3, xp: 2, seedChop: 0.25, sapSell: 8, ownSell: 24, grow: 3 * 3600 },
+  // плодовые деревья из магазина (2026-11-09): чем выше уровень, тем дороже плоды, дольше рост и реже урожай
+  bird_cherry: { name: 'Черёмуха', kind: 'tree', fruit: 'bird_cherry', n: [3, 5], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 22, ownSell: 66, grow: 4 * 3600, pick: true, regrow: 2.5 * 3600 },
+  plum:      { name: 'Слива',     kind: 'tree', fruit: 'plum',         n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 27, ownSell: 81, grow: 5 * 3600, pick: true, regrow: 3 * 3600 },
+  pear:      { name: 'Груша',     kind: 'tree', fruit: 'pear',         n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 32, ownSell: 96, grow: 5 * 3600, pick: true, regrow: 3 * 3600 },
+  apricot:   { name: 'Абрикос',   kind: 'tree', fruit: 'apricot',      n: [2, 4], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 42, ownSell: 126, grow: 6 * 3600, pick: true, regrow: 4 * 3600 },
+  persimmon: { name: 'Хурма',     kind: 'tree', fruit: 'persimmon',    n: [2, 3], wood: [2, 3], hp: 3, xp: 2, seedChop: 0.25, sapSell: 55, ownSell: 165, grow: 6 * 3600, pick: true, regrow: 5 * 3600 },
   blueberry: { name: 'Голубика',  kind: 'bush', fruit: 'blueberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 9, ownSell: 27, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
   raspberry: { name: 'Малина',    kind: 'bush', fruit: 'raspberry',    n: [2, 4], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 8, ownSell: 24, grow: 3600,     pick: true, regrow: 1.5 * 3600 },
   rosehip:   { name: 'Шиповник',  kind: 'bush', fruit: 'rosehip',      n: [2, 3], wood: [1, 1], hp: 1, xp: 1, seedChop: 0.35, sapSell: 5, ownSell: 15, grow: 3600,     pick: true, regrow: 2 * 3600 },
@@ -85,6 +91,11 @@ export const FLORA_GOODS = {
   apple:        { name: 'Яблоко',          sell: 5, food: 4, color: '#e2392f', desc: 'Сочное яблоко. Можно съесть или продать.' },
   pinecone:     { name: 'Шишка',           sell: 2,          color: '#9a6538', desc: 'Еловая шишка. Пригодится для поделок.' },
   linden_blossom: { name: 'Липовый цвет',  sell: 4,          color: '#efe08a', desc: 'Душистые соцветия липы. Пригодятся для чая.' },
+  bird_cherry:  { name: 'Черёмуха',        sell: 4, food: 1, color: '#2e2333', desc: 'Терпкие ягоды черёмухи. Можно съесть или продать.' },
+  plum:         { name: 'Слива',           sell: 7, food: 3, color: '#5b3f8f', desc: 'Спелая слива. Можно съесть или продать.' },
+  pear:         { name: 'Груша',           sell: 8, food: 4, color: '#c9cf4a', desc: 'Сочная груша. Можно съесть или продать.' },
+  apricot:      { name: 'Абрикос',         sell: 11, food: 5, color: '#f29a3a', desc: 'Сладкий абрикос. Можно съесть или продать.' },
+  persimmon:    { name: 'Хурма',           sell: 18, food: 7, color: '#ec6a1c', desc: 'Медовая хурма. Можно съесть или продать.' },
   blueberry:    { name: 'Голубика',        sell: 3, food: 2, color: '#3f5fc8', desc: 'Горсть голубики. Можно съесть или продать.' },
   raspberry:    { name: 'Малина',          sell: 3, food: 2, color: '#e0335a', desc: 'Сладкая малина. Можно съесть или продать.' },
   rosehip:      { name: 'Шиповник',        sell: 3, food: 1, color: '#e2552f', desc: 'Плоды шиповника. Полезные, но кислые.' },
@@ -384,6 +395,11 @@ export const SAPLING_SHOP = {
   blueberry: { price: 35, level: 4 },
   cherry:    { price: 60, level: 5 },
   apple:     { price: 75, level: 6 },
+  bird_cherry: { price: 90, level: 7 },
+  plum:      { price: 110, level: 8 },
+  pear:      { price: 130, level: 9 },
+  apricot:   { price: 170, level: 11 },
+  persimmon: { price: 220, level: 13 },
 };
 for (const [sp, o] of Object.entries(SAPLING_SHOP)) if (FLORA[sp] && FLORA[sp].pick) SHOP.push({ tab: 'trees', item: floraSeedId(sp), price: o.price, level: o.level });
 // Декор: дорожки, от дешёвых к дорогим
@@ -398,3 +414,31 @@ SHOP.push({ tab: 'res', item: 'wood', price: 1, cur: 'gems', qty: 10 });
 SHOP.push({ tab: 'res', item: 'ore', price: 1, cur: 'gems', qty: 3 });
 // Чертежи зданий с крафтом: каждое здание одно на ферму (купить второй чертёж нельзя — buildRules.js)
 for (const b of Object.values(BUILDINGS)) SHOP.push({ tab: 'build', item: bpId(b.key), price: b.blueprint, level: b.level, once: true });
+
+// ---------------- Колодец и грядки в рюкзаке ----------------
+// Починенный колодец и пустую грядку можно убрать в рюкзак (режим «Переставить», по одной или «Убрать всё»)
+// и поставить обратно (well.js, beds.js). В магазине их нет, продать нельзя: грядки копают лопатой, колодец один.
+export const BED_ITEM = 'bed';
+export const WELL_ITEM = 'well';
+ITEMS[BED_ITEM] = {
+  key: BED_ITEM, name: 'Грядка', icon: BED_ITEM, tabs: ['build'], place: 'bed', order: _ord++,
+  desc: 'Пустая грядка, убранная в рюкзак. Нажмите «Поставить» и выбирайте клетки на траве: каждая сразу готовая грядка, копать не нужно.',
+};
+ITEMS[WELL_ITEM] = {
+  key: WELL_ITEM, name: 'Колодец', icon: WELL_ITEM, tabs: ['build'], place: 'well', order: _ord++,
+  desc: 'Ваш колодец: в нём всегда есть вода для лейки. Нажмите «Поставить» и выберите место на траве.',
+};
+
+// ---------------- «Убрать всё своё в рюкзак» ----------------
+// Кнопка «Убрать всё» в режиме «Переставить» (storeAll.js): что можно убрать в рюкзак разом. Порядок — строки
+// окна подтверждения; on — переключатель включён, когда окно открылось; word — как назвать в итоговой надписи
+// (1, 2, 5 штук). Дом не убирается, грядки с посадками и сломанный колодец — тоже, дикая природа — не своя.
+export const STORE_ALL = [
+  { key: 'paths',   name: 'Дорожки',              icon: 'path',           on: true,  word: ['дорожка', 'дорожки', 'дорожек'],    note: 'Все клетки, вид сохраняется' },
+  { key: 'beds',    name: 'Пустые грядки',        icon: BED_ITEM,         on: true,  word: ['грядка', 'грядки', 'грядок'],        note: 'Грядки, где что-то растёт, остаются на месте' },
+  { key: 'ponds',   name: 'Пруды',                icon: 'pond_round',     on: true,  word: ['пруд', 'пруда', 'прудов'],           note: 'Вместе с камышом, рогозом и камнями' },
+  { key: 'well',    name: 'Колодец',              icon: WELL_ITEM,        on: true,  word: ['колодец', 'колодца', 'колодцев'],    note: 'Если он уже починен' },
+  { key: 'plants',  name: 'Свои деревья и кусты', icon: 'own_apple',      on: true,  word: ['растение', 'растения', 'растений'], note: 'Висящие плоды сразу соберутся в рюкзак' },
+  { key: 'placed',  name: 'Постройки',            icon: 'sprinkler_drip', on: true,  word: ['постройка', 'постройки', 'построек'], note: 'Поливалки и другие свои постройки' },
+  { key: 'sprouts', name: 'Растущие ростки',      icon: 'sap_oak',        on: false, word: ['росток', 'ростка', 'ростков'],      note: 'Вернутся саженцами и начнут расти заново' },
+];

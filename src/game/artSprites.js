@@ -2,7 +2,7 @@
 // игра не открывается, пока не загружены все картинки, чтобы в игре не было подгрузок.
 
 import { loadImageRetry, makeCanvas } from '../engine/Sprite.js';
-import { FLORA, PATHS, PATH_KEYS, PONDS, POND_DECOR, pondDecorId, SPRINKLERS } from './data.js';
+import { FLORA, PATHS, PATH_KEYS, PONDS, POND_DECOR, pondDecorId, SPRINKLERS, BED_ITEM, WELL_ITEM } from './data.js';
 import { BUILDINGS, bldId } from './buildData.js';
 
 /* global __ASSET_V__, __ART_MANIFEST__, __ART_ICONS__ */
@@ -106,6 +106,8 @@ export async function loadArt(onProgress) {
     const id = pondDecorId(t);
     if (A[id] && !icons[id]) try { floraIcons[id] = iconOf(A[id]); } catch (e) { /* */ }
   }
+  // грядка и колодец в рюкзаке: иконка — сама пустая грядка и починенный колодец
+  for (const [id, s] of [[BED_ITEM, A.bed_dry], [WELL_ITEM, A.well_fixed]]) if (s && !icons[id]) try { floraIcons[id] = iconOf(s); } catch (e) { /* */ }
   // здания с крафтом (buildData.js): картинка готового здания и его стройка (леса). Иконка здания
   // и его чертежа в рюкзаке — само здание (если нет отдельной ic_bld_<здание>).
   const buildings = {}, sites = {};

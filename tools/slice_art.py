@@ -17,7 +17,6 @@ SRC = os.path.join(ROOT, 'assets', 'source')
 OUT = os.path.join(ROOT, 'assets', 'art')
 DENSITY = 4  # пикселей на мировую единицу
 TILE_W, TILE_H = 64, 32
-YOUNG_K = 0.65  # молодое растение ниже взрослого во столько раз
 
 # Имена картинок: <вид>_<вариант>. Деревья — tree_<вид>, кусты — bush_<вид> (вид — ключ FLORA в
 # src/game/data.js), _bare — без плодов (после сбора), _young — молодое растение.
@@ -28,34 +27,13 @@ YOUNG_K = 0.65  # молодое растение ниже взрослого в
 SHEETS = {
     # ростки посаженных игроком растений (стадия 0): под деревья и под кусты
     'sprouts': [('sprout_tree', -30), ('sprout_bush', -32)],
-    'stumps': [('stump_oak', -42), ('stump_birch', -38), ('stump_pine', -42), ('stump_oak_moss', -42)],
-    'stumps2': [('stump_apple', -42), ('stump_sakura', -42), ('stump_cherry', -42), ('stump_maple', -42)],
     'well': [('well_broken', 41), ('well_fixed', 42)],
-    # дикая высокая трава (WILD): 3 варианта, «пятачок» — ромб чуть меньше клетки
-    'grass_tall': [('grass_tall_0', -44), ('grass_tall_1', -48), ('grass_tall_2', -48)],
-    'stump_linden': [('stump_linden', -42)],  # пень липы: отдельная картинка (2026-11-08)
 }
 # Листы с одной картинкой: лист называется так же, как картинка. Значение — ширина «пятачка».
 # Каждый объект — на своей картинке: на общих листах «пиксели» стиля выходили крупными (пикселили).
 SINGLE = {
-    # взрослые деревья, камни, кусты (до 2026-11-07 были листы trees, trees2, rocks, bushes)
-    'tree_oak': 62, 'tree_apple': 62, 'tree_sakura': 62, 'tree_pine': 60,
-    'tree_cherry_bare': 62,  # вишня цветёт: так она выглядит, пока ягоды отрастают после сбора
-    'tree_maple': 62, 'tree_birch': 60,
-    'tree_linden': 54,  # у липы «пятачок» травы меньше кроны: при 62 она выше берёзы
+    # камни (до 2026-11-07 был лист rocks); деревья, кусты, пни и высокая трава — в NOBASE ниже
     'boulder': 118, 'rock': 54, 'rock_small': 40, 'boulder_moss': 116,
-    'bush_blueberry': 40, 'bush_raspberry': 40, 'bush_rosehip': 40,
-    'bush_hydrangea': 40, 'bush_lavender': 40, 'bush_rose': 40,
-    # с плодами и без плодов: правка исходной картинки того же растения
-    'tree_cherry': 62,  # вишня с ягодами (созревшая)
-    'tree_apple_bare': 62, 'tree_sakura_bare': 62,
-    'bush_blueberry_bare': 40, 'bush_raspberry_bare': 40, 'bush_rosehip_bare': 40,
-    'bush_hydrangea_bare': 40, 'bush_lavender_bare': 40, 'bush_rose_bare': 40,
-    # молодые растения (росток → молодое → взрослое): высота — YOUNG_K от взрослого (YOUNG_OF — от какого)
-    'tree_oak_young': 62, 'tree_birch_young': 60, 'tree_sakura_young': 62, 'tree_cherry_young': 62,
-    'tree_maple_young': 62, 'tree_apple_young': 62, 'tree_pine_young': 60, 'tree_linden_young': 62,
-    'bush_blueberry_young': 40, 'bush_raspberry_young': 40, 'bush_rosehip_young': 40,
-    'bush_hydrangea_young': 40, 'bush_lavender_young': 40, 'bush_rose_young': 40,
     # дом по уровням
     'house_1': -132, 'house_2': -132, 'house_3': -132, 'house_4': -132, 'house_5': -132,
     # здания с крафтом (2×2, как дом; src/game/buildData.js)
@@ -73,14 +51,58 @@ PROPS = {
     'sprinkler_spin': {'h': 40, 'lift': 4},
     'sprinkler_rain': {'h': 56, 'lift': 5},
 }
-# молодое растение по высоте взрослого: по умолчанию — <имя без _young>
-YOUNG_OF = {'tree_cherry_young': 'tree_cherry_bare'}  # молодая вишня — по цветущей
 # Урожай: каждая стадия (0–3) — своя картинка crop_<культура>_<стадия>.png. Растения заполняют
 # ромб грядки: масштаб по ширине (ширина стадии в мире), опора — центр ромба.
 CROPS = ['wheat', 'carrot', 'beet', 'tomato', 'sunflower', 'pumpkin', 'strawberry', 'cotton', 'corn', 'cabbage']
 CROP_W = 54
 # капуста растёт вширь: маленький росток → кочан на всю грядку
 CROP_STAGE_W = {'cabbage': [17.6, 29.65, 47.13, 56.7]}
+
+# Растения без подложки (2026-11-09): деревья, кусты, пни и высокая трава нарисованы без травяного
+# островка и земляного блока и стоят прямо на траве. Каждое — своя картинка <имя>.png. Размер — как
+# у прежних картинок с подложкой, мерка: ('w', ширина) — самая широкая строка в верхних 60% картинки
+# (крона; у травы и пней — во всей картинке), ('h', высота) — от верха до опоры. В мировых единицах.
+# Опора — середина низа ствола или стеблей (foot_of), мягкую тень под растением рисует add_shadow.
+NOBASE = {
+    # деревья — по высоте (от верха до опоры), чтобы рост шёл по породам: ель > дуб > липа > берёза >
+    # клён > вишня > яблоня > сакура. Взрослое с плодами и без — одной высоты, молодое — 0.6 взрослого.
+    'tree_pine': ('h', 110), 'tree_oak': ('h', 106), 'tree_linden': ('h', 100), 'tree_birch': ('h', 96),
+    'tree_maple': ('h', 90), 'tree_cherry': ('h', 86), 'tree_cherry_bare': ('h', 86),
+    'tree_apple': ('h', 82), 'tree_apple_bare': ('h', 82), 'tree_sakura': ('h', 80), 'tree_sakura_bare': ('h', 80),
+    'tree_pine_young': ('h', 66), 'tree_oak_young': ('h', 64), 'tree_linden_young': ('h', 60),
+    'tree_birch_young': ('h', 58), 'tree_maple_young': ('h', 54), 'tree_cherry_young': ('h', 52),
+    'tree_apple_young': ('h', 49), 'tree_sakura_young': ('h', 48),
+    # плодовые деревья из магазина (2026-11-09) — в ряду плодовых: груша > черёмуха > вишня > хурма > слива >
+    # абрикос (крона низкая и широкая). Черёмуха без плодов — в цвету.
+    'tree_pear': ('h', 90), 'tree_pear_bare': ('h', 90), 'tree_bird_cherry': ('h', 88), 'tree_bird_cherry_bare': ('h', 88),
+    'tree_persimmon': ('h', 84), 'tree_persimmon_bare': ('h', 84), 'tree_plum': ('h', 80), 'tree_plum_bare': ('h', 80),
+    'tree_apricot': ('h', 70), 'tree_apricot_bare': ('h', 70),
+    'tree_pear_young': ('h', 54), 'tree_bird_cherry_young': ('h', 53), 'tree_persimmon_young': ('h', 50),
+    'tree_plum_young': ('h', 48), 'tree_apricot_young': ('h', 42),
+    # кусты: с плодами, без, молодые
+    'bush_blueberry': ('w', 58.8), 'bush_raspberry': ('w', 56.5), 'bush_rosehip': ('w', 57.8),
+    'bush_hydrangea': ('w', 58.5), 'bush_lavender': ('w', 53.2), 'bush_rose': ('w', 58.5),
+    'bush_blueberry_bare': ('w', 58.0), 'bush_raspberry_bare': ('w', 61.2), 'bush_rosehip_bare': ('w', 59.5),
+    'bush_hydrangea_bare': ('w', 57.0), 'bush_lavender_bare': ('w', 53.8), 'bush_rose_bare': ('w', 58.0),
+    'bush_blueberry_young': ('w', 33.5), 'bush_raspberry_young': ('w', 30.2), 'bush_rosehip_young': ('w', 33.0),
+    'bush_hydrangea_young': ('w', 34.0), 'bush_lavender_young': ('w', 31.8), 'bush_rose_young': ('w', 31.2),
+    # пни (до 2026-11-09 — листы stumps, stumps2)
+    # пни: ширина всей картинки (корни, листья); дубовые шире — у большого дуба ствол толще остальных
+    'stump_oak': ('w', 38), 'stump_birch': ('w', 27), 'stump_pine': ('w', 31), 'stump_oak_moss': ('w', 38),
+    'stump_apple': ('w', 31), 'stump_sakura': ('w', 31), 'stump_cherry': ('w', 31), 'stump_maple': ('w', 31),
+    'stump_linden': ('w', 31),
+    # пни новых плодовых: их пни выше и без широких веток с цветами по бокам — чуть уже, чтобы ствол был как у яблони
+    'stump_bird_cherry': ('w', 25), 'stump_plum': ('w', 28), 'stump_pear': ('w', 26), 'stump_apricot': ('w', 28),
+    'stump_persimmon': ('w', 28),
+    # дикая высокая трава (до 2026-11-09 — лист grass_tall из трёх)
+    'grass_tall_0': ('w', 42), 'grass_tall_1': ('w', 46), 'grass_tall_2': ('w', 46), 'grass_tall_3': ('w', 38),
+}
+# Тень под растением: (доля ширины кроны, мин. и макс. ширина в мире, непрозрачность в середине).
+# Эллипс 2:1 как клетка, чуть вправо-вниз (свет слева сверху), края мягкие.
+SHADOW = {'tree': (0.64, 34, 80, 0.48), 'bush': (0.92, 25, 52, 0.42), 'stump': (1.2, 25, 46, 0.4),
+          'grass': (0.9, 20, 44, 0.3)}
+SHADOW_RGB = (28, 58, 6)
+NOBASE_KIND = lambda name: 'grass' if name.startswith('grass_') else name.split('_')[0]
 
 # None в списке листа — предмет нарисован, но игре не нужен: его место учитывается, картинка не сохраняется.
 
@@ -129,6 +151,12 @@ ICON_SHEETS = {
     # липа (2026-11-08): липовый цвет и саженец — по одной иконке на картинку
     'ui_linden_blossom': ['linden_blossom'],
     'ui_sap_linden': ['sap_linden'],
+    # плодовые деревья из магазина (2026-11-09): плод и саженец — по одной иконке на картинку
+    'ui_bird_cherry': ['bird_cherry'], 'ui_sap_bird_cherry': ['sap_bird_cherry'],
+    'ui_plum': ['plum'], 'ui_sap_plum': ['sap_plum'],
+    'ui_pear': ['pear'], 'ui_sap_pear': ['sap_pear'],
+    'ui_apricot': ['apricot'], 'ui_sap_apricot': ['sap_apricot'],
+    'ui_persimmon': ['persimmon'], 'ui_sap_persimmon': ['sap_persimmon'],
     # стрелка-подсказка к заданию, кольцо под целью, кружок у края экрана (Farm.applyArt → PixiScene.syncHint)
     'ui_hints': ['hint_arrow', 'hint_ring', 'hint_badge'],
     # подарки: кнопка в интерфейсе, вкладки окна «Подарки», сундук 7-го дня
@@ -317,6 +345,80 @@ def tiles(man):
     print(f'край дорожек (трава и переходы): {len(pieces)} кусков')
 
 
+def crown_px(m, frac=0.6):
+    """Ширина кроны в пикселях: самая широкая строка в верхних frac непрозрачного (m — маска)."""
+    ys = np.where(m.any(1))[0]
+    best = 0
+    for y in range(ys[0], ys[0] + int((ys[-1] - ys[0]) * frac) + 1):
+        xs = np.where(m[y])[0]
+        if len(xs): best = max(best, xs[-1] - xs[0])
+    return best
+
+
+def foot_of(m):
+    """Опора растения без подложки (m — маска): середина основания ствола или стеблей.
+    Ствол меряем на 10% высоты над самой нижней точкой (там уже нет травинок): x — середина этого
+    отрезка (мелкие просветы между стеблями не в счёт), y — выше нижней точки на четверть его ширины:
+    основание ствола на земле — эллипс 2:1, его середина выше переднего края (не больше 12% высоты)."""
+    ys = np.where(m.any(1))[0]
+    y0, yb = ys[0], ys[-1]
+    h = yb - y0 + 1
+    band = m[max(y0, yb - int(h * 0.08)):yb + 1]
+    cols = band.sum(0).astype(float)
+    cx = (cols * np.arange(len(cols))).sum() / cols.sum()  # середина низа: корни и травинки
+    row = ndimage.binary_closing(m[int(yb - h * 0.1)], np.ones(max(3, int(m.shape[1] * 0.05))))
+    lab, n = ndimage.label(row)
+    if not n: return cx, yb
+    runs = [np.where(lab == i)[0] for i in range(1, n + 1)]
+    run = min(runs, key=lambda r: 0 if r[0] <= cx <= r[-1] else min(abs(r[0] - cx), abs(r[-1] - cx)))
+    tw = run[-1] - run[0] + 1
+    return (run[0] + run[-1]) / 2, yb - min(tw / 4, h * 0.12)
+
+
+def add_shadow(img, ax, ay, crown, kind):
+    """Мягкая тень под растением (эллипс 2:1) под картинкой. img — PIL RGBA, ax, ay, crown — в пикселях.
+    Возвращает новую картинку и сдвиг (dx, dy) старой внутри неё."""
+    k, lo, hi, alpha = SHADOW[kind]
+    sw = min(max(crown * k, lo * DENSITY), hi * DENSITY)
+    sh = sw / 2
+    cx, cy = ax + sw * 0.06, ay + sw * 0.02
+    x0, y0 = min(0, int(np.floor(cx - sw / 2)) - 1), min(0, int(np.floor(cy - sh / 2)) - 1)
+    x1, y1 = max(img.width, int(np.ceil(cx + sw / 2)) + 1), max(img.height, int(np.ceil(cy + sh / 2)) + 1)
+    W, H = x1 - x0, y1 - y0
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    r = np.sqrt(((xx + 0.5 + x0 - cx) / (sw / 2)) ** 2 + ((yy + 0.5 + y0 - cy) / (sh / 2)) ** 2)
+    t = np.clip((1 - r) / (1 - 0.3), 0, 1)
+    a = alpha * t * t * (3 - 2 * t)  # smoothstep: плотная середина, мягкий край
+    sh_img = np.zeros((H, W, 4), np.uint8)
+    sh_img[..., :3] = SHADOW_RGB
+    sh_img[..., 3] = np.round(a * 255).astype(np.uint8)
+    out = Image.fromarray(sh_img)
+    out.alpha_composite(img, (-x0, -y0))
+    return out, -x0, -y0
+
+
+def nobase(name, man):
+    """Растение без подложки: размер по мерке NOBASE, опора — низ ствола, тень под ним."""
+    kind = NOBASE_KIND(name)
+    a = load(name)
+    boxes, lab = components(a, 1)
+    y0, y1, x0, x1, i = boxes[0]
+    crop = a[y0:y1, x0:x1].copy()
+    crop[lab[y0:y1, x0:x1] != i, 3] = 0
+    m = crop[..., 3] > 128
+    fx, fy = foot_of(m)
+    how, size = NOBASE[name]
+    if how == 'w': k = size / crown_px(m, 1.0 if kind in ('grass', 'stump') else 0.6)
+    else: k = size / (fy - np.where(m.any(1))[0][0])
+    W, H = (x1 - x0) * k, (y1 - y0) * k
+    img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
+    s = W * DENSITY / (x1 - x0)  # пиксели картинки игры на пиксель исходника
+    crown = crown_px(m, 0.6) * s
+    img, dx, dy = add_shadow(img, fx * s, fy * s, crown, kind)
+    save(img, name, img.width / DENSITY, img.height / DENSITY, (fx * s + dx) / DENSITY, (fy * s + dy) / DENSITY, man)
+    print(f'{name:20s} {x1-x0}x{y1-y0}px -> {img.width / DENSITY:.0f}x{img.height / DENSITY:.0f} u, тень {kind}')
+
+
 def main(only=None):
     """only — нарезать только эти листы SHEETS и дописать их в существующий manifest.json"""
     os.makedirs(OUT, exist_ok=True)
@@ -337,27 +439,21 @@ def main(only=None):
                 base_w = -base_w
             else:
                 bw, bx, by = base_of(crop)
-                # у деревьев «пятачок» травы — ромб, его самая широкая строка и есть центр
-                # (как у пней, иначе пень встаёт выше дерева)
-                if name.startswith('tree_'): by += bw / 4
-                # у кустов газон на земляном блоке, его самая широкая строка — не центр, а выше низа на
-                # высоту стенок: опора — центр ромба, нижний угол которого — низ блока
-                # (иначе куст стоит ниже своей клетки)
-                if name.startswith('bush_'): by = np.where((crop[..., 3] > 128).any(1))[0].max()
                 # у колодца самая широкая строка — середина круглой кладки; опора — от низа кладки
                 # под центром (иначе колодец «съезжает» на клетку перед собой)
                 if sheet == 'well':
                     mm = crop[..., 3] > 128; c = int(bx)
                     by = np.where(mm[:, max(0, c - 3):c + 3].any(1))[0].max()
             k = base_w / bw  # мир/пиксель
-            if name.endswith('_young'):  # молодое — по высоте взрослого
-                adult = YOUNG_OF.get(name, name[:-len('_young')])
-                if adult in man: k = YOUNG_K * man[adult]['h'] / (y1 - y0)
             W, H = (x1 - x0) * k, (y1 - y0) * k
             img = Image.fromarray(crop).resize((max(1, round(W * DENSITY)), max(1, round(H * DENSITY))), Image.LANCZOS)
             # опора — центр ромба основания (низ минус четверть ширины)
             save(img, name, W, H, bx * k, (by - bw / 4) * k, man)
             print(f'{name:14s} {x1-x0}x{y1-y0}px -> {W:.0f}x{H:.0f} u')
+
+    for name in NOBASE:
+        if only and name not in only: continue
+        nobase(name, man)
 
     for name, pr in PROPS.items():
         if only and name not in only: continue
