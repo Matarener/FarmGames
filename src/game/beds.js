@@ -1,7 +1,9 @@
 // Правила грядок: чистые функции над грядкой { crop, p — секунд роста, w — сколько раз полита }.
 // Без звуков, картинок и Date.now — их же потом сможет выполнять сервер.
 
-import { CROPS } from './data.js';
+import { CROPS, BED_ITEM } from './data.js';
+import * as Inv from './inventory.js';
+import { N, T } from './World.js';
 
 // Культуру поливают дважды: после первого полива она растёт до 2/3, после второго — до конца.
 const limitOf = (b, total) => (b.w >= 2 ? total : b.w >= 1 ? total * 2 / 3 : 0);
@@ -35,4 +37,29 @@ export function growBed(b, dt, auto) {
     b.p += step; dt -= step;
   }
   return n;
+}
+
+// ---------- Грядка в рюкзаке ----------
+// Пустую грядку можно убрать в рюкзак (предмет BED_ITEM) и поставить обратно на траву — уже вскопанной.
+// beds — грядки фермы (Map: клетка → грядка { crop, p, w }), на клиенте это Farm.beds. Убранная или
+// поставленная грядка ставит st.movedBeds: стартовые грядки карты больше не возвращаются сами.
+
+// Пустую грядку на клетке i — в рюкзак, клетка снова трава. → true или false (не грядка, на ней растёт урожай)
+export function storeBed(st, w, beds, i) {
+  const b = beds.get(i);
+  if (w.tiles[i] !== T.SOIL || (b && b.crop) || !Inv.addItem(st, BED_ITEM, 1)) return false;
+  w.tiles[i] = T.GRASS;
+  beds.delete(i);
+  st.movedBeds = true;
+  return true;
+}
+
+// Грядку из рюкзака — на клетку i: открытая свободная трава. Саму грядку (объект в beds) создаёт игра
+// (Farm.bedAt). → true или false
+export function placeBed(st, w, i) {
+  const x = i % N, y = (i / N) | 0;
+  if (!w.isOpen(x, y) || w.tiles[i] !== T.GRASS || w.occ[i] >= 0 || !Inv.takeItem(st, BED_ITEM, 1)) return false;
+  w.tiles[i] = T.SOIL;
+  st.movedBeds = true;
+  return true;
 }

@@ -1,94 +1,106 @@
-// «Убрать всё»: всё своё с карты — в рюкзак одной кнопкой («Ещё» → «Переставить» → «Убрать всё»).
-// Дом, колодец, грядки и дикие растения остаются (это не предметы и не своё).
-// Группы (data.js STORE_GROUPS) — галочки в окне: decor — декор и заборы, paths — дорожки, ponds — пруды
-// (с украшениями), plants — свои деревья и кусты (с висящими плодами), build — свои постройки (поливалки и прочее
-// из placed.js), sprouts — свои растущие ростки (вернутся саженцами, рост начнётся заново).
-// Чистые функции над состоянием st и миром (время и случай — в ctx), эффекты делает Mover.
+// «Убрать всё своё в рюкзак» (кнопка «Убрать всё» в режиме «Переставить»): свои вещи с карты — разом в рюкзак.
+// Чистые функции над состоянием st и миром (без звуков, DOM, Date.now и Math.random — время и случайность
+// приходят в ctx), чтобы их же потом мог выполнять сервер. Эффекты (пыль, брызги, надписи) делает Farm.
+//
+// Группы — таблица STORE_ALL (data.js): дорожки, пустые грядки, пруды (с украшениями), декор и заборы, починенный
+// колодец, свои взрослые деревья и кусты (висящие плоды — тоже в рюкзак), свои постройки (placed.js: постройка сама
+// может отказаться, например пока строится), растущие ростки (вернутся саженцами). Каждая вещь убирается тем же
+// правилом, что и по одной в «Переставить»: Paths.storePaths, Beds.storeBed, Ponds.storePond, Well.storeWell,
+// Placed.storeObj, Flora.storeOwn.
+// Не трогаются: дом, грядки, где что-то растёт, сломанный колодец, дикая природа, вещи на закрытых участках и
+// занятое — ctx.busy({ obj }) или ctx.busy({ x, y }) → true (например, там сейчас работает призрачок: это знает
+// только игра).
+//
+// ctx: { now, rng, busy?, beds? } — beds: грядки фермы (Map клетка → грядка; на клиенте Farm.beds, не в st)
 
-import { OBJECTS, STORE_GROUPS } from './data.js';
+import { OBJECTS, STORE_ALL, BED_ITEM, WELL_ITEM } from './data.js';
+import * as Beds from './beds.js';
+import * as Flora from './flora.js';
+import * as Paths from './paths.js';
 import * as Placed from './placed.js';
 import * as Ponds from './ponds.js';
-import * as Paths from './paths.js';
-import * as Flora from './flora.js';
-import { N, T } from './World.js';
+import { plural } from './questRules.js';
+import * as Well from './well.js';
+import { N, T, objCells } from './World.js';
 
-export const GROUP_KEYS = STORE_GROUPS.map((g) => g.key);
+export const GROUPS = STORE_ALL.map((g) => g.key);
 
-// В какую группу попадает объект карты (null — не убирается: дом, колодец, дикие растения, камни)
+// В какую группу попадает объект мира (null — не свой или в рюкзак не убирается: дом, дикое)
 export function groupOf(o) {
-  const def = o && OBJECTS[o.type];
-  if (!def) return null;
+  if (!o) return null;
+  if (o.type === 'well') return 'well';
   if (Ponds.isPond(o)) return 'ponds';
-  if (o.placed) return def.deco || def.fence ? 'decor' : 'build';
-  if (o.own && def.flora) return 'plants';
-  if (o.own && o.type === 'sapling') return 'sprouts';
-  return null;
+  if (Placed.isPlaced(o)) return !Placed.itemOf(o.type) ? null : OBJECTS[o.type].deco || OBJECTS[o.type].fence ? 'decor' : 'placed';
+  if (!o.own) return null;
+  if (o.type === 'sapling') return 'sprouts';
+  return Flora.floraOf(o) ? 'plants' : null;
 }
 
-// Клетки дорожек на открытой земле: номера клеток
-function pathCells(w) {
-  const out = [];
-  for (let i = 0; i < N * N; i++) if (w.tiles[i] === T.PATH && w.isOpen(i % N, (i / N) | 0)) out.push(i);
+// Объект целиком на открытой земле
+const onOpen = (w, o) => objCells(OBJECTS[o.type], o.rot).every(([dx, dy]) => w.isOpen(o.gx + dx, o.gy + dy));
+
+// Что уберётся. → { группа: { list, kept } }: list — клетки дорожек и грядок (номера) или объекты, kept — сколько
+// своих останется на месте (занято, постройка не даёт: строится; колодец сломан). Грядки, где что-то растёт,
+// не считаются вовсе.
+export function collect(st, w, ctx = {}) {
+  const busy = ctx.busy || (() => false), beds = ctx.beds || new Map(), out = {};
+  for (const g of GROUPS) out[g] = { list: [], kept: 0 };
+  for (let i = 0; i < w.tiles.length; i++) {
+    const t = w.tiles[i];
+    if (t !== T.PATH && t !== T.SOIL) continue;
+    const x = i % N, y = (i / N) | 0;
+    if (!w.isOpen(x, y)) continue;
+    if (t === T.SOIL && beds.get(i) && beds.get(i).crop) continue;
+    const g = t === T.PATH ? 'paths' : 'beds';
+    if (busy({ x, y })) out[g].kept++; else out[g].list.push(i);
+  }
+  for (const o of w.objects) {
+    const g = groupOf(o);
+    if (!g || !onOpen(w, o)) continue;
+    const no = ((g === 'placed' || g === 'decor') && Placed.storeWhy(st, o, ctx)) || (g === 'well' && Well.storeWhy(st, w));
+    if (busy({ obj: o }) || no) out[g].kept++;
+    else out[g].list.push(o);
+  }
   return out;
 }
 
-// Сколько чего уберётся: { decor, paths, ponds, plants, build, sprouts }. skip({ obj } | { x, y }) — призрачок там
-// сейчас работает: это не трогаем.
-export function plan(w, skip = () => false) {
-  const n = Object.fromEntries(GROUP_KEYS.map((k) => [k, 0]));
-  for (const o of w.objects) {
-    const g = groupOf(o);
-    if (g && w.isOpen(o.gx, o.gy) && !skip({ obj: o })) n[g]++;
-  }
-  for (const i of pathCells(w)) if (!skip({ x: i % N, y: (i / N) | 0 })) n.paths++;
-  return n;
-}
-
-// Убрать в рюкзак всё из групп groups. ctx: { now, rng, skip }.
-// → { n — сколько вещей убрано, left — сколько осталось (занято, нельзя убрать), paths — убрано клеток дорожек,
-//     by — { группа: сколько убрано }, items — [{ id, n }] что легло в рюкзак }
+// Убрать в рюкзак группы groups (ключи STORE_ALL). → { items: [{ id, n }] — что легло в рюкзак,
+// done: { группа: сколько вещей убрано }, total, spots } . spots — где что было, для эффектов: [{ g, o }] у объектов
+// (o уже снят с карты, но gx, gy, wx, wy при нём), [{ g, x, y, id? }] у клеток дорожек (id — вид) и грядок.
 export function storeAll(st, w, groups, ctx = {}) {
-  const want = new Set(groups), skip = ctx.skip || (() => false), got = new Map();
-  const add = (id, k) => got.set(id, (got.get(id) || 0) + k);
-  const by = Object.fromEntries(GROUP_KEYS.map((k) => [k, 0]));
-  let n = 0, left = 0, paths = 0;
-  for (const o of w.objects.slice()) {
-    const g = groupOf(o);
-    if (!g || !want.has(g) || w.objects[o.id] !== o || !w.isOpen(o.gx, o.gy)) continue;
-    if (skip({ obj: o })) { left++; continue; }
-    let items = null;
-    if (g === 'ponds') items = Ponds.storePond(st, w, o);
-    else if (g === 'plants' || g === 'sprouts') {
-      const r = Flora.storeOwn(st, o, ctx.now, ctx.rng);
-      if (r) { w.remove(o); items = r.items; }
-    } else {
-      const r = Placed.storeObj(st, w, o, ctx);
-      if (!r.why) items = [{ id: r.id, n: 1 }];
+  const want = new Set(groups), list = collect(st, w, ctx), got = {}, done = {}, spots = [];
+  let total = 0;
+  const put = (items, g, spot) => {
+    for (const { id, n } of items) got[id] = (got[id] || 0) + n;
+    done[g] = (done[g] || 0) + 1; total++;
+    spots.push({ g, ...spot });
+  };
+  for (const g of GROUPS) {
+    if (!want.has(g)) continue;
+    if (g === 'paths') {
+      const cells = list.paths.list, kinds = cells.map((i) => Paths.kindAt(w, i));
+      Paths.storePaths(st, w, cells);
+      cells.forEach((i, k) => { if (w.tiles[i] !== T.PATH) put([{ id: kinds[k], n: 1 }], g, { x: i % N, y: (i / N) | 0, id: kinds[k] }); });
+      continue;
     }
-    if (!items) { left++; continue; }
-    n++; by[g]++;
-    for (const it of items) add(it.id, it.n);
-  }
-  if (want.has('paths')) {
-    for (const i of pathCells(w)) {
-      if (skip({ x: i % N, y: (i / N) | 0 })) { left++; continue; }
-      const k = Paths.storePath(st, w, i);
-      if (!k) { left++; continue; }
-      n++; paths++; by.paths++; add(k, 1);
+    if (g === 'beds') {
+      const beds = ctx.beds || new Map();
+      for (const i of list.beds.list) if (Beds.storeBed(st, w, beds, i)) put([{ id: BED_ITEM, n: 1 }], g, { x: i % N, y: (i / N) | 0 });
+      continue;
+    }
+    for (const o of list[g].list) {
+      let items = null;
+      if (g === 'well') { if (Well.storeWell(st, w)) items = [{ id: WELL_ITEM, n: 1 }]; }
+      else if (g === 'ponds') items = Ponds.storePond(st, w, o);
+      else if (g === 'placed' || g === 'decor') { const r = Placed.storeObj(st, w, o, ctx); if (r.id) items = [{ id: r.id, n: 1 }]; }
+      else { const r = Flora.storeOwn(st, o, ctx.now, ctx.rng); if (r) { w.remove(o); items = r.items; } }
+      if (items) put(items, g, { o });
     }
   }
-  return { n, left, paths, by, items: [...got].map(([id, k]) => ({ id, n: k })) };
+  return { items: Object.entries(got).map(([id, n]) => ({ id, n })), done, total, spots };
 }
 
-// Останется ли игрок без воды для лейки: колодец не починен, а все пруды уходят в рюкзак
-export function leavesNoWater(st, w, groups, skip = () => false) {
-  if (st.well || !groups.includes('ponds')) return false;
-  const ponds = w.objects.filter((o) => o && Ponds.isPond(o) && w.isOpen(o.gx, o.gy));
-  return ponds.length > 0 && ponds.every((o) => !skip({ obj: o }));
-}
-
-// Итог словами: «15 дорожек, 1 пруд, 2 постройки» (by — из storeAll)
-export function summary(by) {
-  const word = (n, [one, few, many]) => { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many; };
-  return STORE_GROUPS.filter((g) => by[g.key]).map((g) => `${by[g.key]} ${word(by[g.key], g.n)}`).join(', ');
+// «24 дорожки, 2 пруда, 3 растения» — что убрано (done из storeAll), по порядку STORE_ALL
+export function summary(done) {
+  return STORE_ALL.filter((g) => done[g.key]).map((g) => `${done[g.key]} ${plural(done[g.key], g.word)}`).join(', ');
 }

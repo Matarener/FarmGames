@@ -566,16 +566,6 @@ body[data-side="2"] .debug { top: calc(var(--safe-t) + 248px); }
 .mb-btns .btn-s.mb-rot { flex: 0 0 46px; padding: 0; }
 .mb-btns .btn-s.mb-rot .ic { width: 26px; height: 26px; margin: 0; }
 body.moving .hud-bottom { display: none; }
-/* окно «Убрать всё» (из «Переставить») */
-.sa-note { font-size: 13px; color: #6b5442; margin: 0 0 4px; line-height: 1.35; }
-.set-row.tog.sa-row { grid-template-columns: 30px 1fr auto auto; }
-.sa-row .ic { width: 28px; height: 28px; object-fit: contain; }
-.sa-t { display: flex; flex-direction: column; min-width: 0; font-weight: 700; }
-.sa-t small { font-size: 11.5px; font-weight: 500; color: #8a6a50; line-height: 1.25; margin-top: 1px; }
-.sa-row b { min-width: 2ch; text-align: right; font-size: 15px; color: var(--ink); }
-.sa-warn { margin: 10px 0 0; font-size: 12.5px; font-weight: 700; color: #c0392b; line-height: 1.35; }
-.sa-stay { margin: 10px 0 0; font-size: 12px; color: #8a6a50; }
-.sa-go { width: 100%; margin-top: 12px; }
 body.moving .toast { bottom: calc(var(--safe-b) + 112px); }
 .move-bar.shake { animation: mb-shake .32s; }
 @keyframes mb-shake { 20% { transform: translateX(calc(-50% - 6px)); } 45% { transform: translateX(calc(-50% + 5px)); } 70% { transform: translateX(calc(-50% - 3px)); } }
@@ -839,3 +829,13 @@ body.digging .fab-dig { background: linear-gradient(#ffe48a, #f2b51d); }
   .panel[data-kind="bag"] .pn-card, .panel[data-kind="market"] .pn-card, .panel[data-kind="devitems"] .pn-card { width: min(860px, 92vw); }
   .sh { grid-template-columns: 92px minmax(0, 1fr) 280px; }
 }
+
+/* «Убрать всё» в режиме перестановки: окно с группами своих вещей */
+.set-row.tog.sa-row { grid-template-columns: auto 1fr auto auto; cursor: pointer; }
+.set-row.sa-row .ic { width: 30px; height: 30px; object-fit: contain; }
+.sa-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-weight: 700; }
+.sa-l i { font-style: normal; font-weight: 500; font-size: 12px; color: #8a6a50; }
+.set-row.sa-row b { font-size: 15px; color: var(--ink); min-width: 1.6em; text-align: right; }
+.set-row.sa-row.off { cursor: default; }
+.pn-text.sa-warn { color: #b04a1c; font-weight: 700; }
+.pn-text.sa-stay { color: #8a6a50; font-size: 12px; }

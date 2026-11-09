@@ -2,7 +2,7 @@
 // всплывающие меню у объектов, окна, уведомления. DOM обновляется только
 // при изменениях, а не каждый кадр.
 
-import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS, STORE_GROUPS } from '../game/data.js';
+import { HOUSE, ITEMS, INV_TABS, SELL_TABS, SHOP, SHOP_TABS, CROPS, FLORA, ENERGY, seedId, floraSeedId, floraOwnId, xpToNext, houseNeedChunks, DEV_LIMITS, STORE_ALL } from '../game/data.js';
 import * as Inv from '../game/inventory.js';
 import * as Plant from '../game/planting.js';
 import * as R from '../game/questRules.js';
@@ -13,6 +13,7 @@ import { ACH_GROUPS, ACH_MEDALS } from '../game/achData.js';
 import { hasHint, hintAuto } from '../game/hints.js';
 import { MUSIC } from '../engine/Audio.js';
 import * as Dev from '../game/devRules.js';
+import { Mover } from '../game/Mover.js';
 
 // версия сборки (tools/build.mjs); при локальном запуске — «локально»
 const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'локально';
@@ -415,9 +416,9 @@ export class UI {
 
   // ---------- Окна ----------
   // music: false — музыка фермы не сменяется на музыку меню (короткие окна выбора у грядки)
-  // keepMove — режим «Переставить» не выключается (окно «Убрать всё» открыто из него)
-  openPanel(kind, title, build, { music = true, keepMove = false } = {}) {
-    if (!keepMove && this.farm && this.farm.mover && this.farm.mover.active) this.farm.mover.exit();
+  openPanel(kind, title, build, { music = true } = {}) {
+    if (this.farm && this.farm.mover && this.farm.mover.active) this.farm.mover.exit();
+    this._onClose = null; // окно сменилось другим — прежнее «после закрытия» не нужно
     const p = this.panelEl;
     p.dataset.kind = kind;
     this._build = build;
@@ -454,7 +455,7 @@ export class UI {
       () => this.wheelPanel(f),
       () => this.achPanel(f),
       () => this.settingsPanel(f),
-      () => this.storeAllPanel(f),
+      () => { this.storeAllPanel(f); this._onClose = null; },
       () => { this.closePanel(); this.toggleMore(true); },
       () => { this.toggleMore(false); this.popup(this.root.clientWidth / 2, this.root.clientHeight / 2, { title: 'Дуб', text: 'Срубить', cost: { wood: 1 }, items: [{ icon: 'axe', label: 'Срубить', sub: '1', onClick() {} }] }); },
     ];
@@ -509,6 +510,10 @@ export class UI {
     if (this.panelOpen) this.sfx('close');
     this.panelEl.classList.remove('show'); this.panelEl.dataset.kind = '';
     if (this.farm && this.farm.audio) this.farm.audio.setTheme('farm');
+    // окно, открытое из режима перестановки («Убрать всё»), возвращает в него
+    const back = this._onClose;
+    this._onClose = null;
+    if (back) back();
   }
 
   // ---------- Меню «Ещё» ----------
@@ -564,37 +569,53 @@ export class UI {
     $('#mb-all').hidden = !st.canStoreAll;
   }
 
-  // «Убрать всё»: галочки — что убрать с карты в рюкзак (storeAll.js), сколько чего; режим «Переставить» остаётся
-  storeAllPanel(f) {
-    const S = this.sa || (this.sa = { on: Object.fromEntries(STORE_GROUPS.map((g) => [g.key, !g.off])) });
-    this.openPanel('storeall', 'Убрать в рюкзак', (body) => {
-      const plan = f.mover.storeAllPlan();
-      body.appendChild(h('div', 'sa-note', 'Отмеченное уйдёт в рюкзак. Поставить обратно можно здесь же, в «Переставить»: нажмите на пустую траву.'));
-      let total = 0;
-      const groups = [];
-      for (const g of STORE_GROUPS) {
-        const n = plan[g.key], on = S.on[g.key] && n > 0;
-        if (on) { total += n; groups.push(g.key); }
-        const row = h('div', 'set-row tog sa-row' + (n ? '' : ' off'), `${this.ic(g.icon)}<span class="sa-t"><span>${g.name}</span><small>${g.sub}</small></span><b>${n}</b>`);
-        const b = h('button', 'switch' + (on ? ' on' : ''), '<i></i>');
-        b.setAttribute('role', 'switch'); b.setAttribute('aria-checked', on);
-        b.disabled = !n;
-        b.onclick = () => { S.on[g.key] = !on; this.sfx('tap'); this.refreshPanel(); };
-        row.appendChild(b);
-        body.appendChild(row);
-      }
-      if (f.mover.storeAllNoWater(groups)) body.appendChild(h('div', 'sa-warn', 'Колодец ещё не починен: без прудов воду для лейки набрать будет негде, пока не поставите пруд обратно.'));
-      body.appendChild(h('div', 'sa-stay', 'Останутся на месте: дом, колодец, грядки и дикие растения.'));
-      const go = h('button', 'btn-main sa-go', total ? `Убрать в рюкзак (${total})` : 'Нечего убирать');
-      go.disabled = !total;
-      go.onclick = () => { this.closePanel(); f.mover.storeAll(groups); };
-      body.appendChild(go);
-    }, { keepMove: true });
-  }
-
   moveBarShake() {
     const bar = $('#move-bar');
     bar.classList.remove('shake'); void bar.offsetWidth; bar.classList.add('shake');
+  }
+
+  // «Убрать всё» из режима перестановки: окно подтверждения — группы своих вещей (STORE_ALL) с переключателями
+  // и числом вещей; «Убрать в рюкзак» убирает отмеченное (Mover.storeAll). Закрыли окно или убрали —
+  // снова режим перестановки. Переключатели помнятся до перезапуска игры.
+  storeAllPanel(f) {
+    const S = this.sa || (this.sa = { on: Object.fromEntries(STORE_ALL.map((g) => [g.key, g.on])) });
+    this.openPanel('storeall', 'Убрать в рюкзак', (body) => {
+      const list = f.mover.storeAllList();
+      body.appendChild(h('div', 'pn-text', 'Отмеченное уйдёт в рюкзак. Поставить обратно можно здесь же, в «Переставить»: нажмите на пустую траву.'));
+      let n = 0;
+      for (const g of STORE_ALL) {
+        const c = list[g.key], cnt = c.list.length, on = !!S.on[g.key] && cnt > 0;
+        if (on) n += cnt;
+        // что-то из группы занято (там работает призрачок, постройка ещё строится) — остаётся
+        const note = g.note + (c.kept ? `. Ещё ${c.kept} останется на месте` : '');
+        const row = h('div', 'set-row tog sa-row' + (cnt ? '' : ' off'),
+          `${this.ic(g.icon, 'ic')}<span class="sa-l"><span>${g.name}</span><i>${note}</i></span><b>${cnt}</b>`);
+        const sw = h('button', 'switch' + (on ? ' on' : ''), '<i></i>');
+        sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', on);
+        sw.disabled = !cnt;
+        row.appendChild(sw);
+        if (cnt) row.onclick = () => { S.on[g.key] = !S.on[g.key]; this.sfx('tap'); this.refreshPanel(); };
+        body.appendChild(row);
+      }
+      // после уборки не останется ни пруда, ни колодца — воду для лейки набрать будет негде
+      const gone = (g) => S.on[g] && list[g].list.length > 0;
+      const pondsLeft = (gone('ponds') ? 0 : list.ponds.list.length) + list.ponds.kept;
+      const wellLeft = !!f.world.well && f.st.well > 0 && !gone('well');
+      if ((gone('ponds') || gone('well')) && !pondsLeft && !wellLeft) {
+        body.appendChild(h('div', 'pn-text sa-warn', 'Воду для лейки будет негде набрать, пока не поставите обратно пруд или колодец.'));
+      }
+      const stay = f.world.well && !f.st.well ? 'дом, сломанный колодец (сначала почините его), грядки с посадками и дикие растения' : 'дом, грядки с посадками и дикие растения';
+      body.appendChild(h('div', 'pn-text sa-stay', `Останутся на месте: ${stay}.`));
+      const b = h('button', 'btn-main', n ? `Убрать в рюкзак (${n})` : 'Убирать нечего');
+      b.disabled = !n;
+      b.onclick = () => {
+        this._onClose = null;
+        this.closePanel();
+        f.mover.storeAll(STORE_ALL.filter((g) => S.on[g.key]).map((g) => g.key));
+      };
+      body.appendChild(b);
+    }, { music: false });
+    this._onClose = () => f.mover.enter();
   }
 
   // ---------- Настройки ----------
@@ -1304,9 +1325,9 @@ export class UI {
       acts.appendChild(b);
       // купленную дорожку — сразу класть: окно закрывается, включается «Кладём дорожку»;
       // пруд, украшение пруда, постройку (поливалку) — ставить: выбраны в «Переставить», нажатие на клетку — предпросмотр
-      if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && have) {
+      if (Mover.placeable(it) && have) {
         const p = h('button', 'btn-s', 'Поставить');
-        p.onclick = () => { this.closePanel(); f.mover.use(it.key); };
+        p.onclick = () => { this.closePanel(); f.mover.useItem(it.key); };
         acts.appendChild(p);
       }
       row.appendChild(acts);
@@ -1520,9 +1541,9 @@ export class UI {
     }
     // дорожки: «Поставить» закрывает рюкзак и включает «Кладём дорожку» (нажимай на траву);
     // пруды, украшения прудов и постройки — выбирают клетку с предпросмотром (Mover.takeFromBag)
-    if ((it.place === 'path' || it.place === 'pond' || it.place === 'pondDecor' || it.place === 'obj') && n > 0) {
+    if (Mover.placeable(it) && n > 0) {
       const b = h('button', 'btn-s gold', `${this.ic('move')} Поставить`);
-      b.onclick = () => { this.closePanel(); f.mover.use(it.key); };
+      b.onclick = () => { this.closePanel(); f.mover.useItem(it.key); };
       acts.appendChild(b);
     }
     if (acts.children.length) box.appendChild(acts);

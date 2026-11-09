@@ -1,12 +1,10 @@
-// Проверка декора, заборов, поворота и «Убрать всё» (data.js DECOR/FENCES, placed.js, World.js, storeAll.js)
+// Проверка декора, заборов и поворота (data.js DECOR/FENCES, placed.js, World.js; группа «Декор» в storeAll.js)
 // без браузера: node tools/test-decor.mjs
 import assert from 'node:assert/strict';
 import * as P from '../src/game/placed.js';
-import * as A from '../src/game/storeAll.js';
-import * as Ponds from '../src/game/ponds.js';
-import * as Paths from '../src/game/paths.js';
+import * as SA from '../src/game/storeAll.js';
 import { World, N, T, START_CHUNK, CHUNK, CHUNKS, objCells, normRot } from '../src/game/World.js';
-import { DECOR, FENCES, ITEMS, OBJECTS, SHOP, STORE_GROUPS } from '../src/game/data.js';
+import { DECOR, FENCES, ITEMS, OBJECTS, SHOP } from '../src/game/data.js';
 
 let tests = 0;
 const test = (name, fn) => { fn(); tests++; console.log('ok', name); };
@@ -27,8 +25,6 @@ test('таблица: у декора и заборов — объект, пре
   }
   for (const k of Object.keys(FENCES)) { assert.ok(OBJECTS[k].fence && ITEMS[k].brush); assert.equal(P.rotCount(k), 1, 'забор не поворачивается'); }
   for (const [k, d] of Object.entries(DECOR)) assert.equal(P.rotCount(k), d.rot || 1);
-  assert.deepEqual(A.GROUP_KEYS, ['decor', 'paths', 'ponds', 'plants', 'build', 'sprouts']);
-  assert.ok(STORE_GROUPS.find((g) => g.key === 'sprouts').off, 'ростки по умолчанию не убираются');
 });
 
 test('поворот: положения по числу у вещи, в нечётных фигура отражена (gx ↔ gy)', () => {
@@ -88,43 +84,22 @@ test('забор: секции ставятся по одной, убирают�
   assert.equal(st.placed.length, 2);
 });
 
-test('«Убрать всё»: по группам, дом, колодец и грядки остаются, занятое не трогается', () => {
-  const w = world(), st = st0({ items: { decor_bench: 1, fence_wattle: 2, sprinkler_drip: 1, path_sand: 2, pond_small: 1 } });
-  P.placeObj(st, w, 'decor_bench', x0 + 1, y0 + 1, {}, 1);
-  P.placeObj(st, w, 'fence_wattle', x0 + 2, y0 + 1);
-  const busy = P.placeObj(st, w, 'fence_wattle', x0 + 3, y0 + 1).o;
-  P.placeObj(st, w, 'sprinkler_drip', x0 + 5, y0 + 1);
-  Paths.placePath(st, w, 'path_sand', w.idx(x0 + 1, y0 + 5));
-  Paths.placePath(st, w, 'path_sand', w.idx(x0 + 2, y0 + 5));
-  Ponds.placePond(st, w, 'pond_small', x0 + 6, y0 + 6);
-  w.tiles[w.idx(x0 + 8, y0 + 2)] = T.SOIL; // грядка
-  const plant = w.add('apple', x0 + 1, y0 + 8); plant.own = 1; // своё взрослое растение
-  const sprout = w.add('sapling', x0 + 3, y0 + 8); sprout.own = 1; sprout.tree = 'oak'; sprout.born = 0; // росток
-  const house = w.add('house', x0 + 4, y0 + 3);
-  const skip = (q) => q.obj === busy;
-  assert.deepEqual(A.plan(w, skip), { decor: 2, paths: 2, ponds: 1, plants: 1, build: 1, sprouts: 1 });
-  assert.ok(A.leavesNoWater(st, w, ['ponds'], skip), 'колодец не починен, единственный пруд уходит');
-  assert.ok(!A.leavesNoWater(st, w, ['decor'], skip));
-  assert.ok(!A.leavesNoWater({ ...st, well: 1 }, w, ['ponds'], skip), 'колодец починен — вода есть');
-  // только декор и дорожки
-  const r1 = A.storeAll(st, w, ['decor', 'paths'], { now: 0, rng: () => 0.5, skip });
-  assert.equal(r1.n, 4); assert.equal(r1.left, 1); assert.equal(r1.paths, 2);
-  assert.equal(A.summary(r1.by), '2 вещи декора, 2 дорожки');
-  assert.equal(st.items.decor_bench, 1); assert.equal(st.items.fence_wattle, 1); assert.equal(st.items.path_sand, 2);
-  assert.ok(w.objects[busy.id] === busy, 'забор, у которого работает призрачок, на месте');
-  assert.ok(w.objectAt(x0 + 5, y0 + 1), 'поливалка не выбрана — на месте');
-  // остальное
-  const r2 = A.storeAll(st, w, A.GROUP_KEYS.filter((k) => k !== 'sprouts'), { now: 0, rng: () => 0.5 });
-  assert.equal(r2.n, 4, 'забор, поливалка, пруд, яблоня');
-  assert.equal(A.summary(r2.by), '1 вещь декора, 1 пруд, 1 растение, 1 постройка');
-  assert.equal(st.items.sprinkler_drip, 1); assert.equal(st.items.pond_small, 1); assert.equal(st.items.own_apple, 1);
-  assert.ok(w.objects[house.id] === house && w.objects[sprout.id] === sprout, 'дом и росток остались');
-  // ростки — только если отмечены: возвращаются саженцами
-  const r3 = A.storeAll(st, w, ['sprouts'], { now: 0, rng: () => 0.5 });
-  assert.equal(r3.n, 1); assert.equal(st.items.sap_oak, 1); assert.ok(w.objects[sprout.id] !== sprout);
-  assert.equal(w.tiles[w.idx(x0 + 8, y0 + 2)], T.SOIL, 'грядка осталась');
-  assert.deepEqual(st.placed, []);
-  assert.deepEqual(A.plan(w), { decor: 0, paths: 0, ponds: 0, plants: 0, build: 0, sprouts: 0 });
+test('«Убрать всё»: декор и заборы — своя группа, повёрнутая вещь убирается вся, занятое остаётся', () => {
+  const w = world(), st = st0({ items: { decor_park_bench: 1, fence_wattle: 2, sprinkler_drip: 1 } });
+  const bench = P.placeObj(st, w, 'decor_park_bench', x0 + 1, y0 + 1, {}, 1).o;
+  P.placeObj(st, w, 'fence_wattle', x0 + 3, y0 + 1);
+  const busy = P.placeObj(st, w, 'fence_wattle', x0 + 4, y0 + 1).o;
+  const spr = P.placeObj(st, w, 'sprinkler_drip', x0 + 6, y0 + 4).o;
+  assert.equal(SA.groupOf(bench), 'decor'); assert.equal(SA.groupOf(busy), 'decor'); assert.equal(SA.groupOf(spr), 'placed');
+  const ctx = { now: 0, rng: () => 0.5, busy: (q) => q.obj === busy };
+  const list = SA.collect(st, w, ctx);
+  assert.equal(list.decor.list.length, 2); assert.equal(list.decor.kept, 1); assert.equal(list.placed.list.length, 1);
+  const r = SA.storeAll(st, w, ['decor'], ctx);
+  assert.equal(r.total, 2); assert.equal(SA.summary(r.done), '2 вещи декора');
+  assert.equal(st.items.decor_park_bench, 1); assert.equal(st.items.fence_wattle, 1);
+  assert.equal(w.occ[(y0 + 2) * N + x0 + 1], -1, 'вторая клетка повёрнутой скамейки свободна');
+  assert.ok(w.objects[busy.id] === busy && w.objects[spr.id] === spr, 'занятый забор и поливалка на месте');
+  assert.deepEqual(st.placed, [['fence_wattle', x0 + 4, y0 + 1], ['sprinkler_drip', x0 + 6, y0 + 4]]);
 });
 
 console.log(`\nвсе проверки прошли: ${tests}`);

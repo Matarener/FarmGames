@@ -74,6 +74,21 @@ export function storePath(st, w, i) {
   return k;
 }
 
+// Много клеток дорожек — в рюкзак разом («Убрать всё», storeAll.js): st.paths пересчитывается один раз.
+// Клетка без дорожки пропускается; вид, который в рюкзак уже не лезет, остаётся на карте.
+// → { id: сколько клеток легло в рюкзак }
+export function storePaths(st, w, cells) {
+  const got = {};
+  for (const i of cells) {
+    const k = kindAt(w, i);
+    if (!k || !Inv.addItem(st, k, 1)) continue;
+    clear(w, i);
+    got[k] = (got[k] || 0) + 1;
+  }
+  if (Object.keys(got).length) savePaths(st, w);
+  return got;
+}
+
 // Перенести дорожку с клетки from на клетку to (вид сохраняется). → id или null
 export function movePath(st, w, from, to) {
   const k = kindAt(w, from);
