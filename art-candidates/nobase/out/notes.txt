@@ -4,3 +4,13 @@ tree_pine: tree_pine__1.png — OK: clean key, no ground, small tufts, matches r
 bush_rose: bush_rose__1.png — OK: cyan key clean, no ground, roses/buds as in reference.
 stump_oak: stump_oak__2.png — OK. (__1: unkeyed magenta pocket between the right oak leaves.)
 grass_tall_0: grass_tall_0__1.png — FAIL (least bad of 3): magenta specks trapped in small gaps between blades; __2 more specks, __3 pink tint on back blades. Needs a despill / fill of enclosed magenta, or another key colour.
+tree_oak_young: tree_oak_young__1.png — OK: clean key, thick brown outline as in reference, small tufts.
+tree_apple: (pending retry) __1: small unkeyed magenta pocket behind a grass tuft at the trunk foot.
+tree_apple_bare: tree_apple_bare__1.png — OK.
+tree_apple_young: (pending retry) __1: see-through holes in the crown (dark leaves keyed semi-transparent).
+tree_birch: tree_birch__1.png — OK.
+tree_birch_young: tree_birch_young__1.png — OK.
+tree_cherry: tree_cherry__1.png — OK.
+tree_cherry_bare: (pending retry) __1: Codex drew a black background, not keyed.
+tree_cherry_young: tree_cherry_young__1.png — OK.
+tree_linden: tree_linden__1.png — OK.
